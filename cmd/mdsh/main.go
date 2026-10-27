@@ -250,10 +250,16 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 	}
 
+	// The terminal, if there is one, asks the questions and runs blocks
+	// marked tty.
+	tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if ttyErr == nil {
+		defer tty.Close()
+		opts.TTY = tty
+	}
 	if *yes {
 		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
-	} else if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
-		defer tty.Close()
+	} else if tty != nil {
 		p := newPrompter(tty, tty)
 		// The streamed document already shows the code, unless it is
 		// hidden.

@@ -356,3 +356,29 @@ func TestZsh(t *testing.T) {
 		t.Errorf("c stdout = %q, stderr %q", got, r["c"].Stderr)
 	}
 }
+
+func TestTTYWithoutTerminal(t *testing.T) {
+	_, results := runDoc(t, "```sh {#a tty}\necho hi\n```\n```sh {#b}\necho next\n```\n", run.Options{})
+	r := byID(results)
+	if !errors.Is(r["a"].Err, run.ErrNoTTY) || !r["a"].Failed() {
+		t.Errorf("a: err = %v, want ErrNoTTY", r["a"].Err)
+	}
+	if len(r["a"].Stdout) != 0 {
+		t.Errorf("a ran: stdout = %q", r["a"].Stdout)
+	}
+	if got := string(r["b"].Stdout); got != "next\n" {
+		t.Errorf("b stdout = %q", got)
+	}
+}
+
+func TestTTYOutKind(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a tty}\nx\n```\n\n```sh {#b tty out=recording:s/b.gif}\nx\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range d.Blocks {
+		if k := run.OutKind(b); k != "recording" {
+			t.Errorf("%s: OutKind = %q", b.ID, k)
+		}
+	}
+}

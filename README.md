@@ -234,6 +234,8 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 | `on_error=stop` | Stop the run if this block fails |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run) |
+| `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an animated GIF |
+| `frame=N` | With `tty`, the frame a PDF shows (default the last) |
 | `out=markdown` | Insert output as raw markdown |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image: SVG, or PNG if the path ends in `.png` |
@@ -285,6 +287,31 @@ block's output, stderr included if it failed, as soon as it finishes.
 This happens with `-w` too, so you can follow a run as it is written
 back. Without asking, `-w` prints only a status line per block, followed
 by the output and stderr of a block that failed.
+
+## Terminal blocks
+
+Some commands need a terminal: `docker run -it`, `ssh`, `sudo`, an
+editor, a REPL. Mark their block `tty` and mdsh runs it on a terminal,
+passing your keys through:
+
+````markdown
+```sh {#shell tty}
+docker run -it --rm alpine sh
+```
+````
+
+The block still runs in its env's shell, so variables and the working
+directory carry over as usual. Ctrl+c goes to the command, not to mdsh,
+and window resizes are passed on.
+
+mdsh records the session as an [asciinema](https://asciinema.org) cast,
+`<doc>.assets/<block-id>.cast` (or `out=recording:path` with `.cast`),
+and makes an animated GIF from it beside the cast, linked below the
+block, since GitHub and PDFs can't play a cast. A PDF can't animate, so it shows the last frame; set
+`frame=N` to show frame `N` instead, counting from 1.
+
+With no terminal (cron, CI) or with mdsh in the background, a `tty` block
+fails with an error instead of hanging.
 
 ## Conditions
 

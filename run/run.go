@@ -15,8 +15,11 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
 )
 
@@ -53,6 +56,9 @@ type Options struct {
 	// If Confirm is nil, the run stops at the first such block with
 	// ErrNoConfirm, since nobody can answer.
 	Confirm func(*doc.Block) Answer
+	// TTY is the terminal that blocks marked tty run on. If it is nil,
+	// such blocks fail with ErrNoTTY.
+	TTY *os.File
 }
 
 // Answer is a reply to Confirm.
@@ -67,6 +73,9 @@ const (
 // ErrNoConfirm is returned when a block needs confirming and the run has
 // no way to ask.
 var ErrNoConfirm = errors.New("block needs confirmation")
+
+// ErrNoTTY is a tty block's error when the run has no terminal to give it.
+var ErrNoTTY = errors.New("block needs a terminal (tty) and there is none")
 
 // EventKind says what an Event reports.
 type EventKind int
@@ -161,6 +170,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 		Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
 		Dir:  opts.Dir,
 		Args: opts.Args,
+		TTY:  opts.TTY != nil && hasTTY(d),
 	})
 	defer stack.Close()
 
@@ -333,7 +343,22 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	out := io.MultiWriter(&stdout, eventWriter{Stdout, b, emit})
 	errw := io.MultiWriter(&stderr, eventWriter{Stderr, b, emit})
 
-	r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+	var rec *termrec.Recorder
+	switch {
+	case !b.Attrs.Has("tty"):
+		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+	case opts.TTY == nil:
+		err = ErrNoTTY
+	default:
+		// The block talks to the terminal, so its output is a recording
+		// of the session.
+		cols, rows, serr := term.GetSize(int(opts.TTY.Fd()))
+		if serr != nil || cols <= 0 || rows <= 0 {
+			cols, rows = 80, 24
+		}
+		rec = termrec.NewRecorder(cols, rows)
+		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, prelude(b, opts)+b.Body, opts.TTY, rec)
+	}
 	r.Stdout, r.Stderr = stdout.Bytes(), stderr.Bytes()
 	if err != nil && !errors.Is(err, env.ErrExited) {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -344,6 +369,9 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, opts)
+	}
+	if rec != nil && r.Err == nil {
+		r.Image, r.Err = saveRecording(b, rec.Recording(), opts)
 	}
 
 	if len(vars) > 0 && !r.Exited {
@@ -384,16 +412,60 @@ func prelude(b *doc.Block, opts Options) string {
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-// outKind splits the out= attribute: "image:plots/a.png" is ("image", "plots/a.png").
+// outKind splits the out= attribute: "image:plots/a.png" is ("image",
+// "plots/a.png"). A tty block's output is always a recording; out= only
+// picks its path.
 func outKind(b *doc.Block) (kind, arg string) {
 	kind, arg, _ = strings.Cut(b.Attrs["out"], ":")
-	if kind == "" {
+	switch {
+	case b.Attrs.Has("tty"):
+		kind = "recording"
+	case kind == "":
 		kind = "text"
 	}
 	return kind, arg
 }
 
-// OutKind returns the block's output kind: text, markdown, image or screenshot.
+// hasTTY reports whether any block in d may run on the terminal.
+func hasTTY(d *doc.Document) bool {
+	for _, b := range d.Blocks {
+		if Runnable(b) && b.Attrs.Has("tty") {
+			return true
+		}
+	}
+	return false
+}
+
+// saveRecording saves a tty block's session as an asciinema cast and as
+// an animated GIF made from it, and returns the link to the GIF. The cast
+// is a file even with embed=inline, at the GIF's path with a .cast
+// extension, or <doc>.assets/<block id>.cast. A session that showed
+// nothing saves nothing.
+func saveRecording(b *doc.Block, rec termrec.Recording, opts Options) (string, error) {
+	data, err := termrec.GIF(rec)
+	if errors.Is(err, termrec.ErrEmpty) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("recording: %w", err)
+	}
+	_, rel := outKind(b)
+	castRel := ""
+	if rel != "" {
+		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
+	}
+	var cast bytes.Buffer
+	if err := termrec.WriteCast(&cast, rec); err != nil {
+		return "", fmt.Errorf("recording: %w", err)
+	}
+	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes()); err != nil {
+		return "", err
+	}
+	return saveAsset(b, rel, data, "image/gif", ".gif", opts)
+}
+
+// OutKind returns the block's output kind: text, markdown, image,
+// screenshot, or recording for a tty block.
 func OutKind(b *doc.Block) string {
 	k, _ := outKind(b)
 	return k
@@ -420,21 +492,21 @@ func saveImage(b *doc.Block, data []byte, opts Options) (string, error) {
 			data, mime, ext = textimg.SVG(string(data)), "image/svg+xml", ".svg"
 		}
 	}
+	return saveAsset(b, rel, data, mime, ext, opts)
+}
+
+// saveAsset writes a block's image to rel, by default
+// <doc>.assets/<block id><ext>, or makes it a data: URI with
+// embed=inline, and returns the link to it.
+func saveAsset(b *doc.Block, rel string, data []byte, mime, ext string, opts Options) (string, error) {
 	if b.Attrs.Has("embed") && b.Attrs["embed"] == "inline" {
 		return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 	}
 	if rel == "" {
-		base := "mdsh"
-		if opts.File != "" {
-			base = filepath.Base(opts.File)
-		}
-		rel = filepath.ToSlash(filepath.Join(base+".assets", b.ID+ext))
+		rel = defaultAsset(b, ext, opts)
 	}
-	path := filepath.Join(opts.Dir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	path := assetPath(b, rel, ext, opts)
+	if err := writeAsset(path, data); err != nil {
 		return "", err
 	}
 	if opts.LinkDir != "" {
@@ -448,6 +520,32 @@ func saveImage(b *doc.Block, data []byte, opts Options) (string, error) {
 		return filepath.ToSlash(abs), nil
 	}
 	return rel, nil
+}
+
+// defaultAsset is where a block's file goes when nothing says where:
+// <doc>.assets/<block id><ext>, relative to the document.
+func defaultAsset(b *doc.Block, ext string, opts Options) string {
+	base := "mdsh"
+	if opts.File != "" {
+		base = filepath.Base(opts.File)
+	}
+	return filepath.ToSlash(filepath.Join(base+".assets", b.ID+ext))
+}
+
+// assetPath is the file rel names, or the default for b and ext if rel
+// is empty.
+func assetPath(b *doc.Block, rel, ext string, opts Options) string {
+	if rel == "" {
+		rel = defaultAsset(b, ext, opts)
+	}
+	return filepath.Join(opts.Dir, filepath.FromSlash(rel))
+}
+
+func writeAsset(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 func sniffImage(data []byte) (mime, ext string) {

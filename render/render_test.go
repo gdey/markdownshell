@@ -1,6 +1,7 @@
 package render
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gdey/markdownshell/doc"
@@ -113,6 +114,20 @@ func TestPieces(t *testing.T) {
 	for i := range want {
 		if string(pieces[i]) != want[i] {
 			t.Errorf("piece %d = %q, want %q", i, pieces[i], want[i])
+		}
+	}
+}
+
+func TestRecordingLink(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a tty}\nx\n```\n\n```sh {#b tty frame=3}\nx\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []string{"![a](d.md.assets/a.gif)\n", "![b](d.md.assets/b.gif#frame=3)\n"} {
+		b := d.Blocks[i]
+		r := &run.Result{Block: b, Ran: true, Image: "d.md.assets/" + b.ID + ".gif"}
+		if got := Output(r, false); !strings.Contains(got, want) {
+			t.Errorf("%s: output %q, want %q in it", b.ID, got, want)
 		}
 	}
 }

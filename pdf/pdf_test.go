@@ -9,8 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
 )
 
@@ -99,4 +101,54 @@ func TestRenderInclude(t *testing.T) {
 	if _, err := Render([]byte(md), Options{}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestLoadGIFFrame(t *testing.T) {
+	dir := t.TempDir()
+	data, err := termrec.GIF(termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{
+		{At: 0, Data: []byte("first")},
+		{At: time.Second, Data: []byte("\x1b[2J\x1b[Hsecond")},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "s.gif"), data, 0o644)
+	r := &renderer{dir: dir}
+	for _, tt := range []struct {
+		dest  string
+		frame int
+	}{{"s.gif", 0}, {"s.gif#frame=1", 1}, {"s.gif#frame=2", 2}, {"s.gif#frame=9", 0}} {
+		got, typ := r.load(tt.dest)
+		if typ != "PNG" {
+			t.Fatalf("%s: type %q, want a PNG of one frame", tt.dest, typ)
+		}
+		img, err := png.Decode(bytes.NewReader(got))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _ := termrec.Frame(data, tt.frame)
+		if !sameImage(img, double(want)) {
+			t.Errorf("%s: not frame %d", tt.dest, tt.frame)
+		}
+	}
+	first, _ := termrec.Frame(data, 1)
+	if last, _ := termrec.Frame(data, 0); sameImage(first, last) {
+		t.Fatal("frames are the same; the test can't tell them apart")
+	}
+}
+
+func sameImage(a, b image.Image) bool {
+	if a.Bounds() != b.Bounds() {
+		return false
+	}
+	for y := a.Bounds().Min.Y; y < a.Bounds().Max.Y; y++ {
+		for x := a.Bounds().Min.X; x < a.Bounds().Max.X; x++ {
+			r1, g1, b1, _ := a.At(x, y).RGBA()
+			r2, g2, b2, _ := b.At(x, y).RGBA()
+			if r1 != r2 || g1 != g2 || b1 != b2 {
+				return false
+			}
+		}
+	}
+	return true
 }
