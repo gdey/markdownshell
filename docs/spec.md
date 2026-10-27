@@ -112,6 +112,7 @@ Two modes share one engine: execute mode runs the whole file and prints markdown
 | `mdsh --hide-code doc.md` | Prose and output only | No |
 | `mdsh --hide-output doc.md` | Prose and code only | No |
 | `mdsh --hide-code --hide-output doc.md` | Prose only; nothing runs | No |
+| `mdsh --no-run doc.md` (or `-n`) | Prose, code and the output saved in the file; nothing runs. Combines with `--hide-code` and `--hide-output`; `-o out.md` saves the printout to `out.md` (plain markdown), `-w` is an error | No |
 | `mdsh -w doc.md` | Progress on stderr | Yes: output rewritten |
 | `mdsh -o out.md doc.md` | Progress on stderr | No; writes what `-w` would to `out.md` (new files get the input's mode; image links are relative to `out.md`) |
 | `mdsh --only build doc.md` | That block, plus earlier blocks in its env chain so its state exists | Per flags |

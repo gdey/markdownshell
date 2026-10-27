@@ -105,3 +105,55 @@ func TestIncludeExample(t *testing.T) {
 		t.Errorf("examples/include.md is stale; run mdsh -w on it. Got:\n%s", got)
 	}
 }
+
+func TestNoRun(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "d.md")
+	marker := filepath.Join(dir, "ran")
+	src := "# T\n\n```sh {#a}\ntouch " + marker + "\necho fresh-output\n```\n\n```output {for=a exit=0}\nsaved-output\n```\n"
+	os.WriteFile(f, []byte(src+"\n```sh {<include file=inc.sh}\nstale-line\n```\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "inc.sh"), []byte("included-line\n"), 0o644)
+
+	for _, tc := range []struct {
+		flags      []string
+		want, nope []string
+	}{
+		{[]string{"-n"}, []string{"# T", "touch", "saved-output", "included-line"}, []string{"```\nfresh-output", "stale-line"}},
+		{[]string{"--no-run", "--hide-code"}, []string{"# T", "saved-output"}, []string{"touch"}},
+		{[]string{"--no-run", "--hide-output"}, []string{"# T", "touch"}, []string{"saved-output"}},
+	} {
+		var out, errb bytes.Buffer
+		if rc := mdsh(append(tc.flags, "--no-color", f), nil, &out, &errb); rc != 0 {
+			t.Fatalf("%v: rc = %d, stderr %s", tc.flags, rc, errb.String())
+		}
+		for _, w := range tc.want {
+			if !strings.Contains(out.String(), w) {
+				t.Errorf("%v: missing %q:\n%s", tc.flags, w, out.String())
+			}
+		}
+		for _, w := range tc.nope {
+			if strings.Contains(out.String(), w) {
+				t.Errorf("%v: has %q:\n%s", tc.flags, w, out.String())
+			}
+		}
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("a block ran")
+	}
+	if rc := mdsh([]string{"-n", "-w", f}, nil, &bytes.Buffer{}, &bytes.Buffer{}); rc != 2 {
+		t.Errorf("-n -w: rc = %d, want 2", rc)
+	}
+	var printed bytes.Buffer
+	mdsh([]string{"-n", "--hide-code", "--no-color", f}, nil, &printed, &bytes.Buffer{})
+	copyFile := filepath.Join(dir, "copy.md")
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"-n", "--hide-code", "-o", copyFile, f}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("-n -o: rc = %d, stderr %s", rc, errb.String())
+	}
+	if got, _ := os.ReadFile(copyFile); out.Len() != 0 || string(got) != printed.String() {
+		t.Errorf("-n -o wrote:\n%s\nwant what -n prints:\n%s", got, printed.String())
+	}
+	if b, _ := os.ReadFile(f); !strings.HasPrefix(string(b), src) || strings.Contains(string(b), "included-line") {
+		t.Errorf("file changed:\n%s", b)
+	}
+}
