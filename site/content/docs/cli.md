@@ -10,6 +10,8 @@ weight: 50
 | `mdsh --hide-code doc.md` | Prose and output | No |
 | `mdsh --hide-output doc.md` | Prose and code | No |
 | `mdsh --hide-code --hide-output doc.md` | Prose only; nothing runs | No |
+| `mdsh --no-run doc.md` (or `-n`) | Prose, code and the output saved by `-w`; nothing runs | No |
+| `mdsh -n -o view.md doc.md` | Nothing; saves what `-n` prints to `view.md` | No |
 | `mdsh -w doc.md` | Progress on stderr | Yes: output rewritten |
 | `mdsh -o out.md doc.md` | Progress on stderr | No; writes what `-w` would to `out.md` |
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |

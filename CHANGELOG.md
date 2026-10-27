@@ -14,6 +14,9 @@ follow [Semantic Versioning](https://semver.org/).
   markdown file executable; extra arguments reach blocks as `$1`, `$2`, …
 - `-w` writes output back into the file; `-o out.md` writes it to another
   file instead. Writing back twice gives the same file.
+- `--no-run` (`-n`) prints the document with the output saved in it by
+  `-w`, without running anything. It combines with `--hide-code` and
+  `--hide-output`, and `-o out.md` saves the printout to a file.
 - `--hide-code`, `--hide-output` (both: prose only, nothing runs),
   `--only BLOCK`, `--stop-on-error`, `--yes`, `-` to read from stdin.
 - Styled terminal output with `--color=auto|always|never`, `--no-color`

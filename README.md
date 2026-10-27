@@ -175,6 +175,8 @@ mdsh -o out.md notes.md    # same, but into out.md; notes.md is untouched
 mdsh --hide-code notes.md  # prose and output only
 mdsh --hide-output notes.md
 mdsh --hide-code --hide-output notes.md   # prose only, nothing runs
+mdsh -n notes.md           # print with the output saved by -w; nothing runs
+mdsh -n -o view.md notes.md  # save that printout to view.md instead
 mdsh --only greet notes.md # one block, plus what it depends on
 mdsh --yes notes.md        # run confirm blocks without asking
 ```

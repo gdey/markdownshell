@@ -85,6 +85,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 	hideCode := fs.Bool("hide-code", false, "print prose and output, not runnable code blocks")
 	hideOutput := fs.Bool("hide-output", false, "print prose and code, not output (blocks still run unless --hide-code is also set)")
+	var noRun bool
+	fs.BoolVar(&noRun, "no-run", false, "print the document with the output saved in it, without running any block (-o saves the printout)")
+	fs.BoolVar(&noRun, "n", false, "short for --no-run")
 	write := fs.Bool("w", false, "write output back into the file instead of printing")
 	outFile := fs.String("o", "", "like -w, but write to this file and leave the input alone")
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
@@ -121,6 +124,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if *outFile != "" {
 		*write, target = true, *outFile
 	}
+	if noRun && *outFile == "" && *write {
+		return errors.New("--no-run can't be used with -w; use -o to save what it prints")
+	}
 	if target == "-" && *write {
 		return errors.New("-w needs a file, not stdin; use -o to name one")
 	}
@@ -143,10 +149,19 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 	styled := *color == "always" || (*color == "auto" && isTerminal(stdout) && os.Getenv("NO_COLOR") == "")
 
-	// Both hidden: print the prose only, without running anything.
-	if *hideCode && *hideOutput && !*write {
+	// Nothing to run, or nowhere to show what it printed: print the
+	// document with the output already saved in it. Include blocks are
+	// still filled in, since reading a file runs nothing. -o saves what
+	// would be printed, unstyled.
+	if noRun || (*hideCode && *hideOutput && !*write) {
 		results := run.Includes(d, run.Options{File: file})
-		if err := print(stdout, render.Prose(d, results, os.Environ()), styled); err != nil {
+		out := render.Markdown(d, results, render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()})
+		if *outFile != "" {
+			err = writeFile(*outFile, out, 0o644)
+		} else {
+			err = print(stdout, out, styled)
+		}
+		if err != nil {
 			return err
 		}
 		for _, r := range results {

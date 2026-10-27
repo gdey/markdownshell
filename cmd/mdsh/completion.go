@@ -87,7 +87,7 @@ _mdsh() {
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output -w -o --only --stop-on-error --yes --color --no-color -i --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --only --stop-on-error --yes --color --no-color -i --version -h" -- "$cur"))
 		return
 	fi
 
@@ -129,6 +129,7 @@ _mdsh() {
 	_arguments -s \
 		'--hide-code[print prose and output, not runnable code]' \
 		'--hide-output[print prose and code, not output]' \
+		'(--no-run -n)'{--no-run,-n}'[print saved output without running anything]' \
 		'-w[write output back into the file]' \
 		'-o[write the -w result to this file]:output file:_files' \
 		'--only[run only this block and what it needs]:block:_mdsh_blocks' \
