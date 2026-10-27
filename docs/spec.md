@@ -31,6 +31,7 @@ title: Build notes
 mdsh:
   shell: /bin/sh
   on_error: continue
+  step: false
   interpolate: true
   show_stderr: false
   env:
@@ -120,7 +121,7 @@ Two modes share one engine: execute mode runs the whole file and prints markdown
 | `mdsh completion bash\|zsh` | A completion script: flags, `.md` files, block ids after `--only` | No |
 | `mdsh -i doc.md` | TUI (v2, not built yet) | Yes, as blocks run |
 
-- `confirm` blocks: before running one, mdsh shows its code on the terminal (`/dev/tty`, so piping output still works) and asks `[r]un / [s]top`, using the attribute's value as the question if given. Enter means stop. Stopping leaves the block and everything after it unrun, keeps their old output, and exits 0. With no terminal, the run stops at the block with an error unless `--yes` is passed. The TUI will ask the same question in its own UI.
+- `confirm` blocks: before running one, mdsh shows its code on the terminal (`/dev/tty`, so piping output still works) and asks `[r]un / s[k]ip / [o]nly run blocks without saved output / [s]top`, using the attribute's value as the question if given. Skip leaves the block unrun with its old output and goes on. `o` skips the block and, for the rest of the run, every asked-about block that has saved output, without asking; other blocks are still asked about. Enter means stop. Stopping leaves the block and everything after it unrun, keeps their old output, and exits 0. `--step` or front matter `step: true` asks before every block that would run, as if each were marked `confirm`. With no terminal, the run stops at the block with an error unless `--yes` is passed. The TUI will ask the same question in its own UI.
 - `--hide-code` hides runnable blocks only; other code blocks are part of the prose.
 - `--color=auto|always|never` controls styling, default `auto`. Auto styles only when stdout is a terminal and `NO_COLOR` is unset; otherwise it prints plain markdown. `--no-color` is short for `--color=never`.
 - Execute mode writes to stdout, so `mdsh doc.md > report.md` gives a rendered report.

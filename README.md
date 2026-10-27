@@ -180,6 +180,7 @@ mdsh -n -o view.md notes.md  # save that printout to view.md instead
 mdsh --pdf notes.pdf notes.md   # what it would print, as a PDF
 mdsh --only greet notes.md # one block, plus what it depends on
 mdsh --yes notes.md        # run confirm blocks without asking
+mdsh --step notes.md       # ask before every block: run, skip or stop
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -231,7 +232,7 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent (default all; empty for none) |
 | `on_error=stop` | Stop the run if this block fails |
-| `confirm[="question"]` | Show the block and ask whether to run it or stop the run |
+| `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run) |
 | `out=markdown` | Insert output as raw markdown |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
@@ -259,11 +260,23 @@ shows each option.
 ## Confirming blocks
 
 A block marked `confirm` pauses the run: mdsh shows its code and asks
-`Run this block? [r]un / [s]top` (or your own question, from
-`confirm="Deploy to prod?"`). Pressing enter stops, which is the safe
-choice. The prompt goes to the terminal, so it works even when output is
-piped. With no terminal to ask on, the run stops there with an error
-unless you pass `--yes`.
+`Run this block? [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top`,
+or your own question from `confirm="Deploy to prod?"`.
+
+- `r` runs the block.
+- `k` skips it and goes on. A skipped block keeps any output already saved
+  in the file.
+- `o` skips this block and every later one that already has saved output,
+  and runs the rest. Blocks without saved output are still asked about.
+  The prompt says `(has saved output)` when a block has some.
+- `s`, or just enter, stops the run there. This is the safe choice.
+
+The prompt goes to the terminal, so it works even when output is piped.
+With no terminal, the run stops there with an error unless you pass `--yes`.
+
+To step through a whole document this way, pass `--step` or set
+`step: true` under `mdsh:` in the front matter. Every block that would run
+is then asked about, as if it were marked `confirm`.
 
 ## Conditions
 

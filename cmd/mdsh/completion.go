@@ -87,7 +87,7 @@ _mdsh() {
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --only --stop-on-error --yes --color --no-color -i --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --only --stop-on-error --yes --step --color --no-color -i --version -h" -- "$cur"))
 		return
 	fi
 
@@ -136,6 +136,7 @@ _mdsh() {
 		'--only[run only this block and what it needs]:block:_mdsh_blocks' \
 		'--stop-on-error[stop at the first failing block]' \
 		'--yes[run confirm blocks without asking]' \
+		'--step[ask before running each block]' \
 		'--color[style printed markdown]:when:(auto always never)' \
 		'--no-color[same as --color=never]' \
 		'-i[interactive mode]' \

@@ -61,6 +61,9 @@ type Document struct {
 	Sections []*Section
 }
 
+// HasOutput reports whether output is already saved after b in the file.
+func (b *Block) HasOutput() bool { return b.Output.End > b.Output.Start }
+
 // Block returns the block with the given id, or nil.
 func (d *Document) Block(id string) *Block {
 	for _, b := range d.Blocks {

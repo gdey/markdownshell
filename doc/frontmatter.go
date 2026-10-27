@@ -15,6 +15,9 @@ type Options struct {
 	Shell string `yaml:"shell"`
 	// OnError is "continue" (default) or "stop".
 	OnError string `yaml:"on_error"`
+	// Step asks before running each block, as if every block had the
+	// confirm attribute.
+	Step bool `yaml:"step"`
 	// Interpolate turns {{#block/env(VAR)}} placeholders on or off.
 	// Defaults to on.
 	Interpolate *bool `yaml:"interpolate"`

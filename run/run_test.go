@@ -244,7 +244,7 @@ func TestConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run1 := func(confirm func(*doc.Block) bool) ([]*run.Result, error) {
+	run1 := func(confirm func(*doc.Block) run.Answer) ([]*run.Result, error) {
 		return run.Run(context.Background(), d, run.Options{Dir: t.TempDir(), Confirm: confirm})
 	}
 
@@ -258,16 +258,50 @@ func TestConfirm(t *testing.T) {
 	}
 
 	var asked string
-	results, err = run1(func(b *doc.Block) bool { asked = b.Attrs["confirm"]; return false })
+	results, err = run1(func(b *doc.Block) run.Answer { asked = b.Attrs["confirm"]; return run.Stop })
 	r = byID(results)
 	if err != nil || asked != "Ship it?" || r["deploy"].Ran || !r["deploy"].Declined || r["after"].Ran {
 		t.Errorf("declined: err=%v asked=%q deploy=%+v after=%v", err, asked, r["deploy"], r["after"].Ran)
 	}
 
-	results, err = run1(func(*doc.Block) bool { return true })
+	results, err = run1(func(*doc.Block) run.Answer { return run.Go })
 	r = byID(results)
 	if err != nil || !r["deploy"].Ran || !r["after"].Ran {
 		t.Errorf("accepted: err=%v deploy=%v after=%v", err, r["deploy"].Ran, r["after"].Ran)
+	}
+
+	results, err = run1(func(*doc.Block) run.Answer { return run.Skip })
+	r = byID(results)
+	if err != nil || r["deploy"].Ran || !r["deploy"].Skipped || r["deploy"].Declined || !r["after"].Ran {
+		t.Errorf("skipped: err=%v deploy=%+v after=%v", err, r["deploy"], r["after"].Ran)
+	}
+}
+
+func TestStep(t *testing.T) {
+	body := "```sh {#a}\necho a\n```\n```sh {#b}\necho b\n```\n```md\nnot run\n```\n```sh {#c skip}\necho c\n```\n"
+	for name, tc := range map[string]struct {
+		src  string
+		step bool
+	}{
+		"option":       {body, true},
+		"front matter": {"---\nmdsh:\n  step: true\n---\n" + body, false},
+	} {
+		d, err := doc.Parse([]byte(tc.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var asked []string
+		results, err := run.Run(context.Background(), d, run.Options{Dir: t.TempDir(), Step: tc.step, Confirm: func(b *doc.Block) run.Answer {
+			asked = append(asked, b.ID)
+			if b.ID == "a" {
+				return run.Skip
+			}
+			return run.Go
+		}})
+		r := byID(results)
+		if err != nil || strings.Join(asked, ",") != "a,b" || r["a"].Ran || !r["b"].Ran {
+			t.Errorf("%s: err=%v asked=%v a=%v b=%v", name, err, asked, r["a"].Ran, r["b"].Ran)
+		}
 	}
 }
 

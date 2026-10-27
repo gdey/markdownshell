@@ -4,22 +4,56 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/run"
 )
 
 func TestConfirmPrompt(t *testing.T) {
 	b := &doc.Block{ID: "deploy", Body: "echo hi\n", Attrs: doc.Attrs{"confirm": ""}}
-	for in, want := range map[string]bool{"r\n": true, "yes\n": true, "\n": false, "s\n": false, "huh\nrun\n": true, "": false} {
+	for in, want := range map[string]run.Answer{
+		"r\n": run.Go, "yes\n": run.Go, "\n": run.Stop, "s\n": run.Stop, "huh\nrun\n": run.Go, "": run.Stop,
+		"k\n": run.Skip, "skip\n": run.Skip, "o\n": run.Go,
+	} {
 		var out bytes.Buffer
-		if got := confirm(strings.NewReader(in), &out, b); got != want {
+		if got := newPrompter(strings.NewReader(in), &out).confirm(b); got != want {
 			t.Errorf("input %q: got %v, want %v", in, got, want)
 		}
 		if !strings.Contains(out.String(), "echo hi") || !strings.Contains(out.String(), "Run this block?") {
 			t.Errorf("prompt = %q", out.String())
 		}
+	}
+}
+
+func TestConfirmSkipSaved(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a}\necho a\n```\n\n```output {for=a exit=0}\na\n```\n\n```sh {#b}\necho b\n```\n\n```sh {#c}\necho c\n```\n\n```output {for=c exit=0}\nc\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	p := newPrompter(strings.NewReader("o\nr\n"), &out)
+	var got []run.Answer
+	for _, b := range d.Blocks {
+		got = append(got, p.confirm(b))
+	}
+	if want := []run.Answer{run.Skip, run.Go, run.Skip}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if !strings.Contains(out.String(), "block a (has saved output)") || !strings.Contains(out.String(), "block c: skipped") {
+		t.Errorf("prompt = %q", out.String())
+	}
+}
+
+func TestStepFlag(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "d.md")
+	os.WriteFile(f, []byte("```sh {#a}\necho a\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"--step", "--yes", "--no-color", f}, nil, &out, &errb); rc != 0 || !strings.Contains(out.String(), "```output") {
+		t.Errorf("rc = %d, stdout %s, stderr %s", rc, out.String(), errb.String())
 	}
 }
 
