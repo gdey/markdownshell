@@ -1,0 +1,239 @@
+package doc
+
+import (
+	_ "embed"
+	"reflect"
+	"testing"
+)
+
+func TestParseInfo(t *testing.T) {
+	tests := []struct {
+		info  string
+		lang  string
+		attrs Attrs
+	}{
+		{"sh", "sh", Attrs{}},
+		{"", "", Attrs{}},
+		{"sh {#build env=build share=A,B skip}", "sh", Attrs{"#": "build", "env": "build", "share": "A,B", "skip": ""}},
+		{"sh{#x}", "sh", Attrs{"#": "x"}},
+		{"{.sh #x}", "sh", Attrs{"#": "x"}},
+		{`sh {#x title="a b \"c\""}`, "sh", Attrs{"#": "x", "title": `a b "c"`}},
+	}
+	for _, tt := range tests {
+		lang, attrs := ParseInfo(tt.info)
+		if lang != tt.lang || !reflect.DeepEqual(attrs, tt.attrs) {
+			t.Errorf("ParseInfo(%q) = %q, %v; want %q, %v", tt.info, lang, attrs, tt.lang, tt.attrs)
+		}
+	}
+}
+
+func TestAttrsList(t *testing.T) {
+	a := Attrs{"share": "A, B,", "none": ""}
+	if got := a.List("share"); !reflect.DeepEqual(got, []string{"A", "B"}) {
+		t.Errorf("List(share) = %v", got)
+	}
+	if got := a.List("none"); got == nil || len(got) != 0 {
+		t.Errorf("List(none) = %#v, want empty non-nil", got)
+	}
+	if got := a.List("missing"); got != nil {
+		t.Errorf("List(missing) = %#v, want nil", got)
+	}
+}
+
+//go:embed testdata/sample.md
+var sample string
+
+func TestParse(t *testing.T) {
+	d, err := Parse([]byte(sample))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Shebang != "#!/usr/bin/env mdsh" {
+		t.Errorf("Shebang = %q", d.Shebang)
+	}
+	if d.Options.Shell != "/bin/bash" || d.Options.OnError != "stop" || !reflect.DeepEqual(d.Options.Env.Share, []string{"PATH"}) {
+		t.Errorf("Options = %+v", d.Options)
+	}
+	if len(d.Blocks) != 3 {
+		t.Fatalf("got %d blocks, want 3", len(d.Blocks))
+	}
+
+	a := d.Blocks[0]
+	if a.ID != "a" || a.Lang != "sh" || a.Body != "echo a\n" {
+		t.Errorf("block a = %+v", a)
+	}
+	if got := string(d.Src[a.Output.Start:a.Output.End]); got != "\n```output {for=a exit=0}\na\n```\n" {
+		t.Errorf("a output = %q", got)
+	}
+
+	b := d.Blocks[1]
+	if b.ID != "block-2" || b.Body != "echo '```'\n" {
+		t.Errorf("block 2 = %+v", b)
+	}
+	if got := string(d.Src[b.Output.Start:b.Output.End]); got != "\n<!-- mdsh:output for=\"block-2\" -->\n| x |\n<!-- /mdsh:output -->\n" {
+		t.Errorf("block-2 output = %q", got)
+	}
+
+	g := d.Blocks[2]
+	if g.Lang != "go" || g.Body != "x := 1\n" {
+		t.Errorf("indented block = %+v", g)
+	}
+	if g.Output.Start != g.Output.End {
+		t.Errorf("go block should have no output")
+	}
+}
+
+func TestParseDuplicateID(t *testing.T) {
+	_, err := Parse([]byte("```sh {#a}\n```\n```sh {#a}\n```\n"))
+	if err == nil {
+		t.Fatal("want error for duplicate id")
+	}
+}
+
+func TestParseUnclosed(t *testing.T) {
+	d, err := Parse([]byte("```sh\necho hi\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Blocks) != 1 || d.Blocks[0].Body != "echo hi\n" || d.Blocks[0].Span.End != len(d.Src) {
+		t.Fatalf("blocks = %+v", d.Blocks)
+	}
+}
+
+func TestParseNoFrontMatter(t *testing.T) {
+	// A thematic break with no closing line is not front matter.
+	d, err := Parse([]byte("---\n# hi\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.FrontMatter.End != 0 {
+		t.Errorf("FrontMatter = %+v", d.FrontMatter)
+	}
+}
+
+func TestParseBadOnError(t *testing.T) {
+	if _, err := Parse([]byte("---\nmdsh:\n  on_error: maybe\n---\n")); err == nil {
+		t.Fatal("want error")
+	}
+}
+
+func TestPlaceholders(t *testing.T) {
+	src := "```sh {#setup}\nexport G=hi\n```\n\n" +
+		"Say {{#setup/env(G)}} and {{#setup/env(G):\"old \\\"q\\\"\"}}, not `{{#setup/env(G)}}`.\n\n" +
+		"```sh\necho {{#setup/env(G)}}\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Placeholders) != 2 {
+		t.Fatalf("got %d placeholders, want 2: %+v", len(d.Placeholders), d.Placeholders)
+	}
+	p0, p1 := d.Placeholders[0], d.Placeholders[1]
+	if p0.BlockID != "setup" || p0.Var != "G" || p0.HasValue {
+		t.Errorf("p0 = %+v", p0)
+	}
+	if !p1.HasValue || p1.Value != `old "q"` {
+		t.Errorf("p1 = %+v", p1)
+	}
+	if got := p1.Source("a\"b\\c\nd"); got != `{{#setup/env(G):"a\"b\\c\nd"}}` {
+		t.Errorf("Source = %s", got)
+	}
+}
+
+func TestPlaceholderUnknownBlock(t *testing.T) {
+	if _, err := Parse([]byte("{{#nope/env(X)}}\n")); err == nil {
+		t.Fatal("want error")
+	}
+}
+
+func TestPlaceholdersOff(t *testing.T) {
+	d, err := Parse([]byte("---\nmdsh:\n  interpolate: false\n---\n{{#nope/env(X)}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Placeholders) != 0 {
+		t.Errorf("placeholders = %v", d.Placeholders)
+	}
+}
+
+func TestParseCond(t *testing.T) {
+	look := func(r Ref) (string, bool) {
+		return map[Ref]string{{Var: "ON"}: "1", {Var: "?"}: "0", {Var: "err?"}: "0", {BlockID: "d", Var: "?"}: "2", {BlockID: "d", Var: "err?"}: "2", {Var: "ran?"}: "true", {BlockID: "d", Var: "ran?"}: "true", {Var: "OFF"}: "no", {BlockID: "d", Var: "OS"}: "Linux"}[r], true
+	}
+	for s, want := range map[string]bool{
+		"": true, "true": true, "false": false, "0": false,
+		"{{$ON}}": true, "{{$OFF}}": false, "{{$MISSING}}": false, "!{{$OFF}}": true,
+		"{{#d/env(OS)}}==Linux": true, "{{#d/env(OS)}}==Darwin": false, "{{#d/env(OS)}}!=Darwin": true,
+		"{{$?}}==0": true, "{{$?}}": false, "{{#d/?}}!=0": true,
+		"{{$err?}}": false, "{{#d/err?}}": true, "{{$ran?}}": true, "!{{#d/ran?}}": false,
+	} {
+		c, err := ParseCond(s)
+		if err != nil {
+			t.Errorf("ParseCond(%q): %v", s, err)
+			continue
+		}
+		if got := c.Eval(look); got != want {
+			t.Errorf("%q = %v, want %v", s, got, want)
+		}
+	}
+	for _, bad := range []string{"DEBUG", "{{DEBUG}}", "!{{$X}}==1", "maybe", "{{#d/??}}", "{{$??}}", "{{$ran}}?", "{{#d/env(ran?)}}"} {
+		if _, err := ParseCond(bad); err == nil {
+			t.Errorf("ParseCond(%q) should fail", bad)
+		}
+	}
+}
+
+func TestParseSections(t *testing.T) {
+	src := "a\n<!-- mdsh:if {{$X}} -->\nb\n<!-- mdsh:if !{{$Y}} -->\nc\n<!-- mdsh:end -->\n<!-- mdsh:end -->\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Sections) != 2 || d.Sections[0].End.Start <= d.Sections[1].End.Start {
+		t.Fatalf("sections = %+v", d.Sections)
+	}
+	for _, bad := range []string{
+		"<!-- mdsh:if {{$X}} -->\n",
+		"<!-- mdsh:end -->\n",
+		"<!-- mdsh:if X -->\n<!-- mdsh:end -->\n",
+		"```sh {#a show=nope}\n```\n",
+		"```sh {#a run={{#zz/env(X)}}}\n```\n",
+	} {
+		if _, err := Parse([]byte(bad)); err == nil {
+			t.Errorf("Parse(%q) should fail", bad)
+		}
+	}
+}
+
+func TestCallerPlaceholder(t *testing.T) {
+	d, err := Parse([]byte("hi {{$USER}} and {{$HOME:\"/h\"}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Placeholders) != 2 || d.Placeholders[0].Var != "USER" || d.Placeholders[0].BlockID != "" || d.Placeholders[1].Value != "/h" {
+		t.Fatalf("placeholders = %+v %+v", d.Placeholders[0], d.Placeholders[1])
+	}
+	if got := d.Placeholders[1].Source("/x"); got != `{{$HOME:"/x"}}` {
+		t.Errorf("Source = %s", got)
+	}
+}
+
+func TestStatusPlaceholder(t *testing.T) {
+	d, err := Parse([]byte("```sh {#a}\n```\n{{$?}} {{#a/?:\"3\"}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Placeholders) != 2 {
+		t.Fatalf("placeholders = %+v", d.Placeholders)
+	}
+	p0, p1 := d.Placeholders[0], d.Placeholders[1]
+	if p0.Ref != (Ref{Var: Status}) || p1.Ref != (Ref{BlockID: "a", Var: Status}) || p1.Value != "3" {
+		t.Errorf("got %+v, %+v", p0, p1)
+	}
+	if got := p1.Source("0"); got != `{{#a/?:"0"}}` {
+		t.Errorf("Source = %s", got)
+	}
+	if _, err := Parse([]byte("{{#zz/?}}\n")); err == nil {
+		t.Error("want error for unknown block")
+	}
+}
