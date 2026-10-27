@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `--pdf FILE` lays out what mdsh would print as a PDF, in pure Go. The
+  hide flags, `--only` and the rest apply; with `-w` or `-o` the markdown
+  is written as well. `--pdf -` writes the PDF to stdout.
+  [examples/report.md](examples/report.md) shows it off, and
+  [examples/pdf](examples/pdf) holds PDFs of the examples.
 - `mdsh` command: runs the `sh` blocks in a markdown file top to bottom and
   prints the markdown with each block's output below it. `mdsh file.md`
   is short for `mdsh run file.md`, so `#!/usr/bin/env mdsh` makes a

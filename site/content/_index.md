@@ -43,6 +43,8 @@ hello, world
   parts on with conditions like `{{$DEBUG}}`.
 - **Prose that quotes results.** Placeholders such as
   `{{#setup/env(NAME)}}` show the value a block left behind.
+- **PDF reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
+  Go. See [PDF output]({{< relref "docs/pdf" >}}) for an example.
 - **Executable files.** With a `#!/usr/bin/env mdsh` shebang, `./notes.md`
   just runs.
 

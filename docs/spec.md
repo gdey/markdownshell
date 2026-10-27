@@ -115,6 +115,7 @@ Two modes share one engine: execute mode runs the whole file and prints markdown
 | `mdsh --no-run doc.md` (or `-n`) | Prose, code and the output saved in the file; nothing runs. Combines with `--hide-code` and `--hide-output`; `-o out.md` saves the printout to `out.md` (plain markdown), `-w` is an error | No |
 | `mdsh -w doc.md` | Progress on stderr | Yes: output rewritten |
 | `mdsh -o out.md doc.md` | Progress on stderr | No; writes what `-w` would to `out.md` (new files get the input's mode; image links are relative to `out.md`) |
+| `mdsh --pdf doc.pdf doc.md` | Nothing; what it would print is laid out as `doc.pdf` (`-` for stdout). Hide flags and `--only` apply | No; with `-w` or `-o` those files are written too |
 | `mdsh --only build doc.md` | That block, plus earlier blocks in its env chain so its state exists | Per flags |
 | `mdsh completion bash\|zsh` | A completion script: flags, `.md` files, block ids after `--only` | No |
 | `mdsh -i doc.md` | TUI (v2, not built yet) | Yes, as blocks run |

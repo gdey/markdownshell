@@ -25,6 +25,17 @@ func TestSVG(t *testing.T) {
 	}
 }
 
+func TestFromSVG(t *testing.T) {
+	in := "a < b & c\n\n  x"
+	got, ok := FromSVG(SVG(in))
+	if !ok || got != in {
+		t.Errorf("FromSVG = %q, %v; want %q", got, ok, in)
+	}
+	if _, ok := FromSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg"><text y="10">hi</text></svg>`)); ok {
+		t.Error("FromSVG accepted an SVG it didn't make")
+	}
+}
+
 func TestPNG(t *testing.T) {
 	b, err := PNG("hello\nworld")
 	if err != nil {

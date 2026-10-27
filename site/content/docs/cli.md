@@ -14,6 +14,7 @@ weight: 50
 | `mdsh -n -o view.md doc.md` | Nothing; saves what `-n` prints to `view.md` | No |
 | `mdsh -w doc.md` | Progress on stderr | Yes: output rewritten |
 | `mdsh -o out.md doc.md` | Progress on stderr | No; writes what `-w` would to `out.md` |
+| `mdsh --pdf doc.pdf doc.md` | Nothing; lays out what it would print as `doc.pdf` | No; with `-w` or `-o` it writes those too |
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
 | `mdsh completion bash\|zsh` | A completion script | No |
@@ -25,5 +26,8 @@ weight: 50
 - `-` reads from stdin: `cat doc.md | mdsh -`.
 - Execute mode writes to stdout, so `mdsh doc.md > report.md` gives a
   rendered report.
+- `--pdf` respects `--hide-code`, `--hide-output`, `--only` and the rest:
+  the PDF shows what would be printed. `--pdf -` writes it to stdout. See
+  [PDF output]({{< relref "pdf" >}}) for what goes on the page and an example.
 - Output is styled when stdout is a terminal. `--color=never`, `--no-color`
   or `NO_COLOR` turn that off.

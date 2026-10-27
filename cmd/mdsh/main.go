@@ -23,6 +23,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/pdf"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 )
@@ -90,6 +91,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs.BoolVar(&noRun, "n", false, "short for --no-run")
 	write := fs.Bool("w", false, "write output back into the file instead of printing")
 	outFile := fs.String("o", "", "like -w, but write to this file and leave the input alone")
+	pdfFile := fs.String("pdf", "", "write what would be printed to this PDF file instead (- for stdout)")
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
 	stop := fs.Bool("stop-on-error", false, "stop at the first failing block")
 	yes := fs.Bool("yes", false, "run blocks marked confirm without asking")
@@ -148,6 +150,27 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	styled := *color == "always" || (*color == "auto" && isTerminal(stdout) && os.Getenv("NO_COLOR") == "")
+	// show prints the rendered markdown, or lays it out as a PDF with
+	// image links read from linkDir.
+	show := func(md []byte, linkDir string) error {
+		if *pdfFile == "" {
+			return print(stdout, md, styled)
+		}
+		if linkDir == "" && file != "" {
+			if abs, err := filepath.Abs(file); err == nil {
+				linkDir = filepath.Dir(abs)
+			}
+		}
+		out, err := pdf.Render(md, pdf.Options{Dir: linkDir, Title: title(file)})
+		if err != nil {
+			return fmt.Errorf("pdf: %w", err)
+		}
+		if *pdfFile == "-" {
+			_, err = stdout.Write(out)
+			return err
+		}
+		return writeFile(*pdfFile, out, 0o644)
+	}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are
@@ -158,8 +181,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		out := render.Markdown(d, results, render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()})
 		if *outFile != "" {
 			err = writeFile(*outFile, out, 0o644)
-		} else {
-			err = print(stdout, out, styled)
+		}
+		if err == nil && (*outFile == "" || *pdfFile != "") {
+			err = show(out, "")
 		}
 		if err != nil {
 			return err
@@ -235,9 +259,10 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if err := writeFile(target, out, mode); err != nil {
 			return err
 		}
-	} else {
+	}
+	if !*write || *pdfFile != "" {
 		out := render.Markdown(d, results, render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()})
-		if err := print(stdout, out, styled); err != nil {
+		if err := show(out, opts.LinkDir); err != nil {
 			return err
 		}
 	}
@@ -325,6 +350,15 @@ func termWidth(w io.Writer) int {
 		}
 	}
 	return 80
+}
+
+// title names the document in PDF metadata: its file name without the
+// extension.
+func title(file string) string {
+	if file == "" {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
 func displayName(file string) string {
