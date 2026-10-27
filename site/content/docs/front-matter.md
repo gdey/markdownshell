@@ -14,6 +14,7 @@ title: Build notes
 mdsh:
   shell: /bin/bash
   on_error: stop
+  step: false
   interpolate: true
   show_stderr: false
   env:
@@ -31,6 +32,7 @@ closing line, the `---` is just a thematic break.
 | --- | --- | --- | --- |
 | `shell` | path to a shell | `/bin/sh`, or `zsh` if any block is `zsh` | The shell that runs every block, in every env |
 | `on_error` | `continue`, `stop` | `continue` | Whether a failing block stops the run |
+| `step` | `true`, `false` | `false` | Ask before running each block, as if every block were marked `confirm` |
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
 | `env.share` | list of variable names | all | Variables passed from mdsh's environment into the shell, and the default `share=` for sub-envs |
@@ -51,6 +53,19 @@ blocks don't run. Any other value is an error.
 
 A block's own `on_error=` attribute overrides this, and the
 `--stop-on-error` flag overrides both.
+
+### `step`
+
+`step: true` runs the document a step at a time: before each block that
+would run, mdsh shows its code and asks whether to run it, skip it, skip it
+only if it already has saved output, or stop. It's the same prompt as a
+`confirm` block's; see [Confirming blocks]({{< relref "writing-documents#confirming-blocks" >}}).
+Blocks that wouldn't run anyway (`skip`, a false `run=`, non-shell blocks)
+aren't asked about.
+
+The `--step` flag turns it on for one run without editing the file, and
+`--yes` answers run to every question. It works with `--pdf` too: mdsh asks
+about each block, then writes the PDF.
 
 ### `interpolate`
 

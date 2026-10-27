@@ -95,6 +95,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
 	stop := fs.Bool("stop-on-error", false, "stop at the first failing block")
 	yes := fs.Bool("yes", false, "run blocks marked confirm without asking")
+	step := fs.Bool("step", false, "ask before running each block, as if every block were marked confirm")
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "interactive mode (not implemented yet)")
@@ -204,6 +205,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		Args:        blockArgs,
 		StopOnError: *stop,
 		Only:        *only,
+		Step:        *step,
 	}
 	if file != "" {
 		if abs, err := filepath.Abs(file); err == nil {
@@ -231,10 +233,10 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	if *yes {
-		opts.Confirm = func(*doc.Block) bool { return true }
+		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
 	} else if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
 		defer tty.Close()
-		opts.Confirm = func(b *doc.Block) bool { return confirm(tty, tty, b) }
+		opts.Confirm = newPrompter(tty, tty).confirm
 	}
 
 	results, runErr := run.Run(ctx, d, opts)
@@ -277,26 +279,53 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// confirm shows block b and asks whether to run it. Anything but run
-// stops, so pressing enter is the safe choice.
-func confirm(in io.Reader, out io.Writer, b *doc.Block) bool {
+// prompter asks whether to run blocks. It remembers the [o] answer,
+// which skips every later block that has output saved in the file.
+type prompter struct {
+	in        *bufio.Reader
+	out       io.Writer
+	skipSaved bool
+}
+
+func newPrompter(in io.Reader, out io.Writer) *prompter {
+	return &prompter{in: bufio.NewReader(in), out: out}
+}
+
+// confirm shows block b and asks whether to run it, skip it or stop.
+// Pressing enter stops, so it is the safe choice.
+func (p *prompter) confirm(b *doc.Block) run.Answer {
+	if p.skipSaved && b.HasOutput() {
+		fmt.Fprintf(p.out, "--- block %s: skipped, keeping its saved output ---\n", b.ID)
+		return run.Skip
+	}
 	q := b.Attrs["confirm"]
 	if q == "" {
 		q = "Run this block?"
 	}
-	fmt.Fprintf(out, "\n--- block %s ---\n%s---\n", b.ID, b.Body)
-	r := bufio.NewReader(in)
+	saved := ""
+	if b.HasOutput() {
+		saved = " (has saved output)"
+	}
+	fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", b.ID, saved, b.Body)
 	for {
-		fmt.Fprintf(out, "%s [r]un / [s]top: ", q)
-		line, err := r.ReadString('\n')
+		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", q)
+		line, err := p.in.ReadString('\n')
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":
-			return true
+			return run.Go
+		case "k", "skip":
+			return run.Skip
+		case "o", "only":
+			p.skipSaved = true
+			if b.HasOutput() {
+				return run.Skip
+			}
+			return run.Go
 		case "s", "stop", "n", "no", "":
-			return false
+			return run.Stop
 		}
 		if err != nil {
-			return false
+			return run.Stop
 		}
 	}
 }

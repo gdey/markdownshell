@@ -44,12 +44,25 @@ type Options struct {
 	Only string
 	// OnEvent, if set, is called as blocks start, write and finish.
 	OnEvent func(Event)
-	// Confirm is asked before each block that has the confirm attribute.
-	// It returns true to run the block and false to stop the run there.
+	// Step asks Confirm before every block that would run, not just
+	// those with the confirm attribute.
+	Step bool
+	// Confirm is asked before each block that has the confirm attribute,
+	// or every block in step mode. Its answer runs the block, skips it
+	// (keeping any output saved in the file) or stops the run there.
 	// If Confirm is nil, the run stops at the first such block with
 	// ErrNoConfirm, since nobody can answer.
-	Confirm func(*doc.Block) bool
+	Confirm func(*doc.Block) Answer
 }
+
+// Answer is a reply to Confirm.
+type Answer int
+
+const (
+	Stop Answer = iota
+	Go
+	Skip
+)
 
 // ErrNoConfirm is returned when a block needs confirming and the run has
 // no way to ask.
@@ -77,7 +90,7 @@ type Event struct {
 type Result struct {
 	Block   *doc.Block
 	Ran     bool // false if skipped or not reached
-	Skipped bool // skip, run= false, unknown language, or not selected by Only
+	Skipped bool // skip, run= false, unknown language, not selected by Only, or skipped at the prompt
 	Stdout  []byte
 	Stderr  []byte
 	Status  int
@@ -184,12 +197,17 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 			r.Skipped = true
 			continue
 		}
-		if b.Attrs.Has("confirm") {
+		if b.Attrs.Has("confirm") || opts.Step || d.Options.Step {
 			if opts.Confirm == nil {
 				r.Declined = true
 				return results, fmt.Errorf("%w: %s", ErrNoConfirm, b.ID)
 			}
-			if !opts.Confirm(b) {
+			a := opts.Confirm(b)
+			if a == Skip {
+				r.Skipped = true
+				continue
+			}
+			if a != Go {
 				r.Declined = true
 				break
 			}

@@ -17,6 +17,7 @@ weight: 50
 | `mdsh --pdf doc.pdf doc.md` | Nothing; lays out what it would print as `doc.pdf` | No; with `-w` or `-o` it writes those too |
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
+| `mdsh --step doc.md` | Asks before every block: run, skip or stop | Per flags |
 | `mdsh completion bash\|zsh` | A completion script | No |
 | `mdsh --version` | The version | No |
 

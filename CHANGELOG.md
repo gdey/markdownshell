@@ -24,6 +24,9 @@ follow [Semantic Versioning](https://semver.org/).
   `--hide-output`, and `-o out.md` saves the printout to a file.
 - `--hide-code`, `--hide-output` (both: prose only, nothing runs),
   `--only BLOCK`, `--stop-on-error`, `--yes`, `-` to read from stdin.
+- Step-wise runs: `--step` or front matter `step: true` asks before every
+  block. The confirm prompt can run, skip, skip blocks that already have
+  saved output, or stop.
 - Styled terminal output with `--color=auto|always|never`, `--no-color`
   and `NO_COLOR`.
 - `zsh` blocks run too. A document with any `zsh` block runs in `zsh`

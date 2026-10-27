@@ -14,6 +14,7 @@ mdsh --hide-code --pdf report.pdf report.md     # prose and output only
 mdsh --only build --pdf build.pdf report.md     # one block and what it needs
 mdsh -w --pdf report.pdf report.md              # update the file and the PDF
 mdsh -n --pdf report.pdf report.md              # the output saved by -w; nothing runs
+mdsh --step --pdf report.pdf report.md          # ask before each block, then write the PDF
 mdsh --pdf - report.md | lpr                    # PDF on stdout
 ```
 
@@ -21,6 +22,16 @@ The flags work as they do for printing: `--hide-code` and `--hide-output`
 decide what's shown, `--only` what runs, and `show=`, `show-output=` and
 `mdsh:if` sections still apply. With `-w` or `-o` the markdown is written as
 well, and the PDF still shows the printed view.
+
+## Stepping through a run
+
+`--step`, front matter `step: true` and `confirm` blocks still ask before
+running blocks when you write a PDF. The prompt goes to the terminal, so it
+works with `--pdf -` too. Once you've answered for every block, mdsh writes
+the PDF. A block you skip, or skip with `o` because it already has saved
+output, shows that saved output in the PDF. A block you stop at, and every
+block after it, also shows its saved output. See
+[Confirming blocks]({{< relref "writing-documents#confirming-blocks" >}}).
 
 ## An example
 
