@@ -38,7 +38,8 @@ hello from a sub-env
 - Every `sh` block runs. Other languages are left alone, and `skip` turns a
   block off.
 - mdsh reads only the `mdsh:` key of the front matter, so other tools' keys
-  can live alongside it. Block attributes override it.
+  can live alongside it. Block attributes override it. Every option is
+  listed in [Front matter]({{< relref "front-matter" >}}).
 - Unknown attributes are kept untouched.
 - Blocks can sit inside list items and block quotes, such as a step in a
   numbered list. Their output is written inside the same item or quote.
