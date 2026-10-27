@@ -130,6 +130,31 @@ func TestWriteStep(t *testing.T) {
 	}
 }
 
+// TestStopNote checks that a run that stops early says why, before
+// and after the document.
+func TestStopNote(t *testing.T) {
+	for body, want := range map[string]string{
+		"exit 3":        "block a ended its shell (exit status 3",
+		"set -e; false": "block a ended its shell (exit status 1",
+		"echo a; false": "block a failed (exit status 1)",
+	} {
+		f := filepath.Join(t.TempDir(), "d.md")
+		os.WriteFile(f, []byte("```sh {#a}\n"+body+"\n```\n\n```sh {#b}\necho b\n```\n"), 0o644)
+		var out, errb bytes.Buffer
+		mdsh([]string{"--stop-on-error", "--no-color", f}, nil, &out, &errb)
+		if n := strings.Count(errb.String(), want); n != 2 {
+			t.Errorf("%s: stderr = %q, want %q before and after the document", body, errb.String(), want)
+		}
+	}
+	f := filepath.Join(t.TempDir(), "d.md")
+	os.WriteFile(f, []byte("```sh {#a}\nfalse\n```\n\n```sh {#b}\necho b\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	mdsh([]string{"--no-color", f}, nil, &out, &errb)
+	if strings.Contains(errb.String(), "stopped there") {
+		t.Errorf("run went on, but stderr = %q", errb.String())
+	}
+}
+
 func TestYesFlag(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "d.md")
