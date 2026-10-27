@@ -46,3 +46,47 @@ func TestHideFlags(t *testing.T) {
 		t.Errorf("no results:\ngot  %q\nwant %q", got, src)
 	}
 }
+
+func TestNested(t *testing.T) {
+	src := "1. Run:\n\n   ```sh {#a}\n   echo a\n   ```\n\n> ```sh {#b}\n> echo b\n> ```\n\n- ```sh {#c}\n  echo c\n  ```\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Stdout: []byte("a\n\nA\n")},
+		{Block: d.Blocks[1], Ran: true, Stdout: []byte("b\n")},
+		{Block: d.Blocks[2], Ran: true, Stdout: []byte("c\n")},
+	}
+	want := "1. Run:\n\n   ```sh {#a}\n   echo a\n   ```\n\n   ```output {for=a exit=0}\n   a\n\n   A\n   ```\n\n" +
+		"> ```sh {#b}\n> echo b\n> ```\n>\n> ```output {for=b exit=0}\n> b\n> ```\n\n" +
+		"- ```sh {#c}\n  echo c\n  ```\n\n  ```output {for=c exit=0}\n  c\n  ```\n"
+	got := string(Markdown(d, results, Options{WriteBack: true}))
+	if got != want {
+		t.Fatalf("write-back:\ngot  %q\nwant %q", got, want)
+	}
+
+	// Writing back again replaces the output instead of adding more.
+	d2, err := doc.Parse([]byte(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range results {
+		results[i].Block = d2.Blocks[i]
+	}
+	if again := string(Markdown(d2, results, Options{WriteBack: true})); again != want {
+		t.Errorf("second write-back:\ngot  %q\nwant %q", again, want)
+	}
+
+	// With code hidden, output takes the fence's place, list marker included.
+	hidden := "1. Run:\n\n   ```output {for=a exit=0}\n   a\n\n   A\n   ```\n\n" +
+		"> ```output {for=b exit=0}\n> b\n> ```\n\n" +
+		"- ```output {for=c exit=0}\n  c\n  ```\n"
+	if got := string(Markdown(d2, results, Options{HideCode: true})); got != hidden {
+		t.Errorf("hide code:\ngot  %q\nwant %q", got, hidden)
+	}
+	// Same, with the output kept from the file.
+	if got := string(Markdown(d2, nil, Options{HideCode: true})); got != hidden {
+		t.Errorf("hide code, kept output:\ngot  %q\nwant %q", got, hidden)
+	}
+}

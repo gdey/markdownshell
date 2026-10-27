@@ -89,8 +89,11 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 		if r == nil || !r.Ran {
 			if showCode {
 				buf.Write(src[b.Span.End:b.Output.End])
+			} else if kept := dropGap(src[b.Span.End:b.Output.End], b.Prefix); b.Lead != "" && len(kept) > 0 {
+				buf.WriteString(b.Lead)
+				buf.Write(bytes.TrimPrefix(kept, []byte(b.Prefix)))
 			} else {
-				buf.Write(bytes.TrimLeft(src[b.Span.End:b.Output.End], "\r\n"))
+				buf.Write(kept)
 			}
 			continue
 		}
@@ -105,9 +108,14 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 			if !bytes.HasSuffix(src[b.Span.Start:b.Span.End], []byte("\n")) {
 				buf.WriteByte('\n')
 			}
-			buf.WriteByte('\n')
+			buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+			buf.WriteString(indent(out, b.Prefix))
+		} else if b.Lead != "" {
+			// The output takes the hidden fence's place in its list item.
+			buf.WriteString(b.Lead + strings.TrimPrefix(indent(out, b.Prefix), b.Prefix))
+		} else {
+			buf.WriteString(indent(out, b.Prefix))
 		}
-		buf.WriteString(out)
 	}
 	prose(pos, len(src))
 	return buf.Bytes()
@@ -184,6 +192,20 @@ func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run
 		from = p.Span.End
 	}
 	buf.Write(d.Src[from:to])
+}
+
+// dropGap drops the blank lines, which may hold only prefix, at the start
+// of s.
+func dropGap(s []byte, prefix string) []byte {
+	p := []byte(strings.TrimRight(prefix, " "))
+	for len(s) > 0 {
+		end := lineEnd(s, 0)
+		if len(bytes.TrimSpace(bytes.TrimPrefix(s[:end], p))) > 0 {
+			break
+		}
+		s = s[end:]
+	}
+	return s
 }
 
 // skipBlankLine skips one blank line at pos, so a hidden block doesn't
@@ -271,6 +293,27 @@ func Fence(lang, attrs, body string) string {
 		info += " {" + attrs + "}"
 	}
 	return f + info + "\n" + withNewline(body) + f + "\n"
+}
+
+// indent starts each line of s with prefix, trimming the prefix's trailing
+// spaces on blank lines.
+func indent(s, prefix string) string {
+	if prefix == "" {
+		return s
+	}
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(s, "\n") {
+		if line == "" {
+			continue
+		}
+		if line == "\n" || line == "\r\n" {
+			b.WriteString(strings.TrimRight(prefix, " "))
+		} else {
+			b.WriteString(prefix)
+		}
+		b.WriteString(line)
+	}
+	return b.String()
 }
 
 func withNewline(s string) string {

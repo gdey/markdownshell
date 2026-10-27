@@ -25,6 +25,16 @@ type Block struct {
 	// right after Span. It is empty (Start == End == Span.End) when there
 	// is none.
 	Output Span
+	// Prefix is what starts each line of a block nested in block quotes or
+	// list items, such as "> " or "   ". Output written after the block
+	// starts each line with it. Empty at the top level.
+	Prefix string
+	// Lead is the part of the opening fence line that holds list markers
+	// when the fence opens on the same line as its list item, such as
+	// "- " or "> 1. ". Empty otherwise.
+	Lead string
+
+	quote, col int // the container: block quote depth and list content column
 }
 
 // Document is a parsed markdown file.
@@ -77,13 +87,24 @@ func Parse(src []byte) (*Document, error) {
 	ids := map[string]bool{}
 	var last *Block
 	var open []*Section
+	var lists []int // content columns of the open list items
+	quote := 0      // block quote depth of the current line
 	for pos < len(src) {
 		end := lineEnd(src, pos)
 		line := src[pos:end]
+		rest, q := stripQuotes(line, -1)
+		if q != quote {
+			lists, quote = nil, q
+		}
 
-		if f, ok := openFence(line); ok {
-			b, next := readFence(src, pos, end, f)
-			if last != nil && isOutputFor(b, last.ID) && blank(src[last.Output.End:pos]) {
+		if f, col, lead, ok := scanFence(rest, &lists); ok {
+			b, next := readFence(src, pos, end, f, q, col)
+			head := line[:len(line)-len(rest)+col]
+			b.Prefix = linePrefix(head)
+			if lead {
+				b.Lead = string(head)
+			}
+			if last != nil && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) {
 				last.Output.End = next
 				pos = next
 				continue
@@ -107,16 +128,16 @@ func Parse(src []byte) (*Document, error) {
 			continue
 		}
 
-		if id, ok := regionStart(line); ok {
-			next := regionEnd(src, end)
-			if last != nil && id == last.ID && blank(src[last.Output.End:pos]) {
+		if id, ok := regionStart(rest); ok {
+			next := regionEnd(src, end, q)
+			if last != nil && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q) {
 				last.Output.End = next
 			}
 			pos = next
 			continue
 		}
 
-		if !blank(line) {
+		if !blank(rest) {
 			last = nil
 		}
 		if text, isIf, isEnd := sectionLine(line); isIf || isEnd {
@@ -223,15 +244,24 @@ func closesFence(line []byte, f fence) bool {
 	return n >= f.n && len(bytes.TrimSpace(line[indent+n:])) == 0
 }
 
-// readFence reads the block whose opening fence spans [start, bodyStart).
-// It returns the block and the offset just past its closing fence.
-// An unclosed fence runs to the end of the document.
-func readFence(src []byte, start, bodyStart int, f fence) (*Block, int) {
+// readFence reads the block whose opening fence spans [start, bodyStart),
+// nested in quote block quotes and a list item whose content starts at
+// column col. It returns the block and the offset just past its closing
+// fence. An unclosed fence runs to the end of its container.
+func readFence(src []byte, start, bodyStart int, f fence, quote, col int) (*Block, int) {
 	var body bytes.Buffer
 	pos := bodyStart
 	for pos < len(src) {
 		end := lineEnd(src, pos)
-		line := src[pos:end]
+		line, q := stripQuotes(src[pos:end], quote)
+		if q < quote {
+			break
+		}
+		sp := spaces(line)
+		if sp < col && !blank(line) {
+			break
+		}
+		line = line[min(sp, col):]
 		if closesFence(line, f) {
 			pos = end
 			break
@@ -246,7 +276,127 @@ func readFence(src []byte, start, bodyStart int, f fence) (*Block, int) {
 		Attrs: attrs,
 		Body:  body.String(),
 		Span:  Span{start, pos},
+		quote: quote,
+		col:   col,
 	}, pos
+}
+
+// linePrefix turns the container markers that start an opening fence line
+// into the prefix of the lines that follow: block quote markers stay and
+// list markers become spaces.
+func linePrefix(head []byte) string {
+	p := []byte(string(head))
+	for i, c := range p {
+		if c != '>' {
+			p[i] = ' '
+		}
+	}
+	return string(p)
+}
+
+// stripQuotes strips up to max block quote markers (all of them if max is
+// negative) from the start of line. It returns the rest of the line and
+// how many markers it stripped.
+func stripQuotes(line []byte, max int) ([]byte, int) {
+	n := 0
+	for max < 0 || n < max {
+		i := spaces(line)
+		if i > 3 || i >= len(line) || line[i] != '>' {
+			break
+		}
+		i++
+		if i < len(line) && line[i] == ' ' {
+			i++
+		}
+		line = line[i:]
+		n++
+	}
+	return line, n
+}
+
+// scanFence reports whether line, with its block quote markers stripped,
+// opens a fence. lists holds the content columns of the open list items;
+// scanFence closes the ones line isn't indented into and opens the ones
+// line starts. col is the content column of the list item the fence is in
+// (0 outside lists), and lead is set when that item starts on this line.
+func scanFence(line []byte, lists *[]int) (f fence, col int, lead bool, ok bool) {
+	if blank(line) {
+		return fence{}, 0, false, false
+	}
+	pos := spaces(line)
+	for len(*lists) > 0 && (*lists)[len(*lists)-1] > pos {
+		*lists = (*lists)[:len(*lists)-1]
+	}
+	if len(*lists) > 0 {
+		col = (*lists)[len(*lists)-1]
+	}
+	for pos-col <= 3 {
+		if f, ok := openFence(line[col:]); ok {
+			return f, col, lead, true
+		}
+		w := listMarker(line[pos:])
+		if w == 0 {
+			break
+		}
+		end := pos + w
+		sp := spaces(line[end:])
+		if sp == 0 || sp > 4 || blank(line[end:]) {
+			sp = 1 // empty item, or content that is indented code
+		}
+		col, lead = end+sp, true
+		*lists = append(*lists, col)
+		if col >= len(line) {
+			break
+		}
+		pos = col + spaces(line[col:])
+	}
+	return fence{}, 0, false, false
+}
+
+// listMarker returns the width of the list item marker at the start of
+// line ("-", "*", "+", "1." or "1)"), or 0 if there is none. A marker must
+// be followed by a space or the end of the line.
+func listMarker(line []byte) int {
+	w := 0
+	switch {
+	case len(line) > 0 && (line[0] == '-' || line[0] == '*' || line[0] == '+'):
+		w = 1
+	default:
+		for w < len(line) && w < 9 && line[w] >= '0' && line[w] <= '9' {
+			w++
+		}
+		if w == 0 || w >= len(line) || (line[w] != '.' && line[w] != ')') {
+			return 0
+		}
+		w++
+	}
+	if rest := bytes.TrimRight(line[w:], "\r\n"); len(rest) > 0 && rest[0] != ' ' {
+		return 0
+	}
+	return w
+}
+
+// spaces counts the spaces at the start of line.
+func spaces(line []byte) int {
+	n := 0
+	for n < len(line) && line[n] == ' ' {
+		n++
+	}
+	return n
+}
+
+// gap reports whether src[from:to] holds only blank lines inside quote
+// block quotes, so output there still belongs to the block above it.
+func gap(src []byte, from, to, quote int) bool {
+	for from < to {
+		end := lineEnd(src, from)
+		line, q := stripQuotes(src[from:end], quote)
+		if q < quote || !blank(line) {
+			return false
+		}
+		from = end
+	}
+	return true
 }
 
 func trimIndent(line []byte, n int) []byte {
@@ -281,11 +431,13 @@ func regionStart(line []byte) (string, bool) {
 }
 
 // regionEnd returns the offset just past the closing line of a region whose
-// body starts at pos. An unclosed region ends at the end of the document.
-func regionEnd(src []byte, pos int) int {
+// body starts at pos, inside quote block quotes. An unclosed region ends at
+// the end of the document.
+func regionEnd(src []byte, pos, quote int) int {
 	for pos < len(src) {
 		end := lineEnd(src, pos)
-		if string(bytes.TrimSpace(src[pos:end])) == regionClose {
+		line, _ := stripQuotes(src[pos:end], quote)
+		if string(bytes.TrimSpace(line)) == regionClose {
 			return end
 		}
 		pos = end

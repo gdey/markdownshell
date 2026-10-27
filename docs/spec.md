@@ -55,7 +55,7 @@ hello from a sub-env
 - **Label:** `#name` gives a block an id. Unlabeled blocks get `block-N` by position. Ids must be unique.
 - **What runs:** every block whose language mdsh knows (`sh` in v1). Other languages are left alone. `skip` turns a block off.
 - **Front matter:** standard YAML front matter at the top of the file. mdsh reads only the `mdsh:` key, so `title`, tags and other tools' keys live alongside it. A shebang line may come before the opening `---`. Block attributes override it.
-- **Output block:** language `output`, carrying `for=<id>` and the exit code. stderr gets its own `output {for=<id> stream=stderr}` fence when shown (see Stderr). On a re-run mdsh replaces the old output, so the file stays stable. If output contains backticks, mdsh uses a longer fence.
+- **Output block:** language `output`, carrying `for=<id>` and the exit code. A block in a list item or block quote gets its output inside the same container. stderr gets its own `output {for=<id> stream=stderr}` fence when shown (see Stderr). On a re-run mdsh replaces the old output, so the file stays stable. If output contains backticks, mdsh uses a longer fence.
 - **Unknown attributes** are kept untouched, so files stay friendly to other tools.
 
 Block attributes in v1:
@@ -170,7 +170,7 @@ The runner reports events (started, stdout, stderr, done), and every front end (
 | `cmd/mdsh` | The CLI |
 | `tui` | Interactive mode (v2) |
 
-**Dependencies.** A hand-written fence scanner instead of a full markdown parser: fences are the only syntax mdsh acts on, and owning the scanner makes byte-exact round trips easy. Fences nested in lists or block quotes aren't recognised yet. Standard library `flag` for the CLI, `gopkg.in/yaml.v3` for front matter, Glamour for terminal styling, Bubble Tea for the TUI.
+**Dependencies.** A hand-written fence scanner instead of a full markdown parser: fences are the only syntax mdsh acts on, and owning the scanner makes byte-exact round trips easy. Fences nested in list items and block quotes are recognised, and their output is written with the same prefix (`> ` or the item's indent) so it stays inside the container. Block quotes inside list items must start within three spaces of the line, tabs don't count as indentation, and lazy continuation lines end a nested fence. Standard library `flag` for the CLI, `gopkg.in/yaml.v3` for front matter, Glamour for terminal styling, Bubble Tea for the TUI.
 
 ## Decisions
 

@@ -237,3 +237,81 @@ func TestStatusPlaceholder(t *testing.T) {
 		t.Error("want error for unknown block")
 	}
 }
+
+func TestParseNested(t *testing.T) {
+	tests := []struct {
+		name, src      string
+		body, prefix   string
+		lead, spanText string
+	}{
+		{"bullet", "- ```sh\n  echo a\n  ```\n", "echo a\n", "  ", "- ", "- ```sh\n  echo a\n  ```\n"},
+		{"ordered later line", "1. Run:\n\n   ```sh\n   echo a\n    b\n   ```\n", "echo a\n b\n", "   ", "", "   ```sh\n   echo a\n    b\n   ```\n"},
+		{"nested list", "- a\n  - b\n\n    ```sh\n    echo b\n    ```\n", "echo b\n", "    ", "", "    ```sh\n    echo b\n    ```\n"},
+		{"quote", "> ```sh\n> echo a\n>\n> ```\n", "echo a\n\n", "> ", "", "> ```sh\n> echo a\n>\n> ```\n"},
+		{"quote no space", ">```sh\n>echo a\n>```\n", "echo a\n", ">", "", ">```sh\n>echo a\n>```\n"},
+		{"quote list", "> 1. ```sh\n>    echo a\n>    ```\n", "echo a\n", "> " + "   ", "> 1. ", "> 1. ```sh\n>    echo a\n>    ```\n"},
+		{"list quote", "1. x\n\n   > ```sh\n   > echo a\n   > ```\n", "echo a\n", "   > ", "", "   > ```sh\n   > echo a\n   > ```\n"},
+		{"quote ends fence", "> ```sh\n> echo a\nafter\n", "echo a\n", "> ", "", "> ```sh\n> echo a\n"},
+		{"item ends fence", "- ```sh\n  echo a\nafter\n", "echo a\n", "  ", "- ", "- ```sh\n  echo a\n"},
+	}
+	for _, tt := range tests {
+		d, err := Parse([]byte(tt.src))
+		if err != nil {
+			t.Errorf("%s: %v", tt.name, err)
+			continue
+		}
+		if len(d.Blocks) != 1 {
+			t.Errorf("%s: got %d blocks, want 1", tt.name, len(d.Blocks))
+			continue
+		}
+		b := d.Blocks[0]
+		if b.Lang != "sh" || b.Body != tt.body || b.Prefix != tt.prefix || b.Lead != tt.lead {
+			t.Errorf("%s: got lang %q body %q prefix %q lead %q", tt.name, b.Lang, b.Body, b.Prefix, b.Lead)
+		}
+		if got := string(d.Src[b.Span.Start:b.Span.End]); got != tt.spanText {
+			t.Errorf("%s: span = %q, want %q", tt.name, got, tt.spanText)
+		}
+	}
+}
+
+func TestParseNotNested(t *testing.T) {
+	for _, src := range []string{
+		// Indented code inside a list item.
+		"- a\n\n      ```sh\n      echo a\n      ```\n",
+		// The list item ended, so this is indented code.
+		"- a\n\nb\n\n    ```sh\n    x\n    ```\n",
+		// Not a list marker.
+		"1.5 ```sh\n",
+	} {
+		d, err := Parse([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(d.Blocks) != 0 {
+			t.Errorf("Parse(%q) found %+v", src, d.Blocks[0])
+		}
+	}
+}
+
+func TestParseNestedOutput(t *testing.T) {
+	src := "- ```sh {#a}\n  echo a\n  ```\n\n  ```output {for=a exit=0}\n  a\n  ```\n" +
+		"> ```sh {#b}\n> echo b\n> ```\n>\n> <!-- mdsh:output for=\"b\" -->\n> | b |\n> <!-- /mdsh:output -->\n" +
+		"\n```sh {#c}\n```\n\n  ```output {for=c exit=0}\n  ```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Blocks) != 3 {
+		t.Fatalf("got %d blocks, want 3", len(d.Blocks))
+	}
+	want := []string{
+		"\n  ```output {for=a exit=0}\n  a\n  ```\n",
+		">\n> <!-- mdsh:output for=\"b\" -->\n> | b |\n> <!-- /mdsh:output -->\n",
+		"\n  ```output {for=c exit=0}\n  ```\n", // indent 2 is still the top level
+	}
+	for i, b := range d.Blocks {
+		if got := string(d.Src[b.Output.Start:b.Output.End]); got != want[i] {
+			t.Errorf("block %s output = %q, want %q", b.ID, got, want[i])
+		}
+	}
+}
