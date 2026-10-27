@@ -68,6 +68,20 @@ func TestSubEnvSharing(t *testing.T) {
 	}
 }
 
+func TestShareExclusions(t *testing.T) {
+	src := "---\nmdsh:\n  env:\n    share: [..., -SECRET]\n---\n" +
+		"```sh {#a}\necho \"$OUTER-${SECRET-x}\"\nexport A=1 B=2\n```\n" +
+		"```sh {#b env=sub share=...,-B}\necho \"$A-${B-x}\"\n```\n"
+	_, results := runDoc(t, src, run.Options{Environ: []string{"PATH=" + os.Getenv("PATH"), "OUTER=outer", "SECRET=s"}})
+	want := map[string]string{"a": "outer-x\n", "b": "1-x\n"}
+	r := byID(results)
+	for id, w := range want {
+		if got := string(r[id].Stdout); got != w {
+			t.Errorf("%s stdout = %q, want %q (stderr %q, err %v)", id, got, w, r[id].Stderr, r[id].Err)
+		}
+	}
+}
+
 func TestFailureContinuesByDefault(t *testing.T) {
 	_, results := runDoc(t, "```sh {#a}\nfalse\n```\n```sh {#b}\necho b\n```\n", run.Options{})
 	r := byID(results)

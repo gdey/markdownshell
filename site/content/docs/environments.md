@@ -12,8 +12,9 @@ over like lines of one script.
   it after, so two `env=build` blocks share state. `env=build/test` stacks
   `test` on `build`.
 - **What crosses over.** When a sub-env is created it gets the parent's
-  *exported* variables that pass `share=`. `share=*` passes all, and
-  `share=` (empty) starts clean. Variables only flow down.
+  *exported* variables that pass `share=`. `share=...` (or `share=*`)
+  passes all, `share=...,-TOKEN` passes all but `TOKEN`, and `share=`
+  (empty) starts clean. Variables only flow down.
 - **Never shared.** Unexported variables, functions, aliases and the
   working directory. Every env starts in the document's directory.
 

@@ -35,7 +35,7 @@ closing line, the `---` is just a thematic break.
 | `step` | `true`, `false` | `false` | Ask before running each block, as if every block were marked `confirm` |
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
-| `env.share` | list of variable names | all | Variables passed from mdsh's environment into the shell, and the default `share=` for sub-envs |
+| `env.share` | list of variable names, `...`, `-NAME` | all | Variables passed from mdsh's environment into the shell, and the default `share=` for sub-envs |
 
 ### `shell`
 
@@ -88,8 +88,11 @@ this.
 
 Which variables from the environment mdsh was started in reach the
 top-level shell. Leave it out to pass everything. A list passes only those
-names, `[]` passes nothing (not even `PATH`), and `*` in the list passes
-everything.
+names, `[]` passes nothing (not even `PATH`), and `...` (or `*`) in the
+list passes everything. A name with a leading `-` is left out even when
+`...` or the plain name is also in the list, so `[..., -USER]` passes
+everything except `USER`. Removals only subtract: `[-USER]` on its own
+passes nothing, so add `...` when you mean "all but".
 
 The same list is the default `share=` for sub-envs: a block that creates a
 sub-env without its own `share=` gets only these exported variables from
@@ -99,6 +102,12 @@ its parent. See [Environments]({{< relref "environments" >}}).
 mdsh:
   env:
     share: [PATH, HOME, USER]
+```
+
+```yaml
+mdsh:
+  env:
+    share: [..., -AWS_SECRET_ACCESS_KEY, -GITHUB_TOKEN]
 ```
 
 ## Unknown keys

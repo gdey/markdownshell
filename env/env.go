@@ -77,18 +77,30 @@ func (s *Stack) Close() {
 	}
 }
 
-// Filter keeps the variables named in share. Nil share keeps all of them;
-// "*" in share also keeps all.
+// Filter keeps the variables named in share. Nil share keeps all of them.
+// "..." (or "*") in share keeps all, and a name prefixed with "-" is
+// dropped even if "..." or the plain name also appears, so
+// [..., -USER] keeps everything but USER.
 func Filter(vars map[string]string, share []string) map[string]string {
 	if share == nil {
 		return vars
 	}
-	out := map[string]string{}
+	all := false
+	keep := map[string]bool{}
+	drop := map[string]bool{}
 	for _, k := range share {
-		if k == "*" {
-			return vars
+		switch {
+		case k == "..." || k == "*":
+			all = true
+		case strings.HasPrefix(k, "-"):
+			drop[k[1:]] = true
+		default:
+			keep[k] = true
 		}
-		if v, ok := vars[k]; ok {
+	}
+	out := map[string]string{}
+	for k, v := range vars {
+		if (all || keep[k]) && !drop[k] {
 			out[k] = v
 		}
 	}
