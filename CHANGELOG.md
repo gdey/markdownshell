@@ -18,6 +18,8 @@ follow [Semantic Versioning](https://semver.org/).
   `--only BLOCK`, `--stop-on-error`, `--yes`, `-` to read from stdin.
 - Styled terminal output with `--color=auto|always|never`, `--no-color`
   and `NO_COLOR`.
+- `zsh` blocks run too. A document with any `zsh` block runs in `zsh`
+  unless `shell:` is set.
 - Front matter options under `mdsh:`: `shell`, `on_error`, `interpolate`,
   `show_stderr` and `env.share`.
 - Block attributes: `#id`, `skip`, `env=` (stacked sub-envs), `share=`,

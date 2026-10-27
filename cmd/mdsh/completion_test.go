@@ -33,12 +33,12 @@ func TestCompletionScriptsParse(t *testing.T) {
 
 func TestBlocksCmd(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "d.md")
-	os.WriteFile(f, []byte("```sh {#a}\n```\n```go\n```\n```sh\n```\n"), 0o644)
+	os.WriteFile(f, []byte("```sh {#a}\n```\n```go\n```\n```sh\n```\n```zsh {#z}\n```\n"), 0o644)
 	var out bytes.Buffer
 	if rc := mdsh([]string{"__blocks", f}, nil, &out, &bytes.Buffer{}); rc != 0 {
 		t.Fatalf("rc = %d", rc)
 	}
-	if got := out.String(); got != "a\nblock-3\n" {
+	if got := out.String(); got != "a\nblock-3\nz\n" {
 		t.Errorf("blocks = %q", got)
 	}
 }

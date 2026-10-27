@@ -10,7 +10,8 @@ import (
 // Options are the document-wide settings under the mdsh: key of the
 // front matter.
 type Options struct {
-	// Shell runs sh blocks. Defaults to /bin/sh.
+	// Shell runs sh and zsh blocks. Defaults to zsh when the document
+	// has zsh blocks, else /bin/sh.
 	Shell string `yaml:"shell"`
 	// OnError is "continue" (default) or "stop".
 	OnError string `yaml:"on_error"`

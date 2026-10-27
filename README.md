@@ -193,8 +193,10 @@ Printed markdown is styled when stdout is a terminal; `--color=never`,
 
 ## Blocks
 
-Every `sh` block runs, top to bottom. Blocks without `env=` share one shell,
-so variables, functions and the working directory carry over.
+Every `sh` and `zsh` block runs, top to bottom. Blocks without `env=` share
+one shell, so variables, functions and the working directory carry over.
+Blocks run in `/bin/sh` unless `shell:` under `mdsh:` in the front matter
+says otherwise; a document with any `zsh` block runs in `zsh` by default.
 
 | Attribute | Meaning |
 | --- | --- |

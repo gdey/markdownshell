@@ -108,7 +108,21 @@ func (r *Result) ExitStatus() int {
 }
 
 // Runnable reports whether mdsh knows how to run b.
-func Runnable(b *doc.Block) bool { return b.Lang == "sh" }
+func Runnable(b *doc.Block) bool { return b.Lang == "sh" || b.Lang == "zsh" }
+
+// Shell is the shell d's blocks run in: the front matter's shell, else
+// zsh if any block is a zsh block, else "" for the default /bin/sh.
+func Shell(d *doc.Document) string {
+	if d.Options.Shell != "" {
+		return d.Options.Shell
+	}
+	for _, b := range d.Blocks {
+		if b.Lang == "zsh" {
+			return "zsh"
+		}
+	}
+	return ""
+}
 
 // Run executes d's blocks in order and returns one result per block.
 // It stops early when a block ends its shell, or when a block fails and
@@ -122,7 +136,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 	}
 	shell := opts.Shell
 	if shell == "" {
-		shell = d.Options.Shell
+		shell = Shell(d)
 	}
 	selected, err := selectBlocks(d, opts.Only)
 	if err != nil {
