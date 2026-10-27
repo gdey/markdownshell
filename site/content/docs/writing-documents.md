@@ -40,6 +40,8 @@ hello from a sub-env
 - mdsh reads only the `mdsh:` key of the front matter, so other tools' keys
   can live alongside it. Block attributes override it.
 - Unknown attributes are kept untouched.
+- Blocks can sit inside list items and block quotes, such as a step in a
+  numbered list. Their output is written inside the same item or quote.
 
 ## Block attributes
 
