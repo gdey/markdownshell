@@ -43,7 +43,8 @@ Done:
 Left before tagging v1.0.0:
 
 - [x] Merge the first PR.
-- [ ] Run a few real-world files through it and fix what breaks.
+- [x] Run a few real-world files through it and fix what breaks
+      (`examples/runbooks`, run by `TestRunbooks`).
 - [x] Fences nested in lists or block quotes.
 - [x] Release builds (goreleaser) and install instructions.
 

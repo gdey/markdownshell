@@ -132,6 +132,11 @@ The two images it produced:
 
 ![screenshot](examples/hello.md.assets/screenshot.png)
 
+More complete runbooks live in [examples/runbooks](examples/runbooks): cutting
+a release, a system report, Linux and macOS host triage, and a test
+coverage report for mdsh itself. `go test ./cmd/mdsh` runs each of them; a
+name ending in `_linux.md` or `_darwin.md` runs only on that OS.
+
 ## Install
 
 Download an archive for your system from the
