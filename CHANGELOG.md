@@ -8,6 +8,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `env.share` and `share=` accept `...` for all variables (like `*`) and
+  `-NAME` to leave a variable out, so `[..., -USER]` passes all but `USER`.
 - `--pdf FILE` lays out what mdsh would print as a PDF, in pure Go. The
   hide flags, `--only` and the rest apply; with `-w` or `-o` the markdown
   is written as well. `--pdf -` writes the PDF to stdout.

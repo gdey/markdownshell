@@ -93,7 +93,7 @@ Each env is one long-lived shell process. Blocks without `env=` all run in the t
 
 - **Top-level env:** started once per run with the caller's environment, filtered by the front matter's `env.share` list if set.
 - **Sub-env:** `env=build` creates it on first use and reuses it after, so two `env=build` blocks share state. `env=build/test` stacks `test` on `build`. `share=` is read only when the env is created.
-- **Down (parent to child):** at creation, the child gets the parent's *exported* vars that pass `share`. `share=*` passes all; `share=` (empty) starts clean.
+- **Down (parent to child):** at creation, the child gets the parent's *exported* vars that pass `share`. `share=...` (or `share=*`) passes all, `-NAME` removes a name (`share=...,-TOKEN`); `share=` (empty) starts clean.
 - **Up (child to parent):** nothing in v1. Vars only flow down.
 - **Never shared:** unexported shell vars, functions, aliases, and the working directory. Every env starts in the document's directory.
 
