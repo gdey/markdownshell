@@ -38,6 +38,9 @@ follow [Semantic Versioning](https://semver.org/).
   `<!-- mdsh:if COND -->` … `<!-- mdsh:end -->` sections.
 - `out=image` saves image output; `out=screenshot` draws text output as a
   terminal-style SVG or PNG.
+- Include blocks: a block marked `<include` with `file=`, `from=`, `to=`
+  and `number_on` holds lines from another file, written into its body on
+  every run. Include blocks never run and have no name.
 - Shell helpers for markdown output: `md_h1`–`md_h3`, `md_table`, `md_code`.
 - `mdsh completion bash|zsh`.
 - Fences inside list items and block quotes run like any other block;

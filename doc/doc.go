@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Span is a half-open byte range [Start, End) in Document.Src.
@@ -21,6 +22,12 @@ type Block struct {
 	Body  string
 	// Span covers the fence lines, including the closing fence's newline.
 	Span Span
+	// BodySpan covers the lines between the fences, as they are in Src.
+	// It ends at Span.End when the fence is never closed.
+	BodySpan Span
+	// Fence is the opening fence's run of backticks or tildes, and Info
+	// its info string.
+	Fence, Info string
 	// Output covers any output already attached to this block, starting
 	// right after Span. It is empty (Start == End == Span.End) when there
 	// is none.
@@ -85,6 +92,7 @@ func Parse(src []byte) (*Document, error) {
 	}
 
 	ids := map[string]bool{}
+	includes := 0
 	var last *Block
 	var open []*Section
 	var lists []int // content columns of the open list items
@@ -114,8 +122,22 @@ func Parse(src []byte) (*Document, error) {
 				pos = next
 				continue
 			}
+			if b.IsInclude() {
+				// Includes have no name: give them an id nothing can
+				// refer to, and leave block-N numbering alone.
+				if b.ID != "" {
+					return nil, fmt.Errorf("line %d: an include block has no name; drop #%s", lineNo(src, pos), b.ID)
+				}
+				includes++
+				b.ID = fmt.Sprintf("<include-%d", includes)
+				b.Output = Span{next, next}
+				d.Blocks = append(d.Blocks, b)
+				last = b
+				pos = next
+				continue
+			}
 			if b.ID == "" {
-				b.ID = fmt.Sprintf("block-%d", len(d.Blocks)+1)
+				b.ID = fmt.Sprintf("block-%d", len(d.Blocks)-includes+1)
 			}
 			if ids[b.ID] {
 				return nil, fmt.Errorf("line %d: duplicate block id %q", lineNo(src, pos), b.ID)
@@ -168,6 +190,11 @@ func Parse(src []byte) (*Document, error) {
 		return nil, fmt.Errorf("line %d: mdsh:if without mdsh:end", lineNo(src, open[len(open)-1].If.Start))
 	}
 	for _, b := range d.Blocks {
+		if b.IsInclude() {
+			if _, err := b.Include(); err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNo(src, b.Span.Start), err)
+			}
+		}
 		for _, a := range condAttrs {
 			if v, ok := b.Attrs[a]; ok {
 				if _, err := ParseCond(v); err != nil {
@@ -251,6 +278,7 @@ func closesFence(line []byte, f fence) bool {
 func readFence(src []byte, start, bodyStart int, f fence, quote, col int) (*Block, int) {
 	var body bytes.Buffer
 	pos := bodyStart
+	bodyEnd := -1
 	for pos < len(src) {
 		end := lineEnd(src, pos)
 		line, q := stripQuotes(src[pos:end], quote)
@@ -263,21 +291,28 @@ func readFence(src []byte, start, bodyStart int, f fence, quote, col int) (*Bloc
 		}
 		line = line[min(sp, col):]
 		if closesFence(line, f) {
+			bodyEnd = pos
 			pos = end
 			break
 		}
 		body.Write(trimIndent(line, f.indent))
 		pos = end
 	}
+	if bodyEnd < 0 {
+		bodyEnd = pos
+	}
 	lang, attrs := ParseInfo(f.info)
 	return &Block{
-		ID:    attrs["#"],
-		Lang:  lang,
-		Attrs: attrs,
-		Body:  body.String(),
-		Span:  Span{start, pos},
-		quote: quote,
-		col:   col,
+		ID:       attrs["#"],
+		Lang:     lang,
+		Attrs:    attrs,
+		Body:     body.String(),
+		Span:     Span{start, pos},
+		BodySpan: Span{bodyStart, bodyEnd},
+		Fence:    strings.Repeat(string(f.char), f.n),
+		Info:     f.info,
+		quote:    quote,
+		col:      col,
 	}, pos
 }
 

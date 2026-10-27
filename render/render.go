@@ -4,6 +4,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
@@ -71,6 +72,29 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 			continue
 		}
 
+		var r *run.Result
+		if i < len(results) {
+			r = results[i]
+		}
+		if b.IsInclude() {
+			// Includes are part of the prose, so the hide flags leave
+			// them alone.
+			if !shown(b, "show") {
+				pos = skipBlankLine(src, pos)
+				continue
+			}
+			writeInclude(&buf, src, b, r, opts.WriteBack)
+			switch {
+			case opts.HideOutput:
+			case r != nil && r.Err != nil:
+				buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+				buf.WriteString(indent(Output(r, true), b.Prefix))
+			case r == nil || !r.Ran:
+				buf.Write(src[b.Span.End:b.Output.End])
+			}
+			continue
+		}
+
 		showCode := !(opts.HideCode && run.Runnable(b)) && shown(b, "show")
 		showOutput := !opts.HideOutput && shown(b, "show-output")
 		if showCode {
@@ -81,10 +105,6 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 				pos = skipBlankLine(src, pos)
 			}
 			continue
-		}
-		var r *run.Result
-		if i < len(results) {
-			r = results[i]
 		}
 		if r == nil || !r.Ran {
 			if showCode {
@@ -221,8 +241,9 @@ func skipBlankLine(src []byte, pos int) int {
 }
 
 // Prose renders d with every runnable block and all output left out.
-func Prose(d *doc.Document, env []string) []byte {
-	return Markdown(d, nil, Options{HideCode: true, HideOutput: true, Env: env})
+// results may hold the include blocks' lines, as from run.Includes.
+func Prose(d *doc.Document, results []*run.Result, env []string) []byte {
+	return Markdown(d, results, Options{HideCode: true, HideOutput: true, Env: env})
 }
 
 // Output renders one block's result as the markdown that follows it.
@@ -271,6 +292,61 @@ func Output(r *run.Result, withStderr bool) string {
 		b.WriteString(Fence("output", fmt.Sprintf("for=%s stream=stderr", attrValue(id)), stderr))
 	}
 	return b.String()
+}
+
+// writeInclude writes include block b with the lines r read as its body.
+// Printing numbers the lines if b asks for it; write-back stores them as
+// they are. Without lines, b is written as it is in src.
+func writeInclude(buf *bytes.Buffer, src []byte, b *doc.Block, r *run.Result, writeBack bool) {
+	if r == nil || !r.Ran || r.Err != nil {
+		buf.Write(src[b.Span.Start:b.Span.End])
+		return
+	}
+	body := withNewline(string(r.Stdout))
+	if inc, _ := b.Include(); inc.Numbered && !writeBack {
+		body = numberLines(body, max(inc.From, 1))
+	}
+	open := string(src[b.Span.Start:lineEnd(src, b.Span.Start)])
+	closing := string(src[b.BodySpan.End:b.Span.End])
+	// A longer fence keeps the lines from closing it.
+	if n := fenceLen(b.Fence[0], body); n > len(b.Fence) || closing == "" || !strings.HasSuffix(open, "\n") {
+		head := b.Lead
+		if head == "" {
+			head = b.Prefix
+		}
+		f := strings.Repeat(b.Fence[:1], max(n, len(b.Fence)))
+		open, closing = head+f+b.Info+"\n", b.Prefix+f+"\n"
+	}
+	buf.WriteString(open)
+	buf.WriteString(indent(body, b.Prefix))
+	buf.WriteString(closing)
+}
+
+// numberLines starts each line of s with its number, counting from first.
+func numberLines(s string, first int) string {
+	lines := strings.SplitAfter(strings.TrimSuffix(s, "\n"), "\n")
+	w := len(strconv.Itoa(first + len(lines) - 1))
+	var b strings.Builder
+	for i, line := range lines {
+		fmt.Fprintf(&b, "%*d  %s", w, first+i, line)
+	}
+	return withNewline(b.String())
+}
+
+// fenceLen returns the length of a fence of c that no run of c in s can
+// close: at least 3, and longer than the longest run.
+func fenceLen(c byte, s string) int {
+	n, run := 3, 0
+	for i := 0; i < len(s); i++ {
+		if s[i] != c {
+			run = 0
+			continue
+		}
+		if run++; run >= n {
+			n = run + 1
+		}
+	}
+	return n
 }
 
 // Fence wraps body in a backtick fence long enough that body can't close it.

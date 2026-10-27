@@ -145,7 +145,16 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 	// Both hidden: print the prose only, without running anything.
 	if *hideCode && *hideOutput && !*write {
-		return print(stdout, render.Prose(d, os.Environ()), styled)
+		results := run.Includes(d, run.Options{File: file})
+		if err := print(stdout, render.Prose(d, results, os.Environ()), styled); err != nil {
+			return err
+		}
+		for _, r := range results {
+			if r.Failed() {
+				return errFailed
+			}
+		}
+		return nil
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -173,7 +182,11 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 				if e.Result.Failed() {
 					status = "failed"
 				}
-				fmt.Fprintf(stderr, "%s: %s\n", e.Block.ID, status)
+				name := e.Block.ID
+				if e.Block.IsInclude() {
+					name = "include " + e.Block.Attrs["file"]
+				}
+				fmt.Fprintf(stderr, "%s: %s\n", name, status)
 			}
 		}
 	}
