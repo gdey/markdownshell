@@ -216,9 +216,10 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()}
 	// When the run stops to ask, print the document as it goes, so each
 	// question comes after the prose and code it is about, and each
-	// block's output shows before the next question.
+	// block's output shows before the next question. With -w this is
+	// printed as well as written, in place of the status lines.
 	var live *streamer
-	if !*write && *pdfFile == "" && asks(d, opts) {
+	if *pdfFile == "" && asks(d, opts) {
 		live = newStreamer(d, stdout, styled, renderOpts)
 		opts.OnEvent = live.event
 	}
@@ -227,6 +228,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if abs, err := filepath.Abs(target); err == nil {
 			opts.LinkDir = filepath.Dir(abs)
 		}
+	}
+	if *write && live == nil {
 		opts.OnEvent = func(e run.Event) {
 			if e.Kind == run.Done {
 				status := "ok"
