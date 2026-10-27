@@ -110,6 +110,26 @@ func TestWriteShowsFailure(t *testing.T) {
 	}
 }
 
+// TestWriteStep checks that a step-wise run with -w prints the document
+// as well as writing it.
+func TestWriteStep(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	os.WriteFile(f, []byte("# T\n\n```sh {#a}\necho out; echo oops >&2; false\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"-w", "--step", "--yes", "--no-color", f}, nil, &out, &errb); rc == 0 {
+		t.Fatal("rc = 0, want failure")
+	}
+	if s := out.String(); !strings.HasPrefix(s, "# T\n") || !strings.Contains(s, "out\n```") || !strings.Contains(s, "oops\n") {
+		t.Errorf("stdout = %q", s)
+	}
+	if b, _ := os.ReadFile(f); !strings.Contains(string(b), "out\n```") {
+		t.Errorf("file = %s", b)
+	}
+	if strings.Contains(errb.String(), "a: failed") {
+		t.Errorf("stderr = %q, want no status lines", errb.String())
+	}
+}
+
 func TestYesFlag(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "d.md")
