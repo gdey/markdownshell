@@ -29,7 +29,7 @@ closing line, the `---` is just a thematic break.
 
 | Key | Values | Default | What it does |
 | --- | --- | --- | --- |
-| `shell` | path to a shell | `/bin/sh` | The shell that runs every `sh` block, in every env |
+| `shell` | path to a shell | `/bin/sh`, or `zsh` if any block is `zsh` | The shell that runs every block, in every env |
 | `on_error` | `continue`, `stop` | `continue` | Whether a failing block stops the run |
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
@@ -37,9 +37,11 @@ closing line, the `---` is just a thematic break.
 
 ### `shell`
 
-The shell binary that runs blocks. It must be a POSIX shell, since mdsh
-defines its helpers (`md_table` and friends) as POSIX shell functions. On
-Windows, point it at a POSIX shell such as Git Bash's `bash.exe`.
+The shell binary that runs blocks. It must be a POSIX shell or zsh, since
+mdsh defines its helpers (`md_table` and friends) as POSIX shell functions.
+When it's unset, a document with any `zsh` block runs in `zsh` and every
+other document runs in `/bin/sh`. On Windows, point it at a POSIX shell such
+as Git Bash's `bash.exe`.
 
 ### `on_error`
 

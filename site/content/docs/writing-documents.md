@@ -35,8 +35,11 @@ hello from a sub-env
 
 - `#name` gives a block an id. Unlabeled blocks get `block-N` by position.
   Ids must be unique.
-- Every `sh` block runs. Other languages are left alone, and `skip` turns a
-  block off.
+- Every `sh` and `zsh` block runs. Other languages are left alone, and
+  `skip` turns a block off.
+- Blocks run in `/bin/sh`, or in `zsh` when the document has any `zsh`
+  block. `shell:` under `mdsh:` in the front matter picks another shell.
+  Each env is one shell, so every block in the document runs in it.
 - mdsh reads only the `mdsh:` key of the front matter, so other tools' keys
   can live alongside it. Block attributes override it. Every option is
   listed in [Front matter]({{< relref "front-matter" >}}).

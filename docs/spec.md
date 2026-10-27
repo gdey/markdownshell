@@ -182,7 +182,7 @@ Settled on 2026-10-27.
 - **Output format:** an `output` fence under each block.
 - **Sharing:** vars only flow down in v1.
 - **On failure:** continue by default, configurable with `on_error`; an explicit `exit` always stops the run.
-- **Shell:** `/bin/sh` by default, `shell:` in front matter to change it.
+- **Shell:** `/bin/sh` by default, `zsh` when the document has any `zsh` block, `shell:` in front matter to change it. `sh` and `zsh` blocks run; every block in a document runs in the same shell.
 - **Custom language:** after v1.
 - **Confirm:** a `confirm` block asks to run or stop; `--yes` skips the question.
 - **Images:** `out=image` for image bytes, `out=screenshot` to draw text output as an image.

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/run"
 )
 
 // completionCmd prints a completion script:
@@ -43,7 +44,7 @@ func blocksCmd(args []string, stdout io.Writer) error {
 		return nil
 	}
 	for _, b := range d.Blocks {
-		if b.Lang == "sh" {
+		if run.Runnable(b) {
 			fmt.Fprintln(stdout, b.ID)
 		}
 	}

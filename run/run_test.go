@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -267,5 +268,42 @@ func TestConfirm(t *testing.T) {
 	r = byID(results)
 	if err != nil || !r["deploy"].Ran || !r["after"].Ran {
 		t.Errorf("accepted: err=%v deploy=%v after=%v", err, r["deploy"].Ran, r["after"].Ran)
+	}
+}
+
+func TestShell(t *testing.T) {
+	for src, want := range map[string]string{
+		"```sh\necho\n```\n":                                       "",
+		"```sh\necho\n```\n```zsh\necho\n```\n":                    "zsh",
+		"---\nmdsh:\n  shell: /bin/bash\n---\n```zsh\necho\n```\n": "/bin/bash",
+	} {
+		d, err := doc.Parse([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := run.Shell(d); got != want {
+			t.Errorf("Shell(%q) = %q, want %q", src, got, want)
+		}
+	}
+}
+
+func TestZsh(t *testing.T) {
+	if _, err := exec.LookPath("zsh"); err != nil {
+		t.Skip("zsh not installed")
+	}
+	src := "```zsh {#a}\narr=(one two)\nexport X=\"a b\"\nf() { print -r -- \"f $1\" }\n```\n" +
+		"```sh {#b}\nfor w in $X; do echo \"w=$w\"; done\nf ${arr[1]}\n```\n" +
+		"```zsh {#bad}\necho $(( 1 +\n```\n" +
+		"```zsh {#c env=sub}\necho \"sub $X\" ${+ZSH_VERSION}\n```\n"
+	_, results := runDoc(t, src, run.Options{})
+	r := byID(results)
+	if got := string(r["b"].Stdout); got != "w=a b\nf one\n" {
+		t.Errorf("b stdout = %q, stderr %q", got, r["b"].Stderr)
+	}
+	if r["bad"].Status == 0 || r["bad"].Exited {
+		t.Errorf("bad: status %d exited %v", r["bad"].Status, r["bad"].Exited)
+	}
+	if got := string(r["c"].Stdout); got != "sub a b 1\n" {
+		t.Errorf("c stdout = %q, stderr %q", got, r["c"].Stderr)
 	}
 }
