@@ -1,0 +1,27 @@
+# baseURL is set at build time by the Pages workflow (--baseURL), so moving
+# to a custom domain needs no change here.
+baseURL = "http://localhost:1313/"
+languageCode = "en-us"
+title = "mdsh"
+enableRobotsTXT = true
+disableKinds = ["taxonomy", "term"]
+
+[params]
+  description = "Run the code blocks in a markdown file, like a notebook whose file format is plain markdown."
+  repo = "https://github.com/gdey/markdownshell"
+
+[markup.highlight]
+  noClasses = false
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+[menus]
+  [[menus.main]]
+    name = "Docs"
+    pageRef = "/docs"
+    weight = 10
+  [[menus.main]]
+    name = "GitHub"
+    url = "https://github.com/gdey/markdownshell"
+    weight = 20

@@ -1,0 +1,8 @@
+<nav class="docs-nav" aria-label="Documentation">
+  {{ with site.GetPage "/docs" }}
+  <a href="{{ .RelPermalink }}"{{ if eq . $ }} aria-current="page"{{ end }}>Overview</a>
+  {{ range .Pages.ByWeight }}
+  <a href="{{ .RelPermalink }}"{{ if eq . $ }} aria-current="page"{{ end }}>{{ .Title }}</a>
+  {{ end }}
+  {{ end }}
+</nav>

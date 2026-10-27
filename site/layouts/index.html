@@ -1,0 +1,16 @@
+{{ define "main" }}
+<section class="hero">
+  <div class="wrap">
+    <h1>Markdown that runs.</h1>
+    <p class="lede">{{ site.Params.description }}</p>
+    <pre class="install"><code>go install github.com/gdey/markdownshell/cmd/mdsh@latest</code></pre>
+    <p class="cta">
+      <a class="button" href="{{ "docs/getting-started/" | relURL }}">Get started</a>
+      <a class="button ghost" href="{{ site.Params.repo }}">View on GitHub</a>
+    </p>
+  </div>
+</section>
+<div class="wrap prose">
+  {{ .Content }}
+</div>
+{{ end }}
