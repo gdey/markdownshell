@@ -43,5 +43,8 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh --version`.
 - Release archives for Linux, macOS and Windows (amd64 and arm64), built
   by goreleaser when a `v*` tag is pushed.
+- Runbooks in `examples/runbooks` (release checklist, system report,
+  Linux and macOS triage, test coverage report), run as tests on the OS
+  each is for.
 - Design spec in `docs/spec.md`, roadmap in `docs/plan.md`, and a
   literate example in `examples/hello.md`.
