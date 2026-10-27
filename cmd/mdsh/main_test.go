@@ -157,3 +157,70 @@ func TestNoRun(t *testing.T) {
 		t.Errorf("file changed:\n%s", b)
 	}
 }
+
+func TestPDF(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "in.md")
+	src := "# Doc\n\n```sh {#a}\necho hi\n```\n"
+	os.WriteFile(in, []byte(src), 0o644)
+
+	// --pdf replaces printing.
+	out := filepath.Join(dir, "doc.pdf")
+	var stdout, stderr bytes.Buffer
+	if rc := mdsh([]string{"--pdf", out, "--hide-code", in}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want nothing", stdout.String())
+	}
+	if b, _ := os.ReadFile(out); !bytes.HasPrefix(b, []byte("%PDF-")) {
+		t.Errorf("%s is not a PDF", out)
+	}
+
+	// --pdf - writes it to stdout; prose-only runs nothing.
+	stdout.Reset()
+	if rc := mdsh([]string{"--pdf", "-", "--hide-code", "--hide-output", in}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	if !bytes.HasPrefix(stdout.Bytes(), []byte("%PDF-")) {
+		t.Errorf("stdout is not a PDF: %q", stdout.String()[:min(stdout.Len(), 20)])
+	}
+
+	// With -o both the markdown and the PDF are written.
+	md := filepath.Join(dir, "out.md")
+	os.Remove(out)
+	stdout.Reset()
+	if rc := mdsh([]string{"-o", md, "--pdf", out, in}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	if b, _ := os.ReadFile(md); !strings.Contains(string(b), "```output {for=a exit=0}\nhi\n```") {
+		t.Errorf("out.md = %s", b)
+	}
+	if b, _ := os.ReadFile(out); !bytes.HasPrefix(b, []byte("%PDF-")) {
+		t.Errorf("%s is not a PDF", out)
+	}
+
+	// -n lays out the saved output without running anything.
+	os.Remove(out)
+	stdout.Reset()
+	if rc := mdsh([]string{"-n", "--pdf", out, md}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("-n: rc = %d, stderr %s", rc, stderr.String())
+	}
+	if b, _ := os.ReadFile(out); stdout.Len() != 0 || !bytes.HasPrefix(b, []byte("%PDF-")) {
+		t.Errorf("-n --pdf: stdout %q, %s not a PDF", stdout.String(), out)
+	}
+}
+
+// TestPDFExamples checks that the examples still lay out as PDFs.
+func TestPDFExamples(t *testing.T) {
+	for _, name := range []string{"hello.md", "include.md", "report.md"} {
+		t.Run(name, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "out.pdf")
+			var stdout, stderr bytes.Buffer
+			mdsh([]string{"--yes", "--pdf", out, filepath.Join("..", "..", "examples", name)}, nil, &stdout, &stderr)
+			if b, err := os.ReadFile(out); err != nil || !bytes.HasPrefix(b, []byte("%PDF-")) {
+				t.Errorf("no PDF (%v), stderr %s", err, stderr.String())
+			}
+		})
+	}
+}

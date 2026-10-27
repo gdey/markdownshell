@@ -177,6 +177,7 @@ mdsh --hide-output notes.md
 mdsh --hide-code --hide-output notes.md   # prose only, nothing runs
 mdsh -n notes.md           # print with the output saved by -w; nothing runs
 mdsh -n -o view.md notes.md  # save that printout to view.md instead
+mdsh --pdf notes.pdf notes.md   # what it would print, as a PDF
 mdsh --only greet notes.md # one block, plus what it depends on
 mdsh --yes notes.md        # run confirm blocks without asking
 ```
@@ -192,6 +193,25 @@ source <(mdsh completion zsh)                  # or zsh, after compinit in ~/.zs
 
 Printed markdown is styled when stdout is a terminal; `--color=never`,
 `--no-color` or `NO_COLOR` turn that off.
+
+## PDF output
+
+`--pdf FILE` lays out what mdsh would print as a PDF, so a run can be
+shared as a report. The hide flags and `--only` apply, and with `-w` or
+`-o` the markdown is written too:
+
+```sh
+mdsh --pdf report.pdf report.md                 # run, write the PDF
+mdsh --hide-code --pdf report.pdf report.md     # prose and output only
+mdsh -w --pdf report.pdf report.md              # update the file and the PDF
+mdsh -n --pdf report.pdf report.md              # the output saved by -w; nothing runs
+```
+
+It's pure Go, with no external tools. Output shows in a terminal-style box,
+stderr in red, `out=screenshot` output as text, and `number_on` includes
+with a line-number gutter. [examples/report.md](examples/report.md) shows
+each of these, and [examples/pdf](examples/pdf) holds the PDFs of it,
+[hello.md](examples/hello.md) and [include.md](examples/include.md).
 
 ## Blocks
 

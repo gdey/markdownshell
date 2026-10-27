@@ -54,6 +54,8 @@ a { color: var(--accent); }
 .prose h1 { font-size: 34px; margin: 0 0 16px; }
 .prose h2 { margin-top: 40px; padding-top: 8px; }
 .prose img { max-width: 100%; }
+/* PDF page previews: white paper on any theme. */
+.prose img[src*="images/pdf/"] { display: block; width: 520px; background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(0, 0, 0, .12); margin: 16px 0; }
 .prose table { border-collapse: collapse; display: block; overflow-x: auto; margin: 16px 0; }
 .prose th, .prose td { border: 1px solid var(--line); padding: 6px 12px; text-align: left; vertical-align: top; }
 .prose th { background: var(--code-bg); }

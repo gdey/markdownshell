@@ -4,12 +4,14 @@ package textimg
 
 import (
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"html"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
+	"io"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -94,6 +96,64 @@ func SVG(text string) []byte {
 	}
 	b.WriteString("</g></svg>\n")
 	return b.Bytes()
+}
+
+// FromSVG recovers the text of an SVG that SVG made. ok is false for any
+// other SVG.
+func FromSVG(svg []byte) (text string, ok bool) {
+	dec := xml.NewDecoder(bytes.NewReader(svg))
+	var lines []string
+	var y int
+	mono := false
+	for {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", false
+		}
+		se, isStart := tok.(xml.StartElement)
+		if !isStart {
+			continue
+		}
+		switch se.Name.Local {
+		case "g":
+			mono = strings.HasPrefix(attr(se, "font-family"), "ui-monospace")
+		case "text":
+			if !mono {
+				return "", false
+			}
+			if _, err := fmt.Sscan(attr(se, "y"), &y); err != nil {
+				return "", false
+			}
+			var body string
+			if err := dec.DecodeElement(&body, &se); err != nil {
+				return "", false
+			}
+			i := (y-pad+5)/lineHeight - 1
+			if i < 0 || i > 1<<16 {
+				return "", false
+			}
+			for len(lines) <= i {
+				lines = append(lines, "")
+			}
+			lines[i] = body
+		}
+	}
+	if !mono {
+		return "", false
+	}
+	return strings.Join(lines, "\n"), true
+}
+
+func attr(se xml.StartElement, name string) string {
+	for _, a := range se.Attr {
+		if a.Name.Local == name {
+			return a.Value
+		}
+	}
+	return ""
 }
 
 // PNG renders text as a terminal-style PNG at 2x scale, using Go Mono.
