@@ -116,6 +116,13 @@ with `--pdf`: you answer each prompt, then mdsh writes the PDF, with saved
 output for the blocks you skipped. See
 [PDF output]({{< relref "pdf#stepping-through-a-run" >}}).
 
+When a run can ask, because of `--step`, `step: true` or a `confirm`
+block, mdsh prints the document as it goes rather than all at the end:
+the prose and code up to each block before asking about it, and the
+block's output, stderr included if it failed, as soon as it finishes.
+With `-w` there is nothing to print, so a failed block's output and
+stderr go to stderr along with its status line.
+
 ## Including files
 
 A block marked `<include` holds lines from another file, so a doc can show

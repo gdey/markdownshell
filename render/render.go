@@ -33,7 +33,16 @@ type Options struct {
 // without a result, or that didn't run, keep the output already in the
 // file. results may be nil, and is matched to blocks by position.
 func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
-	var buf bytes.Buffer
+	return bytes.Join(Pieces(d, results, opts), nil)
+}
+
+// Pieces renders d like Markdown, cut at its blocks so a run can print
+// the document as it goes. For block i, piece 3i is the prose before it,
+// 3i+1 the block and 3i+2 its output; the last piece is the prose after
+// the last block. results may hold nil for blocks that haven't finished.
+func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
+	bufs := make([]bytes.Buffer, 3*len(d.Blocks)+1)
+	buf := &bufs[0]
 	src := d.Src
 	lookup := run.NewLookup(d, results, opts.Env)
 
@@ -53,7 +62,7 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 	}
 	prose := func(from, to int) {
 		for _, k := range keep(from, to, cuts) {
-			writeProse(&buf, d, k.Start, k.End, results, lookup, opts.WriteBack)
+			writeProse(buf, d, k.Start, k.End, results, lookup, opts.WriteBack)
 		}
 	}
 	// Display conditions are checked after the block, so {{$?}} is its
@@ -66,8 +75,10 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 
 	pos := 0
 	for i, b := range d.Blocks {
+		buf = &bufs[3*i]
 		prose(pos, b.Span.Start)
 		pos = b.Output.End
+		buf = &bufs[3*i+1]
 		if inCut(b.Span.Start, cuts) {
 			continue
 		}
@@ -83,7 +94,8 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 				pos = skipBlankLine(src, pos)
 				continue
 			}
-			writeInclude(&buf, src, b, r, opts.WriteBack)
+			writeInclude(buf, src, b, r, opts.WriteBack)
+			buf = &bufs[3*i+2]
 			switch {
 			case opts.HideOutput:
 			case r != nil && r.Err != nil:
@@ -100,6 +112,7 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 		if showCode {
 			buf.Write(src[b.Span.Start:b.Span.End])
 		}
+		buf = &bufs[3*i+2]
 		if !showOutput {
 			if !showCode {
 				pos = skipBlankLine(src, pos)
@@ -137,8 +150,13 @@ func Markdown(d *doc.Document, results []*run.Result, opts Options) []byte {
 			buf.WriteString(indent(out, b.Prefix))
 		}
 	}
+	buf = &bufs[len(bufs)-1]
 	prose(pos, len(src))
-	return buf.Bytes()
+	out := make([][]byte, len(bufs))
+	for i := range bufs {
+		out[i] = bufs[i].Bytes()
+	}
+	return out
 }
 
 // showStderr decides whether a block's stderr is shown: its show-stderr=

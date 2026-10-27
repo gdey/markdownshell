@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -54,6 +56,57 @@ func TestStepFlag(t *testing.T) {
 	var out, errb bytes.Buffer
 	if rc := mdsh([]string{"--step", "--yes", "--no-color", f}, nil, &out, &errb); rc != 0 || !strings.Contains(out.String(), "```output") {
 		t.Errorf("rc = %d, stdout %s, stderr %s", rc, out.String(), errb.String())
+	}
+}
+
+// TestStream checks that a run that asks prints the document as it
+// goes: each question comes after the prose and code before it, and a
+// failed block's output and stderr show before the next question.
+func TestStream(t *testing.T) {
+	d, err := doc.Parse([]byte("# T\n\n```sh {#a}\necho out; echo oops >&2; false\n```\n\nnext\n\n```sh {#b}\necho b\n```\n\nend\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	live := newStreamer(d, &out, false, render.Options{})
+	var seen []string
+	results, err := run.Run(context.Background(), d, run.Options{
+		Step:    true,
+		OnEvent: live.event,
+		Confirm: func(b *doc.Block) run.Answer {
+			live.upTo(b)
+			seen = append(seen, out.String())
+			return run.Go
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := live.finish(results); err != nil {
+		t.Fatal(err)
+	}
+	if want := "# T\n\n```sh {#a}\necho out; echo oops >&2; false\n```\n"; seen[0] != want {
+		t.Errorf("before a: %q, want %q", seen[0], want)
+	}
+	if !strings.Contains(seen[1], "out\n```") || !strings.Contains(seen[1], "oops") || !strings.HasSuffix(seen[1], "next\n\n```sh {#b}\necho b\n```\n") {
+		t.Errorf("before b: %q", seen[1])
+	}
+	if want := string(render.Markdown(d, results, render.Options{})); out.String() != want {
+		t.Errorf("streamed %q, want %q", out.String(), want)
+	}
+}
+
+// TestWriteShowsFailure checks that -w prints a failed block's output,
+// since it goes to the file and not to the screen.
+func TestWriteShowsFailure(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	os.WriteFile(f, []byte("```sh {#a}\necho out; echo oops >&2; false\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"-w", f}, nil, &out, &errb); rc == 0 {
+		t.Fatal("rc = 0, want failure")
+	}
+	if s := errb.String(); !strings.Contains(s, "a: failed") || !strings.Contains(s, "out\n") || !strings.Contains(s, "oops\n") {
+		t.Errorf("stderr = %q", s)
 	}
 }
 

@@ -90,3 +90,29 @@ func TestNested(t *testing.T) {
 		t.Errorf("hide code, kept output:\ngot  %q\nwant %q", got, hidden)
 	}
 }
+
+func TestPieces(t *testing.T) {
+	src := "# T\n\n```sh {#a}\necho a\n```\n\nmid\n\n```sh {#b}\nfalse\n```\n\nend\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Stdout: []byte("a\n")},
+		nil, // b hasn't finished
+	}
+	pieces := Pieces(d, results, Options{})
+	want := []string{
+		"# T\n\n", "```sh {#a}\necho a\n```\n", "\n```output {for=a exit=0}\na\n```\n",
+		"\nmid\n\n", "```sh {#b}\nfalse\n```\n", "",
+		"\nend\n",
+	}
+	if len(pieces) != len(want) {
+		t.Fatalf("got %d pieces, want %d: %q", len(pieces), len(want), pieces)
+	}
+	for i := range want {
+		if string(pieces[i]) != want[i] {
+			t.Errorf("piece %d = %q, want %q", i, pieces[i], want[i])
+		}
+	}
+}

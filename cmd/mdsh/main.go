@@ -8,6 +8,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -212,6 +213,15 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			opts.File = abs
 		}
 	}
+	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()}
+	// When the run stops to ask, print the document as it goes, so each
+	// question comes after the prose and code it is about, and each
+	// block's output shows before the next question.
+	var live *streamer
+	if !*write && *pdfFile == "" && asks(d, opts) {
+		live = newStreamer(d, stdout, styled, renderOpts)
+		opts.OnEvent = live.event
+	}
 	if *write {
 		// Image links are written relative to the output file.
 		if abs, err := filepath.Abs(target); err == nil {
@@ -228,6 +238,11 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 					name = "include " + e.Block.Attrs["file"]
 				}
 				fmt.Fprintf(stderr, "%s: %s\n", name, status)
+				// The output goes to the file, so show why it failed
+				// here too.
+				if e.Result.Failed() {
+					io.WriteString(stderr, render.Output(e.Result, true))
+				}
 			}
 		}
 	}
@@ -236,7 +251,18 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
 	} else if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
 		defer tty.Close()
-		opts.Confirm = newPrompter(tty, tty).confirm
+		p := newPrompter(tty, tty)
+		// The streamed document already shows the code, unless it is
+		// hidden.
+		p.quiet = live != nil && !*hideCode
+		opts.Confirm = p.confirm
+	}
+	if live != nil && opts.Confirm != nil {
+		confirm := opts.Confirm
+		opts.Confirm = func(b *doc.Block) run.Answer {
+			live.upTo(b)
+			return confirm(b)
+		}
 	}
 
 	results, runErr := run.Run(ctx, d, opts)
@@ -262,8 +288,12 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			return err
 		}
 	}
-	if !*write || *pdfFile != "" {
-		out := render.Markdown(d, results, render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()})
+	if live != nil {
+		if err := live.finish(results); err != nil {
+			return err
+		}
+	} else if !*write || *pdfFile != "" {
+		out := render.Markdown(d, results, renderOpts)
 		if err := show(out, opts.LinkDir); err != nil {
 			return err
 		}
@@ -279,12 +309,83 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	return nil
 }
 
+// asks reports whether a run of d may stop to ask before a block.
+func asks(d *doc.Document, opts run.Options) bool {
+	if opts.Step || d.Options.Step {
+		return true
+	}
+	for _, b := range d.Blocks {
+		if b.Attrs.Has("confirm") {
+			return true
+		}
+	}
+	return false
+}
+
+// streamer prints the rendered document as a run reaches each block:
+// the prose and code before the block starts, its output once it is
+// done, and the rest at the end.
+type streamer struct {
+	d       *doc.Document
+	print   func(md []byte) error
+	opts    render.Options
+	index   map[*doc.Block]int
+	results []*run.Result
+	printed int // pieces printed so far
+	err     error
+}
+
+func newStreamer(d *doc.Document, w io.Writer, styled bool, opts render.Options) *streamer {
+	s := &streamer{d: d, print: newPrinter(w, styled), opts: opts, index: map[*doc.Block]int{}, results: make([]*run.Result, len(d.Blocks))}
+	for i, b := range d.Blocks {
+		s.index[b] = i
+	}
+	return s
+}
+
+func (s *streamer) event(e run.Event) {
+	switch e.Kind {
+	case run.Started:
+		s.upTo(e.Block)
+	case run.Done:
+		i := s.index[e.Block]
+		s.results[i] = e.Result
+		s.flush(3*i + 3)
+	}
+}
+
+// upTo prints everything before b's output.
+func (s *streamer) upTo(b *doc.Block) { s.flush(3*s.index[b] + 2) }
+
+// flush prints the pieces before piece n that aren't printed yet.
+func (s *streamer) flush(n int) {
+	if n <= s.printed || s.err != nil {
+		return
+	}
+	pieces := render.Pieces(s.d, s.results, s.opts)
+	md := bytes.Join(pieces[s.printed:n], nil)
+	s.printed = n
+	if len(md) > 0 {
+		s.err = s.print(md)
+	}
+}
+
+// finish prints the rest of the document with the run's final results.
+func (s *streamer) finish(results []*run.Result) error {
+	s.results = results
+	s.flush(3*len(s.d.Blocks) + 1)
+	return s.err
+}
+
 // prompter asks whether to run blocks. It remembers the [o] answer,
 // which skips every later block that has output saved in the file.
 type prompter struct {
 	in        *bufio.Reader
 	out       io.Writer
 	skipSaved bool
+	// quiet leaves the block's code out of the question, for when it
+	// has just been printed.
+	quiet bool
 }
 
 func newPrompter(in io.Reader, out io.Writer) *prompter {
@@ -306,7 +407,11 @@ func (p *prompter) confirm(b *doc.Block) run.Answer {
 	if b.HasOutput() {
 		saved = " (has saved output)"
 	}
-	fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", b.ID, saved, b.Body)
+	if p.quiet {
+		fmt.Fprintf(p.out, "\n--- block %s%s ---\n", b.ID, saved)
+	} else {
+		fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", b.ID, saved, b.Body)
+	}
 	for {
 		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", q)
 		line, err := p.in.ReadString('\n')
@@ -330,17 +435,24 @@ func (p *prompter) confirm(b *doc.Block) run.Answer {
 	}
 }
 
-func print(w io.Writer, md []byte, styled bool) error {
+func print(w io.Writer, md []byte, styled bool) error { return newPrinter(w, styled)(md) }
+
+// newPrinter returns a func that prints markdown to w, styled if asked.
+// It sets the style up once, so it can print a document in pieces.
+func newPrinter(w io.Writer, styled bool) func(md []byte) error {
+	var r *glamour.TermRenderer
 	if styled {
-		r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(termWidth(w)))
-		if err == nil {
+		r, _ = glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(termWidth(w)))
+	}
+	return func(md []byte) error {
+		if r != nil {
 			if out, err := r.RenderBytes(md); err == nil {
 				md = out
 			}
 		}
+		_, err := w.Write(md)
+		return err
 	}
-	_, err := w.Write(md)
-	return err
 }
 
 // writeFile atomically replaces path's contents. An existing file keeps

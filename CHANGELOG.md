@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Runs that ask (`--step`, `step: true`, `confirm` blocks) print the
+  document as they go, so each prompt follows the prose and code it is
+  about and a failed block's output and stderr show before the next one.
+  With `-w`, a failed block's output and stderr go to stderr.
 - `env.share` and `share=` accept `...` for all variables (like `*`) and
   `-NAME` to leave a variable out, so `[..., -USER]` passes all but `USER`.
 - `--pdf FILE` lays out what mdsh would print as a PDF, in pure Go. The
