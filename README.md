@@ -216,6 +216,24 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image: SVG, or PNG if the path ends in `.png` |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
 
+## Including files
+
+A block marked `<include` holds lines from another file, so a doc can quote
+real code without a copy that goes stale:
+
+````markdown
+```go {<include file=cmd/main.go from=10 to=24 number_on}
+```
+````
+
+Each run writes the file's lines into the block, so it reads well on
+GitHub too. `file=` is relative to the document. `from=` and `to=` are line
+numbers counted from 1 and inclusive; `from` defaults to the start of the
+file and `to` to the end. The fence's language is the language, and
+`number_on` shows line numbers when the document is printed. An include
+block never runs and has no name. [examples/include.md](examples/include.md)
+shows each option.
+
 ## Confirming blocks
 
 A block marked `confirm` pauses the run: mdsh shows its code and asks

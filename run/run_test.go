@@ -276,6 +276,7 @@ func TestShell(t *testing.T) {
 		"```sh\necho\n```\n":                                       "",
 		"```sh\necho\n```\n```zsh\necho\n```\n":                    "zsh",
 		"---\nmdsh:\n  shell: /bin/bash\n---\n```zsh\necho\n```\n": "/bin/bash",
+		"```zsh {<include file=x}\n```\n":                          "",
 	} {
 		d, err := doc.Parse([]byte(src))
 		if err != nil {

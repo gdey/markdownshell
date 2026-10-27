@@ -108,7 +108,7 @@ func (r *Result) ExitStatus() int {
 }
 
 // Runnable reports whether mdsh knows how to run b.
-func Runnable(b *doc.Block) bool { return b.Lang == "sh" || b.Lang == "zsh" }
+func Runnable(b *doc.Block) bool { return (b.Lang == "sh" || b.Lang == "zsh") && !b.IsInclude() }
 
 // Shell is the shell d's blocks run in: the front matter's shell, else
 // zsh if any block is a zsh block, else "" for the default /bin/sh.
@@ -117,7 +117,7 @@ func Shell(d *doc.Document) string {
 		return d.Options.Shell
 	}
 	for _, b := range d.Blocks {
-		if b.Lang == "zsh" {
+		if b.Lang == "zsh" && Runnable(b) {
 			return "zsh"
 		}
 	}
@@ -151,10 +151,9 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 	})
 	defer stack.Close()
 
-	results := make([]*Result, len(d.Blocks))
-	for i, b := range d.Blocks {
-		results[i] = &Result{Block: b}
-	}
+	// Includes are part of the document, not steps of the run, so they
+	// are read whatever runs.
+	results := Includes(d, opts)
 	emit := func(e Event) {
 		if opts.OnEvent != nil {
 			opts.OnEvent(e)
@@ -171,6 +170,12 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 
 	for i, b := range d.Blocks {
 		r := results[i]
+		if b.IsInclude() {
+			if r.Ran {
+				emit(Event{Kind: Done, Block: b, Result: r})
+			}
+			continue
+		}
 		if !Runnable(b) || b.Attrs.Has("skip") || !selected[b] {
 			r.Skipped = true
 			continue

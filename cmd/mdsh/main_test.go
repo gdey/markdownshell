@@ -85,3 +85,23 @@ func TestVersion(t *testing.T) {
 		t.Errorf("got %q", out.String())
 	}
 }
+
+// TestIncludeExample checks that examples/include.md is up to date: running
+// it again writes the same file.
+func TestIncludeExample(t *testing.T) {
+	dir := filepath.Join("..", "..", "examples")
+	want, err := os.ReadFile(filepath.Join(dir, "include.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Write next to the example, so its relative paths still resolve.
+	out := filepath.Join(dir, ".test-include.md")
+	t.Cleanup(func() { os.Remove(out) })
+	var stdout, stderr bytes.Buffer
+	if rc := mdsh([]string{"-o", out, filepath.Join(dir, "include.md")}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	if got, _ := os.ReadFile(out); string(got) != string(want) {
+		t.Errorf("examples/include.md is stale; run mdsh -w on it. Got:\n%s", got)
+	}
+}

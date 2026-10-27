@@ -1,6 +1,6 @@
 ---
 title: Writing documents
-description: Blocks, attributes, front matter and output kinds.
+description: Blocks, attributes, front matter, output kinds and includes.
 weight: 20
 ---
 
@@ -67,6 +67,8 @@ hello from a sub-env
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
 
+Blocks marked `<include` take their own attributes; see [Including files](#including-files).
+
 ## Output kinds
 
 `text` (the default) fences the output. `markdown` inserts it as-is between
@@ -97,3 +99,43 @@ A block marked `confirm` pauses the run: mdsh shows its code and asks
 `confirm="Deploy to prod?"`. Pressing enter stops, which is the safe choice.
 The prompt goes to the terminal, so it works even when output is piped. With
 no terminal, the run stops there with an error unless you pass `--yes`.
+
+## Including files
+
+A block marked `<include` holds lines from another file, so a doc can show
+real code without a copy that goes stale. mdsh reads the file on every run
+and writes the lines into the block, so the document reads well anywhere
+markdown does, GitHub included.
+
+````markdown
+```go {<include file=cmd/main.go from=10 to=24 number_on}
+func main() {
+	...
+}
+```
+````
+
+| Attribute | Meaning |
+| --- | --- |
+| `<include` | Marks the block as an include |
+| `file=path` | The file to include, relative to the document's directory (required) |
+| `from=N` | First line to include, counting from 1; `0` (the default) is the start of the file |
+| `to=N` | Last line to include, inclusive; the default is the end of the file |
+| `number_on` | Show each line with its line number in the file |
+
+- The fence's language is the language the lines are shown in.
+- An include block never runs, even as `sh` or `zsh`, and has no name: `#id`,
+  `env=`, `share=`, `run=` and the other step attributes are errors on it,
+  and placeholders can't refer to it.
+- The body belongs to mdsh. Each run replaces it with the file's current
+  lines, so edits made by hand are lost.
+- `number_on` is for display. Printed markdown starts each line with its
+  number; write-back stores the plain lines, and other renderers can
+  number them their own way.
+- Includes are read on every run, even with `--only`, `--hide-code` or
+  `--hide-output`. `skip` leaves the stored lines alone and `show=` hides
+  the block. A missing file or a `from=` past the end of the file is an
+  error, shown below the block.
+
+[examples/include.md](https://github.com/gdey/markdownshell/blob/main/examples/include.md)
+in the repository shows each option.
