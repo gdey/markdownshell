@@ -38,5 +38,7 @@ follow [Semantic Versioning](https://semver.org/).
   terminal-style SVG or PNG.
 - Shell helpers for markdown output: `md_h1`–`md_h3`, `md_table`, `md_code`.
 - `mdsh completion bash|zsh`.
+- Fences inside list items and block quotes run like any other block;
+  their output is written inside the same list item or quote.
 - Design spec in `docs/spec.md`, roadmap in `docs/plan.md`, and a
   literate example in `examples/hello.md`.

@@ -7,7 +7,7 @@ says what gets built in which order and what is still open.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
-| v1: library and CLI | Parse, run and render `sh` blocks; `mdsh run` | Built, in review |
+| v1: library and CLI | Parse, run and render `sh` blocks; `mdsh run` | Merged; finishing for v1.0.0 |
 | v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | Not started |
 | Custom language | A nicer block language next to `sh` | Not started, needs its own spec |
 | GUI | Desktop or web front end on the same library | Not started |
@@ -42,9 +42,9 @@ Done:
 
 Left before tagging v1.0.0:
 
-- [ ] Merge the first PR.
+- [x] Merge the first PR.
 - [ ] Run a few real-world files through it and fix what breaks.
-- [ ] Fences nested in lists or block quotes (not recognised yet).
+- [x] Fences nested in lists or block quotes.
 - [ ] Release builds (goreleaser or similar) and install instructions.
 
 ## v2: interactive mode
