@@ -1,7 +1,9 @@
 # mdsh
 
 mdsh runs the code blocks in a markdown file, like a notebook whose file
-format is plain markdown. See [docs/spec.md](docs/spec.md) for the design and
+format is plain markdown. The documentation lives at
+**[gdey.github.io/markdownshell](https://gdey.github.io/markdownshell/)**.
+See [docs/spec.md](docs/spec.md) for the design and
 [docs/plan.md](docs/plan.md) for the roadmap.
 
 Here is [examples/hello.md](examples/hello.md), written the literate way: prose
@@ -270,6 +272,9 @@ markdown reads well without running it and keeps the last value when the
 block doesn't run. Placeholders in code blocks and inline code are left
 alone. Turn them off with `interpolate: false` under `mdsh:` in the front
 matter.
+
+Every front matter option is listed on the
+[Front matter](https://gdey.github.io/markdownshell/docs/front-matter/) page.
 
 ## Shell details
 
