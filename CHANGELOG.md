@@ -8,6 +8,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- When a run stops early, mdsh says why, before and after the rest of
+  the document: the block ended its shell (`exit`, `set -e`), failed
+  with `on_error: stop`, or you stopped at a prompt.
 - Runs that ask (`--step`, `step: true`, `confirm` blocks) print the
   document as they go, so each prompt follows the prose and code it is
   about and a failed block's output and stderr show before the next one.

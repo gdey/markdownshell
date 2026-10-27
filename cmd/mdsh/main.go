@@ -272,13 +272,17 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if results == nil {
 		return runErr
 	}
-	for _, r := range results {
-		if r.Declined && runErr == nil {
-			fmt.Fprintf(stderr, "mdsh: stopped before block %s\n", r.Block.ID)
-		}
-	}
 	if errors.Is(runErr, run.ErrNoConfirm) {
 		runErr = fmt.Errorf("%w; no terminal to ask on (use --yes to run it)", runErr)
+	}
+	// Say why the run stopped early, before the rest of the document and
+	// again after it, so it is seen whether or not that scrolls by.
+	note := ""
+	if n := stopNote(results); n != "" && runErr == nil {
+		note = "mdsh: " + n
+	}
+	if note != "" && (live != nil || (!*write && *pdfFile == "")) {
+		fmt.Fprintln(stderr, note)
 	}
 
 	if *write {
@@ -301,6 +305,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			return err
 		}
 	}
+	if note != "" {
+		fmt.Fprintln(stderr, note)
+	}
 	if runErr != nil {
 		return runErr
 	}
@@ -310,6 +317,34 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// stopNote says why a run stopped before its last block, or returns ""
+// if it didn't.
+func stopNote(results []*run.Result) string {
+	for i, r := range results {
+		switch {
+		case r.Declined:
+			return fmt.Sprintf("stopped before block %s", r.Block.ID)
+		case !r.Ran || !unreached(results[i+1:]):
+		case r.Exited:
+			return fmt.Sprintf("block %s ended its shell (exit status %d, from exit or set -e), so the run stopped there", r.Block.ID, r.Status)
+		case r.Failed():
+			return fmt.Sprintf("block %s failed (exit status %d) and the run stops on errors (on_error: stop or --stop-on-error)", r.Block.ID, r.ExitStatus())
+		}
+	}
+	return ""
+}
+
+// unreached reports whether any of results is a block the run would
+// have run but never got to.
+func unreached(results []*run.Result) bool {
+	for _, r := range results {
+		if !r.Ran && !r.Skipped && run.Runnable(r.Block) && !r.Block.Attrs.Has("skip") {
+			return true
+		}
+	}
+	return false
 }
 
 // asks reports whether a run of d may stop to ask before a block.
