@@ -86,7 +86,7 @@ _mdsh() {
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output -w -o --only --stop-on-error --yes --color --no-color -i -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output -w -o --only --stop-on-error --yes --color --no-color -i --version -h" -- "$cur"))
 		return
 	fi
 
@@ -136,6 +136,7 @@ _mdsh() {
 		'--color[style printed markdown]:when:(auto always never)' \
 		'--no-color[same as --color=never]' \
 		'-i[interactive mode]' \
+		'--version[print the version]' \
 		'-h[show help]' \
 		'1:markdown file:_files -g "*.md"' \
 		'*:block argument:_files'

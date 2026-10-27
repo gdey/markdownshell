@@ -132,9 +132,36 @@ The two images it produced:
 
 ![screenshot](examples/hello.md.assets/screenshot.png)
 
-```
-go install github.com/gdey/markdownshell/cmd/mdsh@latest
+## Install
 
+Download an archive for your system from the
+[releases page](https://github.com/gdey/markdownshell/releases), unpack it,
+and put `mdsh` on your `PATH`. Builds cover Linux, macOS and Windows on
+amd64 and arm64; `checksums.txt` lists each archive's SHA-256. For example,
+on Linux amd64:
+
+```sh
+VERSION=1.0.0
+curl -LO https://github.com/gdey/markdownshell/releases/download/v$VERSION/mdsh_${VERSION}_linux_amd64.tar.gz
+tar xzf mdsh_${VERSION}_linux_amd64.tar.gz mdsh
+sudo mv mdsh /usr/local/bin/
+mdsh --version
+```
+
+On macOS, a downloaded binary may be quarantined; `xattr -d
+com.apple.quarantine mdsh` clears it. Blocks run in `/bin/sh` by default;
+on Windows, set `shell:` under `mdsh:` in the front matter to a POSIX shell
+such as Git Bash's `bash.exe`. The Windows builds are not well tested yet.
+
+With Go 1.24 or newer you can build it instead:
+
+```sh
+go install github.com/gdey/markdownshell/cmd/mdsh@latest
+```
+
+## Usage
+
+```
 mdsh notes.md              # run, print markdown with output under each block
 mdsh -w notes.md           # run, write output back into the file
 mdsh -o out.md notes.md    # same, but into out.md; notes.md is untouched

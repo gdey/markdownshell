@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -28,6 +29,21 @@ import (
 
 func main() {
 	os.Exit(mdsh(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// version is set by release builds with -ldflags "-X main.version=...".
+var version = ""
+
+// versionString returns the release version, or the module version for a
+// go install build, or "dev".
+func versionString() string {
+	if version != "" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return "dev"
 }
 
 // errFailed means a block failed; its output already says why.
@@ -77,8 +93,13 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "interactive mode (not implemented yet)")
+	showVersion := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *showVersion {
+		fmt.Fprintln(stdout, "mdsh", versionString())
+		return nil
 	}
 	if *noColor {
 		*color = "never"
