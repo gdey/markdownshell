@@ -35,8 +35,10 @@ type Shell struct {
 	waited chan struct{}
 	pty    *ptyConn // nil unless started with Config.TTY
 	ttyRun int      // blocks run on the pty, to tell their markers apart
-	exit   int
-	mu     sync.Mutex // one Run at a time
+	// pipes are the read ends of stdout and stderr.
+	pipes []io.Closer
+	exit  int
+	mu    sync.Mutex // one Run at a time
 }
 
 // Config starts a shell.
@@ -101,6 +103,7 @@ func Start(cfg Config) (*Shell, error) {
 	if s.pty != nil {
 		s.pty.started(s.mark)
 	}
+	s.pipes = []io.Closer{stdout, stderr}
 	s.out = newDemux(stdout, s.mark)
 	s.errs = newDemux(stderr, s.mark)
 	go func() {
@@ -200,7 +203,7 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 			}
 			gotErr = true
 		case <-ctx.Done():
-			kill(s.cmd)
+			s.kill()
 			<-s.waited
 			return -1, true, ctx.Err()
 		}
@@ -213,6 +216,27 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		return 0, false, fmt.Errorf("bad status %q", outRC)
 	}
 	return rc, false, nil
+}
+
+// kill ends the shell and whatever it started, and stops reading its
+// output, so a child that outlives the kill can't keep the shell from
+// being waited for.
+func (s *Shell) kill() {
+	kill(s.cmd)
+	for _, p := range s.pipes {
+		p.Close()
+	}
+}
+
+// Exited reports whether the shell has ended, by a block calling exit or
+// by being killed.
+func (s *Shell) Exited() bool {
+	select {
+	case <-s.waited:
+		return true
+	default:
+		return false
+	}
 }
 
 // Exported returns the shell's exported variables.
@@ -248,7 +272,7 @@ func (s *Shell) Close() error {
 	select {
 	case <-s.waited:
 	default:
-		kill(s.cmd)
+		s.kill()
 		<-s.waited
 	}
 	if s.pty != nil {

@@ -8,7 +8,7 @@ says what gets built in which order and what is still open.
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | v1: library and CLI | Parse, run and render `sh` blocks; `mdsh run` | Released as v1.0.0 |
-| v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | Not started |
+| v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | In progress |
 | Custom language | A nicer block language next to `sh` | Not started, needs its own spec |
 | GUI | Desktop or web front end on the same library | Not started |
 
@@ -54,12 +54,17 @@ Done before tagging v1.0.0:
 
 Goal: `mdsh -i doc.md` opens a TUI (Bubble Tea) on the same `run` engine.
 
-- Pick or type a block; it runs in its env and its output appears under it
-  and is saved to the file.
-- Blocks typed at the prompt are appended to the document as `sh` blocks.
-- Re-running a block replaces its output.
-- `confirm` blocks ask inside the TUI instead of on `/dev/tty`.
-- Inline images in terminals that support them (kitty, iTerm2, sixel).
+- [x] `run.Session`: run one block at a time, keeping envs alive.
+- [x] Pick a block; it runs in its env and its output appears under it
+      and is saved to the file.
+- [x] Re-running a block replaces its output.
+- [x] `confirm` blocks and step mode ask inside the TUI instead of on
+      `/dev/tty`.
+- [x] Include blocks shown with `number_on` line numbers.
+- [ ] Blocks typed at the prompt are appended to the document as `sh` blocks.
+- [x] Placeholders in prose show their values, and `out=markdown` output
+      is drawn as markdown.
+- [ ] Inline images in terminals that support them (kitty, iTerm2, sixel).
 
 ## Custom language
 

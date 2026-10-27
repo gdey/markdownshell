@@ -327,7 +327,7 @@ func writeInclude(buf *bytes.Buffer, src []byte, b *doc.Block, r *run.Result, wr
 	}
 	body := withNewline(string(r.Stdout))
 	if inc, _ := b.Include(); inc.Numbered && !writeBack {
-		body = numberLines(body, max(inc.From, 1))
+		body = NumberLines(body, max(inc.From, 1))
 	}
 	open := string(src[b.Span.Start:lineEnd(src, b.Span.Start)])
 	closing := string(src[b.BodySpan.End:b.Span.End])
@@ -345,8 +345,8 @@ func writeInclude(buf *bytes.Buffer, src []byte, b *doc.Block, r *run.Result, wr
 	buf.WriteString(closing)
 }
 
-// numberLines starts each line of s with its number, counting from first.
-func numberLines(s string, first int) string {
+// NumberLines starts each line of s with its number, counting from first.
+func NumberLines(s string, first int) string {
 	lines := strings.SplitAfter(strings.TrimSuffix(s, "\n"), "\n")
 	w := len(strconv.Itoa(first + len(lines) - 1))
 	var b strings.Builder

@@ -218,6 +218,25 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestInteractiveErrors(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "doc.md")
+	os.WriteFile(file, []byte("```sh\necho hi\n```\n"), 0o644)
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-i", "-w", file}, "-w can't be used with -i"},
+		{[]string{"-i", "--pdf", "x.pdf", file}, "-pdf can't be used with -i"},
+		{[]string{"-i", "-"}, "needs a file"},
+		{[]string{"-i", file}, "needs a terminal"},
+	} {
+		var out, errb bytes.Buffer
+		if rc := mdsh(tc.args, strings.NewReader(""), &out, &errb); rc != 2 || !strings.Contains(errb.String(), tc.want) {
+			t.Errorf("%v: rc = %d, stderr %q, want %q", tc.args, rc, errb.String(), tc.want)
+		}
+	}
+}
+
 // TestIncludeExample checks that examples/include.md is up to date: running
 // it again writes the same file.
 func TestIncludeExample(t *testing.T) {

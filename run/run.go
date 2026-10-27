@@ -151,95 +151,13 @@ func Shell(d *doc.Document) string {
 // It stops early when a block ends its shell, or when a block fails and
 // on_error is stop. Blocks after the stop are returned with Ran false.
 func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) {
-	if opts.Environ == nil {
-		opts.Environ = os.Environ()
-	}
-	if opts.Dir == "" && opts.File != "" {
-		opts.Dir = filepath.Dir(opts.File)
-	}
-	shell := opts.Shell
-	if shell == "" {
-		shell = Shell(d)
-	}
-	selected, err := selectBlocks(d, opts.Only)
+	s, err := NewSession(d, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	stack := env.NewStack(env.Config{
-		Path: shell,
-		Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
-		Dir:  opts.Dir,
-		Args: opts.Args,
-		TTY:  hasTTY(d),
-	})
-	defer stack.Close()
-
-	// Includes are part of the document, not steps of the run, so they
-	// are read whatever runs.
-	results := Includes(d, opts)
-	emit := func(e Event) {
-		if opts.OnEvent != nil {
-			opts.OnEvent(e)
-		}
-	}
-
-	wanted := map[string][]string{}
-	refs := d.Refs()
-	for _, r := range results {
-		if r.Block.IsTape() && r.Ran {
-			refs = append(refs, doc.TextRefs(string(r.Stdout))...)
-		}
-	}
-	for _, ref := range refs {
-		if ref.BlockID != "" && !ref.Fact() {
-			wanted[ref.BlockID] = append(wanted[ref.BlockID], ref.Var)
-		}
-	}
-	lookup := NewLookup(d, results, opts.Environ)
-
-	for i, b := range d.Blocks {
-		r := results[i]
-		if b.IsInclude() {
-			if r.Ran {
-				emit(Event{Kind: Done, Block: b, Result: r})
-			}
-			continue
-		}
-		if !Runnable(b) || b.Attrs.Has("skip") || !selected[b] {
-			r.Skipped = true
-			continue
-		}
-		if c, ok := b.Cond("run"); ok && !c.Eval(LookupAt(lookup, d, results, b.Span.Start)) {
-			r.Skipped = true
-			continue
-		}
-		if b.Attrs.Has("confirm") || opts.Step || d.Options.Step {
-			if opts.Confirm == nil {
-				r.Declined = true
-				return results, fmt.Errorf("%w: %s", ErrNoConfirm, b.ID)
-			}
-			a := opts.Confirm(b)
-			if a == Skip {
-				r.Skipped = true
-				continue
-			}
-			if a != Go {
-				r.Declined = true
-				break
-			}
-		}
-		emit(Event{Kind: Started, Block: b})
-		runBlock(ctx, stack, d, b, r, opts, emit, wanted[b.ID], tapeFor(d, results, b), LookupAt(lookup, d, results, b.Span.Start))
-		emit(Event{Kind: Done, Block: b, Result: r})
-		if ctx.Err() != nil {
-			return results, ctx.Err()
-		}
-		if r.Exited || (r.Failed() && stopOnError(d, b, opts)) {
-			break
-		}
-	}
-	return results, nil
+	defer s.Close()
+	err = s.RunFrom(ctx, 0)
+	return s.Results(), err
 }
 
 // NewLookup resolves refs for conditions and placeholders: {{$VAR}} from

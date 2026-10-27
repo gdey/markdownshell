@@ -181,6 +181,7 @@ mdsh --pdf notes.pdf notes.md   # what it would print, as a PDF
 mdsh --only greet notes.md # one block, plus what it depends on
 mdsh --yes notes.md        # run confirm blocks without asking
 mdsh --step notes.md       # ask before every block: run, skip or stop
+mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -194,6 +195,35 @@ source <(mdsh completion zsh)                  # or zsh, after compinit in ~/.zs
 
 Printed markdown is styled when stdout is a terminal; `--color=never`,
 `--no-color` or `NO_COLOR` turn that off.
+
+## Interactive mode
+
+`mdsh -i notes.md` opens the document full screen, with its prose styled
+and each block in a box. Pick a block and run it; its output streams in
+under it and is saved to the file as soon as it finishes. Blocks keep
+their envs between runs, the same as in one `mdsh` run, so running a
+block again runs it in the env as the earlier runs left it, and replaces
+its output.
+
+| Key | Does |
+| --- | --- |
+| `j`/`k`, arrows, tab | next or previous block |
+| `g`/`G` | first or last block |
+| space, pgup/pgdn, ctrl+u/ctrl+d | scroll |
+| enter or `r` | run the block |
+| `a` | run the block and every one after it, like a normal run |
+| `w` | save now |
+| ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
+| `q` | quit |
+
+A block picked by hand runs even if it is marked `skip` or its `run=`
+condition is false; `a` honors both. `confirm` blocks, and every block
+under `--step` or `step: true` when running with `a`, ask in the footer
+with the same choices as on the command line. `--yes`, `--stop-on-error`
+and block arguments work as usual. Include blocks show the file's lines,
+numbered when they have `number_on`. `out=markdown` output is drawn as
+markdown, and placeholders in the prose show their current values. If the file changes on disk while it
+is open, mdsh won't save over it until you press `w` twice.
 
 ## PDF output
 

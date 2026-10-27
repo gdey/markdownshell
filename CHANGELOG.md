@@ -10,11 +10,22 @@ follow [Semantic Versioning](https://semver.org/).
 
 - `examples/pdf/test-coverage.pdf`, the PDF of a run of the test coverage
   report runbook.
+- `mdsh -i file.md`, interactive mode: a terminal UI (Bubble Tea) that
+  shows the document, runs blocks as you pick them, streams their output
+  under them and saves it to the file. `a` runs from the cursor to the
+  end; `confirm` and step mode ask inside the UI.
+- `run.Session` runs a document's blocks one at a time while keeping
+  their shells alive; `run.Run` is now built on it.
 
 ### Fixed
 
 - The last thing a `tty` block or tape shows, after a quiet spell, is no
   longer sometimes cut off from the terminal and the recording.
+- Stopping a block (`timeout=`, ctrl+c) no longer waits for a child that
+  outlives the kill, such as a `sleep`: mdsh stops reading the shell's
+  output instead of waiting for it to close.
+- An env whose shell exited starts a fresh shell for the next block run
+  in it.
 
 ## [1.0.0] - 2026-10-28
 

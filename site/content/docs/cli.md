@@ -18,6 +18,7 @@ weight: 50
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
 | `mdsh --step doc.md` | Asks before every block: run, skip or stop | Per flags |
+| `mdsh -i doc.md` | A full-screen UI: pick blocks and run them, see [Interactive mode](#interactive-mode) | Yes: output saved after each block |
 | `mdsh completion bash\|zsh` | A completion script | No |
 | `mdsh --version` | The version | No |
 
@@ -32,3 +33,32 @@ weight: 50
   [PDF output]({{< relref "pdf" >}}) for what goes on the page and an example.
 - Output is styled when stdout is a terminal. `--color=never`, `--no-color`
   or `NO_COLOR` turn that off.
+
+## Interactive mode
+
+`mdsh -i notes.md` opens the document full screen, with its prose styled
+and each block in a box. Pick a block and run it; its output streams in
+under it and is saved to the file as soon as it finishes. Blocks keep
+their envs between runs, the same as in one `mdsh` run, so running a
+block again runs it in the env as the earlier runs left it, and replaces
+its output.
+
+| Key | Does |
+| --- | --- |
+| `j`/`k`, arrows, tab | next or previous block |
+| `g`/`G` | first or last block |
+| space, pgup/pgdn, ctrl+u/ctrl+d | scroll |
+| enter or `r` | run the block |
+| `a` | run the block and every one after it, like a normal run |
+| `w` | save now |
+| ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
+| `q` | quit |
+
+A block picked by hand runs even if it is marked `skip` or its `run=`
+condition is false; `a` honors both. `confirm` blocks, and every block
+under `--step` or `step: true` when running with `a`, ask in the footer
+with the same choices as on the command line. `--yes`, `--stop-on-error`
+and block arguments work as usual. Include blocks show the file's lines,
+numbered when they have `number_on`. `out=markdown` output is drawn as
+markdown, and placeholders in the prose show their current values. If the file changes on disk while it
+is open, mdsh won't save over it until you press `w` twice.
