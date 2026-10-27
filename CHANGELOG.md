@@ -40,5 +40,8 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh completion bash|zsh`.
 - Fences inside list items and block quotes run like any other block;
   their output is written inside the same list item or quote.
+- `mdsh --version`.
+- Release archives for Linux, macOS and Windows (amd64 and arm64), built
+  by goreleaser when a `v*` tag is pushed.
 - Design spec in `docs/spec.md`, roadmap in `docs/plan.md`, and a
   literate example in `examples/hello.md`.

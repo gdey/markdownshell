@@ -75,3 +75,13 @@ func TestOutputFileFromStdin(t *testing.T) {
 		t.Errorf("out = %s", b)
 	}
 }
+
+func TestVersion(t *testing.T) {
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"--version"}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("rc = %d, stderr %q", rc, errb.String())
+	}
+	if !strings.HasPrefix(out.String(), "mdsh ") {
+		t.Errorf("got %q", out.String())
+	}
+}

@@ -45,7 +45,7 @@ Left before tagging v1.0.0:
 - [x] Merge the first PR.
 - [ ] Run a few real-world files through it and fix what breaks.
 - [x] Fences nested in lists or block quotes.
-- [ ] Release builds (goreleaser or similar) and install instructions.
+- [x] Release builds (goreleaser) and install instructions.
 
 ## v2: interactive mode
 

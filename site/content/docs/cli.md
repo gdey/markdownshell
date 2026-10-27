@@ -15,6 +15,7 @@ weight: 50
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
 | `mdsh completion bash\|zsh` | A completion script | No |
+| `mdsh --version` | The version | No |
 
 - `mdsh doc.md` is short for `mdsh run doc.md`, so `#!/usr/bin/env mdsh`
   works on Linux and macOS. Arguments after the file name reach blocks as
