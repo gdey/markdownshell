@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `mdsh-gui`, a start on a desktop window for mdsh built with Wails v3.
+  It shows a document, runs blocks as you pick them, streams their output
+  and saves it. It is its own Go module under `cmd/mdsh-gui`.
+
 ## [1.1.0] - 2026-10-28
 
 Interactive mode: `mdsh -i` opens a document in a terminal UI and runs its
