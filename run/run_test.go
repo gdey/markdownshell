@@ -443,3 +443,28 @@ func TestTapePlaceholders(t *testing.T) {
 		t.Errorf("typed %q", got)
 	}
 }
+
+func TestTakeTTY(t *testing.T) {
+	src := "```sh {#ask tty}\nread -r name\necho \"hi $name\"\n```\n\n```tape {for=ask}\nSet TypingSpeed 1ms\nType \"bob\"\nEnter\n```\n\n```sh {#next}\necho next\n```\n"
+	dir := t.TempDir()
+	tty, err := os.Create(filepath.Join(dir, "tty"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tty.Close()
+	var calls []string
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md"), TTY: tty,
+		TakeTTY: func(b *doc.Block) func() {
+			calls = append(calls, "take "+b.ID)
+			return func() { calls = append(calls, "give back "+b.ID) }
+		}})
+	if r := byID(results)["ask"]; r.Err != nil {
+		t.Fatal(r.Err)
+	}
+	if got := strings.Join(calls, ", "); got != "take ask, give back ask" {
+		t.Errorf("calls: %s", got)
+	}
+	if shown, _ := os.ReadFile(tty.Name()); !strings.Contains(string(shown), "hi bob") {
+		t.Errorf("the tape's run wasn't shown on the terminal: %q", shown)
+	}
+}

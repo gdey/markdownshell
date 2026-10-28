@@ -458,8 +458,15 @@ func interactiveCmd(file string, args []string, stop, step, yes bool, stdin io.R
 	if os.Getenv("NO_COLOR") != "" {
 		style = "notty"
 	}
+	// Blocks marked tty get the terminal while they run.
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer tty.Close()
 	return tui.Run(d, tui.Options{
 		Run: run.Options{
+			TTY:         tty,
 			File:        abs,
 			LinkDir:     filepath.Dir(abs),
 			Args:        args,
