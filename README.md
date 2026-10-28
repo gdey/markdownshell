@@ -212,8 +212,9 @@ It's pure Go, with no external tools. Output shows in a terminal-style box,
 stderr in red, `out=screenshot` output as text, and `number_on` includes
 with a line-number gutter. [examples/report.md](examples/report.md) shows
 each of these, and [examples/pdf](examples/pdf) holds the PDFs of it,
-[hello.md](examples/hello.md), [include.md](examples/include.md) and
-[terminal.md](examples/terminal.md).
+[hello.md](examples/hello.md), [include.md](examples/include.md),
+[terminal.md](examples/terminal.md) and a run of the
+[test coverage report](examples/runbooks/test-coverage.md).
 
 ## Blocks
 

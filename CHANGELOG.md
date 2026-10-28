@@ -6,6 +6,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `examples/pdf/test-coverage.pdf`, the PDF of a run of the test coverage
+  report runbook.
+
 ### Fixed
 
 - The last thing a `tty` block or tape shows, after a quiet spell, is no
