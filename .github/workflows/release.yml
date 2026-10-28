@@ -17,10 +17,22 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Release notes from CHANGELOG.md
+        run: |
+          # The section under "## [X.Y.Z]" for tag vX.Y.Z, up to the next
+          # heading or the link references at the end.
+          awk -v v="${GITHUB_REF_NAME#v}" '
+            /^## \[/ { p = index($0, "[" v "]") > 0; next }
+            /^\[[^]]*\]: / { p = 0 }
+            p' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q . "$RUNNER_TEMP/notes.md"; then
+            echo "CHANGELOG.md has no section for $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
