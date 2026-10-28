@@ -259,3 +259,29 @@ func TestMarkdownOutputAndPlaceholders(t *testing.T) {
 		t.Errorf("placeholder not filled in:\n%s", v)
 	}
 }
+
+func TestTypeNewBlock(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{AutoSave: true})
+	press(m, "a")
+	pump(t, m)
+	press(m, "i")
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(`echo "$X typed"`)})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pump(t, m)
+	got := read(t, file)
+	want := "```sh\necho \"$X typed\"\n```\n\n```output {for=block-3 exit=0}\nhi typed\n```\n"
+	if !strings.HasSuffix(got, want) {
+		t.Errorf("new block not appended and run:\n%s", got)
+	}
+	if m.cur() != 2 {
+		t.Errorf("cursor on block %d, want the new one", m.cur())
+	}
+
+	// esc cancels.
+	press(m, "i")
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("echo no")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if len(m.d.Blocks) != 3 || m.typing {
+		t.Errorf("esc added a block or kept typing")
+	}
+}

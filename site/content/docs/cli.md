@@ -50,6 +50,7 @@ its output.
 | space, pgup/pgdn, ctrl+u/ctrl+d | scroll |
 | enter or `r` | run the block |
 | `a` | run the block and every one after it, like a normal run |
+| `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
 | `w` | save now |
 | ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
 | `q` | quit |

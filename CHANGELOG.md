@@ -14,6 +14,9 @@ follow [Semantic Versioning](https://semver.org/).
   shows the document, runs blocks as you pick them, streams their output
   under them and saves it to the file. `a` runs from the cursor to the
   end; `confirm` and step mode ask inside the UI.
+- In `mdsh -i`, `i` (or `:`) types a command at a prompt; it is added to
+  the end of the document as an `sh` block and run. `doc.AppendBlock`
+  and `run.Session.Grow` do the work.
 - `run.Session` runs a document's blocks one at a time while keeping
   their shells alive; `run.Run` is now built on it.
 
