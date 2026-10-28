@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mdsh</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header>
+    <span id="file"></span>
+    <span id="status"></span>
+    <button id="open">Open…</button>
+    <button id="run-all" disabled>Run all</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="save" disabled>Save</button>
+  </header>
+  <div id="confirm" hidden>
+    <span id="question"></span>
+    <button data-answer="run">Run</button>
+    <button data-answer="skip">Skip</button>
+    <button data-answer="stop">Stop</button>
+  </div>
+  <main id="doc">
+    <p class="empty">Open a markdown file to run its code blocks.</p>
+  </main>
+</body>
+</html>

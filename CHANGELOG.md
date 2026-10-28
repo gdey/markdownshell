@@ -28,6 +28,9 @@ follow [Semantic Versioning](https://semver.org/).
   unchanged block's identity, and `run.Session.Sync` then keeps their
   results, so a whole-file edit only clears the output of blocks that
   changed.
+- `mdsh-gui`, a start on a desktop window for mdsh built with Wails v3.
+  It shows a document, runs blocks as you pick them, streams their output
+  and saves it. It is its own Go module under `cmd/mdsh-gui`.
 
 ### Changed
 
