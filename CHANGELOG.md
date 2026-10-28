@@ -16,13 +16,18 @@ follow [Semantic Versioning](https://semver.org/).
   end; `confirm` and step mode ask inside the UI.
 - In `mdsh -i`, `i` (or `:`) types a command at a prompt; it is added to
   the end of the document as an `sh` block and run. `doc.AppendBlock`
-  and `run.Session.Grow` do the work.
+  and `run.Session.Sync` do the work.
 - In `mdsh -i`, `tty` blocks and taped blocks run on the terminal: the UI
   steps aside while they run and comes back on enter. `run.Options.TakeTTY`
   lets a front end hand the terminal over.
 - In `mdsh -i`, images and recordings show under their block as
   half-block previews, and `v` shows one full size through the kitty,
   iTerm2 or sixel protocol. The new `termimg` package does the drawing.
+- In `mdsh -i`, `e` opens the selected block, fences and attributes
+  included, in `$VISUAL`, `$EDITOR` or `vi` and saves the edit to the
+  file. Saved output follows a changed id. `doc.Document.BlockText` and
+  `SetBlock` read and replace a block while every block keeps its
+  identity, and `run.Session.Sync` catches a session up with edits.
 - `run.Session` runs a document's blocks one at a time while keeping
   their shells alive; `run.Run` is now built on it.
 

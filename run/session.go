@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ type Session struct {
 	results  []*Result
 	lookup   doc.Lookup
 	wanted   map[string][]string
+	tty      bool // whether the shells have terminals of their own
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -47,7 +49,6 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 		d:        d,
 		opts:     opts,
 		selected: selected,
-		wanted:   map[string][]string{},
 		stack: env.NewStack(env.Config{
 			Path: shell,
 			Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
@@ -55,38 +56,56 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Args: opts.Args,
 			TTY:  hasTTY(d),
 		}),
+		tty: hasTTY(d),
 	}
 	// Includes are part of the document, not steps of the run, so they
 	// are read whatever runs.
 	s.results = Includes(d, opts)
-	refs := d.Refs()
+	s.refs()
+	return s, nil
+}
+
+// refs notes the variables other blocks read from each block and readies
+// the lookup for them.
+func (s *Session) refs() {
+	refs := s.d.Refs()
 	for _, r := range s.results {
 		if r.Block.IsTape() && r.Ran {
 			refs = append(refs, doc.TextRefs(string(r.Stdout))...)
 		}
 	}
+	s.wanted = map[string][]string{}
 	for _, ref := range refs {
 		if ref.BlockID != "" && !ref.Fact() {
 			s.wanted[ref.BlockID] = append(s.wanted[ref.BlockID], ref.Var)
 		}
 	}
-	s.lookup = NewLookup(d, s.results, opts.Environ)
-	return s, nil
+	s.lookup = NewLookup(s.d, s.results, s.opts.Environ)
 }
 
 // Results returns one result per block, in order. A block run again gets
 // a new result, so hold on to the slice only while nothing runs.
 func (s *Session) Results() []*Result { return s.results }
 
-// Grow adds results for blocks appended to the document since the
-// session started, as by doc.AppendBlock. Call it while nothing runs.
-func (s *Session) Grow() {
+// ErrRestart is Sync's answer when the document gained the first tty
+// block after the session's shells started without terminals of their
+// own.
+var ErrRestart = errors.New("the first tty block needs mdsh to start again")
+
+// Sync catches the session up with changes to the document since it
+// started: blocks appended, as by doc.AppendBlock, and blocks edited in
+// place, as by doc.Document.SetBlock. Call it while nothing runs.
+func (s *Session) Sync() error {
 	for i := len(s.results); i < len(s.d.Blocks); i++ {
 		b := s.d.Blocks[i]
 		s.results = append(s.results, &Result{Block: b})
 		s.selected[b] = true
 	}
-	s.lookup = NewLookup(s.d, s.results, s.opts.Environ)
+	s.refs()
+	if hasTTY(s.d) && !s.tty {
+		return ErrRestart
+	}
+	return nil
 }
 
 // Close ends the session's shells.

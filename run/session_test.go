@@ -108,7 +108,7 @@ func TestSessionStopAndGoOn(t *testing.T) {
 	}
 }
 
-func TestSessionGrow(t *testing.T) {
+func TestSessionSync(t *testing.T) {
 	d := parse(t, "```sh {#a}\nX=1\n```\n")
 	s, err := run.NewSession(d, run.Options{Environ: []string{}})
 	if err != nil {
@@ -121,9 +121,19 @@ func TestSessionGrow(t *testing.T) {
 	if _, err := d.AppendBlock("sh", "echo x=$X"); err != nil {
 		t.Fatal(err)
 	}
-	s.Grow()
+	if err := s.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	r, err := s.RunBlock(context.Background(), 1)
 	if err != nil || string(r.Stdout) != "x=1\n" {
 		t.Errorf("appended block: stdout %q, err %v", r.Stdout, err)
+	}
+
+	// The first tty block can't run on shells started without one.
+	if err := d.SetBlock(d.Blocks[0], "```sh {#a tty}\nX=1\n```\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Sync(); !errors.Is(err, run.ErrRestart) {
+		t.Errorf("Sync after adding tty = %v, want ErrRestart", err)
 	}
 }

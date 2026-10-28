@@ -213,6 +213,7 @@ its output.
 | enter or `r` | run the block |
 | `a` | run the block and every one after it, like a normal run |
 | `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
+| `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
 | `v` | show the block's image or recording full screen; enter goes back |
 | `w` | save now |
 | ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |

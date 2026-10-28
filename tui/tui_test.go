@@ -330,3 +330,47 @@ func TestImagePreview(t *testing.T) {
 		t.Errorf("no preview of the saved image:\n%s", v)
 	}
 }
+
+func TestEditBlock(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{AutoSave: true})
+	if m.editor() != "vi" {
+		t.Errorf("editor = %q, want vi", m.editor())
+	}
+	m.opts.Run.Environ = append(m.opts.Run.Environ, "EDITOR=nano -w")
+	if m.editor() != "nano -w" {
+		t.Errorf("editor = %q, want $EDITOR", m.editor())
+	}
+	if press(m, "e"); m.status != "" {
+		t.Fatalf("e: %s", m.status)
+	}
+
+	// The editor gets the whole block; what it leaves is put in the
+	// document and saved.
+	edit := func(i int, text string) {
+		f := filepath.Join(t.TempDir(), "block.md")
+		os.WriteFile(f, []byte(text), 0o644)
+		m.Update(editedMsg{block: i, file: f})
+	}
+	edit(0, "```sh {#one}\nX=bye; echo $X\n```\n")
+	got := read(t, file)
+	if !strings.Contains(got, "```sh {#one}\nX=bye; echo $X\n```") || m.d.Blocks[0].Body != "X=bye; echo $X\n" {
+		t.Errorf("edit not saved:\n%s", got)
+	}
+	press(m, "enter")
+	pump(t, m)
+	if got := read(t, file); !strings.Contains(got, "{for=one exit=0}\nbye\n") {
+		t.Errorf("edited block didn't run:\n%s", got)
+	}
+
+	// Its attributes change too, and its saved output follows a new id.
+	edit(0, "```sh {#greet timeout=5s}\nX=bye; echo $X\n```\n")
+	got = read(t, file)
+	if !strings.Contains(got, "```sh {#greet timeout=5s}\n") || !strings.Contains(got, "{for=greet exit=0}\nbye\n") || m.d.Blocks[0].ID != "greet" {
+		t.Errorf("attributes not changed:\n%s", got)
+	}
+
+	edit(1, "```sh {#two}\necho\n")
+	if !strings.Contains(m.status, "one closed fenced block") || m.d.Blocks[1].Body != "echo \"$X again\"\n" {
+		t.Errorf("an unclosed fence: status %q, body %q", m.status, m.d.Blocks[1].Body)
+	}
+}

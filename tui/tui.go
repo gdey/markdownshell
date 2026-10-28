@@ -11,6 +11,7 @@ import (
 	"image"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -291,6 +292,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.wait
 	case *handOff:
 		return m, tea.Batch(m.wait, tea.Exec(msg, func(error) tea.Msg { return ttyBackMsg{} }))
+	case editedMsg:
+		m.edited(msg)
+		m.refresh()
+		return m, nil
 	case ttyBackMsg:
 		m.refresh()
 		return m, nil
@@ -391,6 +396,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.start(false)
 	case "a":
 		m.start(true)
+	case "e":
+		if cmd := m.edit(); cmd != nil {
+			return m, cmd
+		}
 	case "v":
 		if cmd := m.view(); cmd != nil {
 			return m, cmd
@@ -408,6 +417,97 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	m.refresh()
 	return m, nil
+}
+
+// editedMsg reports that the editor opened by edit has exited.
+type editedMsg struct {
+	block int
+	file  string
+	err   error
+}
+
+// edit opens the block under the cursor, fences and all, in $VISUAL,
+// $EDITOR or vi.
+func (m *Model) edit() tea.Cmd {
+	i := m.cur()
+	switch {
+	case i < 0:
+		return nil
+	case m.running:
+		m.status = "a block is running; ctrl+c stops it"
+		return nil
+	case m.d.Blocks[i].IsInclude():
+		m.status = "an include block's lines come from its file; edit that instead"
+		return nil
+	}
+	f, err := os.CreateTemp("", "mdsh-*.md")
+	if err == nil {
+		_, err = f.WriteString(m.d.BlockText(m.d.Blocks[i]))
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		m.status = "edit: " + err.Error()
+		return nil
+	}
+	editor := strings.Fields(m.editor())
+	cmd := exec.Command(editor[0], append(editor[1:], f.Name())...)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg { return editedMsg{block: i, file: f.Name(), err: err} })
+}
+
+// editor is the command that edits a file: $VISUAL, $EDITOR or vi.
+func (m *Model) editor() string {
+	for _, v := range []string{"VISUAL", "EDITOR"} {
+		if e := strings.TrimSpace(m.getenv(v)); e != "" {
+			return e
+		}
+	}
+	return "vi"
+}
+
+// getenv looks name up in the run's environment.
+func (m *Model) getenv(name string) string {
+	for _, kv := range m.opts.Run.Environ {
+		if k, v, ok := strings.Cut(kv, "="); ok && k == name {
+			return v
+		}
+	}
+	if m.opts.Run.Environ == nil {
+		return os.Getenv(name)
+	}
+	return ""
+}
+
+// edited puts the edited block into the document.
+func (m *Model) edited(msg editedMsg) {
+	defer os.Remove(msg.file)
+	if msg.err != nil {
+		m.status = "editor: " + msg.err.Error()
+		return
+	}
+	text, err := os.ReadFile(msg.file)
+	if err != nil {
+		m.status = "edit: " + err.Error()
+		return
+	}
+	b := m.d.Blocks[msg.block]
+	if strings.TrimRight(string(text), "\n") == strings.TrimRight(m.d.BlockText(b), "\n") {
+		return
+	}
+	if err := m.d.SetBlock(b, string(text)); err != nil {
+		m.status = "edit: " + err.Error()
+		return
+	}
+	m.md = map[string]string{}
+	m.dirty = true
+	m.status = "edited; enter runs it"
+	if err := m.sess.Sync(); err != nil {
+		m.status = "edited; " + err.Error()
+	}
+	if m.opts.AutoSave {
+		m.save(false)
+	}
 }
 
 // view shows the image of the block under the cursor full screen.
@@ -466,7 +566,7 @@ func (m *Model) add(cmd string) {
 		m.status = "can't add a block: " + err.Error()
 		return
 	}
-	m.sess.Grow()
+	m.sess.Sync()
 	m.results = append(m.results, m.sess.Results()[len(m.results):]...)
 	m.layout()
 	m.dirty = true
@@ -642,7 +742,7 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a run from here · i new block · v view image · w save · q quit")
+		help = helpStyle.Render("j/k move · enter run · a run from here · i new · e edit · v view · w save · q quit")
 	}
 	return line1 + "\n" + help
 }
