@@ -107,3 +107,23 @@ func TestSessionStopAndGoOn(t *testing.T) {
 		t.Errorf("next: stdout %q, err %v, result err %v", r.Stdout, err, r.Err)
 	}
 }
+
+func TestSessionGrow(t *testing.T) {
+	d := parse(t, "```sh {#a}\nX=1\n```\n")
+	s, err := run.NewSession(d, run.Options{Environ: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := s.RunBlock(context.Background(), 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.AppendBlock("sh", "echo x=$X"); err != nil {
+		t.Fatal(err)
+	}
+	s.Grow()
+	r, err := s.RunBlock(context.Background(), 1)
+	if err != nil || string(r.Stdout) != "x=1\n" {
+		t.Errorf("appended block: stdout %q, err %v", r.Stdout, err)
+	}
+}

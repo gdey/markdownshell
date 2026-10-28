@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -67,6 +69,9 @@ type Model struct {
 	running bool
 	live    map[int][]chunk
 	prompt  *confirmMsg
+	// input is the prompt for a new block, while typing is set.
+	input  textinput.Model
+	typing bool
 	// skipSaved is the "only run blocks without saved output" answer.
 	skipSaved bool
 
@@ -136,10 +141,20 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	m.sess = sess
 	m.results = append([]*run.Result(nil), sess.Results()...)
 
-	// Prose is drawn from render.Pieces: for block i, piece 3i is the
-	// prose before it. Blocks the cursor skips are drawn with the prose.
+	m.layout()
+	m.input = textinput.New()
+	m.input.Prompt = "$ "
+	m.input.Placeholder = "a command to add to the document as a new block"
+	return m, nil
+}
+
+// layout splits the document into prose and the blocks the cursor
+// stops on. Prose is drawn from render.Pieces: for block i, piece 3i is
+// the prose before it. Blocks the cursor skips are drawn with the prose.
+func (m *Model) layout() {
+	m.parts, m.nav = nil, nil
 	last := 0
-	for i, b := range d.Blocks {
+	for i, b := range m.d.Blocks {
 		m.index[b] = i
 		if !run.Runnable(b) && !b.IsInclude() {
 			continue
@@ -149,8 +164,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		m.nav = append(m.nav, i)
 		last = 3*i + 3
 	}
-	m.parts = append(m.parts, part{block: -1, from: last, to: 3*len(d.Blocks) + 1})
-	return m, nil
+	m.parts = append(m.parts, part{block: -1, from: last, to: 3*len(m.d.Blocks) + 1})
 }
 
 // Close ends the shells blocks ran in.
@@ -242,6 +256,9 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Sequence(cmds...)
 	}
+	if m.typing {
+		return m, m.typed(k)
+	}
 	if m.prompt != nil {
 		m.answer(k.String())
 		m.refresh()
@@ -288,9 +305,58 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.start(true)
 	case "w":
 		m.save(forceArm)
+	case "i", ":":
+		if m.running {
+			m.status = "a block is running; ctrl+c stops it"
+			break
+		}
+		m.typing = true
+		m.refresh()
+		return m, m.input.Focus()
 	}
 	m.refresh()
 	return m, nil
+}
+
+// typed handles a key while a new block is being typed. Enter appends
+// the command to the document as an sh block and runs it; esc cancels.
+func (m *Model) typed(k tea.KeyMsg) tea.Cmd {
+	switch k.Type {
+	case tea.KeyEsc, tea.KeyCtrlC:
+		m.typing = false
+		m.input.Blur()
+		m.input.Reset()
+		m.refresh()
+		return nil
+	case tea.KeyEnter:
+		cmd := strings.TrimSpace(m.input.Value())
+		m.typing = false
+		m.input.Blur()
+		m.input.Reset()
+		if cmd != "" {
+			m.add(cmd)
+		}
+		m.refresh()
+		return nil
+	}
+	var c tea.Cmd
+	m.input, c = m.input.Update(k)
+	return c
+}
+
+// add appends cmd to the document as an sh block and runs it.
+func (m *Model) add(cmd string) {
+	b, err := m.d.AppendBlock("sh", cmd)
+	if err != nil {
+		m.status = "can't add a block: " + err.Error()
+		return
+	}
+	m.sess.Grow()
+	m.results = append(m.results, m.sess.Results()[len(m.results):]...)
+	m.layout()
+	m.dirty = true
+	m.moveTo(m.index[b])
+	m.start(false)
 }
 
 // answer handles a key while a confirm prompt is up. Enter stops, as on
@@ -450,6 +516,8 @@ func (m *Model) footer() string {
 	}
 	var help string
 	switch {
+	case m.typing:
+		help = m.input.View()
 	case m.prompt != nil:
 		q := m.prompt.block.Attrs["confirm"]
 		if q == "" {
@@ -459,7 +527,7 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a run from here · w save · q quit")
+		help = helpStyle.Render("j/k move · enter run · a run from here · i new block · w save · q quit")
 	}
 	return line1 + "\n" + help
 }

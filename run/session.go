@@ -78,6 +78,17 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 // a new result, so hold on to the slice only while nothing runs.
 func (s *Session) Results() []*Result { return s.results }
 
+// Grow adds results for blocks appended to the document since the
+// session started, as by doc.AppendBlock. Call it while nothing runs.
+func (s *Session) Grow() {
+	for i := len(s.results); i < len(s.d.Blocks); i++ {
+		b := s.d.Blocks[i]
+		s.results = append(s.results, &Result{Block: b})
+		s.selected[b] = true
+	}
+	s.lookup = NewLookup(s.d, s.results, s.opts.Environ)
+}
+
 // Close ends the session's shells.
 func (s *Session) Close() { s.stack.Close() }
 

@@ -61,7 +61,7 @@ Goal: `mdsh -i doc.md` opens a TUI (Bubble Tea) on the same `run` engine.
 - [x] `confirm` blocks and step mode ask inside the TUI instead of on
       `/dev/tty`.
 - [x] Include blocks shown with `number_on` line numbers.
-- [ ] Blocks typed at the prompt are appended to the document as `sh` blocks.
+- [x] Blocks typed at the prompt are appended to the document as `sh` blocks.
 - [x] Placeholders in prose show their values, and `out=markdown` output
       is drawn as markdown.
 - [ ] Inline images in terminals that support them (kitty, iTerm2, sixel).
