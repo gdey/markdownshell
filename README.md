@@ -213,6 +213,7 @@ its output.
 | enter or `r` | run the block |
 | `a` | run the block and every one after it, like a normal run |
 | `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
+| `v` | show the block's image or recording full screen; enter goes back |
 | `w` | save now |
 | ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
 | `q` | quit |
@@ -223,7 +224,12 @@ under `--step` or `step: true` when running with `a`, ask in the footer
 with the same choices as on the command line. `--yes`, `--stop-on-error`
 and block arguments work as usual. A `tty` block gets the whole terminal
 while it runs, and the TUI comes back when you press enter after it ends;
-a taped block's run is shown the same way. Include blocks show the file's lines,
+a taped block's run is shown the same way. Images and recordings
+show under their block as a preview in colored half blocks (any terminal
+with 24-bit color; off with `NO_COLOR`). `v` shows one full size, through
+the kitty, iTerm2 or sixel protocol when mdsh recognizes the terminal
+(kitty, Ghostty, iTerm2, WezTerm, foot, mlterm, contour, or `sixel` in
+`TERM`), and in half blocks otherwise. SVG images show only as a link. Include blocks show the file's lines,
 numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
 is open, mdsh won't save over it until you press `w` twice.

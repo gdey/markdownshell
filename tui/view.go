@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -13,6 +16,7 @@ import (
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termimg"
 )
 
 var (
@@ -231,11 +235,22 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		if s := strings.TrimRight(clean(string(r.Stderr)), "\n"); s != "" {
 			parts = append(parts, stderrStyle.Render(s))
 		}
-		return wrap.Render(strings.Join(parts, "\n"))
+		out := wrap.Render(strings.Join(parts, "\n"))
+		if p := m.preview(r.Image, w-2); p != "" {
+			out += "\n" + p
+		}
+		return out
 	}
 	b := m.d.Blocks[i]
 	if b.HasOutput() {
 		out := saved(m.d.Src[b.Output.Start:b.Output.End])
+		if link := imageLink(out); link != "" {
+			s := savedStyle.Render("saved output: " + link)
+			if p := m.preview(link, w-2); p != "" {
+				s += "\n" + p
+			}
+			return s
+		}
 		if run.OutKind(b) == "markdown" {
 			return savedStyle.Render("saved output:") + "\n" + m.markdown(out)
 		}
@@ -243,6 +258,55 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 	}
 	return ""
 }
+
+// imageRE finds a markdown image link.
+var imageRE = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)\)`)
+
+// imageLink returns the target of the first image link in md, or "".
+func imageLink(md string) string {
+	if m := imageRE.FindStringSubmatch(md); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// imagePath resolves link, relative to the document, for termimg.Load.
+func (m *Model) imagePath(link string) string {
+	if link == "" || strings.HasPrefix(link, "data:") || filepath.IsAbs(link) {
+		return link
+	}
+	return filepath.Join(filepath.Dir(m.opts.Run.File), filepath.FromSlash(link))
+}
+
+// preview draws the image at link as half blocks at most cols wide, or
+// returns "" when previews are off or the image can't be read. Previews
+// are cached by link, the file's time and the width.
+func (m *Model) preview(link string, cols int) string {
+	if !m.opts.Images || link == "" {
+		return ""
+	}
+	path := m.imagePath(link)
+	key := fmt.Sprintf("%s|%d", path, cols)
+	if !strings.HasPrefix(path, "data:") {
+		info, err := os.Stat(path)
+		if err != nil {
+			return ""
+		}
+		key += "|" + info.ModTime().String()
+	}
+	if s, ok := m.images[key]; ok {
+		return s
+	}
+	s := ""
+	if img, err := termimg.Load(path); err == nil {
+		s = termimg.HalfBlocks(img, min(cols, previewCols), previewRows)
+	}
+	m.images[key] = s
+	return s
+}
+
+// The largest preview, in cells.
+const previewCols, previewRows = 64, 16
 
 // saved is output saved in the file without its output fences and
 // region markers.

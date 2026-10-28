@@ -1,6 +1,10 @@
 package tui
 
 import (
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -283,5 +287,46 @@ func TestTypeNewBlock(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if len(m.d.Blocks) != 3 || m.typing {
 		t.Errorf("esc added a block or kept typing")
+	}
+}
+
+func TestImagePreview(t *testing.T) {
+	dir := t.TempDir()
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	draw.Draw(img, img.Bounds(), image.NewUniform(color.RGBA{0, 255, 0, 255}), image.Point{}, draw.Src)
+	f, _ := os.Create(filepath.Join(dir, "g.png"))
+	png.Encode(f, img)
+	f.Close()
+
+	src := "```sh {#pic out=image}\ncat g.png\n```\n"
+	file := filepath.Join(dir, "doc.md")
+	os.WriteFile(file, []byte(src), 0o644)
+	open := func() *Model {
+		d, _ := doc.Parse([]byte(read(t, file)))
+		m, err := New(d, Options{
+			Run:      run.Options{File: file, Environ: []string{"PATH=" + os.Getenv("PATH")}},
+			Save:     func(b []byte) error { return os.WriteFile(file, b, 0o644) },
+			AutoSave: true, Images: true, Style: "notty",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(m.Close)
+		m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+		return m
+	}
+	m := open()
+	press(m, "enter")
+	pump(t, m)
+	if v := m.View(); !strings.Contains(v, "image: doc.md.assets/pic.png") || !strings.Contains(v, "▀") {
+		t.Errorf("no preview after the run:\n%s", v)
+	}
+	if _, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")}); cmd == nil {
+		t.Errorf("v didn't show the image: %s", m.status)
+	}
+
+	// Opened again, the saved image is previewed too.
+	if v := open().View(); !strings.Contains(v, "saved output: doc.md.assets/pic.png") || !strings.Contains(v, "▀") {
+		t.Errorf("no preview of the saved image:\n%s", v)
 	}
 }

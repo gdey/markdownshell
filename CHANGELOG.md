@@ -20,6 +20,9 @@ follow [Semantic Versioning](https://semver.org/).
 - In `mdsh -i`, `tty` blocks and taped blocks run on the terminal: the UI
   steps aside while they run and comes back on enter. `run.Options.TakeTTY`
   lets a front end hand the terminal over.
+- In `mdsh -i`, images and recordings show under their block as
+  half-block previews, and `v` shows one full size through the kitty,
+  iTerm2 or sixel protocol. The new `termimg` package does the drawing.
 - `run.Session` runs a document's blocks one at a time while keeping
   their shells alive; `run.Run` is now built on it.
 
