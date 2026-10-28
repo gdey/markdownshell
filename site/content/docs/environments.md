@@ -44,4 +44,6 @@ unless `on_error=stop`, `on_error: stop` in front matter, or
 
 Every block sees `$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, and the script's
 arguments as `$1`, `$2` and so on. The helpers `md_h1`, `md_h2`, `md_h3`,
-`md_table` (TSV on stdin) and `md_code` print markdown.
+`md_table` (TSV on stdin) and `md_code` print markdown. `md_table -F SEP`
+splits fields on SEP as `awk -F` does (`-F ' '` is runs of blanks), and
+`md_table -s N` skips the first N lines.

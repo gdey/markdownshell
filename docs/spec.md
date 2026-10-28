@@ -144,7 +144,7 @@ v1 ships on `sh` plus a few markdown helpers. The custom language gets its own s
 **sh in v1, with extensions**
 
 - `out=markdown` puts a block's output into the document as raw markdown, so a script can print a table or a list that renders.
-- Each shell starts with helper functions: `md_h1`, `md_h2`, `md_h3` (headings), `md_table` (tab-separated lines on stdin, first line is the header) and `md_code LANG` (stdin as a fenced block). They are plain shell functions, so blocks stay valid `sh`.
+- Each shell starts with helper functions: `md_h1`, `md_h2`, `md_h3` (headings), `md_table [-F SEP] [-s N]` (tab-separated lines on stdin, or split on SEP as `awk -F` does; the first line after skipping N is the header) and `md_code LANG` (stdin as a fenced block). They are plain shell functions, so blocks stay valid `sh`.
 
 **Custom language (after v1), first sketch**
 
