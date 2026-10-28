@@ -9,8 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -70,7 +71,6 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 
 	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true)
 
-	s.pty.drain()
 	s.pty.attach(nil)
 	close(stop)
 	wg.Wait()
@@ -140,7 +140,6 @@ func (s *Shell) RunScripted(ctx context.Context, script string, cols, rows int, 
 			res.err = derr
 		}
 	}
-	s.pty.drain()
 	return res.status, res.exited, res.err
 }
 
@@ -188,9 +187,7 @@ func forward(fd int, tty, ptm *os.File, stop <-chan struct{}) {
 // writer is attached.
 type ptyConn struct {
 	ptm, pts *os.File
-	mu       sync.Mutex
-	w        io.Writer
-	last     atomic.Int64 // when output last came, in UnixNano
+	d        *demux
 }
 
 // openPTY makes cmd start in a session of its own, with a new
@@ -205,45 +202,27 @@ func openPTY(cmd *exec.Cmd) (*ptyConn, error) {
 	return &ptyConn{ptm: ptm, pts: pts}, nil
 }
 
-// started starts reading. mdsh keeps the shell's end open too, since
-// reading the pseudo-terminal fails once nothing has that end open, as
-// between blocks.
-func (p *ptyConn) started() {
-	go func() {
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := p.ptm.Read(buf)
-			if n > 0 {
-				p.last.Store(time.Now().UnixNano())
-				p.mu.Lock()
-				if p.w != nil {
-					p.w.Write(buf[:n])
-				}
-				p.mu.Unlock()
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
+// started starts reading, taking out marker lines. mdsh keeps the
+// shell's end open too, since reading the pseudo-terminal fails once
+// nothing has that end open, as between blocks.
+func (p *ptyConn) started(mark string) {
+	p.d = newDemux(p.ptm, mark)
 }
 
 func (p *ptyConn) attach(w io.Writer) {
-	p.mu.Lock()
-	p.w = w
-	p.mu.Unlock()
+	p.d.attach(w)
 }
 
-// drain waits for output still on its way, until none has come for a
-// moment, so the end of a block isn't cut off.
-func (p *ptyConn) drain() {
-	const quiet, most = 30 * time.Millisecond, 500 * time.Millisecond
-	end := time.Now().Add(most)
-	for time.Now().Before(end) {
-		if time.Since(time.Unix(0, p.last.Load())) >= quiet {
+// wait waits for the marker of block n, which the shell writes to the
+// terminal after the block, so everything the block wrote before it has
+// gone to the attached writer. A marker left by a block cut short is
+// skipped.
+func (p *ptyConn) wait(n int) {
+	want := strconv.Itoa(n)
+	for v := range p.d.done {
+		if strings.TrimRight(v, "\r") == want {
 			return
 		}
-		time.Sleep(5 * time.Millisecond)
 	}
 }
 

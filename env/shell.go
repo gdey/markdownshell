@@ -34,6 +34,7 @@ type Shell struct {
 	errs   *demux
 	waited chan struct{}
 	pty    *ptyConn // nil unless started with Config.TTY
+	ttyRun int      // blocks run on the pty, to tell their markers apart
 	exit   int
 	mu     sync.Mutex // one Run at a time
 }
@@ -98,7 +99,7 @@ func Start(cfg Config) (*Shell, error) {
 		return nil, err
 	}
 	if s.pty != nil {
-		s.pty.started()
+		s.pty.started(s.mark)
 	}
 	s.out = newDemux(stdout, s.mark)
 	s.errs = newDemux(stderr, s.mark)
@@ -172,7 +173,10 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		// The INT trap keeps ctrl+c from ending the shell along with the
 		// command it is waiting for. Commands start with the default
 		// action, since a trap isn't inherited.
-		cmd = fmt.Sprintf("trap : INT\n. %s </dev/tty >/dev/tty 2>/dev/tty\nprintf '%%s%%d\\n' '%s' \"$?\"\ntrap - INT\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark)
+		// A marker on the terminal too tells when all the block wrote
+		// there has been read.
+		s.ttyRun++
+		cmd = fmt.Sprintf("trap : INT\n. %s </dev/tty >/dev/tty 2>/dev/tty\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark, s.ttyRun, s.mark)
 	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited
@@ -200,6 +204,9 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 			<-s.waited
 			return -1, true, ctx.Err()
 		}
+	}
+	if onTTY {
+		s.pty.wait(s.ttyRun)
 	}
 	rc, err := strconv.Atoi(outRC)
 	if err != nil {
