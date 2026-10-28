@@ -57,7 +57,7 @@ func (d *demux) loop(r io.Reader) {
 			i := bytes.Index(buf, d.mark)
 			if i < 0 {
 				// Hold back a possible partial marker.
-				safe := len(buf) - (len(d.mark) - 1)
+				safe := len(buf) - partial(buf, d.mark)
 				if safe > 0 {
 					d.write(buf[:safe])
 					buf = append(buf[:0], buf[safe:]...)
@@ -81,4 +81,17 @@ func (d *demux) loop(r io.Reader) {
 			return
 		}
 	}
+}
+
+// partial returns the length of the longest end of buf that is the start
+// of mark, so only what could be a marker is held back and a prompt
+// with no newline still shows.
+func partial(buf, mark []byte) int {
+	n := min(len(buf), len(mark)-1)
+	for ; n > 0; n-- {
+		if bytes.HasPrefix(mark, buf[len(buf)-n:]) {
+			return n
+		}
+	}
+	return 0
 }

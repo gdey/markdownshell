@@ -6,6 +6,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The last thing a `tty` block or tape shows, after a quiet spell, is no
+  longer sometimes cut off from the terminal and the recording.
+
 ## [1.0.0] - 2026-10-28
 
 The first release: a markdown file with shell blocks runs end to end from

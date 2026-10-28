@@ -43,20 +43,48 @@ func TestRunTTY(t *testing.T) {
 	}
 	pts.Close()
 
-	screen := make(chan string)
+	var (
+		mu    sync.Mutex
+		shown strings.Builder
+		read  = make(chan struct{})
+	)
 	go func() {
-		b, _ := io.ReadAll(ptm)
-		screen <- string(b)
+		defer close(read)
+		buf := make([]byte, 1024)
+		for {
+			n, err := ptm.Read(buf)
+			mu.Lock()
+			shown.Write(buf[:n])
+			mu.Unlock()
+			if err != nil {
+				return
+			}
+		}
 	}()
-	time.Sleep(time.Second)
+	// Wait for what the script shows before typing, rather than for a
+	// fixed time, which a loaded machine can outlast.
+	waitFor := func(s string) {
+		for end := time.Now().Add(20 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			mu.Lock()
+			ok := strings.Contains(shown.String(), s)
+			mu.Unlock()
+			if ok {
+				return
+			}
+		}
+		cmd.Process.Kill()
+		t.Fatalf("terminal never showed %q", s)
+	}
+	waitFor("terminal ok")
 	ptm.Write([]byte("typed\r"))
-	time.Sleep(500 * time.Millisecond)
+	waitFor("sleeping")
 	ptm.Write([]byte{3}) // ctrl+c, during the sleep
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("child: %v\n%s", err, report.String())
 	}
 	ptm.Close()
-	out := <-screen
+	<-read
+	out := shown.String()
 
 	for _, want := range []string{"terminal ok", "got typed", "sleep ended 130"} {
 		if !strings.Contains(out, want) {
@@ -89,7 +117,10 @@ func ttyChild() {
 	}
 	defer sh.Close()
 	ctx := context.Background()
-	script := "test -t 0 && test -t 1 && test -t 2 && echo terminal ok\nread -r l; echo \"got $l\"\nsleep 5; echo \"sleep ended $?\"\nX=set\n"
+	// The sleep says so from its own process, which already ends on
+	// ctrl+c, so the test's ctrl+c can't come between commands, where
+	// the shell ignores it.
+	script := "test -t 0 && test -t 1 && test -t 2 && echo terminal ok\nread -r l; echo \"got $l\"\nsh -c 'echo sleeping; exec sleep 5'; echo \"sleep ended $?\"\nX=set\n"
 	var rec bytes.Buffer
 	if _, _, err := sh.RunTTY(ctx, script, tty, &rec); err != nil {
 		fail(err)
@@ -176,3 +207,32 @@ func TestRunScriptedInputEnds(t *testing.T) {
 type writerFunc func([]byte) (int, error)
 
 func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
+
+// What a block writes to its terminal after a quiet spell, right as it
+// ends, must not be cut off.
+func TestRunScriptedShowsLastOutput(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	for i := range 20 {
+		var out bytes.Buffer
+		var mu sync.Mutex
+		shown := writerFunc(func(p []byte) (int, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			return out.Write(p)
+		})
+		_, _, err := sh.RunScripted(context.Background(), "sleep 0.05; printf end", 80, 24, shown, func(context.Context, io.Writer) error { return nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		got := out.String()
+		mu.Unlock()
+		if got != "end" {
+			t.Fatalf("run %d: screen %q, want %q", i, got, "end")
+		}
+	}
+}

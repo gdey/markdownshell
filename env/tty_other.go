@@ -25,5 +25,6 @@ func (s *Shell) RunScripted(context.Context, string, int, int, io.Writer, func(c
 type ptyConn struct{}
 
 func openPTY(*exec.Cmd) (*ptyConn, error) { return nil, errNoTTY }
-func (*ptyConn) started()                 {}
+func (*ptyConn) started(string)           {}
+func (*ptyConn) wait(int)                 {}
 func (*ptyConn) close()                   {}
