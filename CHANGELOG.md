@@ -12,6 +12,9 @@ follow [Semantic Versioning](https://semver.org/).
   values, default, one-line help) for tools that help write them, with
   `AttrSpec.Check` to validate a value. `doc.SplitInfo` edits a fence
   info string in place, keeping unknown attributes and their order.
+- `mdsh-gui`, a start on a desktop window for mdsh built with Wails v3.
+  It shows a document, runs blocks as you pick them, streams their output
+  and saves it. It is its own Go module under `cmd/mdsh-gui`.
 
 ## [1.1.0] - 2026-10-28
 
