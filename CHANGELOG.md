@@ -11,6 +11,15 @@ follow [Semantic Versioning](https://semver.org/).
 - When a run stops early, mdsh says why, before and after the rest of
   the document: the block ended its shell (`exit`, `set -e`), failed
   with `on_error: stop`, or you stopped at a prompt.
+- `tty` block attribute: the block runs on a terminal, so commands that
+  need one, such as `docker run -it`, work, and ctrl+c reaches them
+  rather than mdsh. The session is saved as an asciinema cast and as an
+  animated GIF linked below the block; a PDF shows its last frame, or
+  the one `frame=N` picks. With no terminal the block fails with an
+  error, unless it has a tape. Shells now run in their own process group.
+- `tape {for=id}` fences type the input for a `tty` block, in the
+  commands of a VHS tape, inline or from a file with `<include`, so the
+  block runs unattended.
 - Runs that ask (`--step`, `step: true`, `confirm` blocks) print the
   document as they go, so each prompt follows the prose and code it is
   about and a failed block's output and stderr show before the next one.

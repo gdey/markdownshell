@@ -2,6 +2,7 @@ package doc
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -142,4 +143,31 @@ func UnescapeValue(v string) string {
 func (p *Placeholder) Source(value string) string {
 	ref := p.Ref.String()
 	return ref[:len(ref)-2] + `:"` + EscapeValue(value) + `"}}`
+}
+
+// TextRefs lists the placeholders in text, which unlike prose may be
+// code: a tape's input, say.
+func TextRefs(text string) []Ref {
+	var refs []Ref
+	for _, m := range placeholderRE.FindAllStringSubmatchIndex(text, -1) {
+		line := []byte(text)
+		refs = append(refs, newRef(group(line, m, 1), group(line, m, 2), group(line, m, 3)))
+	}
+	return refs
+}
+
+// Expand replaces each placeholder in text with its value from lookup,
+// ignoring any stored :"..." value. A placeholder lookup doesn't know is
+// an error.
+func Expand(text string, lookup Lookup) (string, error) {
+	var err error
+	out := placeholderRE.ReplaceAllStringFunc(text, func(m string) string {
+		refs := TextRefs(m)
+		v, ok := lookup(refs[0])
+		if !ok && err == nil {
+			err = fmt.Errorf("%s has no value", refs[0])
+		}
+		return v
+	})
+	return out, err
 }

@@ -33,6 +33,7 @@ type Shell struct {
 	out    *demux
 	errs   *demux
 	waited chan struct{}
+	pty    *ptyConn // nil unless started with Config.TTY
 	exit   int
 	mu     sync.Mutex // one Run at a time
 }
@@ -43,6 +44,9 @@ type Config struct {
 	Env  []string // KEY=value, the shell's whole environment
 	Dir  string   // working directory
 	Args []string // positional parameters, $1 and on
+	// TTY gives the shell a pseudo-terminal of its own as its
+	// controlling terminal, so RunTTY can run blocks on it.
+	TTY bool
 }
 
 // Start launches a shell.
@@ -67,6 +71,14 @@ func Start(cfg Config) (*Shell, error) {
 	s.cmd = exec.Command(cfg.Path)
 	s.cmd.Env = cfg.Env
 	s.cmd.Dir = cfg.Dir
+	if cfg.TTY {
+		if s.pty, err = openPTY(s.cmd); err != nil {
+			os.RemoveAll(tmp)
+			return nil, err
+		}
+	} else {
+		ownGroup(s.cmd)
+	}
 	if s.stdin, err = s.cmd.StdinPipe(); err != nil {
 		return nil, err
 	}
@@ -80,7 +92,13 @@ func Start(cfg Config) (*Shell, error) {
 	}
 	if err := s.cmd.Start(); err != nil {
 		os.RemoveAll(tmp)
+		if s.pty != nil {
+			s.pty.close()
+		}
 		return nil, err
+	}
+	if s.pty != nil {
+		s.pty.started()
 	}
 	s.out = newDemux(stdout, s.mark)
 	s.errs = newDemux(stderr, s.mark)
@@ -96,6 +114,11 @@ func Start(cfg Config) (*Shell, error) {
 	}()
 
 	init := "set -- " + quoteAll(cfg.Args) + "\n" + helpers
+	if cfg.TTY {
+		// The terminal stays the shell's controlling terminal, at
+		// /dev/tty, without blocks inheriting the descriptor.
+		init = "exec 3>&-\n" + init
+	}
 	if _, _, err := s.Run(context.Background(), init, io.Discard, io.Discard); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("starting %s: %w", cfg.Path, err)
@@ -107,6 +130,11 @@ func Start(cfg Config) (*Shell, error) {
 // stdin is /dev/null. If the script ends the shell, Run returns ErrExited
 // and the shell's exit status. If ctx ends first, the shell is killed.
 func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer) (status int, exited bool, err error) {
+	return s.run(ctx, script, stdout, stderr, false)
+}
+
+// run runs script, on the shell's terminal if onTTY is set.
+func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer, onTTY bool) (status int, exited bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -140,6 +168,12 @@ func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer
 	defer s.errs.attach(nil)
 
 	cmd := fmt.Sprintf(". %s </dev/null\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark)
+	if onTTY {
+		// The INT trap keeps ctrl+c from ending the shell along with the
+		// command it is waiting for. Commands start with the default
+		// action, since a trap isn't inherited.
+		cmd = fmt.Sprintf("trap : INT\n. %s </dev/tty >/dev/tty 2>/dev/tty\nprintf '%%s%%d\\n' '%s' \"$?\"\ntrap - INT\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark)
+	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited
 		return s.exit, true, ErrExited
@@ -162,7 +196,7 @@ func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer
 			}
 			gotErr = true
 		case <-ctx.Done():
-			s.cmd.Process.Kill()
+			kill(s.cmd)
 			<-s.waited
 			return -1, true, ctx.Err()
 		}
@@ -207,8 +241,11 @@ func (s *Shell) Close() error {
 	select {
 	case <-s.waited:
 	default:
-		s.cmd.Process.Kill()
+		kill(s.cmd)
 		<-s.waited
+	}
+	if s.pty != nil {
+		s.pty.close()
 	}
 	return os.RemoveAll(s.tmp)
 }

@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"image"
+	"image/png"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -15,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
 	"github.com/go-pdf/fpdf"
 	"github.com/yuin/goldmark"
@@ -620,8 +623,46 @@ func (r *renderer) image(n *ast.Image) {
 }
 
 // load reads an image from a data: URI or a local path, and names its
-// type. It returns nil for anything that isn't PNG, JPEG, GIF or SVG.
+// type. It returns nil for anything that isn't PNG, JPEG, GIF or SVG. A
+// GIF becomes a PNG of one frame: the last, or the one a #frame=N
+// fragment names, counting from 1, so an animation shows how it ends.
 func (r *renderer) load(dest string) ([]byte, string) {
+	dest, frag, _ := strings.Cut(dest, "#")
+	data, typ := r.read(dest)
+	if typ != "GIF" {
+		return data, typ
+	}
+	n := 0
+	if v, ok := strings.CutPrefix(frag, "frame="); ok {
+		n, _ = strconv.Atoi(v)
+	}
+	img, err := termrec.Frame(data, n)
+	if err != nil {
+		return nil, ""
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, double(img)); err != nil {
+		return nil, ""
+	}
+	return b.Bytes(), "PNG"
+}
+
+// double scales img up 2x, pixel for pixel. Images are laid out at half
+// size, to suit mdsh's 2x screenshots, and terminal recordings are 1x.
+func double(img image.Image) image.Image {
+	b := img.Bounds()
+	out := image.NewRGBA(image.Rect(0, 0, 2*b.Dx(), 2*b.Dy()))
+	for y := range out.Bounds().Dy() {
+		for x := range out.Bounds().Dx() {
+			out.Set(x, y, img.At(b.Min.X+x/2, b.Min.Y+y/2))
+		}
+	}
+	return out
+}
+
+// read reads an image from a data: URI or a local path, and names its
+// type.
+func (r *renderer) read(dest string) ([]byte, string) {
 	var data []byte
 	if rest, ok := strings.CutPrefix(dest, "data:"); ok {
 		meta, payload, ok := strings.Cut(rest, ",")

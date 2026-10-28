@@ -288,10 +288,15 @@ func Output(r *run.Result, withStderr bool) string {
 			b.WriteString(withNewline(string(r.Stdout)))
 			b.WriteString(doc.RegionEnd + "\n")
 		}
-	case "image", "screenshot":
+	case "image", "screenshot", "recording":
 		if r.Image != "" {
+			link := r.Image
+			// frame= picks the frame a still view, such as a PDF, shows.
+			if f := r.Block.Attrs["frame"]; f != "" && run.OutKind(r.Block) == "recording" {
+				link += "#frame=" + f
+			}
 			b.WriteString(doc.RegionStart(id) + "\n")
-			fmt.Fprintf(&b, "![%s](%s)\n", id, r.Image)
+			fmt.Fprintf(&b, "![%s](%s)\n", id, link)
 			b.WriteString(doc.RegionEnd + "\n")
 		}
 	default:

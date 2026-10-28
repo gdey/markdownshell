@@ -185,5 +185,12 @@ func (d *Document) Refs() []Ref {
 			refs = append(refs, *s.Cond.Ref)
 		}
 	}
+	// An included tape's lines are read when the document runs; see
+	// run.Run.
+	for _, b := range d.Blocks {
+		if b.IsTape() && !b.IsInclude() {
+			refs = append(refs, TextRefs(b.Body)...)
+		}
+	}
 	return refs
 }

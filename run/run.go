@@ -15,8 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/tape"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
 )
 
@@ -53,6 +57,9 @@ type Options struct {
 	// If Confirm is nil, the run stops at the first such block with
 	// ErrNoConfirm, since nobody can answer.
 	Confirm func(*doc.Block) Answer
+	// TTY is the terminal that blocks marked tty run on. If it is nil,
+	// such blocks fail with ErrNoTTY.
+	TTY *os.File
 }
 
 // Answer is a reply to Confirm.
@@ -67,6 +74,9 @@ const (
 // ErrNoConfirm is returned when a block needs confirming and the run has
 // no way to ask.
 var ErrNoConfirm = errors.New("block needs confirmation")
+
+// ErrNoTTY is a tty block's error when the run has no terminal to give it.
+var ErrNoTTY = errors.New("block needs a terminal (tty) and there is none")
 
 // EventKind says what an Event reports.
 type EventKind int
@@ -161,6 +171,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 		Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
 		Dir:  opts.Dir,
 		Args: opts.Args,
+		TTY:  hasTTY(d),
 	})
 	defer stack.Close()
 
@@ -174,7 +185,13 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 	}
 
 	wanted := map[string][]string{}
-	for _, ref := range d.Refs() {
+	refs := d.Refs()
+	for _, r := range results {
+		if r.Block.IsTape() && r.Ran {
+			refs = append(refs, doc.TextRefs(string(r.Stdout))...)
+		}
+	}
+	for _, ref := range refs {
 		if ref.BlockID != "" && !ref.Fact() {
 			wanted[ref.BlockID] = append(wanted[ref.BlockID], ref.Var)
 		}
@@ -213,7 +230,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 			}
 		}
 		emit(Event{Kind: Started, Block: b})
-		runBlock(ctx, stack, d, b, r, opts, emit, wanted[b.ID])
+		runBlock(ctx, stack, d, b, r, opts, emit, wanted[b.ID], tapeFor(d, results, b), LookupAt(lookup, d, results, b.Span.Start))
 		emit(Event{Kind: Done, Block: b, Result: r})
 		if ctx.Err() != nil {
 			return results, ctx.Err()
@@ -306,7 +323,24 @@ func stopOnError(d *doc.Document, b *doc.Block, opts Options) bool {
 	return d.Options.OnError == "stop"
 }
 
-func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, r *Result, opts Options, emit func(Event), vars []string) {
+// tapeFor returns the tape for b: its text, or for an included tape the
+// file's lines, or the error reading them. It returns nil if b has none.
+func tapeFor(d *doc.Document, results []*Result, b *doc.Block) *Result {
+	t := d.Tape(b)
+	if t == nil {
+		return nil
+	}
+	for _, r := range results {
+		if r.Block == t && t.IsInclude() {
+			return r
+		}
+	}
+	return &Result{Block: t, Stdout: []byte(t.Body)}
+}
+
+// runBlock runs b. taped is its tape, if it has one, and lookup fills in
+// the tape's placeholders.
+func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, r *Result, opts Options, emit func(Event), vars []string, taped *Result, lookup doc.Lookup) {
 	r.Ran = true
 	share := b.Attrs.List("share")
 	if share == nil {
@@ -333,7 +367,26 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	out := io.MultiWriter(&stdout, eventWriter{Stdout, b, emit})
 	errw := io.MultiWriter(&stderr, eventWriter{Stderr, b, emit})
 
-	r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+	var rec *termrec.Recorder
+	switch {
+	case !b.Attrs.Has("tty"):
+		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+	case taped != nil:
+		// The tape types for the block, so it needs no terminal. It
+		// runs on a fixed size, so it records the same anywhere.
+		rec, err = runTaped(ctx, e.Shell, prelude(b, opts)+b.Body, taped, lookup, r, opts)
+	case opts.TTY == nil:
+		err = ErrNoTTY
+	default:
+		// The block talks to the terminal, so its output is a recording
+		// of the session.
+		cols, rows, serr := term.GetSize(int(opts.TTY.Fd()))
+		if serr != nil || cols <= 0 || rows <= 0 {
+			cols, rows = 80, 24
+		}
+		rec = termrec.NewRecorder(cols, rows)
+		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, prelude(b, opts)+b.Body, opts.TTY, rec)
+	}
 	r.Stdout, r.Stderr = stdout.Bytes(), stderr.Bytes()
 	if err != nil && !errors.Is(err, env.ErrExited) {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -344,6 +397,14 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, opts)
+	}
+	// A recording is saved even when the block failed, to show how.
+	if rec != nil {
+		img, err := saveRecording(b, rec.Recording(), opts)
+		r.Image = img
+		if r.Err == nil {
+			r.Err = err
+		}
 	}
 
 	if len(vars) > 0 && !r.Exited {
@@ -384,16 +445,97 @@ func prelude(b *doc.Block, opts Options) string {
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-// outKind splits the out= attribute: "image:plots/a.png" is ("image", "plots/a.png").
+// outKind splits the out= attribute: "image:plots/a.png" is ("image",
+// "plots/a.png"). A tty block's output is always a recording; out= only
+// picks its path.
 func outKind(b *doc.Block) (kind, arg string) {
 	kind, arg, _ = strings.Cut(b.Attrs["out"], ":")
-	if kind == "" {
+	switch {
+	case b.Attrs.Has("tty"):
+		kind = "recording"
+	case kind == "":
 		kind = "text"
 	}
 	return kind, arg
 }
 
-// OutKind returns the block's output kind: text, markdown, image or screenshot.
+// tapeCols and tapeRows are the terminal size a taped block runs on.
+const tapeCols, tapeRows = 80, 24
+
+// runTaped runs script on sh's terminal with its input typed by the tape
+// in taped, sets r's status, and returns the recording. Placeholders in
+// what the tape types in double quotes are filled in from lookup as it
+// starts, so values
+// such as passwords stay out of the document. What the block shows is
+// also shown on opts.TTY, if there is one.
+func runTaped(ctx context.Context, sh *env.Shell, script string, taped *Result, lookup doc.Lookup, r *Result, opts Options) (*termrec.Recorder, error) {
+	if taped.Err != nil {
+		return nil, fmt.Errorf("tape: %w", taped.Err)
+	}
+	cmds, err := tape.Parse(string(taped.Stdout))
+	if err != nil {
+		return nil, err
+	}
+	for i, c := range cmds {
+		if c.Literal {
+			continue
+		}
+		if cmds[i].Text, err = doc.Expand(c.Text, lookup); err != nil {
+			return nil, fmt.Errorf("tape line %d: %w", c.Line, err)
+		}
+	}
+	rec := termrec.NewRecorder(tapeCols, tapeRows)
+	screen := termrec.NewScreen(tapeCols, tapeRows)
+	out := []io.Writer{rec, screen}
+	if opts.TTY != nil {
+		out = append(out, opts.TTY)
+	}
+	r.Status, r.Exited, err = sh.RunScripted(ctx, script, tapeCols, tapeRows, io.MultiWriter(out...), func(ctx context.Context, keys io.Writer) error {
+		return tape.Play(ctx, cmds, keys, screen.Text)
+	})
+	return rec, err
+}
+
+// hasTTY reports whether any block in d may run on the terminal.
+func hasTTY(d *doc.Document) bool {
+	for _, b := range d.Blocks {
+		if Runnable(b) && b.Attrs.Has("tty") {
+			return true
+		}
+	}
+	return false
+}
+
+// saveRecording saves a tty block's session as an asciinema cast and as
+// an animated GIF made from it, and returns the link to the GIF. The cast
+// is a file even with embed=inline, at the GIF's path with a .cast
+// extension, or <doc>.assets/<block id>.cast. A session that showed
+// nothing saves nothing.
+func saveRecording(b *doc.Block, rec termrec.Recording, opts Options) (string, error) {
+	data, err := termrec.GIF(rec)
+	if errors.Is(err, termrec.ErrEmpty) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("recording: %w", err)
+	}
+	_, rel := outKind(b)
+	castRel := ""
+	if rel != "" {
+		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
+	}
+	var cast bytes.Buffer
+	if err := termrec.WriteCast(&cast, rec); err != nil {
+		return "", fmt.Errorf("recording: %w", err)
+	}
+	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes()); err != nil {
+		return "", err
+	}
+	return saveAsset(b, rel, data, "image/gif", ".gif", opts)
+}
+
+// OutKind returns the block's output kind: text, markdown, image,
+// screenshot, or recording for a tty block.
 func OutKind(b *doc.Block) string {
 	k, _ := outKind(b)
 	return k
@@ -420,21 +562,21 @@ func saveImage(b *doc.Block, data []byte, opts Options) (string, error) {
 			data, mime, ext = textimg.SVG(string(data)), "image/svg+xml", ".svg"
 		}
 	}
+	return saveAsset(b, rel, data, mime, ext, opts)
+}
+
+// saveAsset writes a block's image to rel, by default
+// <doc>.assets/<block id><ext>, or makes it a data: URI with
+// embed=inline, and returns the link to it.
+func saveAsset(b *doc.Block, rel string, data []byte, mime, ext string, opts Options) (string, error) {
 	if b.Attrs.Has("embed") && b.Attrs["embed"] == "inline" {
 		return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data), nil
 	}
 	if rel == "" {
-		base := "mdsh"
-		if opts.File != "" {
-			base = filepath.Base(opts.File)
-		}
-		rel = filepath.ToSlash(filepath.Join(base+".assets", b.ID+ext))
+		rel = defaultAsset(b, ext, opts)
 	}
-	path := filepath.Join(opts.Dir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	path := assetPath(b, rel, ext, opts)
+	if err := writeAsset(path, data); err != nil {
 		return "", err
 	}
 	if opts.LinkDir != "" {
@@ -448,6 +590,32 @@ func saveImage(b *doc.Block, data []byte, opts Options) (string, error) {
 		return filepath.ToSlash(abs), nil
 	}
 	return rel, nil
+}
+
+// defaultAsset is where a block's file goes when nothing says where:
+// <doc>.assets/<block id><ext>, relative to the document.
+func defaultAsset(b *doc.Block, ext string, opts Options) string {
+	base := "mdsh"
+	if opts.File != "" {
+		base = filepath.Base(opts.File)
+	}
+	return filepath.ToSlash(filepath.Join(base+".assets", b.ID+ext))
+}
+
+// assetPath is the file rel names, or the default for b and ext if rel
+// is empty.
+func assetPath(b *doc.Block, rel, ext string, opts Options) string {
+	if rel == "" {
+		rel = defaultAsset(b, ext, opts)
+	}
+	return filepath.Join(opts.Dir, filepath.FromSlash(rel))
+}
+
+func writeAsset(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 func sniffImage(data []byte) (mime, ext string) {

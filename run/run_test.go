@@ -356,3 +356,90 @@ func TestZsh(t *testing.T) {
 		t.Errorf("c stdout = %q, stderr %q", got, r["c"].Stderr)
 	}
 }
+
+func TestTTYWithoutTerminal(t *testing.T) {
+	_, results := runDoc(t, "```sh {#a tty}\necho hi\n```\n```sh {#b}\necho next\n```\n", run.Options{})
+	r := byID(results)
+	if !errors.Is(r["a"].Err, run.ErrNoTTY) || !r["a"].Failed() {
+		t.Errorf("a: err = %v, want ErrNoTTY", r["a"].Err)
+	}
+	if len(r["a"].Stdout) != 0 {
+		t.Errorf("a ran: stdout = %q", r["a"].Stdout)
+	}
+	if got := string(r["b"].Stdout); got != "next\n" {
+		t.Errorf("b stdout = %q", got)
+	}
+}
+
+func TestTTYOutKind(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a tty}\nx\n```\n\n```sh {#b tty out=recording:s/b.gif}\nx\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range d.Blocks {
+		if k := run.OutKind(b); k != "recording" {
+			t.Errorf("%s: OutKind = %q", b.ID, k)
+		}
+	}
+}
+
+func TestTapedBlock(t *testing.T) {
+	src := "```sh {#ask tty}\nread -r name\necho \"hi $name\"\n```\n\n```tape {for=ask}\nSet TypingSpeed 1ms\nType \"bob\"\nEnter\n```\n\n```sh {#next}\necho \"$name\"\n```\n"
+	dir := t.TempDir()
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md")})
+	r := byID(results)
+	ask := r["ask"]
+	if ask.Err != nil || ask.Status != 0 {
+		t.Fatalf("ask: status %d, err %v", ask.Status, ask.Err)
+	}
+	if ask.Image != "d.md.assets/ask.gif" {
+		t.Errorf("ask image = %q", ask.Image)
+	}
+	cast, err := os.ReadFile(filepath.Join(dir, "d.md.assets", "ask.cast"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(cast), "hi bob") || !strings.Contains(string(cast), `"width":80,"height":24`) {
+		t.Errorf("cast = %s", cast)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "d.md.assets", "ask.gif")); err != nil {
+		t.Error(err)
+	}
+	if got := string(r["next"].Stdout); got != "bob\n" {
+		t.Errorf("next stdout = %q", got)
+	}
+}
+
+func TestTapedBlockFromFile(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "in.tape"), []byte("Set TypingSpeed 1ms\nType \"x\"\nEnter\nWait@100ms /never/\n"), 0o644)
+	src := "```sh {#ask tty}\nread -r v\ncat\n```\n\n```tape {for=ask <include file=in.tape}\n```\n"
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md")})
+	ask := byID(results)["ask"]
+	if ask.Err == nil || !strings.Contains(ask.Err.Error(), "tape line 4: Wait /never/") {
+		t.Errorf("err = %v, want the Wait to time out", ask.Err)
+	}
+	// What happened is still saved, to show where it got stuck.
+	if ask.Image == "" {
+		t.Error("no recording saved")
+	}
+}
+
+func TestTapePlaceholders(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "in.tape"), []byte("Set TypingSpeed 1ms\nType \"{{#secret/env(PW)}}\"\nEnter\n"), 0o644)
+	src := "```sh {#secret}\nPW='s3\"cr t'\n```\n\n" +
+		"```sh {#a tty}\nread -r u; read -r p; read -r lit\n```\n\n```tape {for=a}\nSet TypingSpeed 1ms\nType \"{{$WHO}}\"\nEnter\nType \"{{#secret/env(PW)}}\"\nEnter\nType '{{$WHO}}'\nEnter\n```\n\n" +
+		"```sh {#b tty}\nread -r p2\n```\n\n```tape {for=b <include file=in.tape}\n```\n\n" +
+		"```sh {#check}\nprintf '%s|%s|%s|%s' \"$u\" \"$p\" \"$lit\" \"$p2\"\n```\n"
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md"), Environ: []string{"PATH=" + os.Getenv("PATH"), "WHO=ada"}})
+	r := byID(results)
+	for _, id := range []string{"a", "b"} {
+		if r[id].Err != nil {
+			t.Fatalf("%s: %v", id, r[id].Err)
+		}
+	}
+	if got := string(r["check"].Stdout); got != `ada|s3"cr t|{{$WHO}}|s3"cr t` {
+		t.Errorf("typed %q", got)
+	}
+}
