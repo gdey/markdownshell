@@ -164,7 +164,7 @@ func tagsOf(b *doc.Block) string {
 			tags = append(tags, a+"="+v)
 		}
 	}
-	for _, a := range []string{"confirm", "skip"} {
+	for _, a := range []string{"tty", "confirm", "skip"} {
 		if b.Attrs.Has(a) {
 			tags = append(tags, a)
 		}
@@ -216,7 +216,11 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 	if r.Ran && !r.Block.IsInclude() {
 		var parts []string
 		if r.Image != "" {
-			parts = append(parts, savedStyle.Render("image: "+r.Image))
+			label := "image: "
+			if run.OutKind(r.Block) == "recording" {
+				label = "recording: "
+			}
+			parts = append(parts, savedStyle.Render(label+r.Image))
 		} else if run.OutKind(r.Block) == "markdown" {
 			if s := m.markdown(string(r.Stdout)); s != "" {
 				parts = append(parts, s)

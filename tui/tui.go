@@ -4,9 +4,11 @@
 package tui
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -111,6 +113,31 @@ type confirmMsg struct {
 
 type runDoneMsg struct{ err error }
 
+// handOff gives the terminal to a tty block. As a tea.ExecCommand, Bubble
+// Tea runs it with the terminal released: it lets the block start, waits
+// for it to finish, and then for enter, so the block's last screen can be
+// read before the TUI draws over it.
+type handOff struct {
+	block      *doc.Block
+	tty        *os.File
+	start, end chan struct{}
+}
+
+func (h *handOff) Run() error {
+	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s runs on the terminal ---\r\n", h.block.ID)
+	close(h.start)
+	<-h.end
+	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s is done; press enter to go back ---", h.block.ID)
+	bufio.NewReader(h.tty).ReadString('\n')
+	return nil
+}
+
+func (h *handOff) SetStdin(io.Reader)  {}
+func (h *handOff) SetStdout(io.Writer) {}
+func (h *handOff) SetStderr(io.Writer) {}
+
+type ttyBackMsg struct{}
+
 // New sets up the TUI for d. Close the model when done with it.
 func New(d *doc.Document, opts Options) (*Model, error) {
 	if opts.Run.File == "" {
@@ -134,6 +161,9 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	ro := opts.Run
 	ro.OnEvent = func(e run.Event) { m.events <- eventMsg(e) }
 	ro.Confirm = m.confirm
+	if ro.TTY != nil {
+		ro.TakeTTY = m.takeTTY
+	}
 	sess, err := run.NewSession(d, ro)
 	if err != nil {
 		return nil, err
@@ -180,6 +210,15 @@ func (m *Model) confirm(b *doc.Block) run.Answer {
 	return <-reply
 }
 
+// takeTTY hands the terminal to block b, from the run's goroutine, and
+// returns once the TUI has stepped aside.
+func (m *Model) takeTTY(b *doc.Block) func() {
+	h := &handOff{block: b, tty: m.opts.Run.TTY, start: make(chan struct{}), end: make(chan struct{})}
+	m.events <- h
+	<-h.start
+	return func() { close(h.end) }
+}
+
 func (m *Model) wait() tea.Msg { return <-m.events }
 
 // Init starts listening for run events.
@@ -206,6 +245,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.refresh()
 		return m, m.wait
+	case *handOff:
+		return m, tea.Batch(m.wait, tea.Exec(msg, func(error) tea.Msg { return ttyBackMsg{} }))
+	case ttyBackMsg:
+		m.refresh()
+		return m, nil
 	case runDoneMsg:
 		m.running, m.active = false, -1
 		m.cancel()

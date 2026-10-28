@@ -60,6 +60,10 @@ type Options struct {
 	// TTY is the terminal that blocks marked tty run on. If it is nil,
 	// such blocks fail with ErrNoTTY.
 	TTY *os.File
+	// TakeTTY, if set, is called before a tty block uses TTY, so a front
+	// end that draws on the terminal can step aside. The block runs once
+	// it returns, and calls the function it returned when done with TTY.
+	TakeTTY func(*doc.Block) (giveBack func())
 }
 
 // Answer is a reply to Confirm.
@@ -303,7 +307,9 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 			cols, rows = 80, 24
 		}
 		rec = termrec.NewRecorder(cols, rows)
+		giveBack := takeTTY(b, opts)
 		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, prelude(b, opts)+b.Body, opts.TTY, rec)
+		giveBack()
 	}
 	r.Stdout, r.Stderr = stdout.Bytes(), stderr.Bytes()
 	if err != nil && !errors.Is(err, env.ErrExited) {
@@ -380,6 +386,14 @@ func outKind(b *doc.Block) (kind, arg string) {
 // tapeCols and tapeRows are the terminal size a taped block runs on.
 const tapeCols, tapeRows = 80, 24
 
+// takeTTY asks opts.TakeTTY, if set, for the terminal for b.
+func takeTTY(b *doc.Block, opts Options) (giveBack func()) {
+	if opts.TakeTTY == nil {
+		return func() {}
+	}
+	return opts.TakeTTY(b)
+}
+
 // runTaped runs script on sh's terminal with its input typed by the tape
 // in taped, sets r's status, and returns the recording. Placeholders in
 // what the tape types in double quotes are filled in from lookup as it
@@ -407,6 +421,7 @@ func runTaped(ctx context.Context, sh *env.Shell, script string, taped *Result, 
 	out := []io.Writer{rec, screen}
 	if opts.TTY != nil {
 		out = append(out, opts.TTY)
+		defer takeTTY(r.Block, opts)()
 	}
 	r.Status, r.Exited, err = sh.RunScripted(ctx, script, tapeCols, tapeRows, io.MultiWriter(out...), func(ctx context.Context, keys io.Writer) error {
 		return tape.Play(ctx, cmds, keys, screen.Text)

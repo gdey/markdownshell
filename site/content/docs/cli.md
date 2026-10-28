@@ -59,7 +59,9 @@ A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
 under `--step` or `step: true` when running with `a`, ask in the footer
 with the same choices as on the command line. `--yes`, `--stop-on-error`
-and block arguments work as usual. Include blocks show the file's lines,
+and block arguments work as usual. A `tty` block gets the whole terminal
+while it runs, and the TUI comes back when you press enter after it ends;
+a taped block's run is shown the same way. Include blocks show the file's lines,
 numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
 is open, mdsh won't save over it until you press `w` twice.

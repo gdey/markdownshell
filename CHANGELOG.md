@@ -17,6 +17,9 @@ follow [Semantic Versioning](https://semver.org/).
 - In `mdsh -i`, `i` (or `:`) types a command at a prompt; it is added to
   the end of the document as an `sh` block and run. `doc.AppendBlock`
   and `run.Session.Grow` do the work.
+- In `mdsh -i`, `tty` blocks and taped blocks run on the terminal: the UI
+  steps aside while they run and comes back on enter. `run.Options.TakeTTY`
+  lets a front end hand the terminal over.
 - `run.Session` runs a document's blocks one at a time while keeping
   their shells alive; `run.Run` is now built on it.
 
