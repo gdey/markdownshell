@@ -77,6 +77,73 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 	return status, exited, err
 }
 
+// ErrTapeEnded is returned by RunScripted when the block is still
+// running a while after drive has typed everything, most likely waiting
+// for input that will never come.
+var ErrTapeEnded = errors.New("still running 10s after its input ended")
+
+// tapeGrace is how long RunScripted waits for a script once drive is done.
+var tapeGrace = 10 * time.Second
+
+// RunScripted runs script on the shell's own pseudo-terminal, sized cols
+// by rows, with no person at it: drive types the input, writing to keys,
+// while the script runs, and everything the script shows goes to out.
+// If drive fails, or the script is still running 10s after drive is
+// done, the shell is killed and the error returned.
+func (s *Shell) RunScripted(ctx context.Context, script string, cols, rows int, out io.Writer, drive func(ctx context.Context, keys io.Writer) error) (status int, exited bool, err error) {
+	if s.pty == nil {
+		return 0, false, ErrNoPTY
+	}
+	ptm := s.pty.ptm
+	pty.Setsize(ptm, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+	if st, err := term.GetState(int(ptm.Fd())); err == nil {
+		defer term.Restore(int(ptm.Fd()), st)
+	}
+	s.pty.attach(out)
+	defer s.pty.attach(nil)
+
+	runCtx, stopRun := context.WithCancelCause(ctx)
+	defer stopRun(nil)
+	type result struct {
+		status int
+		exited bool
+		err    error
+	}
+	ran := make(chan result, 1)
+	go func() {
+		st, ex, err := s.run(runCtx, script, io.Discard, io.Discard, true)
+		ran <- result{st, ex, err}
+	}()
+	driveCtx, stopDrive := context.WithCancel(ctx)
+	defer stopDrive()
+	driven := make(chan error, 1)
+	go func() { driven <- drive(driveCtx, ptm) }()
+
+	var res result
+	select {
+	case res = <-ran:
+		stopDrive()
+		<-driven
+	case derr := <-driven:
+		if derr == nil {
+			t := time.NewTimer(tapeGrace)
+			defer t.Stop()
+			select {
+			case res = <-ran:
+			case <-t.C:
+				derr = ErrTapeEnded
+			}
+		}
+		if derr != nil {
+			stopRun(derr)
+			res = <-ran
+			res.err = derr
+		}
+	}
+	s.pty.drain()
+	return res.status, res.exited, res.err
+}
+
 // forward copies what is typed on the terminal fd to ptm, and the
 // terminal's size when it changes, until stop is closed. It polls, so
 // it never holds a read that would take keys meant for whatever reads

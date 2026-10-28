@@ -5,11 +5,13 @@ package env
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -119,3 +121,58 @@ func TestTTYShellDrainsTerminal(t *testing.T) {
 		t.Errorf("status %d, err %v, out %q", status, err, out.String())
 	}
 }
+
+func TestRunScripted(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	ctx := context.Background()
+	var out bytes.Buffer
+	var mu sync.Mutex
+	shown := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return out.Write(p)
+	})
+	script := "test -t 0 && echo terminal ok\nstty size\nread -r l; X=$l\n"
+	status, _, err := sh.RunScripted(ctx, script, 100, 30, shown, func(ctx context.Context, keys io.Writer) error {
+		_, err := io.WriteString(keys, "typed\r")
+		return err
+	})
+	if err != nil || status != 0 {
+		t.Fatalf("status %d, err %v", status, err)
+	}
+	mu.Lock()
+	got := out.String()
+	mu.Unlock()
+	for _, want := range []string{"terminal ok", "30 100", "typed"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("screen %q, want %q in it", got, want)
+		}
+	}
+	var x bytes.Buffer
+	sh.Run(ctx, `printf %s "$X"`, &x, io.Discard)
+	if x.String() != "typed" {
+		t.Errorf("X = %q", x.String())
+	}
+}
+
+func TestRunScriptedInputEnds(t *testing.T) {
+	defer func(g time.Duration) { tapeGrace = g }(tapeGrace)
+	tapeGrace = 200 * time.Millisecond
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	_, _, err = sh.RunScripted(context.Background(), "read -r l\n", 80, 24, io.Discard, func(context.Context, io.Writer) error { return nil })
+	if !errors.Is(err, ErrTapeEnded) {
+		t.Errorf("err = %v, want ErrTapeEnded", err)
+	}
+}
+
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }

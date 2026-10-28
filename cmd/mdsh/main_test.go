@@ -345,11 +345,17 @@ func TestPDF(t *testing.T) {
 
 // TestPDFExamples checks that the examples still lay out as PDFs.
 func TestPDFExamples(t *testing.T) {
-	for _, name := range []string{"hello.md", "include.md", "report.md"} {
+	for _, name := range []string{"hello.md", "include.md", "report.md", "terminal.md"} {
 		t.Run(name, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), "out.pdf")
+			run := "--yes"
+			if name == "terminal.md" {
+				// Running it would rewrite its recordings, whose
+				// timings differ every run.
+				run = "-n"
+			}
 			var stdout, stderr bytes.Buffer
-			mdsh([]string{"--yes", "--pdf", out, filepath.Join("..", "..", "examples", name)}, nil, &stdout, &stderr)
+			mdsh([]string{run, "--pdf", out, filepath.Join("..", "..", "examples", name)}, nil, &stdout, &stderr)
 			if b, err := os.ReadFile(out); err != nil || !bytes.HasPrefix(b, []byte("%PDF-")) {
 				t.Errorf("no PDF (%v), stderr %s", err, stderr.String())
 			}

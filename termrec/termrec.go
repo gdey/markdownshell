@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/gif"
+	"strings"
 	"sync"
 	"time"
 
@@ -371,4 +372,39 @@ func index(c vt10x.Color, def uint8) uint8 {
 		return uint8(c)
 	}
 	return uint8(palette.Index(rgb(uint32(c))))
+}
+
+// Screen is a terminal emulator to write a program's output to, for
+// reading what it shows.
+type Screen struct {
+	vt vt10x.Terminal
+}
+
+// NewScreen returns a blank cols by rows screen.
+func NewScreen(cols, rows int) *Screen {
+	return &Screen{vt: vt10x.New(vt10x.WithSize(cols, rows))}
+}
+
+func (s *Screen) Write(p []byte) (int, error) { return s.vt.Write(p) }
+
+// Text returns what the screen shows, one line per row, without trailing
+// spaces.
+func (s *Screen) Text() string {
+	s.vt.Lock()
+	defer s.vt.Unlock()
+	cols, rows := s.vt.Size()
+	var b strings.Builder
+	for y := range rows {
+		var line strings.Builder
+		for x := range cols {
+			r := s.vt.Cell(x, y).Char
+			if r == 0 {
+				r = ' '
+			}
+			line.WriteRune(r)
+		}
+		b.WriteString(strings.TrimRight(line.String(), " "))
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

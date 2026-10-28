@@ -94,3 +94,11 @@ func TestFrame(t *testing.T) {
 		t.Error("a frame past the end isn't the last")
 	}
 }
+
+func TestScreen(t *testing.T) {
+	s := NewScreen(10, 3)
+	s.Write([]byte("hello\r\nx\x1b[31my\x1b[0m\r\n"))
+	if got := s.Text(); got != "hello\nxy\n\n" {
+		t.Errorf("Text() = %q", got)
+	}
+}

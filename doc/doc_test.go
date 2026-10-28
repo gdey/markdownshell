@@ -3,6 +3,7 @@ package doc
 import (
 	_ "embed"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -313,5 +314,61 @@ func TestParseNestedOutput(t *testing.T) {
 		if got := string(d.Src[b.Output.Start:b.Output.End]); got != want[i] {
 			t.Errorf("block %s output = %q, want %q", b.ID, got, want[i])
 		}
+	}
+}
+
+func TestTapes(t *testing.T) {
+	src := "```sh {#a tty}\nx\n```\n\n```tape {for=a}\nEnter\n```\n\n```sh\ny\n```\n\n```tape {for=b <include file=b.tape}\n```\n\n```sh {#b tty}\nz\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := d.Blocks[2].ID; got != "block-2" {
+		t.Errorf("block after a tape is %q, want block-2", got)
+	}
+	if tp := d.Tape(d.Block("a")); tp == nil || tp.Body != "Enter\n" {
+		t.Errorf("tape for a = %+v", tp)
+	}
+	if tp := d.Tape(d.Block("b")); tp == nil || !tp.IsInclude() {
+		t.Errorf("tape for b = %+v", tp)
+	}
+	if d.Tape(d.Block("block-2")) != nil {
+		t.Error("block-2 has a tape")
+	}
+
+	for _, bad := range []string{
+		"```tape {for=nope}\n```\n",
+		"```sh {#a}\nx\n```\n```tape {for=a}\n```\n",
+		"```sh {#a tty}\nx\n```\n```tape {for=a}\n```\n```tape {for=a}\n```\n",
+		"```sh {#a tty}\nx\n```\n```tape {#t for=a}\n```\n",
+	} {
+		if _, err := Parse([]byte(bad)); err == nil {
+			t.Errorf("Parse(%q) = nil error", bad)
+		}
+	}
+}
+
+func TestTapeRefs(t *testing.T) {
+	src := "```sh {#s}\nP=x\n```\n\n```sh {#a tty}\nx\n```\n\n```tape {for=a}\nType \"{{$USER}}:{{#s/env(P)}}\"\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Ref{{Var: "USER"}, {BlockID: "s", Var: "P"}}
+	if got := d.Refs(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Refs() = %v, want %v", got, want)
+	}
+	if _, err := Parse([]byte(strings.Replace(src, "#s/", "#nope/", 1))); err == nil {
+		t.Error("a tape naming an unknown block parsed")
+	}
+	lookup := func(r Ref) (string, bool) {
+		return map[string]string{"USER": "j", "P": `p"w`}[r.Var], r.Var != "MISSING"
+	}
+	got, err := Expand(`Type "{{$USER}}" {{#s/env(P):"old"}}`, lookup)
+	if err != nil || got != `Type "j" p"w` {
+		t.Errorf("Expand = %q, %v", got, err)
+	}
+	if _, err := Expand("{{$MISSING}}", lookup); err == nil {
+		t.Error("Expand of an unknown ref succeeded")
 	}
 }

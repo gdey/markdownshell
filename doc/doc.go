@@ -95,7 +95,7 @@ func Parse(src []byte) (*Document, error) {
 	}
 
 	ids := map[string]bool{}
-	includes := 0
+	includes, tapes := 0, 0
 	var last *Block
 	var open []*Section
 	var lists []int // content columns of the open list items
@@ -139,8 +139,22 @@ func Parse(src []byte) (*Document, error) {
 				pos = next
 				continue
 			}
+			if b.IsTape() {
+				// Tapes are input for a block, not blocks: like
+				// includes, they have no name.
+				if b.ID != "" {
+					return nil, fmt.Errorf("line %d: a tape has no name; drop #%s", lineNo(src, pos), b.ID)
+				}
+				tapes++
+				b.ID = fmt.Sprintf("<tape-%d", tapes)
+				b.Output = Span{next, next}
+				d.Blocks = append(d.Blocks, b)
+				last = b
+				pos = next
+				continue
+			}
 			if b.ID == "" {
-				b.ID = fmt.Sprintf("block-%d", len(d.Blocks)-includes+1)
+				b.ID = fmt.Sprintf("block-%d", len(d.Blocks)-includes-tapes+1)
 			}
 			if ids[b.ID] {
 				return nil, fmt.Errorf("line %d: duplicate block id %q", lineNo(src, pos), b.ID)
@@ -206,6 +220,9 @@ func Parse(src []byte) (*Document, error) {
 			}
 		}
 	}
+	if err := checkTapes(d); err != nil {
+		return nil, err
+	}
 	for _, p := range d.Placeholders {
 		if p.BlockID != "" && !ids[p.BlockID] {
 			return nil, fmt.Errorf("line %d: placeholder refers to unknown block %q", lineNo(src, p.Span.Start), p.BlockID)
@@ -217,6 +234,52 @@ func Parse(src []byte) (*Document, error) {
 		}
 	}
 	return d, nil
+}
+
+// TapeLang is the language of a tape fence, which types the input for
+// the tty block its for= names:
+//
+//	```tape {for=shell}
+//	Type "exit"
+//	Enter
+//	```
+//
+// It can be an include block too, to read the tape from a file.
+const TapeLang = "tape"
+
+// IsTape reports whether b is a tape for another block.
+func (b *Block) IsTape() bool { return b.Lang == TapeLang && b.Attrs.Has("for") }
+
+// Tape returns the tape for block b, or nil.
+func (d *Document) Tape(b *Block) *Block {
+	for _, t := range d.Blocks {
+		if t.IsTape() && t.Attrs["for"] == b.ID {
+			return t
+		}
+	}
+	return nil
+}
+
+// checkTapes checks each tape is for a tty block, and no block has two.
+func checkTapes(d *Document) error {
+	seen := map[string]bool{}
+	for _, t := range d.Blocks {
+		if !t.IsTape() {
+			continue
+		}
+		id := t.Attrs["for"]
+		b := d.Block(id)
+		switch {
+		case b == nil || b.IsTape() || b.IsInclude():
+			return fmt.Errorf("line %d: tape for unknown block %q", lineNo(d.Src, t.Span.Start), id)
+		case !b.Attrs.Has("tty"):
+			return fmt.Errorf("line %d: tape for block %s, which isn't marked tty", lineNo(d.Src, t.Span.Start), id)
+		case seen[id]:
+			return fmt.Errorf("line %d: block %s has two tapes", lineNo(d.Src, t.Span.Start), id)
+		}
+		seen[id] = true
+	}
+	return nil
 }
 
 func isOutputFor(b *Block, id string) bool {

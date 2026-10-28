@@ -19,6 +19,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/tape"
 	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
 )
@@ -170,7 +171,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 		Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
 		Dir:  opts.Dir,
 		Args: opts.Args,
-		TTY:  opts.TTY != nil && hasTTY(d),
+		TTY:  hasTTY(d),
 	})
 	defer stack.Close()
 
@@ -184,7 +185,13 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 	}
 
 	wanted := map[string][]string{}
-	for _, ref := range d.Refs() {
+	refs := d.Refs()
+	for _, r := range results {
+		if r.Block.IsTape() && r.Ran {
+			refs = append(refs, doc.TextRefs(string(r.Stdout))...)
+		}
+	}
+	for _, ref := range refs {
 		if ref.BlockID != "" && !ref.Fact() {
 			wanted[ref.BlockID] = append(wanted[ref.BlockID], ref.Var)
 		}
@@ -223,7 +230,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 			}
 		}
 		emit(Event{Kind: Started, Block: b})
-		runBlock(ctx, stack, d, b, r, opts, emit, wanted[b.ID])
+		runBlock(ctx, stack, d, b, r, opts, emit, wanted[b.ID], tapeFor(d, results, b), LookupAt(lookup, d, results, b.Span.Start))
 		emit(Event{Kind: Done, Block: b, Result: r})
 		if ctx.Err() != nil {
 			return results, ctx.Err()
@@ -316,7 +323,24 @@ func stopOnError(d *doc.Document, b *doc.Block, opts Options) bool {
 	return d.Options.OnError == "stop"
 }
 
-func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, r *Result, opts Options, emit func(Event), vars []string) {
+// tapeFor returns the tape for b: its text, or for an included tape the
+// file's lines, or the error reading them. It returns nil if b has none.
+func tapeFor(d *doc.Document, results []*Result, b *doc.Block) *Result {
+	t := d.Tape(b)
+	if t == nil {
+		return nil
+	}
+	for _, r := range results {
+		if r.Block == t && t.IsInclude() {
+			return r
+		}
+	}
+	return &Result{Block: t, Stdout: []byte(t.Body)}
+}
+
+// runBlock runs b. taped is its tape, if it has one, and lookup fills in
+// the tape's placeholders.
+func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, r *Result, opts Options, emit func(Event), vars []string, taped *Result, lookup doc.Lookup) {
 	r.Ran = true
 	share := b.Attrs.List("share")
 	if share == nil {
@@ -347,6 +371,10 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	switch {
 	case !b.Attrs.Has("tty"):
 		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+	case taped != nil:
+		// The tape types for the block, so it needs no terminal. It
+		// runs on a fixed size, so it records the same anywhere.
+		rec, err = runTaped(ctx, e.Shell, prelude(b, opts)+b.Body, taped, lookup, r, opts)
 	case opts.TTY == nil:
 		err = ErrNoTTY
 	default:
@@ -370,8 +398,13 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, opts)
 	}
-	if rec != nil && r.Err == nil {
-		r.Image, r.Err = saveRecording(b, rec.Recording(), opts)
+	// A recording is saved even when the block failed, to show how.
+	if rec != nil {
+		img, err := saveRecording(b, rec.Recording(), opts)
+		r.Image = img
+		if r.Err == nil {
+			r.Err = err
+		}
 	}
 
 	if len(vars) > 0 && !r.Exited {
@@ -424,6 +457,43 @@ func outKind(b *doc.Block) (kind, arg string) {
 		kind = "text"
 	}
 	return kind, arg
+}
+
+// tapeCols and tapeRows are the terminal size a taped block runs on.
+const tapeCols, tapeRows = 80, 24
+
+// runTaped runs script on sh's terminal with its input typed by the tape
+// in taped, sets r's status, and returns the recording. Placeholders in
+// what the tape types in double quotes are filled in from lookup as it
+// starts, so values
+// such as passwords stay out of the document. What the block shows is
+// also shown on opts.TTY, if there is one.
+func runTaped(ctx context.Context, sh *env.Shell, script string, taped *Result, lookup doc.Lookup, r *Result, opts Options) (*termrec.Recorder, error) {
+	if taped.Err != nil {
+		return nil, fmt.Errorf("tape: %w", taped.Err)
+	}
+	cmds, err := tape.Parse(string(taped.Stdout))
+	if err != nil {
+		return nil, err
+	}
+	for i, c := range cmds {
+		if c.Literal {
+			continue
+		}
+		if cmds[i].Text, err = doc.Expand(c.Text, lookup); err != nil {
+			return nil, fmt.Errorf("tape line %d: %w", c.Line, err)
+		}
+	}
+	rec := termrec.NewRecorder(tapeCols, tapeRows)
+	screen := termrec.NewScreen(tapeCols, tapeRows)
+	out := []io.Writer{rec, screen}
+	if opts.TTY != nil {
+		out = append(out, opts.TTY)
+	}
+	r.Status, r.Exited, err = sh.RunScripted(ctx, script, tapeCols, tapeRows, io.MultiWriter(out...), func(ctx context.Context, keys io.Writer) error {
+		return tape.Play(ctx, cmds, keys, screen.Text)
+	})
+	return rec, err
 }
 
 // hasTTY reports whether any block in d may run on the terminal.

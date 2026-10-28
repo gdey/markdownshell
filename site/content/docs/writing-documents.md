@@ -148,8 +148,39 @@ and makes an animated GIF from it beside the cast, linked below the
 block, since GitHub and PDFs can't play a cast. A PDF can't animate, so it shows the last frame; set
 `frame=N` to show frame `N` instead, counting from 1.
 
+A `tape` fence types the input for a `tty` block, in the commands of a
+[VHS](https://github.com/charmbracelet/vhs) tape, so the block runs with
+nobody at the keyboard, in CI or under `-w`:
+
+````markdown
+```sh {#repl tty}
+python3 -q
+```
+
+```tape {for=repl}
+Wait />>>$/
+Type "print(6 * 7)"
+Enter
+Wait />>>$/
+Type "exit()"
+Enter
+```
+````
+
+Or read it from a file: ```` ```tape {for=repl <include file=demo.tape} ````.
+mdsh supports `Type`, the named keys (`Enter`, `Tab`, `Up`, …) with a
+count, `Ctrl+X` and `Alt+X`, `Sleep`, `Wait /regex/` and
+`Set TypingSpeed`, `WaitTimeout` and `WaitPattern`, and skips the rest of
+VHS's commands. Double-quoted `Type` strings can hold placeholders,
+`{{$VAR}}` or `{{#block/env(VAR)}}`, filled in as the tape plays, for
+passwords and tokens that shouldn't be written into the document. Single
+quotes or backticks type the text as it is. A taped block runs on an 80x24 terminal so its recording
+is the same everywhere. Start with a `Wait` or `Sleep`, since keys go out
+as soon as the block starts. [examples/terminal.md](https://github.com/gdey/markdownshell/blob/main/examples/terminal.md) shows each of
+these, with the recordings they make.
+
 With no terminal (cron, CI) or with mdsh in the background, a `tty` block
-fails with an error instead of hanging.
+without a tape fails with an error instead of hanging.
 
 ## Including files
 
