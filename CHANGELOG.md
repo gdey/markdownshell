@@ -6,32 +6,45 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
+## [1.1.0] - 2026-10-28
+
+Interactive mode: `mdsh -i` opens a document in a terminal UI and runs its
+blocks as you go.
+
+### Interactive mode
+
+- `mdsh -i file.md`, interactive mode: a terminal UI (Bubble Tea) that
+  shows the document, runs blocks as you pick them, streams their output
+  under them and saves it to the file. `a` runs from the cursor to the
+  end; `confirm` and step mode ask inside the UI.
+- `i` (or `:`) types a command at a prompt; it is added to the end of the
+  document as an `sh` block and run.
+- `tty` blocks and taped blocks run on the terminal: the UI steps aside
+  while they run and comes back on enter.
+- Images and recordings show under their block as half-block previews,
+  and `v` shows one full size through the kitty, iTerm2 or sixel
+  protocol.
+- `e` opens the selected block, fences and attributes included, in
+  `$VISUAL`, `$EDITOR` or `vi` and saves the edit to the file. Saved
+  output follows a changed id.
+
+### Library
+
+- `run.Session` runs a document's blocks one at a time while keeping
+  their shells alive; `run.Run` is now built on it. `run.Session.Sync`
+  catches a session up with edits to the document, and
+  `run.Options.TakeTTY` lets a front end hand the terminal over.
+- `doc.AppendBlock` adds a block to the end of a document, and
+  `doc.Document.BlockText` and `SetBlock` read and replace a block while
+  every block keeps its identity.
+- The new `termimg` package draws images in a terminal.
+
+### Shell helpers and examples
 
 - `md_table -F SEP` splits fields on SEP as `awk -F` does (`-F ' '` is
   runs of blanks), and `md_table -s N` skips the first N lines.
 - `examples/pdf/test-coverage.pdf`, the PDF of a run of the test coverage
   report runbook.
-- `mdsh -i file.md`, interactive mode: a terminal UI (Bubble Tea) that
-  shows the document, runs blocks as you pick them, streams their output
-  under them and saves it to the file. `a` runs from the cursor to the
-  end; `confirm` and step mode ask inside the UI.
-- In `mdsh -i`, `i` (or `:`) types a command at a prompt; it is added to
-  the end of the document as an `sh` block and run. `doc.AppendBlock`
-  and `run.Session.Sync` do the work.
-- In `mdsh -i`, `tty` blocks and taped blocks run on the terminal: the UI
-  steps aside while they run and comes back on enter. `run.Options.TakeTTY`
-  lets a front end hand the terminal over.
-- In `mdsh -i`, images and recordings show under their block as
-  half-block previews, and `v` shows one full size through the kitty,
-  iTerm2 or sixel protocol. The new `termimg` package does the drawing.
-- In `mdsh -i`, `e` opens the selected block, fences and attributes
-  included, in `$VISUAL`, `$EDITOR` or `vi` and saves the edit to the
-  file. Saved output follows a changed id. `doc.Document.BlockText` and
-  `SetBlock` read and replace a block while every block keeps its
-  identity, and `run.Session.Sync` catches a session up with edits.
-- `run.Session` runs a document's blocks one at a time while keeping
-  their shells alive; `run.Run` is now built on it.
 
 ### Fixed
 
@@ -133,5 +146,6 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/gdey/markdownshell/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gdey/markdownshell/releases/tag/v1.0.0
