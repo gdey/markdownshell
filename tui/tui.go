@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"strings"
@@ -16,10 +17,12 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termimg"
 )
 
 // Options configure the TUI.
@@ -35,6 +38,11 @@ type Options struct {
 	// AutoSave saves after every block that runs. Otherwise output is
 	// saved when w is pressed.
 	AutoSave bool
+	// Images turns on image previews, drawn with colored half blocks.
+	Images bool
+	// Protocol is how v shows an image at full size. With termimg.None
+	// it is drawn with half blocks, as large as the terminal allows.
+	Protocol termimg.Protocol
 	// Style is the glamour style prose is drawn in, such as "dark",
 	// "light" or "notty".
 	Style string
@@ -85,6 +93,8 @@ type Model struct {
 	bots   map[int]int
 	// md caches markdown drawn with glamour at the current width.
 	md map[string]string
+	// images caches image previews; see preview.
+	images map[string]string
 
 	dirty     bool
 	mtime     time.Time
@@ -138,6 +148,39 @@ func (h *handOff) SetStderr(io.Writer) {}
 
 type ttyBackMsg struct{}
 
+// viewer shows an image full screen, with the terminal released, until
+// enter is pressed.
+type viewer struct {
+	img      image.Image
+	protocol termimg.Protocol
+	in       io.Reader
+	out      io.Writer
+}
+
+func (v *viewer) Run() error {
+	cols, rows := 80, 24
+	if f, ok := v.out.(*os.File); ok {
+		if w, h, err := term.GetSize(int(f.Fd())); err == nil {
+			cols, rows = w, h
+		}
+	}
+	io.WriteString(v.out, "\x1b[2J\x1b[H")
+	if v.protocol == termimg.None || termimg.Show(v.out, v.protocol, v.img, cols) != nil {
+		io.WriteString(v.out, strings.ReplaceAll(termimg.HalfBlocks(v.img, cols, rows-2), "\n", "\r\n")+"\r\n")
+	}
+	io.WriteString(v.out, "press enter to go back")
+	bufio.NewReader(v.in).ReadString('\n')
+	if v.protocol == termimg.Kitty {
+		io.WriteString(v.out, "\x1b_Ga=d\x1b\\")
+	}
+	io.WriteString(v.out, "\x1b[2J\x1b[H")
+	return nil
+}
+
+func (v *viewer) SetStdin(r io.Reader)  { v.in = r }
+func (v *viewer) SetStdout(w io.Writer) { v.out = w }
+func (v *viewer) SetStderr(io.Writer)   {}
+
 // New sets up the TUI for d. Close the model when done with it.
 func New(d *doc.Document, opts Options) (*Model, error) {
 	if opts.Run.File == "" {
@@ -154,6 +197,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		active: -1,
 		live:   map[int][]chunk{},
 		md:     map[string]string{},
+		images: map[string]string{},
 	}
 	if info, err := os.Stat(opts.Run.File); err == nil {
 		m.mtime = info.ModTime()
@@ -347,6 +391,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.start(false)
 	case "a":
 		m.start(true)
+	case "v":
+		if cmd := m.view(); cmd != nil {
+			return m, cmd
+		}
 	case "w":
 		m.save(forceArm)
 	case "i", ":":
@@ -360,6 +408,29 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	m.refresh()
 	return m, nil
+}
+
+// view shows the image of the block under the cursor full screen.
+func (m *Model) view() tea.Cmd {
+	i := m.cur()
+	if i < 0 {
+		return nil
+	}
+	link := m.results[i].Image
+	if !m.results[i].Ran && m.d.Blocks[i].HasOutput() {
+		b := m.d.Blocks[i]
+		link = imageLink(saved(m.d.Src[b.Output.Start:b.Output.End]))
+	}
+	if link == "" {
+		m.status = "this block has no image"
+		return nil
+	}
+	img, err := termimg.Load(m.imagePath(link))
+	if err != nil {
+		m.status = "can't show " + link + ": " + err.Error()
+		return nil
+	}
+	return tea.Exec(&viewer{img: img, protocol: m.opts.Protocol}, func(error) tea.Msg { return ttyBackMsg{} })
 }
 
 // typed handles a key while a new block is being typed. Enter appends
@@ -571,7 +642,7 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a run from here · i new block · w save · q quit")
+		help = helpStyle.Render("j/k move · enter run · a run from here · i new block · v view image · w save · q quit")
 	}
 	return line1 + "\n" + help
 }

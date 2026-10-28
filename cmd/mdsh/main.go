@@ -28,6 +28,7 @@ import (
 	"github.com/gdey/markdownshell/pdf"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/tui"
 )
 
@@ -478,6 +479,8 @@ func interactiveCmd(file string, args []string, stop, step, yes bool, stdin io.R
 		Save:     func(out []byte) error { return writeFile(abs, out, 0o644) },
 		AutoSave: true,
 		Style:    style,
+		Images:   style != "notty",
+		Protocol: termimg.Detect(os.Getenv),
 	})
 }
 
