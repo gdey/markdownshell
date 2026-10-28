@@ -1,6 +1,6 @@
 module github.com/gdey/markdownshell
 
-go 1.24
+go 1.27
 
 require (
 	github.com/charmbracelet/bubbles v0.21.0
