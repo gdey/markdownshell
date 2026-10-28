@@ -43,6 +43,11 @@ hello, world
   parts on with conditions like `{{$DEBUG}}`.
 - **Prose that quotes results.** Placeholders such as
   `{{#setup/env(NAME)}}` show the value a block left behind.
+- **Interactive mode.** `mdsh -i` opens a document in a terminal UI: pick
+  blocks and run them, type new ones at a prompt, and edit them in your
+  editor. See [Interactive mode]({{< relref "docs/interactive" >}}).
+- **Terminal sessions.** A `tty` block runs on a real terminal and is
+  recorded as a GIF; a `tape` fence types its input so it runs unattended.
 - **PDF reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
   Go. See [PDF output]({{< relref "docs/pdf" >}}) for an example.
 - **Executable files.** With a `#!/usr/bin/env mdsh` shebang, `./notes.md`

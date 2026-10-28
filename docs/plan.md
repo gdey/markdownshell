@@ -8,7 +8,7 @@ says what gets built in which order and what is still open.
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | v1: library and CLI | Parse, run and render `sh` blocks; `mdsh run` | Released as v1.0.0 |
-| v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | In progress |
+| v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | Released in v1.1.0 |
 | Custom language | A nicer block language next to `sh` | Not started, needs its own spec |
 | GUI | Desktop or web front end on the same library | Not started |
 
