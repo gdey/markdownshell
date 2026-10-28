@@ -21,3 +21,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zsh
       - run: go vet ./...
       - run: go test -race ./...
+
+  gui:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: cmd/mdsh-gui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/mdsh-gui/go.mod
+          cache-dependency-path: cmd/mdsh-gui/go.sum
+      - name: Install GTK and WebKitGTK
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build .
