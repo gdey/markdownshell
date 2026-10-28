@@ -155,6 +155,23 @@ func TestMarkdownOutput(t *testing.T) {
 	}
 }
 
+func TestMarkdownTableOptions(t *testing.T) {
+	src := "```sh {#t out=markdown}\nprintf 'total 8\\n-rw-r--r--  1  j  2 a|b\\n' | md_table -s 1 -F ' '\nprintf 'x,y\\n1,2\\n' | md_table -F ,\nmd_table -s x </dev/null\n```\n"
+	d, results := runDoc(t, src, run.Options{})
+	got := string(render.Markdown(d, results, render.Options{}))
+	for _, want := range []string{
+		"| -rw-r--r-- | 1 | j | 2 | a\\|b |\n| --- | --- | --- | --- | --- |\n",
+		"| x | y |\n| --- | --- |\n| 1 | 2 |\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want %q in:\n%s", want, got)
+		}
+	}
+	if r := results[0]; r.ExitStatus() != 2 || !strings.Contains(string(r.Stderr), "-s takes a number") {
+		t.Errorf("md_table -s x: exit %d, stderr %q", r.ExitStatus(), r.Stderr)
+	}
+}
+
 func TestImageOutput(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "doc.md")

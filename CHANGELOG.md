@@ -8,6 +8,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `md_table -F SEP` splits fields on SEP as `awk -F` does (`-F ' '` is
+  runs of blanks), and `md_table -s N` skips the first N lines.
 - `examples/pdf/test-coverage.pdf`, the PDF of a run of the test coverage
   report runbook.
 - `mdsh -i file.md`, interactive mode: a terminal UI (Bubble Tea) that

@@ -58,7 +58,8 @@ GREETING=hello NAME=unset
 
 A block can also write markdown. `out=markdown` puts its output into the
 document as-is, and `md_table` turns tab-separated lines (header first)
-into a table.
+into a table. `md_table -F ' '` splits on runs of blanks instead (any
+`awk -F` separator works), and `-s N` skips the first N lines.
 
 ```sh {#table out=markdown}
 printf 'variable\tvalue\nGREETING\t%s\nNAME\t%s\n' "$GREETING" "$NAME" | md_table
@@ -447,5 +448,5 @@ front matter) says otherwise.
 
 An explicit `exit` ends the shell and stops the run. Blocks can use
 `$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, the script's arguments as `$1`…,
-and the helpers `md_h1`, `md_h2`, `md_h3`, `md_table` (TSV on stdin) and
-`md_code`.
+and the helpers `md_h1`, `md_h2`, `md_h3`, `md_table [-F SEP] [-s N]` (TSV
+on stdin) and `md_code`.
