@@ -30,11 +30,16 @@ func NewStack(cfg Config) *Stack {
 
 // Get returns the env called name, creating it and any missing parents.
 // share is used only when the env is created: it lists the parent's
-// exported variables the new env receives. Nil means all of them.
+// exported variables the new env receives. Nil means all of them. An env
+// whose shell has exited is created again, with a fresh shell.
 func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, error) {
 	name = strings.Trim(name, "/")
 	if e, ok := s.envs[name]; ok {
-		return e, nil
+		if !e.Shell.Exited() {
+			return e, nil
+		}
+		e.Shell.Close()
+		delete(s.envs, name)
 	}
 	if name == TopLevel {
 		sh, err := Start(s.cfg)

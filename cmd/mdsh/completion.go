@@ -139,7 +139,7 @@ _mdsh() {
 		'--step[ask before running each block]' \
 		'--color[style printed markdown]:when:(auto always never)' \
 		'--no-color[same as --color=never]' \
-		'-i[interactive mode]' \
+		'-i[open in the terminal UI]' \
 		'--version[print the version]' \
 		'-h[show help]' \
 		'1:markdown file:_files -g "*.md"' \

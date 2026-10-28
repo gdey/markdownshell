@@ -21,12 +21,14 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/pdf"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/tui"
 )
 
 func main() {
@@ -99,7 +101,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	step := fs.Bool("step", false, "ask before running each block, as if every block were marked confirm")
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
-	interactive := fs.Bool("i", false, "interactive mode (not implemented yet)")
+	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -116,12 +118,19 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("--color must be auto, always or never, got %q", *color)
 	}
-	if *interactive {
-		return errors.New("interactive mode is not implemented yet")
-	}
 	if fs.NArg() < 1 {
 		fs.Usage()
 		return errors.New("no file given")
+	}
+	if *interactive {
+		set := map[string]bool{}
+		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+		for _, name := range []string{"w", "o", "pdf", "no-run", "n", "only", "hide-code", "hide-output"} {
+			if set[name] {
+				return fmt.Errorf("-%s can't be used with -i", name)
+			}
+		}
+		return interactiveCmd(fs.Arg(0), fs.Args()[1:], *stop, *step, *yes, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -419,6 +428,50 @@ func (s *streamer) finish(results []*run.Result) error {
 	s.results = results
 	s.flush(3*len(s.d.Blocks) + 1)
 	return s.err
+}
+
+// interactiveCmd opens file in the TUI. Output is saved to the file
+// after every block that runs.
+func interactiveCmd(file string, args []string, stop, step, yes bool, stdin io.Reader, stdout io.Writer) error {
+	if file == "-" {
+		return errors.New("-i needs a file, not stdin")
+	}
+	if f, ok := stdin.(*os.File); !ok || !term.IsTerminal(int(f.Fd())) || !isTerminal(stdout) {
+		return errors.New("-i needs a terminal")
+	}
+	abs, err := filepath.Abs(file)
+	if err != nil {
+		return err
+	}
+	src, err := os.ReadFile(abs)
+	if err != nil {
+		return err
+	}
+	d, err := doc.Parse(src)
+	if err != nil {
+		return fmt.Errorf("%s: %w", file, err)
+	}
+	style := "light"
+	if lipgloss.HasDarkBackground() {
+		style = "dark"
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		style = "notty"
+	}
+	return tui.Run(d, tui.Options{
+		Run: run.Options{
+			File:        abs,
+			LinkDir:     filepath.Dir(abs),
+			Args:        args,
+			Environ:     os.Environ(),
+			StopOnError: stop,
+			Step:        step,
+		},
+		Yes:      yes,
+		Save:     func(out []byte) error { return writeFile(abs, out, 0o644) },
+		AutoSave: true,
+		Style:    style,
+	})
 }
 
 // prompter asks whether to run blocks. It remembers the [o] answer,
