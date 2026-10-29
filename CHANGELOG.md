@@ -45,6 +45,53 @@ follow [Semantic Versioning](https://semver.org/).
   unchanged block's identity, and `run.Session.Sync` then keeps their
   results, so a whole-file edit only clears the output of blocks that
   changed.
+- `mdsh-gui`, a start on a desktop window for mdsh built with Wails v3.
+  It shows a document, runs blocks as you pick them, streams their output
+  and saves it. It is its own Go module under `cmd/mdsh-gui`.
+- `mdsh-gui` files and menus: one window per file, a start screen listing
+  the markdown files under the current folder, native menus and
+  shortcuts, Save As, Open Recent, Reload, drag and drop, a dirty marker
+  with a prompt before closing unsaved output, a banner when the file
+  changes on disk, run options (arguments, only, step mode, stop on
+  error) and a Settings window (autosave, shell, start folder).
+- `mdsh-gui` start screen shows each file's front matter description
+  (`description`, else `summary`, else `abstract`) under its name, and
+  the filter matches it too.
+- `mdsh-gui` tabs: each file opens in a tab with its own shells. Tabs
+  drag to reorder, onto another window to move there, or away for a
+  window of their own, and a run carries on through a move.
+- `mdsh-gui` packages: releases have an unsigned universal macOS app
+  (`.dmg` and `.zip`) and a Linux AppImage, and `mdsh-gui --version`.
+- `mdsh-gui folder` lists the markdown files under that folder on the
+  start screen, in place of the current folder.
+- `mdsh-gui` block editing: edit a block in a CodeMirror editor, fences
+  and attributes included, or add one at the end. The editor completes
+  attribute names and values, explains them on hover, underlines
+  mistakes and has a form over the attributes. Vim key bindings are a
+  setting. The frontend is now TypeScript, bundled by esbuild from
+  `go generate`, with CodeMirror vendored without npm.
+- `mdsh-gui` source view: edit the whole file in a markdown editor
+  beside the rendered view, or on its own; blocks whose code didn't
+  change keep their output, and a gutter button runs a block. It
+  replaces the block card editor and Add block: the pencil and clicks
+  on prose go to the source, and clicking a block lines the two up. A
+  markdown bar, and Insert in the right-click menu, add headings,
+  lists, tables, links and mdsh blocks. An outline drawer lists the headings
+  and blocks with their state, and View › Show Code and Show Output hide
+  those parts. A Theme setting picks System, Light or Dark, with code
+  colors that read well in both. A confirm block's own Run button
+  runs it without asking again.
+- `mdsh-gui` images: image, screenshot and recording output, and images
+  in the prose, show inline from the document's folder, which the window
+  serves and nothing outside it. Clicking an output image shows it full
+  size.
+- `mdsh-gui` reports: File › Create Report… writes a PDF, HTML or
+  markdown report of the window's run, a run of every block, or the
+  saved file, with code and output shown or hidden. It shows the
+  matching `mdsh` command, and offers to show the file in its folder.
+- `mdsh-gui` tty blocks: a block marked `tty` runs in an xterm.js
+  terminal in its card, sized to fit, with keys going to the block. Its
+  recording replaces the terminal when it ends.
 
 ### Changed
 

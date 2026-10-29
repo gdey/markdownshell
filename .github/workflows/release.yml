@@ -8,7 +8,22 @@ permissions:
   contents: write
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  gui:
+    needs: version
+    uses: ./.github/workflows/gui-packages.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
   release:
+    needs: gui
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +44,12 @@ jobs:
             echo "CHANGELOG.md has no section for $GITHUB_REF_NAME" >&2
             exit 1
           fi
+      - name: mdsh-gui's packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gui-*
+          path: gui-dist
+          merge-multiple: true
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser

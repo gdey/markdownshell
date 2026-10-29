@@ -1,0 +1,158 @@
+package notebook
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/report"
+	"github.com/gdey/markdownshell/run"
+)
+
+// Report is what the Report dialog asks for.
+type Report struct {
+	Format     report.Format `json:"format"`
+	HideCode   bool          `json:"hideCode"`
+	HideOutput bool          `json:"hideOutput"`
+	// Saved reports the file as last saved, running nothing, like
+	// mdsh -n. Otherwise the report shows this window's output. "Run
+	// all first" is a run, then a report of the window.
+	Saved bool `json:"saved"`
+	// Ran says the window's output comes from running every block, for
+	// the command Command shows.
+	Ran bool `json:"ran"`
+	// Dest is the file to write.
+	Dest string `json:"dest"`
+}
+
+// Ran counts the runnable blocks that have run in this window, and all
+// of them.
+func (n *Notebook) Ran() (ran, total int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for i, b := range n.d.Blocks {
+		if !run.Runnable(b) {
+			continue
+		}
+		total++
+		if r := n.results[i]; r != nil && r.Ran {
+			ran++
+		}
+	}
+	return ran, total
+}
+
+// MakeReport renders the report r asks for. Image links are read from
+// the file's folder, where runs write them.
+func (n *Notebook) MakeReport(r Report) ([]byte, error) {
+	if r.Format == "" {
+		r.Format = report.Markdown
+	}
+	opts := report.Options{
+		Format:     r.Format,
+		HideCode:   r.HideCode,
+		HideOutput: r.HideOutput,
+		Env:        os.Environ(),
+		Title:      report.Title(n.File()),
+		Dir:        filepath.Dir(n.File()),
+	}
+	if r.Saved {
+		src, err := os.ReadFile(n.File())
+		if err != nil {
+			return nil, err
+		}
+		d, err := doc.Parse(src)
+		if err != nil {
+			return nil, err
+		}
+		return report.Render(d, run.Includes(d, run.Options{File: n.File()}), opts)
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return nil, ErrBusy
+	}
+	return report.Render(n.d, n.results, opts)
+}
+
+// WriteReport writes the report r asks for to r.Dest.
+func (n *Notebook) WriteReport(r Report) error {
+	if r.Dest == "" {
+		return fmt.Errorf("no file to write the report to")
+	}
+	out, err := n.MakeReport(r)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(r.Dest, out, 0o644)
+}
+
+// ReportCommand is the mdsh command that makes the same report, run in
+// the document's folder: files there are named on their own, and other
+// paths under home as ~/…. For a report of the window's output, it is
+// the command for the saved file, which is the same once it is saved.
+func (n *Notebook) ReportCommand(r Report, home string) string {
+	dir := filepath.Dir(n.File())
+	path := func(p string) string {
+		if filepath.Dir(p) == dir {
+			return JoinArgs([]string{filepath.Base(p)})
+		}
+		if home != "" {
+			if rest, ok := strings.CutPrefix(p, home+string(filepath.Separator)); ok && JoinArgs([]string{rest}) == rest {
+				return "~/" + filepath.ToSlash(rest)
+			}
+		}
+		return JoinArgs([]string{p})
+	}
+	ro := n.RunOptions()
+	cmd := []string{"mdsh"}
+	runs := r.Ran && !r.Saved
+	if !runs {
+		cmd = append(cmd, "-n")
+	} else {
+		if ro.Only != "" {
+			cmd = append(cmd, "--only", JoinArgs([]string{ro.Only}))
+		}
+		if ro.Step {
+			cmd = append(cmd, "--step")
+		}
+		if ro.StopOnError {
+			cmd = append(cmd, "--stop-on-error")
+		}
+	}
+	if r.HideCode {
+		cmd = append(cmd, "--hide-code")
+	}
+	if r.HideOutput {
+		cmd = append(cmd, "--hide-output")
+	}
+	dest := path(r.Dest)
+	if r.Dest == "" {
+		dest = "FILE"
+	}
+	redirect := false
+	switch r.Format {
+	case report.PDF:
+		cmd = append(cmd, "--pdf", dest)
+	case report.HTML:
+		cmd = append(cmd, "--html", dest)
+	default:
+		// -o saves the printed view only with -n; a run's printout
+		// goes to stdout.
+		if runs {
+			redirect = true
+		} else {
+			cmd = append(cmd, "-o", dest)
+		}
+	}
+	cmd = append(cmd, path(n.File()))
+	if runs && len(ro.Args) > 0 {
+		cmd = append(cmd, JoinArgs(ro.Args))
+	}
+	if redirect {
+		cmd = append(cmd, ">", dest)
+	}
+	return strings.Join(cmd, " ")
+}

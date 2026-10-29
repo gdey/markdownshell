@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mdsh</title>
+  <link rel="stylesheet" href="vendor/xterm.css">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="bundle/app.js"></script>
+</head>
+<body data-file-drop-target>
+  <header id="toolbar" hidden>
+    <button id="outline-toggle" class="icon" title="Outline (cmd/ctrl+shift+O)" aria-label="Outline">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 2.5h13v11h-13zm1.4 1.4v8.2h3.2V3.9zm4.6 0v8.2h5.6V3.9z"/></svg>
+    </button>
+    <span id="file"></span>
+    <span id="dirty" title="Output not saved" hidden>•</span>
+    <button id="options" class="chip" title="Run options" hidden></button>
+    <span id="status"></span>
+    <span class="seg" role="group" aria-label="View">
+      <button id="view-split" class="icon" title="Source view (cmd/ctrl+\)" aria-label="Source view">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.4 4.2 6.5 5.3 3.8 8l2.7 2.7-1.1 1.1L1.6 8zm5.2 0L14.4 8l-3.8 3.8-1.1-1.1L12.2 8 9.5 5.3z"/></svg>
+      </button>
+      <button id="view-rendered" class="icon" title="Rendered view (cmd/ctrl+shift+\)" aria-label="Rendered view">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3.5 3.5v9.5h-9.5zm1.4 1.4v10.2h6.7V6H8.5V2.9z"/></svg>
+      </button>
+    </span>
+    <button id="run-all" class="primary" disabled>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+      <span>Run all</span>
+    </button>
+  </header>
+  <div id="changed" class="banner" hidden>
+    <span id="changed-text"></span>
+    <button id="reload">Reload</button>
+    <button id="keep">Keep mine</button>
+  </div>
+
+  <div id="workspace" hidden>
+    <nav id="outline" aria-label="Outline" hidden></nav>
+    <div id="source" hidden>
+      <div id="source-bar"></div>
+      <div id="source-editor"></div>
+    </div>
+    <div id="doc-scroll"><main id="doc"></main></div>
+  </div>
+
+  <main id="start" hidden>
+    <h1>Open a runbook</h1>
+    <div class="start-bar">
+      <input id="filter" type="search" placeholder="Filter files" autocomplete="off" spellcheck="false">
+      <button id="open-other">Open…</button>
+    </div>
+    <p id="start-dir" class="muted"></p>
+    <section id="recent-list" hidden>
+      <h2>Recent</h2>
+      <ul class="files"></ul>
+    </section>
+    <section id="file-list"></section>
+    <p id="start-empty" class="muted" hidden>No markdown files here. Use Open… or drop a file on the window.</p>
+  </main>
+
+  <dialog id="run-options">
+    <form method="dialog">
+      <h2>Run options</h2>
+      <p class="muted">For this file, until it closes. The shells start again when these change.</p>
+      <label>Arguments ($1 and on)
+        <input id="opt-args" type="text" spellcheck="false" placeholder="e.g. prod 'two words'">
+      </label>
+      <label>Only run
+        <select id="opt-only"></select>
+      </label>
+      <label class="check"><input id="opt-step" type="checkbox"> Ask before every block (step mode)</label>
+      <label class="check"><input id="opt-stop" type="checkbox"> Stop at the first failing block</label>
+      <p id="opt-error" class="error" hidden></p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="opt-ok" value="ok" class="primary">Apply</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="report">
+    <form method="dialog">
+      <h2>Create report</h2>
+      <div id="report-form">
+        <div class="row">
+          <span class="label">Format</span>
+          <span class="seg" role="radiogroup" aria-label="Format">
+            <button type="button" data-format="pdf" role="radio">PDF</button>
+            <button type="button" data-format="html" role="radio">HTML</button>
+            <button type="button" data-format="markdown" role="radio">Markdown</button>
+          </span>
+        </div>
+        <div class="row">
+          <span class="label">Show</span>
+          <div class="choices">
+            <label class="check"><input id="rep-code" type="checkbox" checked> Code blocks</label>
+            <label class="check"><input id="rep-output" type="checkbox" checked> Output</label>
+          </div>
+        </div>
+        <div class="row">
+          <span class="label">Output from</span>
+          <div class="choices">
+            <label class="check"><input type="radio" name="rep-from" value="window" checked> <span id="rep-window">This tab's run</span></label>
+            <label class="check"><input type="radio" name="rep-from" value="run"> Run all blocks first</label>
+            <label class="check"><input type="radio" name="rep-from" value="saved"> Saved output only (like <code>--no-run</code>)</label>
+          </div>
+        </div>
+        <div class="row">
+          <span class="label">Save to</span>
+          <div class="dest">
+            <input id="rep-dest" type="text" spellcheck="false">
+            <button type="button" id="rep-choose">Choose…</button>
+          </div>
+        </div>
+        <p class="command muted"><span id="rep-same">Same as</span> <code id="rep-cmd"></code></p>
+      </div>
+      <p id="rep-done" hidden></p>
+      <p id="rep-error" class="error" hidden></p>
+      <div class="buttons" id="rep-buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="rep-ok" value="ok" class="primary">Create report</button>
+      </div>
+      <div class="buttons" id="rep-after" hidden>
+        <button type="button" id="rep-reveal">Show in Folder</button>
+        <button value="done" class="primary">Done</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="viewer" title="Click or press esc to close"><img alt=""></dialog>
+</body>
+</html>

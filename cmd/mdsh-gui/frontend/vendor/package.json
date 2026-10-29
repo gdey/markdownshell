@@ -1,0 +1,19 @@
+{
+  "name": "mdsh-gui-vendor",
+  "private": true,
+  "description": "The JavaScript packages vendored into vendor/codemirror.js and vendor/xterm.js. go run ./internal/vendorjs rebuilds the bundles from package-lock.json without npm.",
+  "dependencies": {
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/language": "^6",
+    "@codemirror/autocomplete": "^6",
+    "@codemirror/search": "^6",
+    "@codemirror/lint": "^6",
+    "@codemirror/legacy-modes": "^6",
+    "@replit/codemirror-vim": "^6",
+    "@wailsio/runtime": "^3.0.0",
+    "@codemirror/lang-markdown": "^6",
+    "@xterm/xterm": "^6.0.0"
+  }
+}

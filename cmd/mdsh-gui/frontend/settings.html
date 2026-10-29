@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="bundle/settings.js"></script>
+</head>
+<body>
+  <main class="settings">
+    <label class="check"><input id="autosave" type="checkbox"> Save the file after each run</label>
+    <p class="muted">Off by default: the window shows • while output isn't saved.</p>
+
+    <label class="check"><input id="vim" type="checkbox"> Vim key bindings in the code editor</label>
+    <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
+
+    <label>Theme
+      <select id="theme">
+        <option value="">Match the system</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+
+    <label>Shell for every file
+      <input id="shell" type="text" spellcheck="false" placeholder="From the file's front matter (default)">
+    </label>
+
+    <label>Start folder
+      <select id="start-mode">
+        <option value="last">The last folder used</option>
+        <option value="fixed">A fixed folder</option>
+      </select>
+    </label>
+    <div id="fixed" class="start-bar" hidden>
+      <input id="start-folder" type="text" spellcheck="false" readonly>
+      <button id="choose">Choose…</button>
+    </div>
+    <p class="muted">Used when mdsh isn't started from a terminal. From a terminal, the start screen lists the current folder.</p>
+    <p id="error" class="error" hidden></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=mdsh
+GenericName=Markdown runbook runner
+Comment=Run the code blocks in a markdown file
+Exec=mdsh-gui %F
+Icon=mdsh-gui
+Terminal=false
+Categories=Development;Utility;
+MimeType=text/markdown;
+Keywords=markdown;shell;runbook;notebook;
