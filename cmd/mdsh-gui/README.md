@@ -5,7 +5,7 @@ It shows a markdown file, runs its `sh` and `zsh` blocks as you pick
 them, streams their output under them and saves it back to the file. It
 uses the same `run.Session` as `mdsh -i`.
 
-There are no images, reports or `tty` blocks yet; see
+There are no `tty` blocks yet; see
 [the design](../../docs/gui/design.md) for what comes next.
 
 ```sh
@@ -17,8 +17,11 @@ folder (or the start folder from Settings, when started from Finder or
 the Dock) to pick from. Each file opens in a window of its own, with its
 own shells.
 
-- **File:** New Window, Open…, Open Recent, Save, Save As…, Reload and
-  Close Window. Dropping a markdown file on a window opens it. A • marks
+- **File:** New Window, Open…, Open Recent, Save, Save As…, Create
+  Report…, Reload and Close Window. Create Report… writes a PDF, HTML
+  or markdown copy, with or without code and output, from the window's
+  run, a run of every block or the saved file, and shows the `mdsh`
+  command that makes the same one. Dropping a markdown file on a window opens it. A • marks
   output that isn't saved, and closing or quitting asks first.
 - **Run:** Run All (cmd/ctrl+R, the toolbar button turns into Stop while
   blocks run), Stop (cmd/ctrl+.) and Run Options… for the file's
@@ -67,6 +70,16 @@ Wails or need cgo. It needs Go 1.27 and cgo, plus:
 ```sh
 cd cmd/mdsh-gui
 go build .
+```
+
+On macOS, Wails, Go and the SDK ask for different minimum macOS
+versions, so the linker warns that object files were "built for newer
+'macOS' version". The warnings are harmless; to build for one version
+and silence them:
+
+```sh
+MACOSX_DEPLOYMENT_TARGET=13.0 CGO_CFLAGS=-mmacosx-version-min=13.0 \
+  CGO_LDFLAGS=-mmacosx-version-min=13.0 go build .
 ```
 
 The frontend is TypeScript in `frontend/src`, bundled into
