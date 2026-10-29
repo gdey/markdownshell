@@ -284,6 +284,27 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image: SVG, or PNG if the path ends in `.png` |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
 
+## Output copies
+
+The output right under a block is its own. To show that output again
+elsewhere, say in a summary at the end, put an `output` fence naming the
+block anywhere else in the document; mdsh refills it on every run, the
+way it fills in a placeholder:
+
+````markdown
+## Environment
+
+```output {for=env exit=0}
+HOME is set
+GITHUB_TOKEN is not set
+```
+````
+
+`stream=stderr` copies the block's stderr fence, and an
+`<!-- mdsh:output for="id" -->` region copies `out=markdown` or image
+output. A copy keeps what it holds when its block doesn't run, and mdsh
+warns about a copy for a block that doesn't exist.
+
 ## Including files
 
 A block marked `<include` holds lines from another file, so a doc can quote

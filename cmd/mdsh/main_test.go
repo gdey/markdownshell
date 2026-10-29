@@ -381,3 +381,28 @@ func TestPDFExamples(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteCopies checks that -w refills output copies, and warns about a
+// copy for a block that doesn't exist.
+func TestWriteCopies(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	src := "```sh {#a}\necho \"$N\"\n```\n\n## Summary\n\n```output {for=a exit=0}\nold\n```\n\n```output {for=gone exit=0}\nx\n```\n"
+	os.WriteFile(f, []byte(src), 0o644)
+	t.Setenv("N", "1")
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"-w", f}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("rc = %d, stderr %q", rc, errb.String())
+	}
+	if !strings.Contains(errb.String(), `warning: line 11: output copy for unknown block "gone"`) {
+		t.Errorf("stderr = %q", errb.String())
+	}
+	t.Setenv("N", "2")
+	if rc := mdsh([]string{"-w", f}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("rc = %d, stderr %q", rc, errb.String())
+	}
+	got, _ := os.ReadFile(f)
+	want := "```sh {#a}\necho \"$N\"\n```\n\n```output {for=a exit=0}\n2\n```\n\n## Summary\n\n```output {for=a exit=0}\n2\n```\n\n```output {for=gone exit=0}\nx\n```\n"
+	if string(got) != want {
+		t.Errorf("file:\ngot  %q\nwant %q", got, want)
+	}
+}

@@ -94,6 +94,18 @@ terminal-style image: SVG by default, PNG when the path ends in `.png`.
 Both save to `<doc>.assets/<block-id>.<ext>` unless you give a path, and
 link the image between the same markers.
 
+### Output copies
+
+The output right under a block is its own, and mdsh replaces it on every
+run. An `output {for=id}` fence anywhere else in the document, or an
+`<!-- mdsh:output for="id" -->` region for `out=markdown` and image
+output, is a copy: mdsh refills it with block `id`'s latest output on every
+run, like a placeholder, so a summary can repeat what an earlier block
+found. `stream=stderr` copies the stderr fence. A copy keeps what it holds
+when its block doesn't run, `--hide-output` and `show-output=` hide copies
+too, and a copy for a block that doesn't exist is left alone with a
+warning.
+
 ## Confirming blocks
 
 A block marked `confirm` pauses the run: mdsh shows its code and asks

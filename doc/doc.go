@@ -42,6 +42,9 @@ type Block struct {
 	Lead string
 
 	quote, col int // the container: block quote depth and list content column
+	// outMain and outErr are set once Output holds a stdout part (a
+	// fence or region) and a stderr fence. Another one is a copy.
+	outMain, outErr bool
 }
 
 // Document is a parsed markdown file.
@@ -59,6 +62,29 @@ type Document struct {
 	// Sections are the mdsh:if ... mdsh:end sections, in order of their
 	// if lines. They may nest.
 	Sections []*Section
+	// Copies are the output fences and regions in the prose that aren't
+	// right after the block they are for, in order. A run refills them.
+	Copies []*Copy
+	// Warnings are problems that don't stop the document running, such
+	// as a copy for a block that doesn't exist.
+	Warnings []string
+}
+
+// Copy is a copy of a block's output somewhere else in the document: an
+// output fence, or an output region, whose for= block isn't the one
+// right above it.
+type Copy struct {
+	// For is the id of the block whose output it copies.
+	For string
+	// Stream is "stderr" for a copy of the stderr fence, else "".
+	Stream string
+	// Region is set for an output region, a copy of out=markdown or
+	// image output.
+	Region bool
+	// Span covers the copy's lines, prefixes included.
+	Span Span
+	// Prefix and Lead are as for Block.
+	Prefix, Lead string
 }
 
 // HasOutput reports whether output is already saved after b in the file.
@@ -115,13 +141,19 @@ func Parse(src []byte) (*Document, error) {
 			if lead {
 				b.Lead = string(head)
 			}
-			if last != nil && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) {
+			if last != nil && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) && !last.hasPart(b.Attrs["stream"] == "stderr") {
 				last.Output.End = next
+				last.addPart(b.Attrs["stream"] == "stderr")
 				pos = next
 				continue
 			}
 			if b.Lang == "output" {
-				// An orphaned output fence: leave it as prose.
+				// Output away from its block is a copy, part of the
+				// prose. An unclosed one is just prose.
+				if b.BodySpan.End < b.Span.End && b.Attrs["for"] != "" {
+					d.Copies = append(d.Copies, &Copy{For: b.Attrs["for"], Stream: b.Attrs["stream"], Span: b.Span, Prefix: b.Prefix, Lead: b.Lead})
+				}
+				last = nil
 				pos = next
 				continue
 			}
@@ -169,8 +201,17 @@ func Parse(src []byte) (*Document, error) {
 
 		if id, ok := regionStart(rest); ok {
 			next := regionEnd(src, end, q)
-			if last != nil && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q) {
+			if last != nil && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q) && !last.hasPart(false) {
 				last.Output.End = next
+				last.addPart(false)
+			} else {
+				head := line[:len(line)-len(rest)+spaces(rest)]
+				c := &Copy{For: id, Region: true, Span: Span{pos, next}, Prefix: linePrefix(head)}
+				if c.Prefix != string(head) {
+					c.Lead = string(head)
+				}
+				d.Copies = append(d.Copies, c)
+				last = nil
 			}
 			pos = next
 			continue
@@ -228,6 +269,11 @@ func Parse(src []byte) (*Document, error) {
 			return nil, fmt.Errorf("line %d: placeholder refers to unknown block %q", lineNo(src, p.Span.Start), p.BlockID)
 		}
 	}
+	for _, c := range d.Copies {
+		if b := d.Block(c.For); b == nil || b.IsInclude() || b.IsTape() {
+			d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: output copy for unknown block %q", lineNo(src, c.Span.Start), c.For))
+		}
+	}
 	for _, r := range d.Refs() {
 		if r.BlockID != "" && !ids[r.BlockID] {
 			return nil, fmt.Errorf("%s refers to unknown block %q", r, r.BlockID)
@@ -280,6 +326,21 @@ func checkTapes(d *Document) error {
 		seen[id] = true
 	}
 	return nil
+}
+
+func (b *Block) hasPart(stderr bool) bool {
+	if stderr {
+		return b.outErr
+	}
+	return b.outMain
+}
+
+func (b *Block) addPart(stderr bool) {
+	if stderr {
+		b.outErr = true
+	} else {
+		b.outMain = true
+	}
 }
 
 func isOutputFor(b *Block, id string) bool {
