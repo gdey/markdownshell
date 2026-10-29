@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `examples/fifo` hands data between blocks through named pipes: a
+  background reader fed by later blocks, a writer held open across
+  blocks, and one never closed, which only a block timeout ends. Tests
+  in `run` pin down what happens in each case.
 - `run.Options.Terminal` runs blocks marked `tty` on a terminal the
   caller draws itself, such as a pane in a window, with keys on a
   channel and the size it reports. `env.Shell.RunTerminal` does the
