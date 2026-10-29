@@ -3,6 +3,7 @@ module github.com/gdey/markdownshell/cmd/mdsh-gui
 go 1.27
 
 require (
+	github.com/evanw/esbuild v0.28.2
 	github.com/gdey/markdownshell v0.0.0
 	github.com/wailsapp/wails/v3 v3.0.0
 	github.com/yuin/goldmark v1.7.17
