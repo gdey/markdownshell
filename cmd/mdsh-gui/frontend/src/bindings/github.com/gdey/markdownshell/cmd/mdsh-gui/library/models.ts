@@ -22,6 +22,12 @@ export interface File {
     "blocks": number;
 
     /**
+     * Description is the file's front matter description, if it has
+     * one. See DescriptionKeys.
+     */
+    "description"?: string;
+
+    /**
      * Mod is when the file last changed.
      */
     "mod": string;

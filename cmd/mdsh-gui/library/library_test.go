@@ -54,3 +54,26 @@ func TestList(t *testing.T) {
 		t.Errorf("blocks = %v", blocks)
 	}
 }
+
+func TestDescription(t *testing.T) {
+	long := strings.Repeat("x", MaxDesc+10)
+	for _, c := range []struct{ src, want string }{
+		{"# No front matter\n", ""},
+		{"---\ntitle: T\n---\n# Hi\n", ""},
+		{"---\ndescription: Deploy the site\n---\n", "Deploy the site"},
+		{"---\nsummary: From summary\ndescription: From description\n---\n", "From description"},
+		{"---\ndescription: \"\"\nsummary: From summary\n---\n", "From summary"},
+		{"---\nabstract: |\n  Two\n  lines\n...\n", "Two lines"},
+		{"---\ndescription: [not, text]\n---\n", ""},
+		{"---\n---\n", ""},
+		{"---\ndescription: " + long + "\n---\n", long[:MaxDesc-1] + "…"},
+	} {
+		path := filepath.Join(t.TempDir(), "f.md")
+		if err := os.WriteFile(path, []byte(c.src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, got := read(path, int64(len(c.src))); got != c.want {
+			t.Errorf("%q: description = %q, want %q", c.src, got, c.want)
+		}
+	}
+}
