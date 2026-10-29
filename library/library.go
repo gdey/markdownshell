@@ -1,4 +1,5 @@
-// Package library finds the markdown files the start screen lists.
+// Package library finds the markdown files a start screen lists: the
+// TUI's and mdsh-gui's.
 package library
 
 import (

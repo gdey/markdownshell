@@ -11,13 +11,13 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/library"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/zshrc"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/library"
+	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/zshrc"
 )
 
 // This file holds the methods the frontend calls.

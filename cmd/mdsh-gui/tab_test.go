@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/settings"
 )
 
 func tabsOf(w *docWindow) []int {
