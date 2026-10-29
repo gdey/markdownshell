@@ -6,6 +6,24 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `mdsh -i` with no file, or with a folder, starts on a list of the
+  markdown files under it, as `mdsh-gui` does: recent files first, the
+  rest grouped by folder, with block counts and front matter
+  descriptions, filtered as you type. `q` in a file goes back to it.
+  The `library` package that finds them moved out of `mdsh-gui` into
+  the root module, so both use it.
+- `mdsh -i`: `W` saves as another file and follows it, ctrl+s saves,
+  and a banner says when the file changed on disk, with `R` to reload
+  it and `M` to keep yours.
+
+### Changed
+
+- `mdsh -i` saves when asked (`w`), as `mdsh-gui` does, and marks
+  output not saved with a •. `--autosave` saves after every block that
+  runs, as before.
+
 ## [1.2.0] - 2026-10-29
 
 The desktop app: `mdsh-gui` opens documents in a window, with packages for

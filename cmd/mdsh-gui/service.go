@@ -11,10 +11,10 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/library"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
 )
