@@ -54,6 +54,9 @@ hello, world
 - **PDF and HTML reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
   Go, and `--html report.html` as a standalone page. See
   [PDF output]({{< relref "docs/pdf" >}}) for an example.
+- **Runbooks and reports.** Deploys, incident steps, weekly reports and
+  setup checklists, with sample reports. See
+  [Use cases]({{< relref "use-cases" >}}).
 - **Executable files.** With a `#!/usr/bin/env mdsh` shebang, `./notes.md`
   just runs.
 

@@ -1,5 +1,5 @@
-<nav class="docs-nav" aria-label="Documentation">
-  {{ with site.GetPage "/docs" }}
+<nav class="docs-nav" aria-label="{{ .FirstSection.Title }}">
+  {{ with .FirstSection }}
   <a href="{{ .RelPermalink }}"{{ if eq . $ }} aria-current="page"{{ end }}>Overview</a>
   {{ range .Pages.ByWeight }}
   <a href="{{ .RelPermalink }}"{{ if eq . $ }} aria-current="page"{{ end }}>{{ .Title }}</a>

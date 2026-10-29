@@ -16,6 +16,10 @@ There is no theme to install: the layouts in `layouts/` and the CSS in
 `static/css/` are the whole design. Pages live in `content/`; docs pages
 are ordered by `weight` in their front matter.
 
+The sample reports on the Use cases pages, in `static/samples/`, and
+their previews come from the runbooks in `examples/runbooks`. Regenerate
+them with `./samples.sh` (needs `mdsh` on your `PATH` and `pdftoppm`).
+
 `static/css/chroma.css` holds the code highlighting colors. Regenerate it
 with:
 

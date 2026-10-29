@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="mdsh">
+<title>.sample-deploy</title>
+<style>
+body { margin: 0; background: #fff; color: #1e1e1e; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+h1, h2 { border-bottom: 1px solid #d8d8dc; padding-bottom: .25em; }
+a { color: #0a5bd3; }
+code, pre { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+:not(pre) > code { background: #f0f0f3; border-radius: 4px; padding: .1em .3em; }
+pre { margin: 0; padding: 10px 12px; overflow-x: auto; }
+figure { margin: 1em 0; border-radius: 6px; overflow: hidden; background: #f4f4f6; }
+figcaption { padding: 6px 12px 0; color: #8a8a8e; font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+figure.output { background: #1e1e1e; color: #d4d4d4; }
+figure.stderr { background: #3c1414; color: #ffc8c8; }
+figure.output figcaption { color: #ff8a8a; }
+table { border-collapse: collapse; margin: 1em 0; }
+th, td { border: 1px solid #d8d8dc; padding: 4px 10px; }
+th { background: #f4f4f6; }
+blockquote { margin: 1em 0; padding: 0 1em; border-left: 4px solid #d8d8dc; color: #555; }
+img { max-width: 100%; }
+@media print { main { max-width: none; padding: 0; } figure { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Deploy the docs site</h1>
+<p>This runbook builds a small static site, checks it, and ships it as a new
+release behind a <code>current</code> symlink, the way many hosts serve static sites.
+&quot;Production&quot; is a scratch directory under <code>$TMPDIR</code>, so running it changes
+nothing on your machine. Swap the <code>build</code> and <code>ship</code> blocks for your own
+commands to use it for real.</p>
+<p>The run stops at the first failing step (<code>on_error: stop</code>), and shipping
+asks first (<code>confirm</code>). <code>mdsh --yes</code> answers yes for you, as CI would.</p>
+<h2>Build</h2>
+<figure class="block"><figcaption>sh {#build}</figcaption><pre><code class="language-sh">export WORK=&#34;$(mktemp -d)&#34;
+export SITE=&#34;$WORK/public&#34; PROD=&#34;$WORK/prod&#34;
+export RELEASE=&#34;2026-01-02.1&#34;
+mkdir -p &#34;$SITE/guide&#34; &#34;$PROD/releases&#34;
+page() {
+  printf &#39;&lt;!doctype html&gt;\n&lt;title&gt;%s&lt;/title&gt;\n&lt;h1&gt;%s&lt;/h1&gt;\n%s\n&#39; &#34;$2&#34; &#34;$2&#34; &#34;$3&#34; &gt; &#34;$SITE/$1&#34;
+}
+page index.html &#34;Home&#34; &#39;&lt;a href=&#34;guide/&#34;&gt;Guide&lt;/a&gt; &lt;a href=&#34;about.html&#34;&gt;About&lt;/a&gt;&#39;
+page about.html &#34;About&#34; &#39;&lt;a href=&#34;index.html&#34;&gt;Home&lt;/a&gt;&#39;
+page guide/index.html &#34;Guide&#34; &#39;&lt;a href=&#34;install.html&#34;&gt;Install&lt;/a&gt; &lt;a href=&#34;../index.html&#34;&gt;Home&lt;/a&gt;&#39;
+page guide/install.html &#34;Install&#34; &#39;&lt;a href=&#34;index.html&#34;&gt;Guide&lt;/a&gt;&#39;
+PAGES=&#34;$(find &#34;$SITE&#34; -name &#39;*.html&#39; | wc -l | tr -d &#39; &#39;)&#34;
+echo &#34;built $PAGES pages for release $RELEASE&#34;
+</code></pre></figure>
+<figure class="output"><pre><code>built 4 pages for release 2026-01-02.1
+</code></pre></figure>
+<h2>Check</h2>
+<p>Two checks run side by side. The link checker is a <code>background</code> block: it
+starts, and the run goes straight on to the size check below while it
+works.</p>
+<figure class="block"><figcaption>sh {#links background timeout=30s}</figcaption><pre><code class="language-sh">cd &#34;$SITE&#34;
+broken=0
+for f in $(find . -name &#39;*.html&#39; | sort); do
+  dir=&#34;$(dirname &#34;$f&#34;)&#34;
+  for href in $(grep -o &#39;href=&#34;[^&#34;]*&#34;&#39; &#34;$f&#34; | sed &#39;s/^href=&#34;//; s/&#34;$//&#39;); do
+    target=&#34;$dir/$href&#34;
+    case &#34;$href&#34; in */) target=&#34;${target}index.html&#34; ;; esac
+    if [ ! -e &#34;$target&#34; ]; then
+      echo &#34;broken: $f -&gt; $href&#34;
+      broken=$((broken + 1))
+    fi
+  done
+done
+echo &#34;$broken broken links&#34;
+test &#34;$broken&#34; -eq 0
+</code></pre></figure>
+<figure class="output"><pre><code>0 broken links
+</code></pre></figure>
+<figure class="block"><figcaption>sh {#size}</figcaption><pre><code class="language-sh">SIZE_KB=&#34;$(du -sk &#34;$SITE&#34; | cut -f1)&#34;
+echo &#34;site is ${SIZE_KB} KiB&#34;
+test &#34;$SIZE_KB&#34; -lt 10240
+</code></pre></figure>
+<figure class="output"><pre><code>site is 24 KiB
+</code></pre></figure>
+<p>Before shipping, wait for the link checker. <code>wait</code> gives its exit status,
+so broken links stop the run here.</p>
+<figure class="block"><figcaption>sh {#links-done}</figcaption><pre><code class="language-sh">wait &#34;$MDSH_BG_links&#34; &amp;&amp; echo &#34;links ok&#34;
+</code></pre></figure>
+<figure class="output"><pre><code>links ok
+</code></pre></figure>
+<h2>Ship</h2>
+<p>Copy the build into a new release directory, then point the <code>current</code>
+symlink at it, so visitors never see a half-copied site.</p>
+<figure class="block"><figcaption>sh {#ship confirm=&#34;Ship release to production?&#34;}</figcaption><pre><code class="language-sh">cp -R &#34;$SITE&#34; &#34;$PROD/releases/$RELEASE&#34;
+ln -sfn &#34;releases/$RELEASE&#34; &#34;$PROD/current&#34;
+echo &#34;current -&gt; $(readlink &#34;$PROD/current&#34;)&#34;
+</code></pre></figure>
+<figure class="output"><pre><code>current -&gt; releases/2026-01-02.1
+</code></pre></figure>
+<h2>Verify</h2>
+<p>What production serves must match what was built.</p>
+<figure class="block"><figcaption>sh {#verify}</figcaption><pre><code class="language-sh">diff -r &#34;$SITE&#34; &#34;$PROD/current/&#34; &amp;&amp; echo &#34;production matches the build&#34;
+</code></pre></figure>
+<figure class="output"><pre><code>production matches the build
+</code></pre></figure>
+<h2>Summary</h2>
+<figure class="block"><figcaption>sh {#summary out=markdown}</figcaption><pre><code class="language-sh">{
+  printf &#39;step\tresult\n&#39;
+  printf &#39;release\t%s\n&#39; &#34;$RELEASE&#34;
+  printf &#39;pages\t%s\n&#39; &#34;$PAGES&#34;
+  printf &#39;size\t%s KiB\n&#39; &#34;$SIZE_KB&#34;
+  printf &#39;links\tok\n&#39;
+  printf &#39;verified\tyes\n&#39;
+} | md_table
+</code></pre></figure>
+<!-- raw HTML omitted -->
+<table>
+<thead>
+<tr>
+<th>step</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>release</td>
+<td>2026-01-02.1</td>
+</tr>
+<tr>
+<td>pages</td>
+<td>4</td>
+</tr>
+<tr>
+<td>size</td>
+<td>24 KiB</td>
+</tr>
+<tr>
+<td>links</td>
+<td>ok</td>
+</tr>
+<tr>
+<td>verified</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<!-- raw HTML omitted -->
+<p>Shipped release <strong>2026-01-02.1</strong>.</p>
+<h2>Roll back</h2>
+<p>Not part of a normal run, so this block is marked <code>skip</code>: it is here to
+copy into a shell when a release goes wrong.</p>
+<figure class="block"><figcaption>sh {#rollback skip}</figcaption><pre><code class="language-sh">ln -sfn &#34;releases/$PREVIOUS&#34; &#34;$PROD/current&#34;
+</code></pre></figure>
+<h2>Clean up</h2>
+</main>
+</body>
+</html>
