@@ -15,6 +15,12 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui`, a start on a desktop window for mdsh built with Wails v3.
   It shows a document, runs blocks as you pick them, streams their output
   and saves it. It is its own Go module under `cmd/mdsh-gui`.
+- `mdsh-gui` files and menus: one window per file, a start screen listing
+  the markdown files under the current folder, native menus and
+  shortcuts, Save As, Open Recent, Reload, drag and drop, a dirty marker
+  with a prompt before closing unsaved output, a banner when the file
+  changes on disk, run options (arguments, only, step mode, stop on
+  error) and a Settings window (autosave, shell, start folder).
 
 ## [1.1.0] - 2026-10-28
 
