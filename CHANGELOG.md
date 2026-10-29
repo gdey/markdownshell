@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `doc.BlockAttrs` describes every block attribute (kind, allowed
+  values, default, one-line help) for tools that help write them, with
+  `AttrSpec.Check` to validate a value. `doc.SplitInfo` edits a fence
+  info string in place, keeping unknown attributes and their order.
+
 ## [1.1.0] - 2026-10-28
 
 Interactive mode: `mdsh -i` opens a document in a terminal UI and runs its
