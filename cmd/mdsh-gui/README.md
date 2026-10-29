@@ -9,11 +9,11 @@ See [the design](../../docs/gui/design.md) for how it works and what
 comes next.
 
 ```sh
-mdsh-gui [file.md [args...]]
+mdsh-gui [file.md [args...] | folder]
 ```
 
 With no file, the window lists the markdown files under the current
-folder (or the start folder from Settings, when started from Finder or
+folder, or under `folder` when one is given (or the start folder from Settings, when started from Finder or
 the Dock) to pick from, with the description from each file's front
 matter (`description`, else `summary`, else `abstract`) under its name.
 Each file opens in a window of its own, with its

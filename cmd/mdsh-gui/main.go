@@ -1,17 +1,19 @@
 // Command mdsh-gui opens markdown files in windows and runs their code
 // blocks as you pick them, like mdsh -i does in a terminal.
 //
-//	mdsh-gui [file.md [args...]]
+//	mdsh-gui [file.md [args...] | folder]
 //
 // With no file, the window lists the markdown files under the current
-// folder to pick from.
+// folder to pick from, or under folder when one is given.
 package main
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -49,8 +51,15 @@ func mdshGUI(args []string) error {
 	if err != nil {
 		return err
 	}
+	dir, err := argDir(args)
+	if err != nil {
+		return err
+	}
+	if dir != "" {
+		args = nil
+	}
 	cwd, _ := os.Getwd()
-	a := &App{settings: store, cwd: cwd, windows: map[uint]*docWindow{}}
+	a := &App{settings: store, cwd: cwd, dir: dir, windows: map[uint]*docWindow{}}
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
@@ -77,4 +86,19 @@ func mdshGUI(args []string) error {
 		}
 	}
 	return app.Run()
+}
+
+// argDir returns the folder named on the command line, made absolute, or
+// "" if the first argument is not a folder.
+func argDir(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", nil
+	}
+	if fi, err := os.Stat(args[0]); err != nil || !fi.IsDir() {
+		return "", nil
+	}
+	if len(args) > 1 {
+		return "", errors.New("arguments after a folder are only for a file")
+	}
+	return filepath.Abs(args[0])
 }

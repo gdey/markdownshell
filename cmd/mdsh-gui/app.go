@@ -25,6 +25,7 @@ type App struct {
 	app      *application.App
 	settings *settings.Store
 	cwd      string // the folder mdsh-gui started in
+	dir      string // the folder given on the command line, if any
 
 	menu       *application.Menu
 	viewItems  struct{ split, rendered, outline, code, output *application.MenuItem }
@@ -233,6 +234,9 @@ func (a *App) openFromMenu() {
 }
 
 func (a *App) startDir() string {
+	if a.dir != "" {
+		return a.dir
+	}
 	home, _ := os.UserHomeDir()
 	docs := ""
 	if runtime.GOOS == "darwin" {
