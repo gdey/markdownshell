@@ -1,12 +1,6 @@
-package main
+package ui
 
-import (
-	"path/filepath"
-	"slices"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
-)
+import "slices"
 
 // docWindow is one window and its tabs. The tab bar is the window's page;
 // each tab is a page of its own inside it.
@@ -14,7 +8,7 @@ import (
 // App.mu guards tabs, active and closing.
 type docWindow struct {
 	app *App
-	win *application.WebviewWindow
+	win Window
 
 	tabs    []*docTab
 	active  *docTab
@@ -96,7 +90,7 @@ func (w *docWindow) changed() {
 		}
 	}
 	w.win.SetTitle(title)
-	w.win.EmitEvent("tabs", s)
+	w.win.Emit("tabs", s)
 }
 
 // activeTab is the tab in front, or nil.
@@ -106,24 +100,6 @@ func (w *docWindow) activeTab() *docTab {
 	return w.active
 }
 
-// closingHook closes the window's tabs first, asking about unsaved
-// output in each, and lets the window close once none are left.
-func (w *docWindow) closingHook(e *application.WindowEvent) {
-	w.app.mu.Lock()
-	closing := w.closing || w.app.quitting
-	tabs, _ := w.tabsLocked()
-	w.app.mu.Unlock()
-	if closing {
-		for _, t := range tabs {
-			w.app.dropTab(t)
-		}
-		w.app.removeWindow(w)
-		return
-	}
-	e.Cancel()
-	go w.closeTabs(tabs)
-}
-
 // closeTabs closes tabs one by one, asking about each with unsaved
 // output, and the window after them. A Cancel stops there.
 func (w *docWindow) closeTabs(tabs []*docTab) {
@@ -131,7 +107,7 @@ func (w *docWindow) closeTabs(tabs []*docTab) {
 		w.app.mu.Lock()
 		w.closing = true
 		w.app.mu.Unlock()
-		w.app.onMain(w.win.Close)
+		w.app.host.OnMain(w.win.Close)
 		return
 	}
 	t, rest := tabs[0], tabs[1:]
@@ -141,32 +117,4 @@ func (w *docWindow) closeTabs(tabs []*docTab) {
 		return
 	}
 	w.closeTabs(rest)
-}
-
-// dropped opens markdown files dropped on the window.
-func (w *docWindow) dropped(e *application.WindowEvent) {
-	files := e.Context().DroppedFiles()
-	go func() {
-		for _, f := range files {
-			if ext := filepath.Ext(f); ext != ".md" && ext != ".markdown" {
-				continue
-			}
-			if err := w.app.openIn(w, f); err != nil {
-				w.app.showError(w.win, err)
-			}
-		}
-	}()
-}
-
-func (w *docWindow) hook() {
-	w.win.RegisterHook(events.Common.WindowClosing, w.closingHook)
-	w.win.OnWindowEvent(events.Common.WindowFilesDropped, w.dropped)
-	w.win.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) {
-		if t := w.activeTab(); t != nil {
-			t.mu.Lock()
-			v := t.view
-			t.mu.Unlock()
-			w.app.showView(v)
-		}
-	})
 }

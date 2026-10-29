@@ -1,6 +1,6 @@
 // The Go calls and types the frontend uses, from the generated bindings.
-export * as App from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/app.js";
-export type { Doc, ReportStart, Start, Tab, Tabs } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/models.js";
+export * as App from "./bindings/github.com/gdey/markdownshell/ui/app.js";
+export type { Doc, ReportStart, Start, Tab, Tabs } from "./bindings/github.com/gdey/markdownshell/ui/models.js";
 export type { Cell, Names, Problem, Report, RunOptions } from "./bindings/github.com/gdey/markdownshell/notebook/models.js";
 export type { Settings } from "./bindings/github.com/gdey/markdownshell/settings/models.js";
 export type { File } from "./bindings/github.com/gdey/markdownshell/library/models.js";

@@ -3,7 +3,9 @@
 
 /**
  * App is the service the frontend calls. A call from a tab's page acts on
- * that tab; one from a window's tab bar, on that window.
+ * that tab; one from a window's tab bar, on that window. Its exported
+ * methods are all calls the frontend makes; the Host drives it through
+ * its Control.
  * @module
  */
 
@@ -13,16 +15,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "/wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as doc$0 from "../../doc/models.js";
+import * as doc$0 from "../doc/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as notebook$0 from "../../notebook/models.js";
+import * as notebook$0 from "../notebook/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as report$0 from "../../report/models.js";
+import * as report$0 from "../report/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as settings$0 from "../../settings/models.js";
+import * as settings$0 from "../settings/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -33,7 +35,7 @@ import * as $models from "./models.js";
  * or "stop".
  */
 export function Answer(reply: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Answer", reply);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Answer", reply);
 }
 
 /**
@@ -41,21 +43,21 @@ export function Answer(reply: string): $CancellablePromise<void> {
  * and the attribute form.
  */
 export function BlockAttrs(): $CancellablePromise<doc$0.AttrSpec[] | null> {
-    return $Call.ByName("main.App.BlockAttrs");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.BlockAttrs");
 }
 
 /**
  * Cells is the document laid out for drawing.
  */
 export function Cells(): $CancellablePromise<notebook$0.Cell[] | null> {
-    return $Call.ByName("main.App.Cells");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Cells");
 }
 
 /**
  * CheckInfo checks the attributes in a fence's info string.
  */
 export function CheckInfo(info: string): $CancellablePromise<notebook$0.Problem[] | null> {
-    return $Call.ByName("main.App.CheckInfo", info);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.CheckInfo", info);
 }
 
 /**
@@ -63,7 +65,7 @@ export function CheckInfo(info: string): $CancellablePromise<notebook$0.Problem[
  * picked.
  */
 export function ChooseFolder(): $CancellablePromise<string> {
-    return $Call.ByName("main.App.ChooseFolder");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.ChooseFolder");
 }
 
 /**
@@ -71,21 +73,21 @@ export function ChooseFolder(): $CancellablePromise<string> {
  * and returns the file, or "" if none was picked.
  */
 export function ChooseReport(format: report$0.Format, dest: string): $CancellablePromise<string> {
-    return $Call.ByName("main.App.ChooseReport", format, dest);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.ChooseReport", format, dest);
 }
 
 /**
  * CloseTab closes tab id, asking first if it has unsaved output.
  */
 export function CloseTab(id: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.CloseTab", id);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.CloseTab", id);
 }
 
 /**
  * CreateReport writes the report r describes.
  */
 export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
-    return $Call.ByName("main.App.CreateReport", r);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.CreateReport", r);
 }
 
 /**
@@ -94,14 +96,14 @@ export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
  * dragged.
  */
 export function DetachTab(x: number, y: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.DetachTab", x, y);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.DetachTab", x, y);
 }
 
 /**
  * Doc describes the open file. File is "" while the start screen shows.
  */
 export function Doc(): $CancellablePromise<$models.Doc> {
-    return $Call.ByName("main.App.Doc");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Doc");
 }
 
 /**
@@ -109,7 +111,7 @@ export function Doc(): $CancellablePromise<$models.Doc> {
  * dropped on can take it.
  */
 export function DragTab(id: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.DragTab", id);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.DragTab", id);
 }
 
 /**
@@ -117,7 +119,7 @@ export function DragTab(id: number): $CancellablePromise<void> {
  * of its tab bar. It does nothing if no tab is being dragged.
  */
 export function DropTab(i: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.DropTab", i);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.DropTab", i);
 }
 
 /**
@@ -126,7 +128,7 @@ export function DropTab(i: number): $CancellablePromise<void> {
  * there.
  */
 export function EndDrag(id: number, outside: boolean, x: number, y: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.EndDrag", id, outside, x, y);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.EndDrag", id, outside, x, y);
 }
 
 /**
@@ -134,14 +136,14 @@ export function EndDrag(id: number, outside: boolean, x: number, y: number): $Ca
  * that starts partway through it.
  */
 export function Live(): $CancellablePromise<$models.liveEvent[] | null> {
-    return $Call.ByName("main.App.Live");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Live");
 }
 
 /**
  * Names are the block ids and envs in the file, for completion.
  */
 export function Names(): $CancellablePromise<notebook$0.Names> {
-    return $Call.ByName("main.App.Names");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Names");
 }
 
 /**
@@ -149,14 +151,14 @@ export function Names(): $CancellablePromise<notebook$0.Names> {
  * the tab in front.
  */
 export function NewTab(): $CancellablePromise<void> {
-    return $Call.ByName("main.App.NewTab");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.NewTab");
 }
 
 /**
  * NewWindow opens a window with the start screen.
  */
 export function NewWindow(): $CancellablePromise<void> {
-    return $Call.ByName("main.App.NewWindow");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.NewWindow");
 }
 
 /**
@@ -164,7 +166,7 @@ export function NewWindow(): $CancellablePromise<void> {
  * it shows the start screen, the rest in new tabs.
  */
 export function Open(): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Open");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Open");
 }
 
 /**
@@ -173,63 +175,63 @@ export function Open(): $CancellablePromise<void> {
  * and any other file as the system would open it.
  */
 export function OpenLink(href: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.OpenLink", href);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.OpenLink", href);
 }
 
 /**
  * OpenPath opens file, from the start screen.
  */
 export function OpenPath(file: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.OpenPath", file);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.OpenPath", file);
 }
 
 /**
  * Reload reads the file from disk again, dropping output not saved.
  */
 export function Reload(): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Reload");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Reload");
 }
 
 /**
  * ReportCommand is the mdsh command that makes the report r describes.
  */
 export function ReportCommand(r: notebook$0.Report): $CancellablePromise<string> {
-    return $Call.ByName("main.App.ReportCommand", r);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.ReportCommand", r);
 }
 
 /**
  * ReportStart reads what the Report dialog shows when it opens.
  */
 export function ReportStart(): $CancellablePromise<$models.ReportStart> {
-    return $Call.ByName("main.App.ReportStart");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.ReportStart");
 }
 
 /**
  * Reveal shows file in the file manager.
  */
 export function Reveal(file: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Reveal", file);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Reveal", file);
 }
 
 /**
  * RunBlock runs block i alone.
  */
 export function RunBlock(i: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.RunBlock", i);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.RunBlock", i);
 }
 
 /**
  * RunFrom runs block i and the blocks after it.
  */
 export function RunFrom(i: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.RunFrom", i);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.RunFrom", i);
 }
 
 /**
  * Save writes the output into the file.
  */
 export function Save(): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Save");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Save");
 }
 
 /**
@@ -237,14 +239,14 @@ export function Save(): $CancellablePromise<void> {
  * the tab shows the new file. It returns false if the user cancels.
  */
 export function SaveAs(): $CancellablePromise<boolean> {
-    return $Call.ByName("main.App.SaveAs");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SaveAs");
 }
 
 /**
  * SelectTab brings tab id to the front of its window.
  */
 export function SelectTab(id: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SelectTab", id);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SelectTab", id);
 }
 
 /**
@@ -252,7 +254,7 @@ export function SelectTab(id: number): $CancellablePromise<void> {
  * --only, --step and --stop-on-error for this file.
  */
 export function SetRunOptions(args: string, only: string, step: boolean, stopOnError: boolean): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetRunOptions", args, only, step, stopOnError);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetRunOptions", args, only, step, stopOnError);
 }
 
 /**
@@ -261,7 +263,7 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
  * "settings" event.
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetSettings", s);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetSettings", s);
 }
 
 /**
@@ -269,28 +271,28 @@ export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
  * window works out from its width.
  */
 export function SetTerminalSize(cols: number, rows: number): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetTerminalSize", cols, rows);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetTerminalSize", cols, rows);
 }
 
 /**
  * SetText replaces the whole file, as typed in the source pane.
  */
 export function SetText(text: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetText", text);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetText", text);
 }
 
 /**
  * SetView notes what the calling tab shows.
  */
 export function SetView(v: $models.View): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetView", v);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetView", v);
 }
 
 /**
  * Settings are the app-wide settings.
  */
 export function Settings(): $CancellablePromise<settings$0.Settings> {
-    return $Call.ByName("main.App.Settings");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Settings");
 }
 
 /**
@@ -298,7 +300,7 @@ export function Settings(): $CancellablePromise<settings$0.Settings> {
  * recent files that still exist.
  */
 export function StartScreen(): $CancellablePromise<$models.Start> {
-    return $Call.ByName("main.App.StartScreen");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.StartScreen");
 }
 
 /**
@@ -306,21 +308,21 @@ export function StartScreen(): $CancellablePromise<$models.Start> {
  * to be confirmed.
  */
 export function Stop(): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Stop");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Stop");
 }
 
 /**
  * Tabs are the calling window's tabs, for its tab bar.
  */
 export function Tabs(): $CancellablePromise<$models.Tabs> {
-    return $Call.ByName("main.App.Tabs");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Tabs");
 }
 
 /**
  * Text is the whole file, for the split view's source pane.
  */
 export function Text(): $CancellablePromise<string> {
-    return $Call.ByName("main.App.Text");
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Text");
 }
 
 /**
@@ -328,5 +330,5 @@ export function Text(): $CancellablePromise<string> {
  * it.
  */
 export function Type(keys: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.Type", keys);
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Type", keys);
 }
