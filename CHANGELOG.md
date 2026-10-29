@@ -54,6 +54,9 @@ follow [Semantic Versioning](https://semver.org/).
   with a prompt before closing unsaved output, a banner when the file
   changes on disk, run options (arguments, only, step mode, stop on
   error) and a Settings window (autosave, shell, start folder).
+- `mdsh-gui` start screen shows each file's front matter description
+  (`description`, else `summary`, else `abstract`) under its name, and
+  the filter matches it too.
 - `mdsh-gui` block editing: edit a block in a CodeMirror editor, fences
   and attributes included, or add one at the end. The editor completes
   attribute names and values, explains them on hover, underlines

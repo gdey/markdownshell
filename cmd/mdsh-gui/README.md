@@ -14,7 +14,9 @@ mdsh-gui [file.md [args...]]
 
 With no file, the window lists the markdown files under the current
 folder (or the start folder from Settings, when started from Finder or
-the Dock) to pick from. Each file opens in a window of its own, with its
+the Dock) to pick from, with the description from each file's front
+matter (`description`, else `summary`, else `abstract`) under its name.
+Each file opens in a window of its own, with its
 own shells.
 
 - **File:** New Window, Open…, Open Recent, Save, Save As…, Create
