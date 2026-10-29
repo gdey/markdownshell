@@ -43,6 +43,9 @@ type Cell struct {
 	Ran    bool `json:"ran"`
 	Status int  `json:"status"`
 	Failed bool `json:"failed"`
+	// Running is true while a background block is still going; its
+	// output and status come in when it ends.
+	Running bool `json:"running"`
 	// From and To are the cell's bytes in the file, output included.
 	From int `json:"from"`
 	To   int `json:"to"`
@@ -52,9 +55,10 @@ type Cell struct {
 
 // Event is what OnEvent reports while a block runs.
 type Event struct {
-	// Kind is started, stdout, stderr or done; or, for a tty block,
-	// terminal (it takes the terminal pane), tty (it showed Bytes there)
-	// and terminal-end.
+	// Kind is started, stdout, stderr or done; background when a
+	// background block starts, which goes on while other blocks run,
+	// with done when it ends; or, for a tty block, terminal (it takes
+	// the terminal pane), tty (it showed Bytes there) and terminal-end.
 	Kind  string `json:"kind"`
 	Block int    `json:"block"`
 	Data  string `json:"data,omitempty"`
@@ -103,7 +107,18 @@ type Notebook struct {
 	clicked *doc.Block // the block RunBlock runs, which needs no confirm
 	dirty   bool       // output changed since the last save
 	stamp   fileStamp  // the file as last read or written
+	// bg are the background blocks still running. While nothing else
+	// runs, reaper checks on them every reapEvery; reaping is set while
+	// it does, and idle tells those waiting for it that it is done.
+	bg      map[*doc.Block]bool
+	reaping bool
+	idle    *sync.Cond
+	quit    chan struct{}
 }
+
+// reapEvery is how often a notebook checks on background blocks while
+// nothing else runs.
+const reapEvery = 250 * time.Millisecond
 
 // fileStamp is what Changed compares to notice the file changing on
 // disk.
@@ -140,7 +155,10 @@ func Open(file string, opts Options) (*Notebook, error) {
 		d:     d,
 		index: map[*doc.Block]int{},
 		term:  newTerminal(),
+		bg:    map[*doc.Block]bool{},
+		quit:  make(chan struct{}),
 	}
+	n.idle = sync.NewCond(&n.mu)
 	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer()))
 	for i, b := range d.Blocks {
 		n.index[b] = i
@@ -152,6 +170,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 	}
 	n.sess = sess
 	n.results = append([]*run.Result(nil), sess.Results()...)
+	go n.reaper()
 	return n, nil
 }
 
@@ -195,11 +214,12 @@ func (n *Notebook) SetRunOptions(ro RunOptions) error {
 	if n.running {
 		return ErrBusy
 	}
+	n.waitReap()
 	sess, err := n.newSession(ro)
 	if err != nil {
 		return err
 	}
-	n.sess.Close()
+	n.closeSession()
 	n.sess, n.opts.Run = sess, ro
 	return nil
 }
@@ -219,10 +239,69 @@ func (n *Notebook) Changed() bool {
 	return stampOf(n.file) != n.stamp
 }
 
-// Close ends the shells blocks ran in, stopping any block that runs.
+// Close ends the shells blocks ran in, stopping any block that runs,
+// background blocks included.
 func (n *Notebook) Close() {
 	n.Stop()
-	n.sess.Close()
+	n.mu.Lock()
+	select {
+	case <-n.quit:
+	default:
+		close(n.quit)
+	}
+	n.waitReap()
+	sess := n.sess
+	n.mu.Unlock()
+	sess.Close()
+}
+
+// closeSession ends n.sess, with n.mu held, before it is replaced. A
+// background block still running in it is killed and reported through
+// event, which takes n.mu, so the session closes on its own goroutine.
+func (n *Notebook) closeSession() {
+	go n.sess.Close()
+}
+
+// reaper checks on background blocks until the notebook closes.
+func (n *Notebook) reaper() {
+	t := time.NewTicker(reapEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-n.quit:
+			return
+		case <-t.C:
+			n.reap()
+		}
+	}
+}
+
+// reap fills in the results of background blocks that ended, unless a
+// run is going, which does that itself before each block.
+func (n *Notebook) reap() {
+	n.mu.Lock()
+	if n.running || n.reaping || len(n.bg) == 0 {
+		n.mu.Unlock()
+		return
+	}
+	n.reaping = true
+	sess := n.sess
+	n.mu.Unlock()
+
+	sess.Reap()
+
+	n.mu.Lock()
+	n.reaping = false
+	n.idle.Broadcast()
+	n.fold()
+	n.mu.Unlock()
+}
+
+// waitReap waits, with n.mu held, until reap isn't using the session.
+func (n *Notebook) waitReap() {
+	for n.reaping {
+		n.idle.Wait()
+	}
 }
 
 func attrsText(info string) string {
@@ -272,6 +351,7 @@ func (n *Notebook) start(f func(context.Context) error) error {
 		n.mu.Unlock()
 		return ErrBusy
 	}
+	n.waitReap()
 	ctx, cancel := context.WithCancel(context.Background())
 	n.running, n.cancel = true, cancel
 	n.mu.Unlock()
@@ -323,6 +403,7 @@ func (n *Notebook) SaveAs(file string) error {
 	if n.running {
 		return ErrBusy
 	}
+	n.waitReap()
 	if err := n.write(abs); err != nil {
 		return err
 	}
@@ -333,7 +414,7 @@ func (n *Notebook) SaveAs(file string) error {
 		if err != nil {
 			return err
 		}
-		n.sess.Close()
+		n.closeSession()
 		n.sess = sess
 	}
 	return nil
@@ -368,16 +449,31 @@ func (n *Notebook) fold() error {
 // event runs on the run's goroutine.
 func (n *Notebook) event(e run.Event) {
 	n.mu.Lock()
-	i := n.index[e.Block]
-	if e.Kind == run.Done {
+	i, ok := n.index[e.Block]
+	if !ok {
+		// A block edited away, whose background run a closing session
+		// reports as killed.
+		delete(n.bg, e.Block)
+		n.mu.Unlock()
+		return
+	}
+	background := e.Block.Attrs.Has("background")
+	switch {
+	case e.Kind == run.Done:
 		n.results[i] = e.Result
 		n.dirty = true
+		delete(n.bg, e.Block)
+	case e.Kind == run.Started && background:
+		n.bg[e.Block] = true
 	}
 	n.mu.Unlock()
 	if n.opts.OnEvent == nil {
 		return
 	}
 	kind := map[run.EventKind]string{run.Started: "started", run.Stdout: "stdout", run.Stderr: "stderr", run.Done: "done"}[e.Kind]
+	if e.Kind == run.Started && background {
+		kind = "background"
+	}
 	n.opts.OnEvent(Event{Kind: kind, Block: i, Data: string(e.Data)})
 }
 

@@ -30,7 +30,10 @@ own shells.
   arguments, `--only`, step mode and stop on error. A block marked
   `tty` runs in a terminal in its card: type at it as you would in a
   terminal. When it ends the card shows the recording, as `mdsh` saves
-  it.
+  it. A block marked `background` starts and lets other blocks run: its
+  card has a dashed edge and says it is running in the background, the
+  status line counts them, and its output shows when it ends. Closing
+  the window kills those still running.
 - **Editing** happens in the source view. The pencil (or `e`) on a block
   opens it with the cursor on the block's code, and clicking prose opens
   it on that text. New blocks are typed there too. Inside

@@ -14,6 +14,7 @@ import (
 // kept their identity keep their results. A document that gains its
 // first tty block needs new shells.
 func (n *Notebook) sync() error {
+	n.waitReap()
 	old := make(map[*doc.Block]*run.Result, len(n.results))
 	for _, r := range n.results {
 		old[r.Block] = r
@@ -34,7 +35,7 @@ func (n *Notebook) sync() error {
 	if err != nil {
 		return err
 	}
-	n.sess.Close()
+	n.closeSession()
 	n.sess = sess
 	return nil
 }

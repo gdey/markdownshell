@@ -45,17 +45,18 @@ func (n *Notebook) Cells() []Cell {
 		}
 		r := n.results[i]
 		l.cells = append(l.cells, Cell{
-			Block:  i,
-			ID:     b.ID,
-			Lang:   b.Lang,
-			Body:   b.Body,
-			Attrs:  attrsText(b.Info),
-			Output: n.html(out),
-			Ran:    r.Ran,
-			Status: r.Status,
-			Failed: r.Failed(),
-			From:   span.Start,
-			To:     span.End,
+			Block:   i,
+			ID:      b.ID,
+			Lang:    b.Lang,
+			Body:    b.Body,
+			Attrs:   attrsText(b.Info),
+			Output:  n.html(out),
+			Ran:     r.Ran,
+			Status:  r.Status,
+			Failed:  r.Failed(),
+			Running: n.bg[b],
+			From:    span.Start,
+			To:      span.End,
 		})
 	}
 	l.prose(pos, len(d.Src))
