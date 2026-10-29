@@ -131,3 +131,22 @@ label.check { display: flex; gap: 8px; align-items: center; }
 .settings { padding: 8px 24px; }
 .settings p { font-size: 13px; margin: 4px 0 12px; }
 button.file .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Block editor */
+.block .editing { border-top: 1px solid var(--border); }
+.block .editor .cm-editor { background: var(--code-bg); max-height: 60vh; }
+.block .editor .cm-editor.cm-focused { outline: none; }
+.block .editor .cm-gutters { background: var(--code-bg); border-right-color: var(--border); color: var(--muted); }
+.block .editing .error { margin: 0; padding: 6px 12px; font-size: 13px; border-top: 1px solid var(--border); }
+.edit-bar { display: flex; gap: 8px; align-items: center; padding: 6px 8px 6px 12px; border-top: 1px solid var(--border); }
+.edit-bar .hint { flex: 1; font-size: 12px; }
+.block.new { border-style: dashed; }
+button.add-block { display: flex; gap: 6px; align-items: center; margin: 16px 0 40px; background: none; border-style: dashed; color: var(--muted); }
+.attr-help { padding: 4px 8px; font-size: 12px; max-width: 360px; }
+.attr-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 16px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.attr-form label { margin: 4px 0; font-size: 12px; }
+.attr-form label > span { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.attr-form input[type="text"] { display: block; width: 100%; box-sizing: border-box; margin-top: 2px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--fg); }
+.attr-form label.check, .attr-form label.bare { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.attr-form label.bare input[type="text"] { flex-basis: 100%; }
+.attr-form input:disabled { opacity: 0.5; }
