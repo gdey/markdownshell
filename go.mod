@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
+	github.com/coder/websocket v1.8.14
 	github.com/creack/pty v1.1.24
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02

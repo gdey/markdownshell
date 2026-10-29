@@ -187,6 +187,7 @@ mdsh --yes notes.md        # run confirm blocks without asking
 mdsh --step notes.md       # ask before every block: run, skip or stop
 mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
+mdsh --serve notes.md      # open it in a web browser instead; see Serving to a browser
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -239,6 +240,49 @@ the kitty, iTerm2 or sixel protocol when mdsh recognizes the terminal
 numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
 is open, mdsh won't save over it until you press `w` twice.
+
+## Serving to a browser
+
+`mdsh --serve` serves the same notebook mdsh-gui shows to a web browser:
+rendered prose, blocks you run and watch stream, the source view, tty
+blocks in a terminal, reports and tabs. It prints the address to open.
+
+```
+mdsh --serve                     # the markdown files under this folder, at 127.0.0.1:8080
+mdsh --serve notes.md a b        # notes.md, with $1 and $2 set
+mdsh --serve=localhost:9000 docs # the files under docs, on port 9000
+```
+
+The address comes after `=`: `--serve host:port` would take
+`host:port` for the file. Each browser tab is a window with its own tabs.
+Closing the browser tab leaves its shells running; opening the address
+again picks the window up, and closing its last tab ends it. Ctrl+C
+stops the server and every shell, without saving.
+
+### Security
+
+**Anyone who can use the page can run any command as the user who
+started mdsh.** That is what the page is for, so treat the address like
+a shell login:
+
+- By default mdsh listens on 127.0.0.1, so only this machine can reach
+  it. `--serve=0.0.0.0:8080` or another machine's address lets the
+  network in, and mdsh warns when it does.
+- Every start makes a new random token and prints it in the address.
+  The first visit trades it for a cookie; without it every request is
+  refused. Don't share the address or put it in a shell history others
+  read.
+- Requests from other sites' pages are refused (their `Origin` must be
+  this server), and on 127.0.0.1 the `Host` must be a loopback name, so
+  a site can't point its own name at your machine to get in.
+- There is no TLS: the token and everything on the page cross the
+  network in the clear. To use it from another machine, keep the
+  default address and tunnel to it, for example
+  `ssh -L 8080:127.0.0.1:8080 host`, rather than listening on the
+  network.
+- The page can read and write any file the user can, through its file
+  dialogs and the commands it runs, and it shows the images and files
+  beside open documents.
 
 ## PDF output
 
