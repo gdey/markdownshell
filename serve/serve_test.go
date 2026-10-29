@@ -251,3 +251,47 @@ func TestAsk(t *testing.T) {
 		t.Errorf("%d windows left", n)
 	}
 }
+
+func TestFiles(t *testing.T) {
+	_, ts, c := start(t, "")
+	login(t, ts, c)
+	dir := t.TempDir()
+	for _, p := range []string{"b.md", "a.txt", "sub/x.md", ".hidden.md"} {
+		p = filepath.Join(dir, p)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := func(kind, pattern string) string {
+		t.Helper()
+		resp, err := c.Get(ts.URL + "/wails/files?" + url.Values{"dir": {dir + "/"}, "kind": {kind}, "pattern": {pattern}}.Encode())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var f folder
+		if err := json.NewDecoder(resp.Body).Decode(&f); err != nil {
+			t.Fatal(err)
+		}
+		if f.Dir != dir || f.Parent != filepath.Dir(dir) {
+			t.Errorf("dir %q parent %q", f.Dir, f.Parent)
+		}
+		var names []string
+		for _, e := range f.Entries {
+			names = append(names, e.Name)
+		}
+		return strings.Join(names, " ")
+	}
+	if got := list("open", "*.md;*.markdown"); got != "sub b.md" {
+		t.Errorf("markdown files: %q", got)
+	}
+	if got := list("save", ""); got != "sub a.txt b.md" {
+		t.Errorf("all files: %q", got)
+	}
+	if got := list("folder", ""); got != "sub" {
+		t.Errorf("folders: %q", got)
+	}
+}
