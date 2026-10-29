@@ -97,6 +97,12 @@ The GUI is a thin layer: the frontend draws, `ui.App` binds, and `notebook` hold
 
 Only `notebook` and below hold logic. The CLI and TUI use the same library, so a fix there reaches all three.
 
+### In a browser: mdsh --serve
+
+`mdsh --serve` shows the same pages in a web browser, with the same `ui.App` behind them. The `serve` package is a second `ui.Host`. Its `/wails/runtime.js` stands in for the runtime Wails serves, so `web` doesn't change. `Call.ByName` posts to `/wails/call`, which calls `ui.App`'s method of that name by reflection. Events arrive over a WebSocket from `/wails/events`, and the window's page passes them on to its tabs, as it does under Wails. runtime.js draws what Wails does natively: the title, questions and errors, a path prompt that browses the server's folders, the menu's shortcuts, and a settings button. Each browser tab is one of the App's windows, named in its URL. A window outlives its browser tab, so its shells keep running and `/` picks it up again.
+
+Because the page runs commands as the user, the server needs a token on every request. The first visit gives the token in the URL and trades it for a SameSite=Strict cookie. The server refuses requests whose Origin is another site, and on loopback it refuses any Host that isn't a loopback name. It listens on 127.0.0.1:8080 unless told otherwise, and warns when it listens anywhere else. There is no TLS; the docs suggest an SSH tunnel.
+
 ## Decisions
 
 j answered the open questions on Oct 28.
