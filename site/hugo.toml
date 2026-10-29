@@ -22,6 +22,10 @@ disableKinds = ["taxonomy", "term"]
     pageRef = "/docs"
     weight = 10
   [[menus.main]]
+    name = "Use cases"
+    pageRef = "/use-cases"
+    weight = 15
+  [[menus.main]]
     name = "GitHub"
     url = "https://github.com/gdey/markdownshell"
     weight = 20

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="mdsh">
+<title>.sample-onboarding</title>
+<style>
+body { margin: 0; background: #fff; color: #1e1e1e; font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+h1, h2 { border-bottom: 1px solid #d8d8dc; padding-bottom: .25em; }
+a { color: #0a5bd3; }
+code, pre { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+:not(pre) > code { background: #f0f0f3; border-radius: 4px; padding: .1em .3em; }
+pre { margin: 0; padding: 10px 12px; overflow-x: auto; }
+figure { margin: 1em 0; border-radius: 6px; overflow: hidden; background: #f4f4f6; }
+figcaption { padding: 6px 12px 0; color: #8a8a8e; font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+figure.output { background: #1e1e1e; color: #d4d4d4; }
+figure.stderr { background: #3c1414; color: #ffc8c8; }
+figure.output figcaption { color: #ff8a8a; }
+table { border-collapse: collapse; margin: 1em 0; }
+th, td { border: 1px solid #d8d8dc; padding: 4px 10px; }
+th { background: #f4f4f6; }
+blockquote { margin: 1em 0; padding: 0 1em; border-left: 4px solid #d8d8dc; color: #555; }
+img { max-width: 100%; }
+@media print { main { max-width: none; padding: 0; } figure { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>New developer setup</h1>
+<p>Run this on your first day to check that your machine can build mdsh.
+It only checks and builds into a temporary directory; it doesn't install
+anything. Send the report to your onboarding buddy when something is
+missing:</p>
+<figure class="block"><figcaption>console</figcaption><pre><code class="language-console">$ mdsh --pdf setup.pdf examples/runbooks/onboarding.md
+</code></pre></figure>
+<h2>Tools</h2>
+<p>Each tool you need, the version you have, and the oldest that works.</p>
+<figure class="block"><figcaption>sh {#tools out=markdown}</figcaption><pre><code class="language-sh">ver() { &#34;$@&#34; 2&gt;/dev/null | head -n 1 | grep -Eo &#39;[0-9]+\.[0-9]+(\.[0-9]+)?&#39; | head -n 1; }
+row() {
+  name=&#34;$1&#34; need=&#34;$2&#34;; shift 2
+  if command -v &#34;$name&#34; &gt;/dev/null 2&gt;&amp;1; then
+    have=&#34;$(ver &#34;$@&#34;)&#34;
+    printf &#39;%s\t%s\t%s\tok\n&#39; &#34;$name&#34; &#34;${have:-unknown}&#34; &#34;$need&#34;
+  else
+    printf &#39;%s\tmissing\t%s\t**install it**\n&#39; &#34;$name&#34; &#34;$need&#34;
+  fi
+}
+ROWS=&#34;$(printf &#39;tool\tyou have\tneeds\tstatus&#39;)&#34;
+for t in &#34;git 2.30 git --version&#34; &#34;go 1.24 go version&#34; &#34;make 3.81 make --version&#34; &#34;curl 7.0 curl --version&#34;; do
+  ROWS=&#34;$ROWS
+$(row $t)&#34;
+done
+MISSING=&#34;$(printf &#39;%s\n&#39; &#34;$ROWS&#34; | grep -c &#39;install it&#39; || true)&#34;
+printf &#39;%s\n&#39; &#34;$ROWS&#34; | md_table
+</code></pre></figure>
+<!-- raw HTML omitted -->
+<table>
+<thead>
+<tr>
+<th>tool</th>
+<th>you have</th>
+<th>needs</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>git</td>
+<td>2.43.0</td>
+<td>2.30</td>
+<td>ok</td>
+</tr>
+<tr>
+<td>go</td>
+<td>1.27.0</td>
+<td>1.24</td>
+<td>ok</td>
+</tr>
+<tr>
+<td>make</td>
+<td>4.3</td>
+<td>3.81</td>
+<td>ok</td>
+</tr>
+<tr>
+<td>curl</td>
+<td>8.5.0</td>
+<td>7.0</td>
+<td>ok</td>
+</tr>
+</tbody>
+</table>
+<!-- raw HTML omitted -->
+<h2>Git</h2>
+<p>Commits need a name and an email. This only says whether they're set, so
+the report doesn't carry your address around.</p>
+<figure class="block"><figcaption>sh {#git-identity}</figcaption><pre><code class="language-sh">for key in user.name user.email; do
+  if [ -n &#34;$(git config --get &#34;$key&#34; 2&gt;/dev/null)&#34; ]; then
+    echo &#34;$key: set&#34;
+  else
+    echo &#34;$key: not set, run: git config --global $key ...&#34;
+  fi
+done
+</code></pre></figure>
+<figure class="output"><pre><code>user.name: set
+user.email: set
+</code></pre></figure>
+<h2>SSH key</h2>
+<p>GitHub over SSH needs a key. This lists the public keys you have, by
+type only.</p>
+<figure class="block"><figcaption>sh {#ssh}</figcaption><pre><code class="language-sh">found=0
+for k in &#34;$HOME&#34;/.ssh/id_*.pub; do
+  [ -e &#34;$k&#34; ] || continue
+  echo &#34;$(basename &#34;$k&#34;): $(cut -d&#39; &#39; -f1 &#34;$k&#34;)&#34;
+  found=1
+done
+[ &#34;$found&#34; = 1 ] || echo &#34;no SSH key yet: ssh-keygen -t ed25519&#34;
+</code></pre></figure>
+<figure class="output"><pre><code>no SSH key yet: ssh-keygen -t ed25519
+</code></pre></figure>
+<h2>Build</h2>
+<p>Build mdsh from this checkout into a temporary directory and run it.</p>
+<figure class="block"><figcaption>sh {#build timeout=5m}</figcaption><pre><code class="language-sh">cd &#34;$(git rev-parse --show-toplevel 2&gt;/dev/null || echo ../..)&#34;
+BIN=&#34;$(mktemp -d)&#34;
+go build -o &#34;$BIN/mdsh&#34; ./cmd/mdsh &amp;&amp; &#34;$BIN/mdsh&#34; --version &gt;/dev/null &amp;&amp; echo &#34;mdsh builds and runs&#34;
+</code></pre></figure>
+<figure class="output"><pre><code>mdsh builds and runs
+</code></pre></figure>
+<h2>Next steps</h2>
+<ol>
+<li>Read <a href="https://gdey.github.io/markdownshell/docs/getting-started/">Getting started</a>.</li>
+<li>Run <code>go test -short ./...</code> before your first pull request.</li>
+<li>Open <code>examples/hello.md</code> with <code>mdsh -i</code> and try a block of your own.</li>
+</ol>
+</main>
+</body>
+</html>

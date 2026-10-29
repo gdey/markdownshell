@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A Use cases section on the site: runbooks, reports and setup
+  checklists, each with a sample report in PDF, HTML and markdown. New
+  runbooks in `examples/runbooks` back them: `deploy.md`,
+  `disk-report.md` and `onboarding.md`. `site/samples.sh` regenerates
+  the samples.
 - A block marked `background` starts and the run goes on to the next
   block. Its output is kept apart from other blocks', its process ID is
   in `$MDSH_BG_<id>` for `wait`, `timeout=` kills just that block, and
