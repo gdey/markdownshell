@@ -138,6 +138,10 @@ follow [Semantic Versioning](https://semver.org/).
   current output only, as before.
 
   ![An HTML report made with --history: a block's current output, then its earlier runs, each under an italic line with how far back it is, its time and exit status](docs/changelog/earlier-runs-report.png)
+- `mdsh --serve` serves the notebook mdsh-gui shows to a web browser,
+  at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
+  address can run commands as you, so it listens on loopback by default;
+  see Serving to a browser in the README.
 
 ### Fixed
 
