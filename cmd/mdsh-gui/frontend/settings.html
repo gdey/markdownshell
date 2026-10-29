@@ -47,6 +47,13 @@
       <button id="choose">Choose…</button>
     </div>
     <p class="muted">Used when mdsh isn't started from a terminal. From a terminal, the start screen lists the current folder.</p>
+    <label>Templates folder</label>
+    <div class="start-bar">
+      <input id="template-folder" type="text" spellcheck="false" readonly placeholder="None: new files start blank">
+      <button id="choose-templates">Choose…</button>
+      <button id="clear-templates">Clear</button>
+    </div>
+    <p class="muted">New File… offers the markdown files in this folder to start from, as well as a blank file.</p>
     <label class="check"><input id="zsh-wrapper" type="checkbox"> Give blocks your zsh aliases and functions</label>
     <p class="muted">Adds an <code>mdsh</code> function to <span id="zshrc">~/.zshrc</span> that passes them to <code>mdsh</code> in a terminal with <code>--source</code>. New terminals pick it up. This app isn't started from your shell, so it can't see them.</p>
 

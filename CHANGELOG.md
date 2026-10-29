@@ -44,6 +44,14 @@ follow [Semantic Versioning](https://semver.org/).
   block's language and exit status as badges and label their output.
 - `mdsh-gui` shows the ANSI colors and bold, italic and underline in a
   block's output, saved or live, instead of the escape codes.
+- `mdsh-gui` File › New File… (cmd/ctrl+N), and a New File… button on
+  the start screen: it offers the markdown files in the new
+  **Templates folder** setting to start from, or a blank file with a
+  heading named for it, then asks where to save it and opens it.
+
+### Changed
+
+- `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
 
 ### Fixed
 

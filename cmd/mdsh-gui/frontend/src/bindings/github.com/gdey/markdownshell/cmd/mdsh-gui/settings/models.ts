@@ -38,6 +38,12 @@ export interface Settings {
     "startFolder": string;
 
     /**
+     * TemplateFolder holds the markdown files New File… offers to start
+     * from. Empty offers only a blank file.
+     */
+    "templateFolder": string;
+
+    /**
      * LastFolder is the folder of the file opened last.
      */
     "lastFolder": string;

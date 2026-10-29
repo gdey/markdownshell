@@ -82,6 +82,7 @@ func (a *App) buildMenu() *application.Menu {
 	}
 
 	file := m.AddSubmenu("File")
+	file.Add("New File…").SetAccelerator("CmdOrCtrl+N").OnClick(func(*application.Context) { go a.newFromMenu() })
 	file.Add("New Tab").SetAccelerator("CmdOrCtrl+T").OnClick(func(*application.Context) {
 		if w := a.current(); w != nil {
 			a.newTabIn(w)
@@ -89,7 +90,7 @@ func (a *App) buildMenu() *application.Menu {
 			a.newWindow(nil)
 		}
 	})
-	file.Add("New Window").SetAccelerator("CmdOrCtrl+N").OnClick(func(*application.Context) { a.newWindow(nil) })
+	file.Add("New Window").SetAccelerator("CmdOrCtrl+Shift+N").OnClick(func(*application.Context) { a.newWindow(nil) })
 	file.Add("Open…").SetAccelerator("CmdOrCtrl+O").OnClick(func(*application.Context) { go a.openFromMenu() })
 	a.recentMenu = file.AddSubmenu("Open Recent")
 	file.AddSeparator()

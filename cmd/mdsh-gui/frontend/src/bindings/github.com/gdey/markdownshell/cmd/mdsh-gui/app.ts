@@ -13,6 +13,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "/wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as library$0 from "./library/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as notebook$0 from "./notebook/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -59,11 +62,11 @@ export function CheckInfo(info: string): $CancellablePromise<notebook$0.Problem[
 }
 
 /**
- * ChooseFolder asks for a folder and returns it, or "" if none was
- * picked.
+ * ChooseFolder asks for a folder, with title, starting in dir or the
+ * start folder, and returns it, or "" if none was picked.
  */
-export function ChooseFolder(): $CancellablePromise<string> {
-    return $Call.ByName("main.App.ChooseFolder");
+export function ChooseFolder(title: string, dir: string): $CancellablePromise<string> {
+    return $Call.ByName("main.App.ChooseFolder", title, dir);
 }
 
 /**
@@ -150,6 +153,15 @@ export function Live(): $CancellablePromise<$models.liveEvent[] | null> {
  */
 export function Names(): $CancellablePromise<notebook$0.Names> {
     return $Call.ByName("main.App.Names");
+}
+
+/**
+ * NewFile asks where to make a new markdown file and opens it: in this
+ * tab if it shows the start screen, else in a new tab. The file is a
+ * copy of template, or a heading if template is "".
+ */
+export function NewFile(template: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NewFile", template);
 }
 
 /**
@@ -265,7 +277,8 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
 
 /**
  * SetSettings saves the settings the Settings window edits: autosave,
- * Vim mode, theme, shell, the view files open in and the start folder. Open windows hear of it with a
+ * Vim mode, theme, shell, the view files open in, the start folder and
+ * the templates folder. Open windows hear of it with a
  * "settings" event.
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
@@ -330,6 +343,14 @@ export function Stop(): $CancellablePromise<void> {
  */
 export function Tabs(): $CancellablePromise<$models.Tabs> {
     return $Call.ByName("main.App.Tabs");
+}
+
+/**
+ * Templates lists the markdown files in the templates folder, for New
+ * File… to start from. With no templates folder set it lists none.
+ */
+export function Templates(): $CancellablePromise<library$0.File[] | null> {
+    return $Call.ByName("main.App.Templates");
 }
 
 /**

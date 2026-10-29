@@ -50,6 +50,7 @@
     <h1>Open a runbook</h1>
     <div class="start-bar">
       <input id="filter" type="search" placeholder="Filter files" autocomplete="off" spellcheck="false">
+      <button id="new-file">New File…</button>
       <button id="open-other">Open…</button>
     </div>
     <p id="start-dir" class="muted"></p>
@@ -58,9 +59,20 @@
       <ul class="files"></ul>
     </section>
     <section id="file-list"></section>
-    <p id="start-empty" class="muted" hidden>No markdown files here. Use Open… or drop a file on the window.</p>
+    <p id="start-empty" class="muted" hidden>No markdown files here. Use New File…, Open… or drop a file on the window.</p>
   </main>
 
+  <dialog id="new-file-dialog">
+    <form method="dialog">
+      <h2>New file</h2>
+      <p class="muted">Start from a template, then choose where to save it.</p>
+      <ul id="templates" class="files"></ul>
+      <p id="new-file-error" class="error" hidden></p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="run-options">
     <form method="dialog">
       <h2>Run options</h2>
