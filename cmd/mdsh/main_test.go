@@ -227,6 +227,7 @@ func TestInteractiveErrors(t *testing.T) {
 	}{
 		{[]string{"-i", "-w", file}, "-w can't be used with -i"},
 		{[]string{"-i", "--pdf", "x.pdf", file}, "-pdf can't be used with -i"},
+		{[]string{"-i", "--html", "x.html", file}, "-html can't be used with -i"},
 		{[]string{"-i", "-"}, "needs a file"},
 		{[]string{"-i", file}, "needs a terminal"},
 	} {
@@ -359,6 +360,33 @@ func TestPDF(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(out); stdout.Len() != 0 || !bytes.HasPrefix(b, []byte("%PDF-")) {
 		t.Errorf("-n --pdf: stdout %q, %s not a PDF", stdout.String(), out)
+	}
+}
+
+func TestHTML(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "in.md")
+	os.WriteFile(in, []byte("# Doc\n\n```sh {#a}\necho hi\n```\n"), 0o644)
+
+	out := filepath.Join(dir, "doc.html")
+	var stdout, stderr bytes.Buffer
+	if rc := mdsh([]string{"--html", out, "--hide-code", in}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	b, _ := os.ReadFile(out)
+	if s := string(b); stdout.Len() != 0 || !strings.HasPrefix(s, "<!doctype html>") || !strings.Contains(s, "<title>in</title>") ||
+		strings.Contains(s, "echo hi") || !strings.Contains(s, `<figure class="output"><pre><code>hi`) {
+		t.Errorf("stdout %q, %s:\n%s", stdout.String(), out, s)
+	}
+
+	// -n --html - writes the saved output to stdout.
+	stdout.Reset()
+	if rc := mdsh([]string{"-n", "--html", "-", in}, nil, &stdout, &stderr); rc != 0 || !strings.Contains(stdout.String(), "echo hi") {
+		t.Errorf("-n: rc = %d, stdout %s", rc, stdout.String())
+	}
+
+	if rc := mdsh([]string{"--html", out, "--pdf", "x.pdf", in}, nil, &stdout, &stderr); rc != 2 || !strings.Contains(stderr.String(), "can't be used together") {
+		t.Errorf("--html --pdf: rc = %d, stderr %q", rc, stderr.String())
 	}
 }
 

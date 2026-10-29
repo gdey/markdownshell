@@ -80,14 +80,14 @@ _mdsh() {
 		done
 		[[ -n $f ]] && COMPREPLY=($(compgen -W "$(mdsh __blocks "$f" 2>/dev/null)" -- "$cur"))
 		return ;;
-	-o|--pdf|-pdf)
+	-o|--pdf|-pdf|--html|-html)
 		compopt -o filenames 2>/dev/null
 		COMPREPLY=($(compgen -f -- "$cur"))
 		return ;;
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --only --stop-on-error --yes --step --color --no-color -i --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --only --stop-on-error --yes --step --color --no-color -i --version -h" -- "$cur"))
 		return
 	fi
 
@@ -133,6 +133,7 @@ _mdsh() {
 		'-w[write output back into the file]' \
 		'-o[write the -w result to this file]:output file:_files' \
 		'--pdf[write what would be printed as a PDF]:pdf file:_files -g "*.pdf"' \
+		'--html[write what would be printed as an HTML page]:html file:_files -g "*.html"' \
 		'--only[run only this block and what it needs]:block:_mdsh_blocks' \
 		'--stop-on-error[stop at the first failing block]' \
 		'--yes[run confirm blocks without asking]' \

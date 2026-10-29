@@ -23,6 +23,10 @@ decide what's shown, `--only` what runs, and `show=`, `show-output=` and
 `mdsh:if` sections still apply. With `-w` or `-o` the markdown is written as
 well, and the PDF still shows the printed view.
 
+`--html FILE` works the same way and writes a standalone HTML page, styled
+like the PDF, with local images inside it so the file can be sent on its
+own. Raw HTML in the document is left out of the page.
+
 ## Stepping through a run
 
 `--step`, front matter `step: true` and `confirm` blocks still ask before
