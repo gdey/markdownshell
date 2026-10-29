@@ -8,9 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 )
@@ -385,6 +388,55 @@ func TestTTYWithoutTerminal(t *testing.T) {
 	}
 	if got := string(r["b"].Stdout); got != "next\n" {
 		t.Errorf("b stdout = %q", got)
+	}
+}
+
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
+
+// TestTTYOnTerminal runs a tty block on a terminal the caller draws, as
+// a window's terminal pane does.
+func TestTTYOnTerminal(t *testing.T) {
+	keys := make(chan []byte, 1)
+	var mu sync.Mutex
+	var shown strings.Builder
+	out := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return shown.Write(p)
+	})
+	// Type once the block asks.
+	go func() {
+		for end := time.Now().Add(20 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			mu.Lock()
+			asked := strings.Contains(shown.String(), "name?")
+			mu.Unlock()
+			if asked {
+				keys <- []byte("bob\r")
+				return
+			}
+		}
+	}()
+	dir := t.TempDir()
+	took := 0
+	_, results := runDoc(t, "```sh {#ask tty}\necho name?\nread -r name\necho \"hi $name\"\n```\n\n```sh {#next}\necho \"$name\"\n```\n", run.Options{
+		Dir:      dir,
+		File:     filepath.Join(dir, "d.md"),
+		Terminal: &env.Terminal{Keys: keys, Out: out, Size: func() (int, int) { return 90, 20 }},
+		TakeTTY:  func(*doc.Block) func() { took++; return func() {} },
+	})
+	r := byID(results)
+	if r["ask"].Failed() || r["ask"].Image == "" {
+		t.Fatalf("ask: err %v, image %q", r["ask"].Err, r["ask"].Image)
+	}
+	if got := string(r["next"].Stdout); got != "bob\n" {
+		t.Errorf("next stdout = %q", got)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(shown.String(), "hi bob") || took != 1 {
+		t.Errorf("shown %q, TakeTTY called %d times", shown.String(), took)
 	}
 }
 

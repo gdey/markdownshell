@@ -60,6 +60,9 @@ type Options struct {
 	// TTY is the terminal that blocks marked tty run on. If it is nil,
 	// such blocks fail with ErrNoTTY.
 	TTY *os.File
+	// Terminal, if TTY is nil, is a terminal the caller draws itself,
+	// such as a pane in a window, for blocks marked tty to run on.
+	Terminal *env.Terminal
 	// TakeTTY, if set, is called before a tty block uses TTY, so a front
 	// end that draws on the terminal can step aside. The block runs once
 	// it returns, and calls the function it returned when done with TTY.
@@ -297,6 +300,11 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 		// The tape types for the block, so it needs no terminal. It
 		// runs on a fixed size, so it records the same anywhere.
 		rec, err = runTaped(ctx, e.Shell, prelude(b, opts)+b.Body, taped, lookup, r, opts)
+	case opts.TTY == nil && opts.Terminal != nil:
+		rec = termrec.NewRecorder(opts.Terminal.Dims())
+		giveBack := takeTTY(b, opts)
+		r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(b, opts)+b.Body, *opts.Terminal, rec)
+		giveBack()
 	case opts.TTY == nil:
 		err = ErrNoTTY
 	default:
@@ -419,8 +427,12 @@ func runTaped(ctx context.Context, sh *env.Shell, script string, taped *Result, 
 	rec := termrec.NewRecorder(tapeCols, tapeRows)
 	screen := termrec.NewScreen(tapeCols, tapeRows)
 	out := []io.Writer{rec, screen}
-	if opts.TTY != nil {
+	switch {
+	case opts.TTY != nil:
 		out = append(out, opts.TTY)
+		defer takeTTY(r.Block, opts)()
+	case opts.Terminal != nil && opts.Terminal.Out != nil:
+		out = append(out, opts.Terminal.Out)
 		defer takeTTY(r.Block, opts)()
 	}
 	r.Status, r.Exited, err = sh.RunScripted(ctx, script, tapeCols, tapeRows, io.MultiWriter(out...), func(ctx context.Context, keys io.Writer) error {

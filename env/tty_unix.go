@@ -77,6 +77,54 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 	return status, exited, err
 }
 
+// RunTerminal runs script like RunTTY, but on t, a terminal mdsh draws
+// itself rather than one it runs on: what is typed on t goes to the
+// script, and what the script writes to its terminal goes to t.Out and
+// to rec. The shell's pseudo-terminal takes t's size, and follows it.
+func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec io.Writer) (status int, exited bool, err error) {
+	if s.pty == nil {
+		return 0, false, ErrNoPTY
+	}
+	ptm := s.pty.ptm
+	resize := func() {
+		cols, rows := t.Dims()
+		pty.Setsize(ptm, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+	}
+	resize()
+	if st, err := term.GetState(int(ptm.Fd())); err == nil {
+		defer term.Restore(int(ptm.Fd()), st)
+	}
+	s.pty.attach(io.MultiWriter(t.Out, rec))
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		keys, resized := t.Keys, t.Resized
+		for {
+			select {
+			case <-stop:
+				return
+			case k, ok := <-keys:
+				if !ok {
+					keys = nil
+					continue
+				}
+				ptm.Write(k)
+			case <-resized:
+				resize()
+			}
+		}
+	}()
+
+	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true)
+
+	s.pty.attach(nil)
+	close(stop)
+	wg.Wait()
+	return status, exited, err
+}
+
 // ErrTapeEnded is returned by RunScripted when the block is still
 // running a while after drive has typed everything, most likely waiting
 // for input that will never come.

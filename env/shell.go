@@ -41,6 +41,31 @@ type Shell struct {
 	mu    sync.Mutex // one Run at a time
 }
 
+// Terminal is a terminal mdsh draws itself, such as a pane in a window,
+// for RunTerminal. It has no file of its own: keys arrive on a channel
+// and what the script shows goes to a writer.
+type Terminal struct {
+	// Keys carries what is typed, as the bytes a terminal would send.
+	Keys <-chan []byte
+	// Out shows what the script writes to its terminal.
+	Out io.Writer
+	// Size is the terminal's size in cells. Nil, or a zero size, means
+	// 80 by 24.
+	Size func() (cols, rows int)
+	// Resized, if not nil, says when Size changes.
+	Resized <-chan struct{}
+}
+
+// Dims is t's size, or 80 by 24 if it has none.
+func (t Terminal) Dims() (cols, rows int) {
+	if t.Size != nil {
+		if c, r := t.Size(); c > 0 && r > 0 {
+			return c, r
+		}
+	}
+	return 80, 24
+}
+
 // Config starts a shell.
 type Config struct {
 	Path string   // shell binary; defaults to /bin/sh
