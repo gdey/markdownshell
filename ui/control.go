@@ -75,6 +75,14 @@ func (c Control) Settings() *settings.Store { return c.a.settings }
 // open documents, such as the images their blocks write.
 func (c Control) Assets(frontend http.Handler) http.Handler { return c.a.assets(frontend) }
 
+// Quitting lets every window close without asking about unsaved
+// output, as the program is ending.
+func (c Control) Quitting() {
+	c.a.mu.Lock()
+	c.a.quitting = true
+	c.a.mu.Unlock()
+}
+
 // ShouldQuit asks before quitting with unsaved output in any window.
 func (c Control) ShouldQuit() bool { return c.a.shouldQuit() }
 
@@ -172,7 +180,7 @@ func (c Control) NewTab() {
 }
 
 // NewWindow opens a window with the start screen.
-func (c Control) NewWindow() { c.a.newWindow(nil) }
+func (c Control) NewWindow() Window { return c.a.newWindow(nil).win }
 
 // OpenSettings brings the Settings tab forward, opening one if there is
 // none, at one of its own tabs, such as "about", or at the one it was on
