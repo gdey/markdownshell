@@ -57,6 +57,7 @@ type Options struct {
 type Server struct {
 	app   *ui.App
 	ctrl  ui.Control
+	cwd   string
 	token string
 	addr  string // the address listened on
 	local bool   // listening on a loopback address only
@@ -79,6 +80,7 @@ func New(opts Options) (*Server, error) {
 	}
 	s := &Server{
 		token:   opts.Token,
+		cwd:     opts.Cwd,
 		addr:    addr,
 		log:     opts.Log,
 		windows: map[uint]*window{},
@@ -225,6 +227,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.Handle("POST /wails/call", ui.TabCalls(http.HandlerFunc(s.call)))
 	mux.HandleFunc("POST /wails/answer", s.answer)
+	mux.HandleFunc("GET /wails/files", s.files)
 	mux.HandleFunc("GET /wails/events", s.events)
 	mux.HandleFunc("GET /index.html", s.tabPage)
 	mux.Handle("GET /", files)

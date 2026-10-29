@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -232,11 +233,14 @@ type question struct {
 	Cancel  int      `json:"cancel"`  // -1 for none
 }
 
-// prompt is what runtime.js draws for a file or folder: a path to type.
+// prompt is what runtime.js draws for a file or folder: a path to type,
+// over a list of the files in its folder.
 type prompt struct {
-	ID    int    `json:"id"`
-	Title string `json:"title"`
-	Value string `json:"value"`
+	ID      int    `json:"id"`
+	Title   string `json:"title"`
+	Value   string `json:"value"`
+	Kind    string `json:"kind"`    // "open", "save" or "folder"
+	Pattern string `json:"pattern"` // the files to list, such as "*.md;*.markdown"; "" for all
 }
 
 // errNoPage is returned when a dialog has no page to show in.
@@ -297,18 +301,40 @@ func (s *Server) Ask(win ui.Window, q ui.Question) {
 	}()
 }
 
-// promptPath asks for a path in w, starting with value.
-func (s *Server) promptPath(w *window, title, value string) (string, error) {
+// promptPath asks for a path in w, and returns it absolute, or "" if
+// none was given.
+func (s *Server) promptPath(w *window, p prompt) (string, error) {
 	if w == nil {
 		return "", errNoPage
 	}
-	return s.wait(w, func(id int) message {
-		return message{Name: "mdsh:prompt", Data: prompt{ID: id, Title: title, Value: value}}
-	}), nil
+	path := s.wait(w, func(id int) message {
+		p.ID = id
+		return message{Name: "mdsh:prompt", Data: p}
+	})
+	if path == "" {
+		return "", nil
+	}
+	return s.absPath(path)
+}
+
+// absPath makes path, as typed, absolute: ~ is the home folder, and a
+// relative path is from the folder mdsh started in.
+func (s *Server) absPath(path string) (string, error) {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		path = filepath.Join(home, path[1:])
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(s.cwd, path)
+	}
+	return filepath.Clean(path), nil
 }
 
 func (s *Server) OpenFiles(win ui.Window, dir string) ([]string, error) {
-	file, err := s.promptPath(s.over(win), "Open a markdown file", strings.TrimSuffix(dir, "/")+"/")
+	file, err := s.promptPath(s.over(win), prompt{Title: "Open a markdown file", Value: withSlash(dir), Kind: "open", Pattern: "*.md;*.markdown"})
 	if err != nil || file == "" {
 		return nil, err
 	}
@@ -316,8 +342,12 @@ func (s *Server) OpenFiles(win ui.Window, dir string) ([]string, error) {
 }
 
 func (s *Server) SaveFile(win ui.Window, sf ui.SaveFile) (string, error) {
-	return s.promptPath(s.over(win), sf.Message, strings.TrimSuffix(sf.Dir, "/")+"/"+sf.Name)
+	return s.promptPath(s.over(win), prompt{Title: sf.Message, Value: withSlash(sf.Dir) + sf.Name, Kind: "save", Pattern: sf.Pattern})
 }
+
+// withSlash is dir with a / at the end, as the path prompt shows a
+// folder.
+func withSlash(dir string) string { return strings.TrimSuffix(dir, "/") + "/" }
 
 func (s *Server) ChooseFolder(ctx context.Context, dir string) (string, error) {
 	var w *window
@@ -326,7 +356,7 @@ func (s *Server) ChooseFolder(ctx context.Context, dir string) (string, error) {
 		w = s.windows[id]
 		s.mu.Unlock()
 	}
-	return s.promptPath(w, "Choose the start folder", dir)
+	return s.promptPath(w, prompt{Title: "Choose the start folder", Value: withSlash(dir), Kind: "folder"})
 }
 
 // Reveal can't show a file manager in the browser.
