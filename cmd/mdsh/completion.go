@@ -87,7 +87,7 @@ _mdsh() {
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --only --stop-on-error --yes --step --color --no-color -i --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --only --stop-on-error --yes --step --color --no-color -i --serve --version -h" -- "$cur"))
 		return
 	fi
 
@@ -141,6 +141,7 @@ _mdsh() {
 		'--color[style printed markdown]:when:(auto always never)' \
 		'--no-color[same as --color=never]' \
 		'-i[open in the terminal UI]' \
+		'--serve=-[serve the notebook to a web browser]::address (host\:port):' \
 		'--version[print the version]' \
 		'-h[show help]' \
 		'1:markdown file:_files -g "*.md"' \
