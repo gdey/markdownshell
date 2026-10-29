@@ -220,6 +220,13 @@ th { background: var(--code-bg); }
 .block .ask .info svg { width: 15px; height: 15px; fill: currentColor; }
 .block .output:empty { display: none; }
 .block .output { border-top: 1px solid var(--border); padding: 0 12px; }
+.block .output img, .prose img { max-width: 100%; height: auto; }
+.block .output img { display: block; margin: 12px 0; cursor: zoom-in; }
+#viewer { width: fit-content; max-width: 96vw; max-height: 96vh; padding: 0; border: 1px solid var(--border); background: var(--bg); cursor: zoom-out; outline: none; }
+#viewer::backdrop { background: rgb(0 0 0 / 0.6); }
+#viewer img { display: block; max-width: 94vw; max-height: 94vh; }
+/* A vector image has no pixel size to keep, so it fills the window. */
+#viewer img.vector { width: 94vw; height: 94vh; object-fit: contain; }
 .stderr { color: var(--bad); }
 
 /* Start screen */

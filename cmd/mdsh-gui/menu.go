@@ -139,12 +139,28 @@ func (a *App) buildMenu() *application.Menu {
 	if mac {
 		m.AddRole(application.WindowMenu)
 	}
-	a.fillRecent()
+	a.recentItems()
 	return m
 }
 
-// showView sets the View menu's check marks to v.
+// showView sets the View menu's check marks to v. It is called from
+// window events and bound methods, off the main thread, and macOS menus
+// may only change on the main thread.
 func (a *App) showView(v View) {
+	a.onMain(func() { a.checkView(v) })
+}
+
+// onMain runs fn on the main thread. Before the app runs there is none
+// to send it to, and the caller is the main goroutine, so fn runs there.
+func (a *App) onMain(fn func()) {
+	if !a.started.Load() {
+		fn()
+		return
+	}
+	application.InvokeSync(fn)
+}
+
+func (a *App) checkView(v View) {
 	items := a.viewItems
 	if items.split == nil {
 		return
@@ -159,8 +175,15 @@ func (a *App) showView(v View) {
 	}
 }
 
-// fillRecent lists the recent files under File › Open Recent.
+// fillRecent lists the recent files under File › Open Recent, on the
+// main thread, as showView does.
 func (a *App) fillRecent() {
+	a.onMain(a.recentItems)
+}
+
+// recentItems fills File › Open Recent. buildMenu calls it before the
+// app runs; later calls go through fillRecent.
+func (a *App) recentItems() {
 	if a.recentMenu == nil {
 		return
 	}
