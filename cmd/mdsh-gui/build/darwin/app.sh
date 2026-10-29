@@ -40,7 +40,9 @@ codesign --force --deep --sign - "$app"
 
 name=mdsh-gui_${version}_macos_universal
 ditto -c -k --keepParent "$app" "$out/$name.zip"
-mkdir "$work/dmg"
-cp -R "$app" "$work/dmg/"
-ln -s /Applications "$work/dmg/Applications"
-hdiutil create -volname mdsh -srcfolder "$work/dmg" -ov -format UDZO "$out/$name.dmg" >/dev/null
+
+# The .dmg opens on a window that shows dragging mdsh to Applications;
+# build/darwin/dmg/settings.py lays it out.
+python3 -m venv "$work/venv"
+"$work/venv/bin/pip" install --quiet dmgbuild==1.6.7
+"$work/venv/bin/dmgbuild" -s build/darwin/dmg/settings.py -D app="$app" mdsh "$out/$name.dmg" >/dev/null

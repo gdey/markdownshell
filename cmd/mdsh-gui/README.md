@@ -182,7 +182,11 @@ npx --package typescript tsc -p frontend
 ## Packages
 
 `build/darwin/app.sh VERSION OUTDIR`, on macOS, builds the universal
-`mdsh.app`, signed ad hoc, and puts it in a `.dmg` and a `.zip`.
+`mdsh.app`, signed ad hoc, and puts it in a `.dmg` and a `.zip`. The
+`.dmg` window shows an arrow from mdsh to Applications; it is laid out
+with [dmgbuild](https://github.com/dmgbuild/dmgbuild) by
+`build/darwin/dmg/settings.py`, over a background drawn from
+`build/darwin/dmg/background.svg` by `build/darwin/dmg/render.sh`.
 `build/linux/appimage.sh VERSION OUTDIR`, on Linux, builds the
 AppImage with `wails3 generate appimage`, which bundles GTK and WebKit's
 helper processes. The icon is `build/appicon.png`, drawn from
