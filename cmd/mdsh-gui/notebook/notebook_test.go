@@ -136,3 +136,127 @@ func TestSections(t *testing.T) {
 		t.Errorf("after running: cells %q, want %q", got, want)
 	}
 }
+
+func TestDirtyAndChanged(t *testing.T) {
+	file := write(t, src)
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if n.Dirty() || n.Changed() {
+		t.Fatalf("a file just opened is neither dirty nor changed")
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if !n.Dirty() {
+		t.Errorf("running a block should make the notebook dirty")
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if n.Dirty() || n.Changed() {
+		t.Errorf("after Save the notebook is dirty %v, changed %v", n.Dirty(), n.Changed())
+	}
+	if err := os.WriteFile(file, []byte(src+"\nMore.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !n.Changed() {
+		t.Errorf("Changed should notice the file being written")
+	}
+}
+
+func TestSaveAs(t *testing.T) {
+	file := write(t, src)
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(t.TempDir(), "copy.md")
+	if err := n.SaveAs(other); err != nil {
+		t.Fatal(err)
+	}
+	if n.File() != other {
+		t.Errorf("File = %s, want %s", n.File(), other)
+	}
+	got, err := os.ReadFile(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "```output {for=hello exit=0}\nhello\n```") {
+		t.Errorf("the copy lacks the output:\n%s", got)
+	}
+	if orig, _ := os.ReadFile(file); string(orig) != src {
+		t.Errorf("SaveAs changed the original file:\n%s", orig)
+	}
+	// The shells now start in the new folder.
+	var mu sync.Mutex
+	var out strings.Builder
+	n2, err := Open(write(t, "```sh {#pwd}\npwd\n```\n"), Options{OnEvent: func(e Event) {
+		mu.Lock()
+		defer mu.Unlock()
+		if e.Kind == "stdout" {
+			out.WriteString(e.Data)
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n2.Close()
+	dir := t.TempDir()
+	if err := n2.SaveAs(filepath.Join(dir, "pwd.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := n2.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if real, _ := filepath.EvalSymlinks(dir); strings.TrimSpace(out.String()) != dir && strings.TrimSpace(out.String()) != real {
+		t.Errorf("pwd = %q, want %s", out.String(), dir)
+	}
+}
+
+func TestRunOptions(t *testing.T) {
+	var mu sync.Mutex
+	var out strings.Builder
+	n, err := Open(write(t, "```sh {#args}\necho \"$1-$2\"\n```\n\n```sh {#two}\necho two\n```\n"), Options{
+		Run: RunOptions{Args: []string{"a", "b"}},
+		OnEvent: func(e Event) {
+			mu.Lock()
+			defer mu.Unlock()
+			if e.Kind == "stdout" {
+				out.WriteString(e.Data)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.SetRunOptions(RunOptions{Args: []string{"c", "d"}, Only: "args"}); err != nil {
+		t.Fatal(err)
+	}
+	if c := n.Cells(); !c[0].Ran {
+		t.Errorf("output from before the change should be kept")
+	}
+	if err := n.RunFrom(0); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got, want := out.String(), "a-b\nc-d\n"; got != want {
+		t.Errorf("output = %q, want %q (only=args leaves out two)", got, want)
+	}
+	if n.RunOptions().Only != "args" {
+		t.Errorf("RunOptions = %+v", n.RunOptions())
+	}
+}
