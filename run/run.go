@@ -113,7 +113,10 @@ type Result struct {
 	Status  int
 	// Exited is true when the block ended its shell (exit, or a timeout).
 	Exited bool
-	Err    error
+	// Running is true while a background block is still going. Its
+	// output and status come in once it ends.
+	Running bool
+	Err     error
 	// Image is the markdown image target when the block has out=image:
 	// a path relative to the document, or a data: URI.
 	Image string
@@ -267,11 +270,7 @@ func tapeFor(d *doc.Document, results []*Result, b *doc.Block) *Result {
 // the tape's placeholders.
 func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, r *Result, opts Options, emit func(Event), vars []string, taped *Result, lookup doc.Lookup) {
 	r.Ran = true
-	share := b.Attrs.List("share")
-	if share == nil {
-		share = d.Options.Env.Share
-	}
-	e, err := stack.Get(ctx, b.Attrs["env"], share)
+	e, err := envFor(ctx, stack, d, b)
 	if err != nil {
 		r.Err = err
 		return
@@ -345,6 +344,15 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 			r.Err = err
 		}
 	}
+}
+
+// envFor returns the env b runs in.
+func envFor(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block) (*env.Env, error) {
+	share := b.Attrs.List("share")
+	if share == nil {
+		share = d.Options.Env.Share
+	}
+	return stack.Get(ctx, b.Attrs["env"], share)
 }
 
 // captureVars reads vars from sh, exported or not.

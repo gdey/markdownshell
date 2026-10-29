@@ -137,9 +137,10 @@ func TestStopNote(t *testing.T) {
 		"exit 3":        "block a ended its shell (exit status 3",
 		"set -e; false": "block a ended its shell (exit status 1",
 		"echo a; false": "block a failed (exit status 1)",
+		"sleep 5":       "block a timed out after 100ms, which ended its shell",
 	} {
 		f := filepath.Join(t.TempDir(), "d.md")
-		os.WriteFile(f, []byte("```sh {#a}\n"+body+"\n```\n\n```sh {#b}\necho b\n```\n"), 0o644)
+		os.WriteFile(f, []byte("```sh {#a timeout=100ms}\n"+body+"\n```\n\n```sh {#b}\necho b\n```\n"), 0o644)
 		var out, errb bytes.Buffer
 		mdsh([]string{"--stop-on-error", "--no-color", f}, nil, &out, &errb)
 		if n := strings.Count(errb.String(), want); n != 2 {

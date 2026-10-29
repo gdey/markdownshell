@@ -356,6 +356,8 @@ func stopNote(results []*run.Result) string {
 		case r.Declined:
 			return fmt.Sprintf("stopped before block %s", r.Block.ID)
 		case !r.Ran || !unreached(results[i+1:]):
+		case r.Exited && r.Err != nil:
+			return fmt.Sprintf("block %s %v, which ended its shell, so the run stopped there", r.Block.ID, r.Err)
 		case r.Exited:
 			return fmt.Sprintf("block %s ended its shell (exit status %d, from exit or set -e), so the run stopped there", r.Block.ID, r.Status)
 		case r.Failed():
@@ -417,6 +419,12 @@ func (s *streamer) event(e run.Event) {
 	case run.Done:
 		i := s.index[e.Block]
 		s.results[i] = e.Result
+		if s.printed > 3*i+2 && e.Block.Attrs.Has("background") && s.err == nil {
+			// A background block ends after later blocks were printed,
+			// so its output goes here, under its name.
+			s.err = s.print([]byte(fmt.Sprintf("*Background block %s ended:*\n\n%s", e.Block.ID, render.Output(e.Result, e.Result.Failed()))))
+			return
+		}
 		s.flush(3*i + 3)
 	}
 }
