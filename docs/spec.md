@@ -19,7 +19,7 @@ Everything is written in Go, as one core library with three front ends built on 
 - Blocks can share a session or run in their own sub-env, set per block.
 - Output can be printed as markdown or written back into the file.
 
-**Not in v1:** the custom language interpreter, the GUI, running languages other than `sh`.
+**Not in v1:** the GUI, running languages other than `sh`.
 
 ## Document format
 
@@ -144,34 +144,12 @@ Two modes share one engine: execute mode runs the whole file and prints markdown
 
 ## Block languages
 
-v1 ships on `sh` plus a few markdown helpers. The custom language gets its own spec once v1 runs real files.
+v1 ships on `sh` plus a few markdown helpers.
 
 **sh in v1, with extensions**
 
 - `out=markdown` puts a block's output into the document as raw markdown, so a script can print a table or a list that renders.
 - Each shell starts with helper functions: `md_h1`, `md_h2`, `md_h3` (headings), `md_table [-F SEP] [-s N]` (tab-separated lines on stdin, or split on SEP as `awk -F` does; the first line after skipping N is the header) and `md_code LANG` (stdin as a fenced block). They are plain shell functions, so blocks stay valid `sh`.
-
-**Custom language (after v1), first sketch**
-
-Goals: nicer loops, easy command execution, easy markdown output. A rough feel, nothing settled:
-
-```text
-files = $ ls *.go            # $ runs a command, returns its output
-
-for f in files.lines {
-    n = $ wc -l < {f}        # {x} interpolates, quoted safely
-    table.row f, n.trim
-}
-
-md table("File", "Lines")   # md writes markdown into the document
-```
-
-Two ways to build it, to decide in that spec:
-
-| Option | Upside | Downside |
-| --- | --- | --- |
-| Write our own lexer, parser and interpreter in Go | Syntax exactly as wanted | Most work; we own every bug |
-| Build on an embeddable Go language (Starlark, Risor) with mdsh builtins | Fast to ship, proven runtime | Syntax is theirs, not ours |
 
 ## Go architecture
 
@@ -199,7 +177,7 @@ Settled on 2026-10-27.
 - **Sharing:** vars only flow down in v1.
 - **On failure:** continue by default, configurable with `on_error`; an explicit `exit` always stops the run.
 - **Shell:** `/bin/sh` by default, `zsh` when the document has any `zsh` block, `shell:` in front matter to change it. `sh` and `zsh` blocks run; every block in a document runs in the same shell.
-- **Custom language:** after v1.
+- **Custom language:** dropped on 2026-10-29. Blocks are `sh` or `zsh`, with the markdown helpers.
 - **Confirm:** a `confirm` block asks to run or stop; `--yes` skips the question.
 - **Images:** `out=image` for image bytes, `out=screenshot` to draw text output as an image.
 - **Conditions:** `run=`, `show=`, `show-output=`, `show-stderr=` and `mdsh:if` sections, driven by `{{$VAR}}`, `{{#block/env(VAR)}}` and the block facts `?` (alias `err?`) and `ran?`.

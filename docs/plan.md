@@ -9,8 +9,7 @@ says what gets built in which order and what is still open.
 | --- | --- | --- |
 | v1: library and CLI | Parse, run and render `sh` blocks; `mdsh run` | Released as v1.0.0 |
 | v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | Released in v1.1.0 |
-| Custom language | A nicer block language next to `sh` | Not started, needs its own spec |
-| GUI | Desktop or web front end on the same library | Not started |
+| GUI | Desktop or web front end on the same library | Desktop app `mdsh-gui` released in v1.2.0 |
 
 ## v1: library and CLI
 
@@ -68,16 +67,6 @@ Goal: `mdsh -i doc.md` opens a TUI (Bubble Tea) on the same `run` engine.
 - [x] `e` edits a whole block, attributes included, in `$EDITOR`.
 - [x] Images: half-block previews inline, and full size with kitty, iTerm2
       or sixel on `v`.
-
-## Custom language
-
-Goal from the start: nicer loops, easy command execution and easy markdown
-output. Starts after v1 runs real files, with its own spec covering:
-
-- Syntax, from the sketch in [spec.md](spec.md#block-languages).
-- Build our own interpreter in Go, or build on an embeddable Go language
-  (Starlark, Risor) with mdsh builtins.
-- How it plugs into `run` next to `sh`, and how it shares env vars.
 
 ## GUI
 

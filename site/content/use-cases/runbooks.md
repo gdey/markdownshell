@@ -47,6 +47,9 @@ The report from one run:
 - [release-checklist.md](https://github.com/gdey/markdownshell/blob/main/examples/runbooks/release-checklist.md)
   tags a release in a scratch git repository, with numbered steps whose
   blocks sit inside the list, and cleans up only if every step worked.
+- [mdsh-release.md](https://github.com/gdey/markdownshell/blob/main/examples/runbooks/mdsh-release.md)
+  is how mdsh itself is released: it checks the changelog and the
+  checkout, and with `PUSH=1` tags and pushes the release.
 - [linux-triage_linux.md](https://github.com/gdey/markdownshell/blob/main/examples/runbooks/linux-triage_linux.md)
   and
   [macos-triage_darwin.md](https://github.com/gdey/markdownshell/blob/main/examples/runbooks/macos-triage_darwin.md)
