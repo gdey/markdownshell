@@ -44,6 +44,8 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui` start screen shows each file's front matter description
   (`description`, else `summary`, else `abstract`) under its name, and
   the filter matches it too.
+- `mdsh-gui folder` lists the markdown files under that folder on the
+  start screen, in place of the current folder.
 - `mdsh-gui` block editing: edit a block in a CodeMirror editor, fences
   and attributes included, or add one at the end. The editor completes
   attribute names and values, explains them on hover, underlines
