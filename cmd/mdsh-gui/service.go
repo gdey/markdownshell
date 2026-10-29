@@ -247,6 +247,10 @@ func (a *App) Settings() settings.Settings { return a.settings.Get() }
 func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) {
 		cur.Autosave, cur.Vim, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.Shell, s.StartFolder
+		cur.Theme = ""
+		if s.Theme == "light" || s.Theme == "dark" {
+			cur.Theme = s.Theme
+		}
 	})
 	if err == nil {
 		a.app.Event.Emit("settings", a.settings.Get())
@@ -272,38 +276,6 @@ func (a *App) ChooseFolder(ctx context.Context) (string, error) {
 // NewWindow opens a window with the start screen.
 func (a *App) NewWindow() { a.newWindow() }
 
-// BlockSource is block i's text, fences included, for the block editor.
-func (a *App) BlockSource(ctx context.Context, i int) (string, error) {
-	_, n, err := a.notebook(ctx)
-	if err != nil {
-		return "", err
-	}
-	return n.Source(i)
-}
-
-// SetBlock replaces block i with text, as BlockSource gave it.
-func (a *App) SetBlock(ctx context.Context, i int, text string) error {
-	dw, n, err := a.notebook(ctx)
-	if err != nil {
-		return err
-	}
-	err = n.SetBlock(i, text)
-	dw.title()
-	return err
-}
-
-// AddBlock adds a block, written with its fences, to the end of the
-// file and returns its index.
-func (a *App) AddBlock(ctx context.Context, text string) (int, error) {
-	dw, n, err := a.notebook(ctx)
-	if err != nil {
-		return 0, err
-	}
-	i, err := n.AddBlock(text)
-	dw.title()
-	return i, err
-}
-
 // BlockAttrs describes the block attributes, for completion, hover help
 // and the attribute form.
 func (a *App) BlockAttrs() []doc.AttrSpec { return doc.BlockAttrs }
@@ -320,24 +292,45 @@ func (a *App) Names(ctx context.Context) (notebook.Names, error) {
 // CheckInfo checks the attributes in a fence's info string.
 func (a *App) CheckInfo(info string) []notebook.Problem { return notebook.CheckInfo(info) }
 
-// EditInfo sets or removes one attribute in a fence's info string.
-func (a *App) EditInfo(info, key, value string, bare, remove bool) string {
-	return notebook.EditInfo(info, key, value, bare, remove)
+// Text is the whole file, for the split view's source pane.
+func (a *App) Text(ctx context.Context) (string, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return "", err
+	}
+	return n.Text(), nil
 }
 
-// SetLang changes the language in a fence's info string.
-func (a *App) SetLang(info, lang string) string { return notebook.SetLang(info, lang) }
-
-// Info is a fence info string read for the attribute form.
-type Info struct {
-	Lang string `json:"lang"`
-	// Attrs maps each attribute to its value, "" when bare. The id is
-	// under "#".
-	Attrs map[string]string `json:"attrs"`
+// SetText replaces the whole file, as typed in the source pane.
+func (a *App) SetText(ctx context.Context, text string) error {
+	dw, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetText(text)
+	dw.title()
+	return err
 }
 
-// ReadInfo reads a fence info string as mdsh does.
-func (a *App) ReadInfo(info string) Info {
-	lang, attrs := doc.ParseInfo(info)
-	return Info{Lang: lang, Attrs: attrs}
+// View is what a window shows, for the View menu's check marks.
+type View struct {
+	Split    bool `json:"split"`    // the source pane
+	Rendered bool `json:"rendered"` // the rendered view
+	Outline  bool `json:"outline"`
+	Code     bool `json:"code"`
+	Output   bool `json:"output"`
+}
+
+// SetView notes what the calling window shows.
+func (a *App) SetView(ctx context.Context, v View) {
+	dw, err := a.window(ctx)
+	if err != nil {
+		return
+	}
+	dw.mu.Lock()
+	dw.view = v
+	dw.mu.Unlock()
+	if a.current() == dw {
+		a.showView(v)
+	}
 }
