@@ -4,8 +4,9 @@
 //
 //	go generate
 //
-// Imports of CodeMirror packages become imports of the vendored bundle,
-// frontend/vendor/codemirror.js, which the app serves beside the bundle, and
+// Imports of CodeMirror and xterm packages become imports of the vendored
+// bundles, frontend/vendor/codemirror.js and xterm.js, which the app
+// serves beside the bundle, and
 // /wails/runtime.js stays an import, since Wails serves it.
 package main
 
@@ -17,8 +18,12 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-// vendored are the packages that frontend/vendor/codemirror.js holds.
-const vendored = `^(@codemirror/.*|@replit/codemirror-vim|@lezer/highlight)$`
+// vendored are the packages that frontend/vendor/codemirror.js holds, and
+// xterm those that frontend/vendor/xterm.js holds.
+const (
+	vendored = `^(@codemirror/.*|@replit/codemirror-vim|@lezer/highlight)$`
+	xterm    = `^@xterm/`
+)
 
 func main() {
 	log.SetFlags(0)
@@ -52,6 +57,9 @@ func build() error {
 			Setup: func(b api.PluginBuild) {
 				b.OnResolve(api.OnResolveOptions{Filter: vendored}, func(api.OnResolveArgs) (api.OnResolveResult, error) {
 					return api.OnResolveResult{Path: "../vendor/codemirror.js", External: true}, nil
+				})
+				b.OnResolve(api.OnResolveOptions{Filter: xterm}, func(api.OnResolveArgs) (api.OnResolveResult, error) {
+					return api.OnResolveResult{Path: "../vendor/xterm.js", External: true}, nil
 				})
 			},
 		}},

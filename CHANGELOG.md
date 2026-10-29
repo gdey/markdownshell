@@ -69,6 +69,9 @@ follow [Semantic Versioning](https://semver.org/).
   markdown report of the window's run, a run of every block, or the
   saved file, with code and output shown or hidden. It shows the
   matching `mdsh` command, and offers to show the file in its folder.
+- `mdsh-gui` tty blocks: a block marked `tty` runs in an xterm.js
+  terminal in its card, sized to fit, with keys going to the block. Its
+  recording replaces the terminal when it ends.
 
 ### Changed
 
