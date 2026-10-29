@@ -152,6 +152,15 @@ follow [Semantic Versioning](https://semver.org/).
   the start screen: it offers the markdown files in the new
   **Templates folder** setting to start from, or a blank file with a
   heading named for it, then asks where to save it and opens it.
+- `mdsh -i` with no file, or with a folder, starts on a list of the
+  markdown files under it, as `mdsh-gui` does: recent files first, the
+  rest grouped by folder, with block counts and front matter
+  descriptions, filtered as you type. `q` in a file goes back to it.
+  The `library` package that finds them moved out of `mdsh-gui` into
+  the root module, so both use it.
+- `mdsh -i`: `W` saves as another file and follows it, ctrl+s saves,
+  and a banner says when the file changed on disk, with `R` to reload
+  it and `M` to keep yours.
 
 ### Changed
 
@@ -159,6 +168,9 @@ follow [Semantic Versioning](https://semver.org/).
   run icon for a block, and, in purple, a textbox or choice icon for a
   control. A block's name shows its underscores as spaces, so `make_db`
   reads as "make db"; its tooltip keeps the name as written.
+- `mdsh -i` saves when asked (`w`), as `mdsh-gui` does, and marks
+  output not saved with a •. `--autosave` saves after every block that
+  runs, as before.
 - `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
 - Folding in `mdsh-gui`: a block's code and its output each fold to one
   line, and a heading folds its section. `collapse[=COND]`,

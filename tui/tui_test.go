@@ -33,7 +33,7 @@ func newModel(t *testing.T, src string, opts Options) (*Model, string) {
 	opts.Run.Environ = []string{"PATH=" + os.Getenv("PATH")}
 	opts.Style = "notty"
 	if opts.Save == nil {
-		opts.Save = func(b []byte) error { return os.WriteFile(file, b, 0o644) }
+		opts.Save = func(file string, b []byte) error { return os.WriteFile(file, b, 0o644) }
 	}
 	m, err := New(d, opts)
 	if err != nil {
@@ -307,7 +307,7 @@ func TestImagePreview(t *testing.T) {
 		d, _ := doc.Parse([]byte(read(t, file)))
 		m, err := New(d, Options{
 			Run:      run.Options{File: file, Environ: []string{"PATH=" + os.Getenv("PATH")}},
-			Save:     func(b []byte) error { return os.WriteFile(file, b, 0o644) },
+			Save:     func(file string, b []byte) error { return os.WriteFile(file, b, 0o644) },
 			AutoSave: true, Images: true, Style: "notty",
 		})
 		if err != nil {
@@ -406,7 +406,7 @@ func TestBackgroundBlock(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatal("the background block never ended")
 		}
-		m.Update(reapMsg{})
+		m.Update(reapMsg{m})
 		for len(m.events) > 0 {
 			m.Update(<-m.events)
 		}
@@ -465,5 +465,171 @@ func TestRunSection(t *testing.T) {
 	press(m, "g", "s")
 	if !strings.Contains(m.View(), "isn't under a heading") {
 		t.Errorf("no status for a block under no heading:\n%s", m.View())
+	}
+}
+
+func TestSaveAs(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	press(m, "enter")
+	pump(t, m)
+	other := filepath.Join(filepath.Dir(file), "copy.md")
+	press(m, "W")
+	m.saveAs.SetValue("copy.md")
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !strings.Contains(read(t, other), "for=one") {
+		t.Fatal("save as didn't write the output")
+	}
+	if strings.Contains(read(t, file), "for=one") {
+		t.Error("save as wrote the old file")
+	}
+	if m.opts.Run.File != other || m.dirty {
+		t.Errorf("after save as: file %s, dirty %v", m.opts.Run.File, m.dirty)
+	}
+	if msg, ok := cmd().(savedAsMsg); !ok || msg.file != other {
+		t.Errorf("save as in the same folder sent %#v", msg)
+	}
+
+	// Another file that exists takes enter twice.
+	press(m, "W")
+	m.saveAs.SetValue(file)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.naming || strings.Contains(read(t, file), "for=one") {
+		t.Fatal("save as overwrote a file without asking")
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.naming || !strings.Contains(read(t, file), "for=one") {
+		t.Error("enter again didn't overwrite")
+	}
+}
+
+func TestFileChangedOnDisk(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	later := time.Now().Add(time.Hour)
+	os.WriteFile(file, []byte("edited\n"), 0o644)
+	os.Chtimes(file, later, later)
+	m.Update(checkMsg{m})
+	if !m.changed || !strings.Contains(m.View(), "changed on disk") {
+		t.Fatal("no notice for a file changed on disk")
+	}
+	press(m, "M")
+	if m.changed || !m.dirty {
+		t.Fatalf("keep mine: changed %v, dirty %v", m.changed, m.dirty)
+	}
+	press(m, "w")
+	if !strings.Contains(read(t, file), "# Title") {
+		t.Error("w after keep mine didn't overwrite")
+	}
+
+	os.WriteFile(file, []byte("edited again\n"), 0o644)
+	os.Chtimes(file, later.Add(time.Hour), later.Add(time.Hour))
+	m.Update(checkMsg{m})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	if cmd == nil {
+		t.Fatal("R didn't reload")
+	}
+	if msg, ok := cmd().(openMsg); !ok || msg.file != file {
+		t.Errorf("R sent %#v", msg)
+	}
+}
+
+// newApp opens the start screen on a folder holding two runbooks.
+func newTestApp(t *testing.T) (*app, string) {
+	t.Helper()
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "a.md"), []byte("---\ndescription: |\n  The first\n  runbook.\n---\n"+twoBlocks), 0o644)
+	os.MkdirAll(filepath.Join(dir, "sub"), 0o755)
+	os.WriteFile(filepath.Join(dir, "sub", "b.md"), []byte("```sh\necho b\n```\n"), 0o644)
+	recent := filepath.Join(t.TempDir(), "tui.json")
+	a, err := newApp(Config{Dir: dir, Recent: recent, Open: func(file string) (*doc.Document, Options, error) {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			return nil, Options{}, err
+		}
+		d, err := doc.Parse(src)
+		return d, Options{
+			Run:   run.Options{File: file, Environ: []string{"PATH=" + os.Getenv("PATH")}},
+			Save:  func(file string, b []byte) error { return os.WriteFile(file, b, 0o644) },
+			Style: "notty",
+		}, err
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(a.close)
+	a.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	return a, dir
+}
+
+// do sends msg to a, and what its command sends back, until one is not
+// for the app itself.
+func do(a *app, msg tea.Msg) {
+	for msg != nil {
+		_, cmd := a.Update(msg)
+		msg = nil
+		if cmd != nil {
+			switch next := cmd().(type) {
+			case openMsg, backMsg, savedAsMsg:
+				msg = next
+			}
+		}
+	}
+}
+
+func TestStartScreen(t *testing.T) {
+	a, dir := newTestApp(t)
+	view := a.View()
+	for _, want := range []string{"This folder", "a.md", "2 blocks", "The first runbook.", "sub/", "b.md", "1 block"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("start screen is missing %q:\n%s", want, view)
+		}
+	}
+	for _, r := range "sub" {
+		a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if v := a.View(); strings.Contains(v, "a.md") || !strings.Contains(v, "b.md") {
+		t.Errorf("filter sub:\n%s", v)
+	}
+	a.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	for _, r := range "first" {
+		a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if v := a.View(); !strings.Contains(v, "a.md") || strings.Contains(v, "b.md") {
+		t.Errorf("filter on the description:\n%s", v)
+	}
+
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	if a.doc == nil || a.doc.opts.Run.File != filepath.Join(dir, "a.md") {
+		t.Fatal("enter didn't open a.md")
+	}
+	if !strings.Contains(a.View(), "q close") {
+		t.Error("q should go back to the start screen")
+	}
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if a.doc != nil {
+		t.Fatal("q didn't go back to the start screen")
+	}
+	v := a.View()
+	if i, j := strings.Index(v, "Recent"), strings.Index(v, "This folder"); i < 0 || j < i {
+		t.Errorf("a.md isn't listed as recent first:\n%s", v)
+	}
+	if got := loadRecent(a.c.Recent); len(got) != 1 || got[0] != filepath.Join(dir, "a.md") {
+		t.Errorf("recent files kept: %v", got)
+	}
+}
+
+func TestSaveAsAnotherFolderReopens(t *testing.T) {
+	a, dir := newTestApp(t)
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	m := a.doc
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pump(t, m)
+	press(m, "W")
+	m.saveAs.SetValue(filepath.Join(dir, "sub", "c.md"))
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	if a.doc == m || a.doc.opts.Run.File != filepath.Join(dir, "sub", "c.md") {
+		t.Fatal("save as into another folder didn't open the new file")
+	}
+	if !strings.Contains(a.View(), "hi") {
+		t.Error("the new file doesn't show the output saved")
 	}
 }

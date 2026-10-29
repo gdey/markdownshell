@@ -187,6 +187,7 @@ mdsh --yes notes.md        # run confirm blocks without asking
 mdsh --step notes.md       # ask before every block: run, skip or stop
 mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
+mdsh -i ~/notes            # pick a file under ~/notes first (mdsh -i alone: this folder)
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -205,7 +206,16 @@ Printed markdown is styled when stdout is a terminal; `--color=never`,
 
 `mdsh -i notes.md` opens the document full screen, with its prose styled
 and each block in a box. Pick a block and run it; its output streams in
-under it and is saved to the file as soon as it finishes. Blocks keep
+under it. A • in the status line marks output that isn't saved; `w`
+saves it, and `--autosave` saves after every block that runs.
+
+Without a file, or with a folder, `mdsh -i` starts on a list of the
+markdown files under the folder, as `mdsh-gui` does: the files opened
+recently first, then the rest grouped by folder, each with its block
+count, when it changed and the `description` (else `summary`, else
+`abstract`) from its front matter. Typing filters the list by path and
+description, and enter opens the file picked; `q` goes back to the list.
+Recent files are kept in `mdsh/tui.json` in the user's config folder. Blocks keep
 their envs between runs, the same as in one `mdsh` run, so running a
 block again runs it in the env as the earlier runs left it, and replaces
 its output.
@@ -221,9 +231,12 @@ its output.
 | `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
 | `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
 | `v` | show the block's image or recording full screen; enter goes back |
-| `w` | save now |
+| `w` or ctrl+s | save now |
+| `W` | save as: type a path (relative to the file's folder); mdsh follows the new file. In another folder it opens it again, with fresh shells |
+| `R` | reload the file from disk, dropping output not saved |
+| `M` | when the file changed on disk, keep what is shown; the next save overwrites the file |
 | ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
-| `q` | quit |
+| `q` | quit, or go back to the list of files |
 
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
@@ -239,7 +252,8 @@ the kitty, iTerm2 or sixel protocol when mdsh recognizes the terminal
 `TERM`), and in half blocks otherwise. SVG images show only as a link. Include blocks show the file's lines,
 numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
-is open, mdsh won't save over it until you press `w` twice.
+is open, a banner offers to reload it (`R`) or keep yours (`M`), and mdsh
+won't save over it until you pick one or press `w` twice.
 
 ## PDF output
 

@@ -103,7 +103,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	step := fs.Bool("step", false, "ask before running each block, as if every block were marked confirm")
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
-	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them")
+	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
+	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	// Files are read as the flag is parsed, so a pipe such as
 	// <(alias -L) is read once, however many shells start.
@@ -132,7 +133,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("--color must be auto, always or never, got %q", *color)
 	}
-	if fs.NArg() < 1 {
+	if fs.NArg() < 1 && !*interactive {
 		fs.Usage()
 		return errors.New("no file given")
 	}
@@ -144,7 +145,11 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 				return fmt.Errorf("-%s can't be used with -i", name)
 			}
 		}
-		return interactiveCmd(fs.Arg(0), fs.Args()[1:], sources.String(), *stop, *step, *yes, stdin, stdout)
+		var args []string
+		if fs.NArg() > 1 {
+			args = fs.Args()[1:]
+		}
+		return interactiveCmd(fs.Arg(0), args, sources.String(), *stop, *step, *yes, *autosave, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -490,26 +495,31 @@ func (s *streamer) finish(results []*run.Result) error {
 	return s.err
 }
 
-// interactiveCmd opens file in the TUI. Output is saved to the file
-// after every block that runs.
-func interactiveCmd(file string, args []string, source string, stop, step, yes bool, stdin io.Reader, stdout io.Writer) error {
+// interactiveCmd opens file in the TUI. With no file, or a folder, the
+// TUI starts with a list of the markdown files under it to pick from.
+// Output is saved when asked, or with autosave after every block that
+// runs.
+func interactiveCmd(file string, args []string, source string, stop, step, yes, autosave bool, stdin io.Reader, stdout io.Writer) error {
 	if file == "-" {
 		return errors.New("-i needs a file, not stdin")
 	}
 	if f, ok := stdin.(*os.File); !ok || !term.IsTerminal(int(f.Fd())) || !isTerminal(stdout) {
 		return errors.New("-i needs a terminal")
 	}
-	abs, err := filepath.Abs(file)
-	if err != nil {
-		return err
+	c := tui.Config{Dir: "."}
+	if file != "" {
+		info, err := os.Stat(file)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			c.Dir = file
+		} else {
+			c.File = file
+		}
 	}
-	src, err := os.ReadFile(abs)
-	if err != nil {
-		return err
-	}
-	d, err := doc.Parse(src)
-	if err != nil {
-		return fmt.Errorf("%s: %w", file, err)
+	if conf, err := os.UserConfigDir(); err == nil {
+		c.Recent = filepath.Join(conf, "mdsh", "tui.json")
 	}
 	style := "light"
 	if lipgloss.HasDarkBackground() {
@@ -524,25 +534,41 @@ func interactiveCmd(file string, args []string, source string, stop, step, yes b
 		return err
 	}
 	defer tty.Close()
-	return tui.Run(d, tui.Options{
-		Run: run.Options{
-			TTY:         tty,
-			File:        abs,
-			LinkDir:     filepath.Dir(abs),
-			Args:        args,
-			Environ:     run.WithMode(os.Environ(), run.ModeInteractive),
-			Source:      source,
-			StopOnError: stop,
-			Step:        step,
-			Mode:        run.ModeInteractive,
-		},
-		Yes:      yes,
-		Save:     func(out []byte) error { return writeFile(abs, out, 0o644) },
-		AutoSave: true,
-		Style:    style,
-		Images:   style != "notty",
-		Protocol: termimg.Detect(os.Getenv),
-	})
+	protocol := termimg.Detect(os.Getenv)
+	c.Open = func(file string) (*doc.Document, tui.Options, error) {
+		abs, err := filepath.Abs(file)
+		if err != nil {
+			return nil, tui.Options{}, err
+		}
+		src, err := os.ReadFile(abs)
+		if err != nil {
+			return nil, tui.Options{}, err
+		}
+		d, err := doc.Parse(src)
+		if err != nil {
+			return nil, tui.Options{}, fmt.Errorf("%s: %w", file, err)
+		}
+		return d, tui.Options{
+			Run: run.Options{
+				TTY:         tty,
+				File:        abs,
+				LinkDir:     filepath.Dir(abs),
+				Args:        args,
+				Environ:     run.WithMode(os.Environ(), run.ModeInteractive),
+				Source:      source,
+				StopOnError: stop,
+				Step:        step,
+				Mode:        run.ModeInteractive,
+			},
+			Yes:      yes,
+			Save:     func(file string, out []byte) error { return writeFile(file, out, 0o644) },
+			AutoSave: autosave,
+			Style:    style,
+			Images:   style != "notty",
+			Protocol: protocol,
+		}, nil
+	}
+	return tui.Run(c)
 }
 
 // prompter asks whether to run blocks. It remembers the [o] answer,
