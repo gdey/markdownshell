@@ -114,7 +114,7 @@ func (m *Model) block(i int) string {
 
 	border := dimCol
 	switch {
-	case m.prompt != nil && m.prompt.block == b, running:
+	case m.prompt != nil && m.prompt.block == b, running, m.bg[i]:
 		border = runningCol
 	case selected:
 		border = accent
@@ -168,7 +168,7 @@ func tagsOf(b *doc.Block) string {
 			tags = append(tags, a+"="+v)
 		}
 	}
-	for _, a := range []string{"tty", "confirm", "skip"} {
+	for _, a := range []string{"background", "tty", "confirm", "skip"} {
 		if b.Attrs.Has(a) {
 			tags = append(tags, a)
 		}
@@ -186,6 +186,8 @@ func (m *Model) state(i int, r *run.Result) string {
 	switch {
 	case m.active == i:
 		return lipgloss.NewStyle().Foreground(runningCol).Render("running…")
+	case m.bg[i]:
+		return lipgloss.NewStyle().Foreground(runningCol).Render("running in the background…")
 	case m.prompt != nil && m.index[m.prompt.block] == i:
 		return lipgloss.NewStyle().Foreground(runningCol).Render("waiting for an answer")
 	case r.Ran && errors.Is(r.Err, context.Canceled):

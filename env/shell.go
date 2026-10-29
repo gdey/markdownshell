@@ -35,6 +35,7 @@ type Shell struct {
 	waited chan struct{}
 	pty    *ptyConn // nil unless started with Config.TTY
 	ttyRun int      // blocks run on the pty, to tell their markers apart
+	bgRun  int      // background jobs started, to name their files
 	// pipes are the read ends of stdout and stderr.
 	pipes []io.Closer
 	exit  int
@@ -177,18 +178,8 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 	if err := os.WriteFile(f, []byte(script), 0o600); err != nil {
 		return 0, false, err
 	}
-	// A syntax error in a dot script ends a non-interactive POSIX shell,
-	// so check syntax in a separate process first.
-	var syn bytes.Buffer
-	chk := exec.CommandContext(ctx, s.path, "-n", f)
-	chk.Stdout, chk.Stderr = &syn, &syn
-	if err := chk.Run(); err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			stderr.Write(bytes.ReplaceAll(syn.Bytes(), []byte(f), []byte("block")))
-			return 2, false, nil
-		}
-		return 0, false, err
+	if ok, err := s.check(ctx, f, stderr); err != nil || !ok {
+		return 2, false, err
 	}
 
 	s.out.attach(stdout)

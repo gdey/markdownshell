@@ -79,6 +79,10 @@ type Model struct {
 	active  int
 	running bool
 	live    map[int][]chunk
+	// bg are the background blocks still running. While there are any,
+	// a tick checks for those that ended.
+	bg      map[int]bool
+	ticking bool
 	prompt  *confirmMsg
 	// input is the prompt for a new block, while typing is set.
 	input  textinput.Model
@@ -123,6 +127,13 @@ type confirmMsg struct {
 }
 
 type runDoneMsg struct{ err error }
+
+// reapMsg is the tick that checks for background blocks that ended.
+type reapMsg struct{}
+
+// reapEvery is how often the TUI checks on background blocks while
+// nothing else runs.
+const reapEvery = 250 * time.Millisecond
 
 // handOff gives the terminal to a tty block. As a tea.ExecCommand, Bubble
 // Tea runs it with the terminal released: it lets the block start, waits
@@ -197,6 +208,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		events: make(chan tea.Msg, 64),
 		active: -1,
 		live:   map[int][]chunk{},
+		bg:     map[int]bool{},
 		md:     map[string]string{},
 		images: map[string]string{},
 	}
@@ -266,6 +278,16 @@ func (m *Model) takeTTY(b *doc.Block) func() {
 
 func (m *Model) wait() tea.Msg { return <-m.events }
 
+// tick schedules a check on background blocks, if any are running and
+// none is scheduled.
+func (m *Model) tick() tea.Cmd {
+	if len(m.bg) == 0 || m.ticking {
+		return nil
+	}
+	m.ticking = true
+	return tea.Tick(reapEvery, func(time.Time) tea.Msg { return reapMsg{} })
+}
+
 // Init starts listening for run events.
 func (m *Model) Init() tea.Cmd { return m.wait }
 
@@ -279,7 +301,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	case eventMsg:
 		m.event(run.Event(msg))
-		return m, m.wait
+		return m, tea.Batch(m.wait, m.tick())
+	case reapMsg:
+		m.ticking = false
+		// A run checks on them itself, before each block; the session
+		// runs one thing at a time.
+		if !m.running {
+			m.sess.Reap()
+		}
+		return m, m.tick()
 	case confirmMsg:
 		i := m.index[msg.block]
 		if m.skipSaved && m.hasOutput(i) {
@@ -318,6 +348,12 @@ func (m *Model) event(e run.Event) {
 	i := m.index[e.Block]
 	switch e.Kind {
 	case run.Started:
+		if e.Block.Attrs.Has("background") {
+			// The run goes straight on; Done comes when the block ends.
+			m.bg[i] = true
+			delete(m.live, i)
+			break
+		}
 		m.active = i
 		m.live[i] = nil
 		m.moveTo(i)
@@ -325,6 +361,7 @@ func (m *Model) event(e run.Event) {
 		m.live[i] = append(m.live[i], chunk{stderr: e.Kind == run.Stderr, data: string(e.Data)})
 	case run.Done:
 		delete(m.live, i)
+		delete(m.bg, i)
 		m.results[i] = e.Result
 		if e.Result.Ran {
 			m.dirty = true
@@ -724,6 +761,12 @@ func (m *Model) footer() string {
 	status := m.status
 	if m.running {
 		status = "running…"
+	}
+	if n := len(m.bg); n > 0 {
+		if status != "" {
+			status += " · "
+		}
+		status += fmt.Sprintf("%d in background", n)
 	}
 	line1 := titleStyle.Render(name) + state
 	if status != "" {

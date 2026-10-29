@@ -374,3 +374,47 @@ func TestEditBlock(t *testing.T) {
 		t.Errorf("an unclosed fence: status %q, body %q", m.status, m.d.Blocks[1].Body)
 	}
 }
+
+// A background block shows as running in the background, the run goes
+// on, and its output comes in when a tick finds it ended.
+func TestBackgroundBlock(t *testing.T) {
+	src := "```sh {#bg background}\nsleep 0.3; echo from bg\n```\n\n```sh {#fg}\necho fg\n```\n"
+	m, file := newModel(t, src, Options{AutoSave: true})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	for _, want := range []string{"background", "running in the background…", "1 in background"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view doesn't show %q:\n%s", want, v)
+		}
+	}
+	if m.running {
+		t.Error("the run is still going; a background block shouldn't hold it")
+	}
+
+	// Another block runs meanwhile.
+	press(m, "j", "enter")
+	pump(t, m)
+	if v := m.View(); !strings.Contains(v, "fg") {
+		t.Errorf("fg didn't run:\n%s", v)
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for len(m.bg) > 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the background block never ended")
+		}
+		m.Update(reapMsg{})
+		for len(m.events) > 0 {
+			m.Update(<-m.events)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	v = m.View()
+	if !strings.Contains(v, "from bg") || strings.Contains(v, "in background") {
+		t.Errorf("view after the block ended:\n%s", v)
+	}
+	if got := read(t, file); !strings.Contains(got, "```output {for=bg exit=0}\nfrom bg\n```") {
+		t.Errorf("background output not saved:\n%s", got)
+	}
+}
