@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -34,6 +35,8 @@ type App struct {
 	named    int // windows made so far, for unique names
 	prefs    *application.WebviewWindow
 	quitting bool
+
+	started atomic.Bool // the app is running, so menus change on its main thread
 }
 
 // errNoFile is returned by calls that need a file before one is open.
