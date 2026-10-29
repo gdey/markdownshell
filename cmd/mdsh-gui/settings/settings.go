@@ -21,6 +21,8 @@ type Settings struct {
 	Autosave bool `json:"autosave"`
 	// Vim turns on Vim key bindings in the code editors.
 	Vim bool `json:"vim"`
+	// Theme is "light" or "dark"; empty follows the system.
+	Theme string `json:"theme"`
 	// Shell, if set, overrides the front matter's shell for every file.
 	Shell string `json:"shell"`
 	// StartFolder is the folder the start screen lists when the app

@@ -26,6 +26,7 @@ type App struct {
 	cwd      string // the folder mdsh-gui started in
 
 	menu       *application.Menu
+	viewItems  struct{ split, rendered, outline, code, output *application.MenuItem }
 	recentMenu *application.Menu
 
 	mu       sync.Mutex
