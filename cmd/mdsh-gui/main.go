@@ -2,6 +2,7 @@
 // blocks as you pick them, like mdsh -i does in a terminal.
 //
 //	mdsh-gui [file.md [args...] | folder]
+//	mdsh-gui --version
 //
 // With no file, the window lists the markdown files under the current
 // folder to pick from, or under folder when one is given.
@@ -10,6 +11,7 @@ package main
 import (
 	"embed"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -32,7 +34,14 @@ import (
 //go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css
 var frontend embed.FS
 
+// version is set by release builds.
+var version = "dev"
+
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("mdsh-gui", version)
+		return
+	}
 	if err := mdshGUI(os.Args[1:]); err != nil {
 		log.Fatal("mdsh-gui: ", err)
 	}

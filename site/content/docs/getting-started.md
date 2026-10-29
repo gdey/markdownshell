@@ -25,6 +25,9 @@ com.apple.quarantine mdsh` clears it. Blocks run in `/bin/sh` by default;
 on Windows, set `shell:` under `mdsh:` in the front matter to a POSIX shell
 such as Git Bash's `bash.exe`. The Windows builds are not well tested yet.
 
+For a desktop window instead of a terminal, the releases also have
+`mdsh-gui` for macOS and Linux; see [Desktop app]({{< relref "desktop" >}}).
+
 With Go 1.27 or newer you can build it instead:
 
 ```sh

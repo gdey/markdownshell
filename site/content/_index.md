@@ -46,6 +46,9 @@ hello, world
 - **Interactive mode.** `mdsh -i` opens a document in a terminal UI: pick
   blocks and run them, type new ones at a prompt, and edit them in your
   editor. See [Interactive mode]({{< relref "docs/interactive" >}}).
+- **A desktop app.** `mdsh-gui` opens documents in tabs, runs blocks as
+  you click them and edits the source beside the rendered view, on macOS
+  and Linux. See [Desktop app]({{< relref "docs/desktop" >}}).
 - **Terminal sessions.** A `tty` block runs on a real terminal and is
   recorded as a GIF; a `tape` fence types its input so it runs unattended.
 - **PDF and HTML reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
