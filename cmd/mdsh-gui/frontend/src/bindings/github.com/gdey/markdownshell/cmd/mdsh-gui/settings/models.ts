@@ -16,6 +16,11 @@ export interface Settings {
     "vim": boolean;
 
     /**
+     * Theme is "light" or "dark"; empty follows the system.
+     */
+    "theme": string;
+
+    /**
      * Shell, if set, overrides the front matter's shell for every file.
      */
     "shell": string;

@@ -12,6 +12,7 @@
     "@codemirror/lint": "^6",
     "@codemirror/legacy-modes": "^6",
     "@replit/codemirror-vim": "^6",
-    "@wailsio/runtime": "^3.0.0"
+    "@wailsio/runtime": "^3.0.0",
+    "@codemirror/lang-markdown": "^6"
   }
 }
