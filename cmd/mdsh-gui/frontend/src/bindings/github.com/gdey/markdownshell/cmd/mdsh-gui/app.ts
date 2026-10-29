@@ -168,6 +168,15 @@ export function Open(): $CancellablePromise<void> {
 }
 
 /**
+ * OpenLink follows href, a link in the tab's document: a web address
+ * opens in the browser, a markdown file in a new tab beside this one,
+ * and any other file as the system would open it.
+ */
+export function OpenLink(href: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.OpenLink", href);
+}
+
+/**
  * OpenPath opens file, from the start screen.
  */
 export function OpenPath(file: string): $CancellablePromise<void> {

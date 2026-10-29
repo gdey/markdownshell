@@ -1,6 +1,6 @@
 import "./tab.js";
 import { EditorView } from "@codemirror/view";
-import { Browser, Events, Window } from "/wails/runtime.js";
+import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Doc, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
@@ -118,17 +118,12 @@ function drawDoc() {
 }
 
 // drawProse draws one top-level block of prose. Clicking it shows its
-// markdown in the source pane; cmd/ctrl+click on a link opens the link
-// instead.
+// markdown in the source pane, except on a link, which followLinks
+// follows.
 function drawProse(c: Cell): HTMLElement {
   // goldmark's HTML, with raw HTML in the markdown left out.
   const s = el("section", { className: "prose", innerHTML: c.html ?? "", title: "Click to show it in the source" });
-  s.onclick = (e) => {
-    const a = (e.target as HTMLElement).closest("a");
-    if (a) {
-      e.preventDefault();
-      if ((e.metaKey || e.ctrlKey) && /^https?:/.test(a.href)) return void Browser.OpenURL(a.href);
-    }
+  s.onclick = () => {
     if (window.getSelection()?.toString()) return;
     void showInSource(s, c.line, true);
   };
@@ -165,6 +160,65 @@ function drawBlock(c: Cell): HTMLElement {
   };
   return block;
 }
+
+// followLinks makes a click on a link in the rendered view follow it,
+// rather than load it over the app's page: a web address opens in the
+// browser, a markdown file in a new tab and a heading in this document
+// scrolls into view. A right-click gets the link menu (menu.go), with
+// the link's href as its data.
+function followLinks() {
+  const link = (e: Event) => (e.target as HTMLElement).closest<HTMLAnchorElement>("#doc a[href]");
+  document.addEventListener(
+    "click",
+    (e) => {
+      const a = link(e);
+      if (!a) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const href = a.getAttribute("href")!;
+      if (href.startsWith("#")) return void scrollToHeading(href.slice(1));
+      App.OpenLink(href).catch(fail);
+    },
+    true,
+  );
+  document.addEventListener(
+    "auxclick",
+    (e) => {
+      if (link(e)) e.preventDefault();
+    },
+    true,
+  );
+  document.addEventListener(
+    "contextmenu",
+    (e) => {
+      const a = link(e);
+      // goldmark escapes hrefs, so they hold no quote to end the string.
+      if (a) a.style.setProperty("--custom-contextmenu-data", '"' + a.getAttribute("href") + '"');
+    },
+    true,
+  );
+}
+
+// scrollToHeading scrolls the heading with the id fragment names into
+// view: a GitHub-style one, made from its text.
+function scrollToHeading(fragment: string) {
+  const slug = (t: string) =>
+    t
+      .trim()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+      .replace(/\s/g, "-");
+  let id = fragment;
+  try {
+    id = decodeURIComponent(fragment);
+  } catch {}
+  const h = [...document.querySelectorAll<HTMLElement>("#doc :is(h1, h2, h3, h4, h5, h6)")].find(
+    (h) => h.id === id || slug(h.textContent ?? "") === id.toLowerCase(),
+  );
+  h?.scrollIntoView({ block: "start" });
+}
+
+followLinks();
 
 // backgroundNote is what a background block's card says while it runs.
 const backgroundNote = "running in the background…";
