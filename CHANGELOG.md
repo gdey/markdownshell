@@ -60,6 +60,8 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui` tabs: each file opens in a tab with its own shells. Tabs
   drag to reorder, onto another window to move there, or away for a
   window of their own, and a run carries on through a move.
+- `mdsh-gui` packages: releases have an unsigned universal macOS app
+  (`.dmg` and `.zip`) and a Linux AppImage, and `mdsh-gui --version`.
 - `mdsh-gui folder` lists the markdown files under that folder on the
   start screen, in place of the current folder.
 - `mdsh-gui` block editing: edit a block in a CodeMirror editor, fences

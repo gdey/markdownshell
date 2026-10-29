@@ -106,7 +106,7 @@ j answered the open questions on Oct 28.
 | Frontend build | TypeScript with no npm. esbuild's Go library bundles it from `go generate`. CodeMirror is a vendored pre-built bundle in `frontend/vendor/`, rebuilt from a package lock by a Go tool. Typed bindings come from `wails3 generate bindings -ts`. `tsc` type-checks in CI only, through npx. |
 | Autosave | Off by default: save when asked, with a dirty marker. Autosave is a setting. |
 | Windows or tabs | Tabs, which drag between windows and out into their own (j, Oct 29). They are drawn in the window rather than using macOS's own window tabs, so they work the same on Linux. |
-| Packaging | An unsigned universal `.app` and `.dmg` for macOS, and an AppImage and a Flatpak for Linux, released under the same tag as mdsh as separate files (j, Oct 29). A Windows installer much later. |
+| Packaging | An unsigned (ad hoc signed) universal `.app` in a `.dmg` and a `.zip` for macOS, and an AppImage for Linux, added to the same release as mdsh as separate files (j, Oct 29). A Flatpak needs blocks to run on the host, outside its sandbox, so it comes later. A Windows installer much later. |
 | Platforms | macOS and Linux. Windows is not supported for now. |
 | Where to edit | In the source view only. Clicks in the rendered view take you there. Inline editors in the rendered view were tried and dropped (Oct 29). |
 | Block attribute helper | Completion and hover help inside `{…}`, from an attribute table exported by `doc`. |
@@ -126,4 +126,4 @@ Each milestone is one PR into `gui`, one commit each, with tests passing. Librar
 7. **M6, tty blocks.** A tty block runs in an xterm.js terminal in its own card, sized to fit the card (24 rows), so it records at the size it is shown at. Keys go to the block through `notebook.Type`; when it ends the card shows its recording. A tty block brings back the rendered view, as a confirm does. Library change 4 (#40).
 8. **M7, Tabs.** A window holds tabs, each with its own notebook and shells. New Tab (cmd/ctrl+T) opens the start screen; Open…, Open Recent and dropped files open in a new tab unless the tab in front shows the start screen; Close Tab (cmd/ctrl+W) asks about unsaved output, and the window closes with its last tab. Tabs drag to reorder, onto another window to move there, or away from the tab bar for a window of their own; a run carries on through a move. View › Show Next Tab and Show Previous Tab (cmd/ctrl+shift+] and [).
 
-After M5: merge `gui` into main. Packaging comes later: `.app` and `.dmg` for macOS, Flatpak for Linux, and a Windows installer much later.
+After the milestones, a release PR adds the packages (see Packaging under Decisions), the release workflow that builds them for a tag, the site's Desktop app page and screenshots in the README; then `gui` merges into main.

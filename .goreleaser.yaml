@@ -34,9 +34,14 @@ archives:
 
 checksum:
   name_template: checksums.txt
+  # mdsh-gui's packages, which .github/workflows/gui-packages.yml builds.
+  extra_files:
+    - glob: ./gui-dist/*
 
 changelog:
   disable: true
 
 release:
   draft: true
+  extra_files:
+    - glob: ./gui-dist/*

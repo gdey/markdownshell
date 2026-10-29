@@ -72,6 +72,66 @@ Each file opens in a tab of its own, with its own shells.
 
 If the file changes on disk, a banner offers to reload it.
 
+## A tour
+
+The start screen lists the runbooks in a folder, with the description
+from each one's front matter. Type to filter.
+
+![The start screen: four runbooks in ~/runbooks, each with a description](../../site/static/images/gui/start.png)
+
+Run All streams each block's output in under it as it runs.
+
+![A run in progress: the build block's output so far, with Stop in the toolbar](../../site/static/images/gui/running.png)
+
+A `background` block runs on while the next ones do, with a dashed edge
+until it ends. A `confirm` block asks in its card before it runs.
+
+![A background block still running, and a confirm block asking "Ship the site to production?" with Run, Skip and Stop](../../site/static/images/gui/confirm.png)
+
+The outline lists the headings and blocks, with a mark for each block's
+state.
+
+![The outline beside the document, with a check by each block that ran](../../site/static/images/gui/outline.png)
+
+The source view shows the file in a markdown editor, with the markdown
+bar over it, beside the rendered view. The two scroll together.
+
+![The source view on the left, with line numbers and run buttons in the gutter, beside the rendered view](../../site/static/images/gui/source.png)
+
+Image, screenshot and recording output shows in the block.
+
+![A block with out=screenshot, and its output drawn as a picture of a terminal](../../site/static/images/gui/image.png)
+
+A `tty` block runs in a terminal in its card.
+
+![A tty block asking "Your name?" in a terminal in its card](../../site/static/images/gui/tty.png)
+
+If the file changes on disk, a banner offers to reload it.
+
+![A banner saying disk.md changed on disk, with Reload and Keep mine](../../site/static/images/gui/changed.png)
+
+File › Create Report… makes a PDF, HTML or markdown report, and shows
+the `mdsh` command that makes the same one.
+
+![The Create report dialog: format, what to show, where the output comes from, and the mdsh command](../../site/static/images/gui/report.png)
+
+Tabs drag between windows, or out into a window of their own.
+
+![Two windows: deploy.md and disk.md in one, and onboarding.md, dragged out, in another](../../site/static/images/gui/windows.png)
+
+Settings has autosave, Vim mode, a shell for every file, the start folder
+and the theme.
+
+![The settings window](../../site/static/images/gui/settings.png)
+
+![The deploy runbook in the dark theme](../../site/static/images/gui/dark.png)
+
+## Install
+
+Releases have an unsigned universal macOS app (`.dmg` and `.zip`) and a
+Linux AppImage; see [Desktop app](../../site/content/docs/desktop.md)
+for how to open the unsigned app the first time.
+
 ## Building
 
 mdsh-gui is its own Go module, so the `mdsh` command doesn't pull in
@@ -114,3 +174,13 @@ again without npm. To type-check the TypeScript:
 ```sh
 npx --package typescript tsc -p frontend
 ```
+
+## Packages
+
+`build/darwin/app.sh VERSION OUTDIR`, on macOS, builds the universal
+`mdsh.app`, signed ad hoc, and puts it in a `.dmg` and a `.zip`.
+`build/linux/appimage.sh VERSION OUTDIR`, on Linux, builds the
+AppImage with `wails3 generate appimage`, which bundles GTK and WebKit's
+helper processes. The icon is `build/appicon.png`, drawn from
+`build/appicon.svg`. `.github/workflows/gui-packages.yml` runs both;
+the release workflow adds their files to the release.
