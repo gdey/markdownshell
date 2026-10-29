@@ -24,19 +24,6 @@ export interface Doc {
 }
 
 /**
- * Info is a fence info string read for the attribute form.
- */
-export interface Info {
-    "lang": string;
-
-    /**
-     * Attrs maps each attribute to its value, "" when bare. The id is
-     * under "#".
-     */
-    "attrs": { [_ in string]?: string } | null;
-}
-
-/**
  * Start is what the start screen lists.
  */
 export interface Start {
@@ -53,4 +40,22 @@ export interface Start {
      */
     "full": boolean;
     "recent": string[] | null;
+}
+
+/**
+ * View is what a window shows, for the View menu's check marks.
+ */
+export interface View {
+    /**
+     * the source pane
+     */
+    "split": boolean;
+
+    /**
+     * the rendered view
+     */
+    "rendered": boolean;
+    "outline": boolean;
+    "code": boolean;
+    "output": boolean;
 }
