@@ -26,14 +26,6 @@ import * as doc$0 from "../../doc/models.js";
 import * as $models from "./models.js";
 
 /**
- * AddBlock adds a block, written with its fences, to the end of the
- * file and returns its index.
- */
-export function AddBlock(text: string): $CancellablePromise<number> {
-    return $Call.ByName("main.App.AddBlock", text);
-}
-
-/**
  * Answer replies to the question a confirm event asked: "run", "skip"
  * or "stop".
  */
@@ -47,13 +39,6 @@ export function Answer(reply: string): $CancellablePromise<void> {
  */
 export function BlockAttrs(): $CancellablePromise<doc$0.AttrSpec[] | null> {
     return $Call.ByName("main.App.BlockAttrs");
-}
-
-/**
- * BlockSource is block i's text, fences included, for the block editor.
- */
-export function BlockSource(i: number): $CancellablePromise<string> {
-    return $Call.ByName("main.App.BlockSource", i);
 }
 
 /**
@@ -86,13 +71,6 @@ export function Doc(): $CancellablePromise<$models.Doc> {
 }
 
 /**
- * EditInfo sets or removes one attribute in a fence's info string.
- */
-export function EditInfo(info: string, key: string, value: string, bare: boolean, remove: boolean): $CancellablePromise<string> {
-    return $Call.ByName("main.App.EditInfo", info, key, value, bare, remove);
-}
-
-/**
  * Names are the block ids and envs in the file, for completion.
  */
 export function Names(): $CancellablePromise<notebook$0.Names> {
@@ -119,13 +97,6 @@ export function Open(): $CancellablePromise<void> {
  */
 export function OpenPath(file: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.OpenPath", file);
-}
-
-/**
- * ReadInfo reads a fence info string as mdsh does.
- */
-export function ReadInfo(info: string): $CancellablePromise<$models.Info> {
-    return $Call.ByName("main.App.ReadInfo", info);
 }
 
 /**
@@ -165,20 +136,6 @@ export function SaveAs(): $CancellablePromise<boolean> {
 }
 
 /**
- * SetBlock replaces block i with text, as BlockSource gave it.
- */
-export function SetBlock(i: number, text: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetBlock", i, text);
-}
-
-/**
- * SetLang changes the language in a fence's info string.
- */
-export function SetLang(info: string, lang: string): $CancellablePromise<string> {
-    return $Call.ByName("main.App.SetLang", info, lang);
-}
-
-/**
  * SetRunOptions sets the arguments (one line, split as a shell would),
  * --only, --step and --stop-on-error for this file.
  */
@@ -193,6 +150,20 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetSettings", s);
+}
+
+/**
+ * SetText replaces the whole file, as typed in the source pane.
+ */
+export function SetText(text: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetText", text);
+}
+
+/**
+ * SetView notes what the calling window shows.
+ */
+export function SetView(v: $models.View): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetView", v);
 }
 
 /**
@@ -216,4 +187,11 @@ export function StartScreen(): $CancellablePromise<$models.Start> {
  */
 export function Stop(): $CancellablePromise<void> {
     return $Call.ByName("main.App.Stop");
+}
+
+/**
+ * Text is the whole file, for the split view's source pane.
+ */
+export function Text(): $CancellablePromise<string> {
+    return $Call.ByName("main.App.Text");
 }

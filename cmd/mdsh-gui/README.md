@@ -5,7 +5,7 @@ It shows a markdown file, runs its `sh` and `zsh` blocks as you pick
 them, streams their output under them and saves it back to the file. It
 uses the same `run.Session` as `mdsh -i`.
 
-There is no prose editing, no images and no `tty` blocks yet; see
+There are no images, reports or `tty` blocks yet; see
 [the design](../../docs/gui/design.md) for what comes next.
 
 ```sh
@@ -23,17 +23,30 @@ own shells.
 - **Run:** Run All (cmd/ctrl+R, the toolbar button turns into Stop while
   blocks run), Stop (cmd/ctrl+.) and Run Options… for the file's
   arguments, `--only`, step mode and stop on error.
-- **Editing:** the pencil icon (or `e`) opens a block in a code editor,
-  fences and attributes included, and **Add block** adds one at the end.
-  Inside `{…}` the editor completes attribute names and values, explains
-  an attribute on hover and underlines mistakes, and the sliders icon
-  opens a form over the attributes. Cmd/ctrl+enter applies the edit.
-  Vim key bindings are a setting.
+- **Editing** happens in the source view. The pencil (or `e`) on a block
+  opens it with the cursor on the block's code, and clicking prose opens
+  it on that text. New blocks are typed there too. Inside
+  `{…}` the editor completes attribute names and values, explains an
+  attribute on hover and underlines mistakes. Vim key bindings are a
+  setting. Cmd/ctrl+click on a link opens it.
+- **Source view** (the `<>` button or cmd/ctrl+\\): the whole file in a
+  markdown editor beside the rendered view. Typing re-renders after a
+  pause, and the two scroll together; clicking a block lines the source
+  up with it. Blocks whose code didn't change
+  keep their output. The play button in the gutter runs a block. The
+  rendered view can be turned off too (its button or
+  cmd/ctrl+shift+\\), to work in the source alone.
+- **Markdown bar** over the source view, and Insert in its right-click
+  menu: heading, bold, italic, code, link, image, lists, quote, table,
+  code block and an mdsh block. Tab moves between table cells.
+- **Outline** (the sidebar button or cmd/ctrl+shift+O): headings and
+  blocks with their state, to jump around in both panes. View › Show Code and Show
+  Output hide those parts of the blocks.
 - **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
   `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
-  Linux): autosave after each run, Vim mode, a shell for every file and
-  the start folder. They are kept in `mdsh/gui.json` in the user's
+  Linux): autosave after each run, Vim mode, a shell for every file,
+  the start folder and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
   config folder.
 
 If the file changes on disk, a banner offers to reload it.

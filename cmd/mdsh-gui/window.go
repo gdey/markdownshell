@@ -28,6 +28,7 @@ type docWindow struct {
 	n       *notebook.Notebook // nil while the start screen shows
 	closing bool               // the user chose to close it
 	warned  bool               // file-changed was sent for the file on disk
+	view    View               // what the window shows, for the View menu
 }
 
 // emit sends an event to this window's frontend. Events reach every
@@ -209,5 +210,11 @@ func (dw *docWindow) dropped(e *application.WindowEvent) {
 func (dw *docWindow) hook() {
 	dw.win.RegisterHook(events.Common.WindowClosing, dw.closingHook)
 	dw.win.OnWindowEvent(events.Common.WindowFilesDropped, dw.dropped)
+	dw.win.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) {
+		dw.mu.Lock()
+		v := dw.view
+		dw.mu.Unlock()
+		dw.app.showView(v)
+	})
 	go dw.watch()
 }
