@@ -26,7 +26,9 @@ Each file opens in a tab of its own, with its own shells.
   (cmd/ctrl+W, the ×, or a middle click) closes it, and the window goes
   with its last tab. View › Show Next Tab and Show Previous Tab
   (cmd/ctrl+shift+] and [) move between them.
-- **File:** New Tab, New Window, Open…, Open Recent, Save, Save As…,
+- **File:** New File… (cmd/ctrl+N, or New File… on the start screen)
+  asks where to make a markdown file, starts it with a heading named
+  for it and opens it. New Tab, New Window (cmd/ctrl+shift+N), Open…, Open Recent, Save, Save As…,
   Create Report…, Reload, Close Tab and Close Window (cmd/ctrl+shift+W). Create Report… writes a PDF, HTML
   or markdown copy, with or without code and output, from the tab's
   run, a run of every block or the saved file, and shows the `mdsh`

@@ -700,6 +700,7 @@ $("filter").oninput = filterStart;
 $("filter").onkeydown = (e) => {
   if (e.key === "Enter") document.querySelector<HTMLElement>("#start .file")?.click();
 };
+$("new-file").onclick = () => App.NewFile().catch(fail);
 $("open-other").onclick = () => App.Open().catch(fail);
 
 // Events from Go

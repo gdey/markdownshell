@@ -6,6 +6,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `mdsh-gui` File › New File… (cmd/ctrl+N), and a New File… button on
+  the start screen: it asks where to make a markdown file, starts it
+  with a heading named for the file and opens it.
+
+### Changed
+
+- `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
+
 ## [1.2.1] - 2026-10-29
 
 Three changes to `mdsh-gui`: links in a document now work, a setting

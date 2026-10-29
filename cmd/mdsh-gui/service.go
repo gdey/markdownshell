@@ -163,6 +163,16 @@ func (a *App) Open(ctx context.Context) error {
 	return nil
 }
 
+// NewFile asks where to make a new markdown file and opens it: in this
+// tab if it shows the start screen, else in a new tab.
+func (a *App) NewFile(ctx context.Context) error {
+	w, err := a.window(ctx)
+	if err != nil {
+		return err
+	}
+	return a.newFile(w)
+}
+
 // OpenPath opens file, from the start screen.
 func (a *App) OpenPath(ctx context.Context, file string) error {
 	t, err := a.tab(ctx)
