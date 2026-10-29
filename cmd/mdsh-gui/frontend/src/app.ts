@@ -1,3 +1,4 @@
+import "./tab.js";
 import { EditorView } from "@codemirror/view";
 import { Browser, Events, Window } from "/wails/runtime.js";
 
@@ -10,15 +11,16 @@ import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal }
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "" };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "" };
 let cells: Cell[] = [];
 let running = false;
+let ranHere = false; // the run going on was started from this page
 let selected = -1; // index into the block cards, for j/k
 let settings: Settings;
 let attrs: AttrSpec[] = [];
 let known: Names = { ids: [], envs: [] }; // for completion in the source pane
 
-// The view: what each window shows. It starts as the last window left it.
+// The view: what each tab shows. It starts as the last tab left it.
 // split shows the source pane and rendered the rendered view; at least
 // one is always on.
 interface View {
@@ -72,8 +74,21 @@ async function refresh() {
   drawOptions();
   cells = (await App.Cells()) ?? [];
   drawDoc();
+  if (doc.running && !ranHere) await catchUp();
   known = await names();
   await loadSource();
+}
+
+// catchUp shows a run that started before this page did, as when its
+// tab moved to another window: what it has sent so far, then the rest as
+// it comes. A "ran" event says when it is over.
+async function catchUp() {
+  busy(true);
+  status("running");
+  for (const e of (await App.Live()) ?? []) {
+    if (e.name === "block") onBlock(e.data as BlockEvent);
+    else if (e.name === "confirm") onConfirm(e.data as Question);
+  }
 }
 
 function drawOptions() {
@@ -201,6 +216,7 @@ function busy(on: boolean) {
 async function start(method: "RunBlock" | "RunFrom", block: number) {
   if (running) return;
   busy(true);
+  ranHere = true;
   status("running");
   try {
     await App[method](block);
@@ -208,6 +224,7 @@ async function start(method: "RunBlock" | "RunFrom", block: number) {
   } catch (err) {
     fail(err);
   }
+  ranHere = false;
   busy(false);
   await refresh();
   backgroundStatus();
@@ -320,7 +337,7 @@ async function applySource() {
 }
 
 async function loadSource() {
-  if (!source || sourcePending) return;
+  if (!source || sourcePending || doc.file === "") return;
   try {
     source.setText(await App.Text());
   } catch (err) {
@@ -453,7 +470,7 @@ function applyView() {
   try {
     localStorage.setItem("mdsh-view", JSON.stringify(view));
   } catch {
-    // Only a convenience: the next window starts with the default view.
+    // Only a convenience: the next tab starts with the default view.
   }
   void App.SetView(view).catch(() => {});
 }
@@ -631,75 +648,87 @@ interface BlockEvent {
   bytes?: string; // base64
 }
 
-Events.On(
-  "block",
-  mine<BlockEvent>((e) => {
-    const block = document.getElementById("block-" + e.block);
-    if (!block) return;
-    const out = block.querySelector(".output")!;
-    switch (e.kind) {
-      case "background":
-        // The block runs on while others do; done comes when it ends.
-        block.querySelector<HTMLElement>(".ask")!.hidden = true;
-        block.classList.remove("ran", "failed");
-        block.classList.add("background");
-        block.querySelector(".exit")!.textContent = backgroundNote;
-        out.replaceChildren();
-        break;
-      case "started":
-        block.querySelector<HTMLElement>(".ask")!.hidden = true;
-        out.replaceChildren(el("pre", { className: "live" }));
-        block.scrollIntoView({ block: "nearest" });
-        break;
-      case "stdout":
-      case "stderr":
-        out.querySelector(".live")?.append(el("span", { className: e.kind, textContent: e.data ?? "" }));
-        break;
-      case "done":
-        $("dirty").hidden = false;
-        // A background block can end while nothing runs, so nothing
-        // else would draw its output.
-        if (block.classList.contains("background") && !running) void refresh().then(backgroundStatus);
-        break;
-      case "terminal":
-        // The block runs in its card, so show it, as a confirm does.
-        if (!view.rendered) toggle("rendered", true);
-        openTerminal(e.block);
-        break;
-      case "tty":
-        return writeTerminal(e.block, e.bytes);
-      case "terminal-end":
-        endTerminal(e.block);
-        break;
-    }
-    if (e.kind !== "stdout" && e.kind !== "stderr") drawOutline();
-  }),
-);
+interface Question {
+  block: number;
+  question: string;
+}
 
+function onBlock(e: BlockEvent) {
+  const block = document.getElementById("block-" + e.block);
+  if (!block) return;
+  const out = block.querySelector(".output")!;
+  switch (e.kind) {
+    case "background":
+      // The block runs on while others do; done comes when it ends.
+      block.querySelector<HTMLElement>(".ask")!.hidden = true;
+      block.classList.remove("ran", "failed");
+      block.classList.add("background");
+      block.querySelector(".exit")!.textContent = backgroundNote;
+      out.replaceChildren();
+      break;
+    case "started":
+      block.querySelector<HTMLElement>(".ask")!.hidden = true;
+      out.replaceChildren(el("pre", { className: "live" }));
+      block.scrollIntoView({ block: "nearest" });
+      break;
+    case "stdout":
+    case "stderr":
+      out.querySelector(".live")?.append(el("span", { className: e.kind, textContent: e.data ?? "" }));
+      break;
+    case "done":
+      $("dirty").hidden = false;
+      // A background block can end while nothing runs, so nothing
+      // else would draw its output.
+      if (block.classList.contains("background") && !running) void refresh().then(backgroundStatus);
+      break;
+    case "terminal":
+      // The block runs in its card, so show it, as a confirm does.
+      if (!view.rendered) toggle("rendered", true);
+      openTerminal(e.block);
+      break;
+    case "tty":
+      return writeTerminal(e.block, e.bytes);
+    case "terminal-end":
+      endTerminal(e.block);
+      break;
+  }
+  if (e.kind !== "stdout" && e.kind !== "stderr") drawOutline();
+}
+
+function onConfirm({ block, question }: Question) {
+  const card = document.getElementById("block-" + block);
+  if (!card) return;
+  // The question is asked in the block's card, so show it.
+  if (!view.rendered) toggle("rendered", true);
+  const ask = card.querySelector<HTMLElement>(".ask")!;
+  const info = el("span", { className: "info", title: "This block is marked confirm, so it waits for you before it runs." }, svg(icons.info));
+  const answer = (reply: string) => async () => {
+    ask.hidden = true;
+    await App.Answer(reply).catch(fail);
+  };
+  const run = el("button", { className: "primary" }, "Run");
+  run.onclick = answer("run");
+  const skip = el("button", {}, "Skip");
+  skip.onclick = answer("skip");
+  const stop = el("button", {}, "Stop");
+  stop.onclick = answer("stop");
+  ask.replaceChildren(info, el("span", { className: "question" }, question), run, skip, stop);
+  ask.hidden = false;
+  card.scrollIntoView({ block: "center" });
+  status("waiting for you");
+  drawOutline();
+}
+
+Events.On("block", mine(onBlock));
+Events.On("confirm", mine(onConfirm));
+// A run this page didn't start is over.
 Events.On(
-  "confirm",
-  mine<{ block: number; question: string }>(({ block, question }) => {
-    const card = document.getElementById("block-" + block);
-    if (!card) return;
-    // The question is asked in the block's card, so show it.
-    if (!view.rendered) toggle("rendered", true);
-    const ask = card.querySelector<HTMLElement>(".ask")!;
-    const info = el("span", { className: "info", title: "This block is marked confirm, so it waits for you before it runs." }, svg(icons.info));
-    const answer = (reply: string) => async () => {
-      ask.hidden = true;
-      await App.Answer(reply).catch(fail);
-    };
-    const run = el("button", { className: "primary" }, "Run");
-    run.onclick = answer("run");
-    const skip = el("button", {}, "Skip");
-    skip.onclick = answer("skip");
-    const stop = el("button", {}, "Stop");
-    stop.onclick = answer("stop");
-    ask.replaceChildren(info, el("span", { className: "question" }, question), run, skip, stop);
-    ask.hidden = false;
-    card.scrollIntoView({ block: "center" });
-    status("waiting for you");
-    drawOutline();
+  "ran",
+  mine(() => {
+    if (ranHere || !running) return;
+    busy(false);
+    status("");
+    void refresh();
   }),
 );
 

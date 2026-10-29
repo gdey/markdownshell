@@ -13,8 +13,8 @@ import (
 // as a "menu" event.
 func (a *App) send(action string) func(*application.Context) {
 	return func(*application.Context) {
-		if dw := a.current(); dw != nil {
-			dw.emit("menu", action)
+		if t := a.currentTab(); t != nil {
+			t.emit("menu", action)
 		}
 	}
 }
@@ -82,7 +82,14 @@ func (a *App) buildMenu() *application.Menu {
 	}
 
 	file := m.AddSubmenu("File")
-	file.Add("New Window").SetAccelerator("CmdOrCtrl+N").OnClick(func(*application.Context) { a.newWindow() })
+	file.Add("New Tab").SetAccelerator("CmdOrCtrl+T").OnClick(func(*application.Context) {
+		if w := a.current(); w != nil {
+			a.newTabIn(w)
+		} else {
+			a.newWindow(nil)
+		}
+	})
+	file.Add("New Window").SetAccelerator("CmdOrCtrl+N").OnClick(func(*application.Context) { a.newWindow(nil) })
 	file.Add("Open…").SetAccelerator("CmdOrCtrl+O").OnClick(func(*application.Context) { go a.openFromMenu() })
 	a.recentMenu = file.AddSubmenu("Open Recent")
 	file.AddSeparator()
@@ -91,9 +98,14 @@ func (a *App) buildMenu() *application.Menu {
 	file.Add("Create Report…").OnClick(send("report"))
 	file.Add("Reload").OnClick(send("reload"))
 	file.AddSeparator()
-	file.Add("Close Window").SetAccelerator("CmdOrCtrl+W").OnClick(func(*application.Context) {
-		if dw := a.current(); dw != nil {
-			dw.win.Close()
+	file.Add("Close Tab").SetAccelerator("CmdOrCtrl+W").OnClick(func(*application.Context) {
+		if t := a.currentTab(); t != nil {
+			go a.closeTab(t)
+		}
+	})
+	file.Add("Close Window").SetAccelerator("CmdOrCtrl+Shift+W").OnClick(func(*application.Context) {
+		if w := a.current(); w != nil {
+			w.win.Close()
 		}
 	})
 	if !mac {
@@ -135,6 +147,16 @@ func (a *App) buildMenu() *application.Menu {
 	view.AddRole(application.ResetZoom)
 	view.AddSeparator()
 	view.AddRole(application.ToggleFullscreen)
+	view.AddSeparator()
+	cycle := func(by int) func(*application.Context) {
+		return func(*application.Context) {
+			if w := a.current(); w != nil {
+				a.cycleTab(w, by)
+			}
+		}
+	}
+	view.Add("Show Next Tab").SetAccelerator("CmdOrCtrl+Shift+]").OnClick(cycle(1))
+	view.Add("Show Previous Tab").SetAccelerator("CmdOrCtrl+Shift+[").OnClick(cycle(-1))
 
 	if mac {
 		m.AddRole(application.WindowMenu)

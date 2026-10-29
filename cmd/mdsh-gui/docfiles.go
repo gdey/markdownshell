@@ -45,19 +45,17 @@ func (a *App) serveDocFile(w http.ResponseWriter, r *http.Request, path string) 
 }
 
 // underDoc reports whether path is under the folder of a document open
-// in some window.
+// in some tab.
 func (a *App) underDoc(path string) bool {
 	a.mu.Lock()
-	windows := make([]*docWindow, 0, len(a.windows))
-	for _, dw := range a.windows {
-		windows = append(windows, dw)
+	tabs := make([]*docTab, 0, len(a.tabs))
+	for _, t := range a.tabs {
+		tabs = append(tabs, t)
 	}
 	a.mu.Unlock()
-	for _, dw := range windows {
-		dw.mu.Lock()
-		n := dw.n
-		dw.mu.Unlock()
-		if n == nil {
+	for _, t := range tabs {
+		n, err := t.notebook()
+		if err != nil {
 			continue
 		}
 		dir, err := filepath.EvalSymlinks(filepath.Dir(n.File()))

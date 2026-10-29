@@ -285,3 +285,68 @@ dialog#report { width: min(560px, 92vw); }
 .block .output .terminal { margin: 12px 0; padding: 6px; background: var(--term-bg); border-radius: 6px; }
 .block .output .terminal :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
 .block .output:has(.terminal) { padding: 0 12px; }
+
+/* A window: the tab bar, and the tab in front under it. */
+body.shell { overflow: hidden; }
+#tabbar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 6px 0;
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+#tabs { display: flex; gap: 2px; min-width: 0; flex: 1; overflow: hidden; }
+#new-tab { flex: none; align-self: center; margin-bottom: 4px; }
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 60px;
+  flex: 0 1 200px;
+  padding: 3px 4px 3px 10px;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  cursor: default;
+  position: relative;
+}
+.tab:hover { background: var(--hover); }
+.tab.active { color: var(--fg); background: var(--bg); border-color: var(--border); margin-bottom: -1px; padding-bottom: 4px; }
+.tab .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab .dot { color: var(--accent); }
+.tab .close { background: none; border: none; padding: 0 5px; line-height: 1.2; color: var(--muted); visibility: hidden; border-radius: 4px; }
+.tab:hover .close, .tab.active .close { visibility: visible; }
+.tab .close:hover { color: var(--fg); background: var(--hover); }
+.tab.dragging { opacity: 0.4; }
+.tab.drop-before::before, .tab.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent);
+}
+.tab.drop-before::before { left: -2px; }
+.tab.drop-after::after { right: -2px; }
+#frames { flex: 1; position: relative; min-height: 0; }
+#frames iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#frames iframe[hidden] { display: none; }
+#drop-here {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  border: 2px dashed var(--border);
+}
+#drop-here[hidden] { display: none; }
+#drop-here.over { color: var(--fg); border-color: var(--accent); }

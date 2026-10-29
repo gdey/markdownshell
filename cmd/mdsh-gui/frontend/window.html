@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mdsh</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="bundle/window.js"></script>
+</head>
+<body class="shell" data-file-drop-target>
+  <nav id="tabbar" aria-label="Tabs">
+    <div id="tabs" role="tablist">
+      <button id="new-tab" class="icon" title="New tab (cmd/ctrl+T)" aria-label="New tab">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.3 2.5h1.4v4.8h4.8v1.4H8.7v4.8H7.3V8.7H2.5V7.3h4.8z"/></svg>
+      </button>
+    </div>
+  </nav>
+  <div id="frames">
+    <div id="drop-here" hidden>Drop the tab here</div>
+  </div>
+</body>
+</html>
