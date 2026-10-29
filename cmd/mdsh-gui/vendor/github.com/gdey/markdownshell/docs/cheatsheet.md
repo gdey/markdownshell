@@ -33,6 +33,8 @@ behaves.
 | `mdsh --color=never doc.md` | No styling on a terminal; `--no-color` and `NO_COLOR` too (`auto`, `always`, `never`) |
 | `mdsh -i doc.md` | The terminal UI; `--autosave` saves after every block that runs |
 | `mdsh -i [folder]` | A start screen listing the markdown files under this folder, or that one |
+| `mdsh --serve [doc.md \| folder]` | The desktop app's notebook in a web browser, at 127.0.0.1:8080; `--serve=host:port` listens elsewhere. Anyone with the printed address can run commands as you |
+| `mdsh --serve=stdio doc.md` | The same notebook to the program that started mdsh, such as an editor plugin, as JSON lines on stdin and stdout |
 | `mdsh - < doc.md` | Read the document from stdin |
 | `mdsh completion bash\|zsh` | A completion script: flags, `.md` files and, after `--only`, block ids |
 | `mdsh lsp` | A language server on stdin and stdout: completes and explains fence attributes, flags mistakes |
@@ -53,7 +55,7 @@ or file.
 | `mdsh ctl help` | List these. Exit codes: 0 done, 2 refused, 3 not under mdsh |
 
 `mdsh-gui [flags] [file.md [args…] | folder]` takes `--source FILE`,
-`--only ID`, `--step`, `--stop-on-error` and `--version`; on Linux the
+`--only ID`, `--step`, `--stop-on-error`, `--serve=stdio` and `--version`; on Linux the
 AppImage runs the command line tool when started with `--cli` first.
 
 ### Questions a run asks
