@@ -9,18 +9,64 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 )
 
+// send is a menu item's action: it sends action to the window in front
+// as a "menu" event.
+func (a *App) send(action string) func(*application.Context) {
+	return func(*application.Context) {
+		if dw := a.current(); dw != nil {
+			dw.emit("menu", action)
+		}
+	}
+}
+
+// inserts are the source view's Insert menu, as the markdown bar has
+// them: a label and the frontend's name for the action, sent as
+// "insert:" + name. An empty name is a separator.
+var inserts = []struct{ label, name string }{
+	{"Heading", "heading"},
+	{"Bold", "bold"},
+	{"Italic", "italic"},
+	{"Code", "code"},
+	{"Link", "link"},
+	{"Image", "image"},
+	{"", ""},
+	{"Bulleted List", "ul"},
+	{"Numbered List", "ol"},
+	{"Task List", "task"},
+	{"Quote", "quote"},
+	{"Table", "table"},
+	{"Code Block", "fence"},
+	{"", ""},
+	{"sh Block", "sh"},
+	{"sh Block, Confirm First", "sh-confirm"},
+	{"zsh Block", "zsh"},
+}
+
+// buildSourceMenu makes the source view's right-click menu: the edit
+// commands, and Insert.
+func (a *App) buildSourceMenu() {
+	m := application.NewContextMenu("source")
+	m.AddRole(application.Cut)
+	m.AddRole(application.Copy)
+	m.AddRole(application.Paste)
+	m.AddSeparator()
+	ins := m.AddSubmenu("Insert")
+	for _, it := range inserts {
+		if it.name == "" {
+			ins.AddSeparator()
+			continue
+		}
+		ins.Add(it.label).OnClick(a.send("insert:" + it.name))
+	}
+	m.Update()
+}
+
 // buildMenu makes the menu bar. Commands that act on a document are
 // sent to the window in front as a "menu" event, so its frontend runs
 // them the way its own buttons and keys do.
 func (a *App) buildMenu() *application.Menu {
 	mac := runtime.GOOS == "darwin"
-	send := func(action string) func(*application.Context) {
-		return func(*application.Context) {
-			if dw := a.current(); dw != nil {
-				dw.emit("menu", action)
-			}
-		}
-	}
+	send := a.send
 	m := application.NewMenu()
 	if mac {
 		app := m.AddSubmenu("mdsh")
@@ -74,7 +120,16 @@ func (a *App) buildMenu() *application.Menu {
 	run.AddSeparator()
 	run.Add("Run Options…").OnClick(send("runoptions"))
 
+	// The check marks show the window in front; each window keeps its
+	// own view and says what it is with SetView.
 	view := m.AddSubmenu("View")
+	a.viewItems.split = view.AddCheckbox("Source View", false).SetAccelerator("CmdOrCtrl+\\").OnClick(send("split"))
+	a.viewItems.rendered = view.AddCheckbox("Rendered View", true).SetAccelerator("CmdOrCtrl+Shift+\\").OnClick(send("rendered"))
+	a.viewItems.outline = view.AddCheckbox("Outline", false).SetAccelerator("CmdOrCtrl+Shift+O").OnClick(send("outline"))
+	view.AddSeparator()
+	a.viewItems.code = view.AddCheckbox("Show Code", true).OnClick(send("code"))
+	a.viewItems.output = view.AddCheckbox("Show Output", true).OnClick(send("output"))
+	view.AddSeparator()
 	view.AddRole(application.ZoomIn)
 	view.AddRole(application.ZoomOut)
 	view.AddRole(application.ResetZoom)
@@ -86,6 +141,22 @@ func (a *App) buildMenu() *application.Menu {
 	}
 	a.fillRecent()
 	return m
+}
+
+// showView sets the View menu's check marks to v.
+func (a *App) showView(v View) {
+	items := a.viewItems
+	if items.split == nil {
+		return
+	}
+	items.split.SetChecked(v.Split)
+	items.rendered.SetChecked(v.Rendered || !v.Split)
+	items.outline.SetChecked(v.Outline)
+	items.code.SetChecked(v.Code)
+	items.output.SetChecked(v.Output)
+	if a.menu != nil {
+		a.menu.Update()
+	}
 }
 
 // fillRecent lists the recent files under File › Open Recent.

@@ -36,14 +36,14 @@ func TestCells(t *testing.T) {
 			kinds = append(kinds, c.ID)
 		}
 	}
-	if got, want := strings.Join(kinds, " "), "prose hello prose fail"; got != want {
+	if got, want := strings.Join(kinds, " "), "prose prose hello prose fail"; got != want {
 		t.Fatalf("cells = %s, want %s", got, want)
 	}
-	if !strings.Contains(cells[0].HTML, "<em>prose</em>") {
-		t.Errorf("prose HTML = %q", cells[0].HTML)
+	if !strings.Contains(cells[1].HTML, "<em>prose</em>") {
+		t.Errorf("prose HTML = %q", cells[1].HTML)
 	}
-	if !strings.Contains(cells[2].HTML, "not run") {
-		t.Errorf("the go block should be drawn with the prose: %q", cells[2].HTML)
+	if !strings.Contains(cells[3].HTML, "not run") {
+		t.Errorf("the go block should be drawn as prose: %+v", cells[3])
 	}
 }
 
@@ -69,10 +69,10 @@ func TestRunAndSave(t *testing.T) {
 		t.Errorf("streamed stdout = %q", got)
 	}
 	cells := n.Cells()
-	if c := cells[1]; !c.Ran || c.Failed || !strings.Contains(c.Output, "hello") {
+	if c := cells[2]; !c.Ran || c.Failed || !strings.Contains(c.Output, "hello") {
 		t.Errorf("hello cell = %+v", c)
 	}
-	if c := cells[3]; !c.Failed || c.Status != 3 {
+	if c := cells[4]; !c.Failed || c.Status != 3 {
 		t.Errorf("fail cell = %+v", c)
 	}
 	if err := n.Save(); err != nil {
@@ -95,7 +95,7 @@ func TestConfirm(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if err := n.RunBlock(0); err != nil {
+	if err := n.RunFrom(0); err != nil {
 		t.Fatal(err)
 	}
 	if asked != "Really?" {
@@ -103,6 +103,18 @@ func TestConfirm(t *testing.T) {
 	}
 	if n.Cells()[0].Ran {
 		t.Error("a skipped block ran")
+	}
+
+	// Running the block itself is the answer.
+	asked = ""
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if asked != "" {
+		t.Errorf("RunBlock asked %q", asked)
+	}
+	if !n.Cells()[0].Ran {
+		t.Error("RunBlock didn't run the block")
 	}
 }
 

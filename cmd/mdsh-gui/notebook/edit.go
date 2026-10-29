@@ -10,84 +10,21 @@ import (
 	"github.com/gdey/markdownshell/run"
 )
 
-// Source is block i's text, opening fence to closing fence, as the block
-// editor shows it. SetBlock takes it back.
-func (n *Notebook) Source(i int) (string, error) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if i < 0 || i >= len(n.d.Blocks) {
-		return "", fmt.Errorf("no block %d", i)
-	}
-	return n.d.BlockText(n.d.Blocks[i]), nil
-}
-
-// SetBlock replaces block i with text, as Source gives it. The block's
-// output stays until it runs again, as in mdsh -i.
-func (n *Notebook) SetBlock(i int, text string) error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if n.running {
-		return ErrBusy
-	}
-	if i < 0 || i >= len(n.d.Blocks) {
-		return fmt.Errorf("no block %d", i)
-	}
-	if err := n.d.SetBlock(n.d.Blocks[i], text); err != nil {
-		return err
-	}
-	n.dirty = true
-	return n.sync()
-}
-
-// AddBlock adds a block, written as text with its fences, to the end of
-// the document and returns its index.
-func (n *Notebook) AddBlock(text string) (int, error) {
-	nd, err := doc.Parse([]byte(text))
-	if err != nil {
-		return 0, err
-	}
-	if len(nd.Blocks) != 1 || strings.TrimSpace(string(nd.Src[nd.Blocks[0].Span.End:])) != "" || strings.TrimSpace(string(nd.Src[:nd.Blocks[0].Span.Start])) != "" {
-		return 0, errors.New("write one fenced block")
-	}
-	nb := nd.Blocks[0]
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if n.running {
-		return 0, ErrBusy
-	}
-	body := nb.Body
-	if strings.TrimSpace(body) == "" {
-		return 0, errors.New("the block is empty")
-	}
-	saved := n.d.Src
-	b, err := n.d.AppendBlock(nb.Lang, body)
-	if err != nil {
-		return 0, err
-	}
-	// AppendBlock writes only the language; SetBlock adds the id and the
-	// other attributes as written.
-	if err := n.d.SetBlock(b, text); err != nil {
-		n.undoAppend(saved)
-		return 0, err
-	}
-	n.dirty = true
-	return len(n.d.Blocks) - 1, n.sync()
-}
-
-// undoAppend drops the block AppendBlock just added.
-func (n *Notebook) undoAppend(src []byte) {
-	n.d.Src = src
-	n.d.Blocks = n.d.Blocks[:len(n.d.Blocks)-1]
-}
-
-// sync catches the session up with an edited document. A document that
-// gains its first tty block needs new shells.
+// sync catches the session up with an edited document. Blocks that
+// kept their identity keep their results. A document that gains its
+// first tty block needs new shells.
 func (n *Notebook) sync() error {
-	for i := len(n.results); i < len(n.d.Blocks); i++ {
-		n.results = append(n.results, &run.Result{Block: n.d.Blocks[i]})
+	old := make(map[*doc.Block]*run.Result, len(n.results))
+	for _, r := range n.results {
+		old[r.Block] = r
 	}
+	n.results = make([]*run.Result, len(n.d.Blocks))
+	clear(n.index)
 	for i, b := range n.d.Blocks {
 		n.index[b] = i
+		if n.results[i] = old[b]; n.results[i] == nil {
+			n.results[i] = &run.Result{Block: b}
+		}
 	}
 	err := n.sess.Sync()
 	if !errors.Is(err, run.ErrRestart) {
@@ -194,23 +131,4 @@ func unquote(v string) string {
 		return strings.ReplaceAll(v[1:len(v)-1], `\"`, `"`)
 	}
 	return v
-}
-
-// EditInfo sets or removes one attribute in a fence's info string,
-// keeping the others and their order. bare writes it without a value.
-func EditInfo(info, key, value string, bare, remove bool) string {
-	in := doc.SplitInfo(info)
-	if remove {
-		in.Del(key)
-	} else {
-		in.Set(key, value, bare)
-	}
-	return in.String()
-}
-
-// SetLang changes the language in a fence's info string.
-func SetLang(info, lang string) string {
-	in := doc.SplitInfo(info)
-	in.Lang = lang
-	return in.String()
 }

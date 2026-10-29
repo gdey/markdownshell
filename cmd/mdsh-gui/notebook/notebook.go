@@ -22,8 +22,8 @@ import (
 	"github.com/gdey/markdownshell/run"
 )
 
-// Cell is one piece of the document as the frontend draws it: prose,
-// or a block the user can run.
+// Cell is one piece of the document as the frontend draws it: a
+// top-level block of prose, or a block the user can run.
 type Cell struct {
 	// Block is the block's index in the document, or -1 for prose.
 	Block int `json:"block"`
@@ -43,6 +43,11 @@ type Cell struct {
 	Ran    bool `json:"ran"`
 	Status int  `json:"status"`
 	Failed bool `json:"failed"`
+	// From and To are the cell's bytes in the file, output included.
+	From int `json:"from"`
+	To   int `json:"to"`
+	// Line is the line From is on, counting from 1.
+	Line int `json:"line"`
 }
 
 // Event is what OnEvent reports while a block runs.
@@ -90,8 +95,9 @@ type Notebook struct {
 	index   map[*doc.Block]int
 	cancel  context.CancelFunc
 	running bool
-	dirty   bool      // output changed since the last save
-	stamp   fileStamp // the file as last read or written
+	clicked *doc.Block // the block RunBlock runs, which needs no confirm
+	dirty   bool       // output changed since the last save
+	stamp   fileStamp  // the file as last read or written
 }
 
 // fileStamp is what Changed compares to notice the file changing on
@@ -211,51 +217,6 @@ func (n *Notebook) Close() {
 	n.sess.Close()
 }
 
-// Cells lays the document out for drawing. Blocks mdsh can't run are
-// drawn as part of the prose around them, as mdsh -i does. Blocks that
-// printing leaves out, such as those in an mdsh:if section that is off,
-// are left out here too.
-func (n *Notebook) Cells() []Cell {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	pieces := render.Pieces(n.d, n.results, render.Options{Env: os.Environ()})
-	var cells []Cell
-	var prose bytes.Buffer
-	flush := func() {
-		if len(bytes.TrimSpace(prose.Bytes())) > 0 {
-			cells = append(cells, Cell{Block: -1, HTML: n.html(prose.Bytes())})
-		}
-		prose.Reset()
-	}
-	for i, b := range n.d.Blocks {
-		prose.Write(pieces[3*i])
-		if !run.Runnable(b) {
-			prose.Write(pieces[3*i+1])
-			prose.Write(pieces[3*i+2])
-			continue
-		}
-		if len(pieces[3*i+1]) == 0 {
-			continue
-		}
-		flush()
-		r := n.results[i]
-		cells = append(cells, Cell{
-			Block:  i,
-			ID:     b.ID,
-			Lang:   b.Lang,
-			Body:   b.Body,
-			Attrs:  attrsText(b.Info),
-			Output: n.html(pieces[3*i+2]),
-			Ran:    r.Ran,
-			Status: r.Status,
-			Failed: r.Failed(),
-		})
-	}
-	prose.Write(pieces[len(pieces)-1])
-	flush()
-	return cells
-}
-
 func attrsText(info string) string {
 	in := doc.SplitInfo(info)
 	in.Del("#")
@@ -273,9 +234,20 @@ func (n *Notebook) html(md []byte) string {
 // ErrBusy is returned when a run is asked for while one is going.
 var ErrBusy = errors.New("a block is running")
 
-// RunBlock runs block i alone, waiting for it to finish.
+// RunBlock runs block i alone, waiting for it to finish. Asking for the
+// block to run answers its confirm, so it isn't asked again.
 func (n *Notebook) RunBlock(i int) error {
 	return n.start(func(ctx context.Context) error {
+		n.mu.Lock()
+		if i >= 0 && i < len(n.d.Blocks) {
+			n.clicked = n.d.Blocks[i]
+		}
+		n.mu.Unlock()
+		defer func() {
+			n.mu.Lock()
+			n.clicked = nil
+			n.mu.Unlock()
+		}()
 		_, err := n.sess.RunBlock(ctx, i)
 		return err
 	})
@@ -300,6 +272,9 @@ func (n *Notebook) start(f func(context.Context) error) error {
 
 	n.mu.Lock()
 	n.running, n.cancel = false, nil
+	if ferr := n.fold(); err == nil {
+		err = ferr
+	}
 	n.mu.Unlock()
 	cancel()
 	if errors.Is(err, context.Canceled) {
@@ -357,13 +332,29 @@ func (n *Notebook) SaveAs(file string) error {
 }
 
 func (n *Notebook) write(file string) error {
-	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: os.Environ()})
-	if err := os.WriteFile(file, out, 0o644); err != nil {
+	if err := n.fold(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(file, n.d.Src, 0o644); err != nil {
 		return err
 	}
 	n.dirty = false
 	n.stamp = stampOf(file)
 	return nil
+}
+
+// fold writes the results into the document's source, as saving will, so
+// the source pane shows the output as soon as a run ends. No block
+// changes, so every result stays.
+func (n *Notebook) fold() error {
+	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: os.Environ()})
+	if bytes.Equal(out, n.d.Src) {
+		return nil
+	}
+	if err := n.d.SetSource(out); err != nil {
+		return err
+	}
+	return n.sync()
 }
 
 // event runs on the run's goroutine.
@@ -383,6 +374,12 @@ func (n *Notebook) event(e run.Event) {
 }
 
 func (n *Notebook) confirm(b *doc.Block) run.Answer {
+	n.mu.Lock()
+	clicked := n.clicked == b
+	n.mu.Unlock()
+	if clicked {
+		return run.Go
+	}
 	if n.opts.Confirm == nil {
 		return run.Stop
 	}

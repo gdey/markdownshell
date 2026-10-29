@@ -9,10 +9,21 @@
 </head>
 <body data-file-drop-target>
   <header id="toolbar" hidden>
+    <button id="outline-toggle" class="icon" title="Outline (cmd/ctrl+shift+O)" aria-label="Outline">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 2.5h13v11h-13zm1.4 1.4v8.2h3.2V3.9zm4.6 0v8.2h5.6V3.9z"/></svg>
+    </button>
     <span id="file"></span>
     <span id="dirty" title="Output not saved" hidden>•</span>
     <button id="options" class="chip" title="Run options" hidden></button>
     <span id="status"></span>
+    <span class="seg" role="group" aria-label="View">
+      <button id="view-split" class="icon" title="Source view (cmd/ctrl+\)" aria-label="Source view">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.4 4.2 6.5 5.3 3.8 8l2.7 2.7-1.1 1.1L1.6 8zm5.2 0L14.4 8l-3.8 3.8-1.1-1.1L12.2 8 9.5 5.3z"/></svg>
+      </button>
+      <button id="view-rendered" class="icon" title="Rendered view (cmd/ctrl+shift+\)" aria-label="Rendered view">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3.5 3.5v9.5h-9.5zm1.4 1.4v10.2h6.7V6H8.5V2.9z"/></svg>
+      </button>
+    </span>
     <button id="run-all" class="primary" disabled>
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
       <span>Run all</span>
@@ -24,7 +35,14 @@
     <button id="keep">Keep mine</button>
   </div>
 
-  <main id="doc" hidden></main>
+  <div id="workspace" hidden>
+    <nav id="outline" aria-label="Outline" hidden></nav>
+    <div id="source" hidden>
+      <div id="source-bar"></div>
+      <div id="source-editor"></div>
+    </div>
+    <div id="doc-scroll"><main id="doc"></main></div>
+  </div>
 
   <main id="start" hidden>
     <h1>Open a runbook</h1>

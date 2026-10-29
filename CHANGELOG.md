@@ -47,6 +47,17 @@ follow [Semantic Versioning](https://semver.org/).
   mistakes and has a form over the attributes. Vim key bindings are a
   setting. The frontend is now TypeScript, bundled by esbuild from
   `go generate`, with CodeMirror vendored without npm.
+- `mdsh-gui` source view: edit the whole file in a markdown editor
+  beside the rendered view, or on its own; blocks whose code didn't
+  change keep their output, and a gutter button runs a block. It
+  replaces the block card editor and Add block: the pencil and clicks
+  on prose go to the source, and clicking a block lines the two up. A
+  markdown bar, and Insert in the right-click menu, add headings,
+  lists, tables, links and mdsh blocks. An outline drawer lists the headings
+  and blocks with their state, and View › Show Code and Show Output hide
+  those parts. A Theme setting picks System, Light or Dark, with code
+  colors that read well in both. A confirm block's own Run button
+  runs it without asking again.
 
 ### Changed
 

@@ -18,7 +18,7 @@ import (
 )
 
 // vendored are the packages that frontend/vendor/codemirror.js holds.
-const vendored = `^(@codemirror/.*|@replit/codemirror-vim)$`
+const vendored = `^(@codemirror/.*|@replit/codemirror-vim|@lezer/highlight)$`
 
 func main() {
 	log.SetFlags(0)
