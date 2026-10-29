@@ -4,6 +4,7 @@ import { Browser, Events, Window } from "/wails/runtime.js";
 import { App, type AttrSpec, type Cell, type Doc, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
+import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { applyTheme } from "./theme.js";
 
@@ -475,6 +476,7 @@ const actions: Record<string, () => Promise<void> | void> = {
     }
   },
   runall: () => (running ? actions.stop() : start("RunFrom", 0)),
+  report: () => (doc.file && !running ? openReport() : undefined),
   stop: () => App.Stop(),
   runoptions: () => openRunOptions(),
   split: () => toggle("split"),
@@ -694,6 +696,11 @@ Events.On("settings", (ev: { data: Settings }) => {
 });
 
 $("run-all").onclick = () => void actions.runall();
+initReport({
+  dirty: () => !$("dirty").hidden,
+  before: applySource,
+  runAll: () => start("RunFrom", 0),
+});
 $("outline-toggle").onclick = () => toggle("outline");
 $("view-split").onclick = () => toggle("split");
 $("view-rendered").onclick = () => toggle("rendered");
