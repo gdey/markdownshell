@@ -6,50 +6,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
+## [1.2.0] - 2026-10-29
 
-- A Use cases section on the site: runbooks, reports and setup
-  checklists, each with a sample report in PDF, HTML and markdown. New
-  runbooks in `examples/runbooks` back them: `deploy.md`,
-  `disk-report.md` and `onboarding.md`. `site/samples.sh` regenerates
-  the samples.
-- A block marked `background` starts and the run goes on to the next
-  block. Its output is kept apart from other blocks', its process ID is
-  in `$MDSH_BG_<id>` for `wait`, `timeout=` kills just that block, and
-  after the last block mdsh waits for it (until its timeout, or 5s) and
-  then kills it. `run.Result.Running`, `Session.Reap` and `Session.Wait`
-  let front ends follow background blocks, and `env.Shell.Background`
-  starts one. `mdsh -i` tags them, shows them as running in the
-  background while other blocks run, counts them in the status line,
-  and fills in their output when they end.
-- `examples/fifo` hands data between blocks through named pipes: a
-  background reader fed by later blocks, a writer held open across
-  blocks, and one never closed, which only a timeout ends. Tests in
-  `run` pin down what happens in each case.
-- `run.Options.Terminal` runs blocks marked `tty` on a terminal the
-  caller draws itself, such as a pane in a window, with keys on a
-  channel and the size it reports. `env.Shell.RunTerminal` does the
-  running.
-- `--html FILE` writes what mdsh would print as a standalone HTML page,
-  styled like the PDF, with local images inside it. `--html -` writes it
-  to stdout.
-- The `report` package makes the reports `--pdf`, `--html` and `-n -o`
-  write (PDF, HTML or the printed markdown), so other tools such as
-  mdsh-gui make the same ones.
-- `doc.BlockAttrs` describes every block attribute (kind, allowed
-  values, default, one-line help) for tools that help write them, with
-  `AttrSpec.Check` to validate a value. `doc.SplitInfo` edits a fence
-  info string in place, keeping unknown attributes and their order.
-- Output copies: an `output {for=id}` fence, or an `mdsh:output` region,
-  that isn't right after block `id` is a copy of its output, refilled on
-  every run like a placeholder. `stream=stderr` copies the stderr fence.
-  A copy keeps its content when the block doesn't run, and one for a
-  block that doesn't exist is a warning. `doc.Document.Copies` lists them
-  and `doc.Document.Warnings` holds the warnings, which the CLI prints.
-- `doc.Document.SetSource` parses an edited file again, keeping each
-  unchanged block's identity, and `run.Session.Sync` then keeps their
-  results, so a whole-file edit only clears the output of blocks that
-  changed.
+The desktop app: `mdsh-gui` opens documents in a window, with packages for
+macOS and Linux. Blocks can also run in the background, output can be
+copied elsewhere in a document, and reports come as HTML too.
+
+### Desktop app (`mdsh-gui`)
+
 - `mdsh-gui`, a start on a desktop window for mdsh built with Wails v3.
   It shows a document, runs blocks as you pick them, streams their output
   and saves it. It is its own Go module under `cmd/mdsh-gui`.
@@ -98,11 +62,70 @@ follow [Semantic Versioning](https://semver.org/).
   terminal in its card, sized to fit, with keys going to the block. Its
   recording replaces the terminal when it ends.
 
+### Running documents
+
+- A block marked `background` starts and the run goes on to the next
+  block. Its output is kept apart from other blocks', its process ID is
+  in `$MDSH_BG_<id>` for `wait`, `timeout=` kills just that block, and
+  after the last block mdsh waits for it (until its timeout, or 5s) and
+  then kills it. `run.Result.Running`, `Session.Reap` and `Session.Wait`
+  let front ends follow background blocks, and `env.Shell.Background`
+  starts one. `mdsh -i` tags them, shows them as running in the
+  background while other blocks run, counts them in the status line,
+  and fills in their output when they end.
+- `examples/fifo` hands data between blocks through named pipes: a
+  background reader fed by later blocks, a writer held open across
+  blocks, and one never closed, which only a timeout ends. Tests in
+  `run` pin down what happens in each case.
+- Output copies: an `output {for=id}` fence, or an `mdsh:output` region,
+  that isn't right after block `id` is a copy of its output, refilled on
+  every run like a placeholder. `stream=stderr` copies the stderr fence.
+  A copy keeps its content when the block doesn't run, and one for a
+  block that doesn't exist is a warning. `doc.Document.Copies` lists them
+  and `doc.Document.Warnings` holds the warnings, which the CLI prints.
+
+### Reports
+
+- `--html FILE` writes what mdsh would print as a standalone HTML page,
+  styled like the PDF, with local images inside it. `--html -` writes it
+  to stdout.
+- The `report` package makes the reports `--pdf`, `--html` and `-n -o`
+  write (PDF, HTML or the printed markdown), so other tools such as
+  mdsh-gui make the same ones.
+
+### Library
+
+- `run.Options.Terminal` runs blocks marked `tty` on a terminal the
+  caller draws itself, such as a pane in a window, with keys on a
+  channel and the size it reports. `env.Shell.RunTerminal` does the
+  running.
+- `doc.BlockAttrs` describes every block attribute (kind, allowed
+  values, default, one-line help) for tools that help write them, with
+  `AttrSpec.Check` to validate a value. `doc.SplitInfo` edits a fence
+  info string in place, keeping unknown attributes and their order.
+- `doc.Document.SetSource` parses an edited file again, keeping each
+  unchanged block's identity, and `run.Session.Sync` then keeps their
+  results, so a whole-file edit only clears the output of blocks that
+  changed.
+
+### Site and examples
+
+- A Use cases section on the site: runbooks, reports and setup
+  checklists, each with a sample report in PDF, HTML and markdown. New
+  runbooks in `examples/runbooks` back them: `deploy.md`,
+  `disk-report.md` and `onboarding.md`. `site/samples.sh` regenerates
+  the samples.
+- `examples/runbooks/mdsh-release.md`, the runbook for releasing mdsh:
+  it checks `CHANGELOG.md` and the checkout, shows the release notes'
+  sections, and with `PUSH=1` tags and pushes the release.
+
 ### Changed
 
 - The output right after a block holds at most one stdout part and one
   stderr fence. A second `output` fence for the same block used to be
   replaced along with the first; it is now a copy.
+- mdsh now needs Go 1.27 or newer to build, since the desktop app's
+  Wails v3 needs Go 1.26 or newer and the CLI and app share one Go.
 
 ### Fixed
 
@@ -249,6 +272,7 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/gdey/markdownshell/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gdey/markdownshell/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gdey/markdownshell/releases/tag/v1.0.0
