@@ -46,7 +46,11 @@ Each file opens in a tab of its own, with its own shells.
   it on that text. New blocks are typed there too. Inside
   `{…}` the editor completes attribute names and values, explains an
   attribute on hover and underlines mistakes. Vim key bindings are a
-  setting. Cmd/ctrl+click on a link opens it.
+  setting.
+- **Links** in the rendered view open when clicked: web links in the
+  browser, a markdown file in a new tab (or the tab it's already open
+  in), any other file as the system would open it, and `#heading`
+  links scroll to the heading. Right-click a link to open or copy it.
 - **Source view** (the `<>` button or cmd/ctrl+\\): the whole file in a
   markdown editor beside the rendered view. Typing re-renders after a
   pause, and the two scroll together; clicking a block lines the source

@@ -83,6 +83,7 @@ func mdshGUI(args []string) error {
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { a.started.Store(true) })
 	a.menu = a.buildMenu()
 	a.buildSourceMenu()
+	a.buildLinkMenu()
 	if runtime.GOOS == "darwin" {
 		app.Menu.Set(a.menu)
 	}
