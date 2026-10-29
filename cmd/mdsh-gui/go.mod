@@ -7,6 +7,7 @@ require (
 	github.com/gdey/markdownshell v0.0.0
 	github.com/wailsapp/wails/v3 v3.0.0
 	github.com/yuin/goldmark v1.7.17
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -23,7 +24,6 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 // The GUI is built from the same tree as the library it shows.
