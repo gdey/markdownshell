@@ -48,8 +48,9 @@ hello, world
   editor. See [Interactive mode]({{< relref "docs/interactive" >}}).
 - **Terminal sessions.** A `tty` block runs on a real terminal and is
   recorded as a GIF; a `tape` fence types its input so it runs unattended.
-- **PDF reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
-  Go. See [PDF output]({{< relref "docs/pdf" >}}) for an example.
+- **PDF and HTML reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
+  Go, and `--html report.html` as a standalone page. See
+  [PDF output]({{< relref "docs/pdf" >}}) for an example.
 - **Executable files.** With a `#!/usr/bin/env mdsh` shebang, `./notes.md`
   just runs.
 

@@ -25,8 +25,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
-	"github.com/gdey/markdownshell/pdf"
 	"github.com/gdey/markdownshell/render"
+	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/tui"
@@ -96,6 +96,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	write := fs.Bool("w", false, "write output back into the file instead of printing")
 	outFile := fs.String("o", "", "like -w, but write to this file and leave the input alone")
 	pdfFile := fs.String("pdf", "", "write what would be printed to this PDF file instead (- for stdout)")
+	htmlFile := fs.String("html", "", "write what would be printed to this HTML file instead (- for stdout)")
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
 	stop := fs.Bool("stop-on-error", false, "stop at the first failing block")
 	yes := fs.Bool("yes", false, "run blocks marked confirm without asking")
@@ -126,7 +127,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if *interactive {
 		set := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
-		for _, name := range []string{"w", "o", "pdf", "no-run", "n", "only", "hide-code", "hide-output"} {
+		for _, name := range []string{"w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with -i", name)
 			}
@@ -140,6 +141,14 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 	if noRun && *outFile == "" && *write {
 		return errors.New("--no-run can't be used with -w; use -o to save what it prints")
+	}
+	if *pdfFile != "" && *htmlFile != "" {
+		return errors.New("--pdf and --html can't be used together")
+	}
+	// reportFile is the file --pdf or --html writes, in its format.
+	reportFile, format := *pdfFile, report.PDF
+	if *htmlFile != "" {
+		reportFile, format = *htmlFile, report.HTML
 	}
 	if target == "-" && *write {
 		return errors.New("-w needs a file, not stdin; use -o to name one")
@@ -165,27 +174,29 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	styled := *color == "always" || (*color == "auto" && isTerminal(stdout) && os.Getenv("NO_COLOR") == "")
-	// show prints the rendered markdown, or lays it out as a PDF with
-	// image links read from linkDir.
-	show := func(md []byte, linkDir string) error {
-		if *pdfFile == "" {
-			return print(stdout, md, styled)
+	// show prints the document with results, or writes it as a report
+	// with image links read from linkDir.
+	show := func(results []*run.Result, opts report.Options, linkDir string) error {
+		if reportFile == "" {
+			return print(stdout, render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env}), styled)
 		}
 		if linkDir == "" && file != "" {
 			if abs, err := filepath.Abs(file); err == nil {
 				linkDir = filepath.Dir(abs)
 			}
 		}
-		out, err := pdf.Render(md, pdf.Options{Dir: linkDir, Title: title(file)})
+		opts.Format, opts.Dir, opts.Title = format, linkDir, report.Title(file)
+		out, err := report.Render(d, results, opts)
 		if err != nil {
-			return fmt.Errorf("pdf: %w", err)
+			return err
 		}
-		if *pdfFile == "-" {
+		if reportFile == "-" {
 			_, err = stdout.Write(out)
 			return err
 		}
-		return writeFile(*pdfFile, out, 0o644)
+		return writeFile(reportFile, out, 0o644)
 	}
+	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are
@@ -193,12 +204,12 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	// would be printed, unstyled.
 	if noRun || (*hideCode && *hideOutput && !*write) {
 		results := run.Includes(d, run.Options{File: file})
-		out := render.Markdown(d, results, render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()})
 		if *outFile != "" {
+			out, _ := report.Render(d, results, reportOpts)
 			err = writeFile(*outFile, out, 0o644)
 		}
-		if err == nil && (*outFile == "" || *pdfFile != "") {
-			err = show(out, "")
+		if err == nil && (*outFile == "" || reportFile != "") {
+			err = show(results, reportOpts, "")
 		}
 		if err != nil {
 			return err
@@ -226,13 +237,13 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			opts.File = abs
 		}
 	}
-	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()}
+	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: reportOpts.Env}
 	// When the run stops to ask, print the document as it goes, so each
 	// question comes after the prose and code it is about, and each
 	// block's output shows before the next question. With -w this is
 	// printed as well as written, in place of the status lines.
 	var live *streamer
-	if *pdfFile == "" && asks(d, opts) {
+	if reportFile == "" && asks(d, opts) {
 		live = newStreamer(d, stdout, styled, renderOpts)
 		opts.OnEvent = live.event
 	}
@@ -300,7 +311,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if n := stopNote(results); n != "" && runErr == nil {
 		note = "mdsh: " + n
 	}
-	if note != "" && (live != nil || (!*write && *pdfFile == "")) {
+	if note != "" && (live != nil || (!*write && reportFile == "")) {
 		fmt.Fprintln(stderr, note)
 	}
 
@@ -318,9 +329,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if err := live.finish(results); err != nil {
 			return err
 		}
-	} else if !*write || *pdfFile != "" {
-		out := render.Markdown(d, results, renderOpts)
-		if err := show(out, opts.LinkDir); err != nil {
+	} else if !*write || reportFile != "" {
+		if err := show(results, reportOpts, opts.LinkDir); err != nil {
 			return err
 		}
 	}
@@ -601,15 +611,6 @@ func termWidth(w io.Writer) int {
 		}
 	}
 	return 80
-}
-
-// title names the document in PDF metadata: its file name without the
-// extension.
-func title(file string) string {
-	if file == "" {
-		return ""
-	}
-	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
 func displayName(file string) string {

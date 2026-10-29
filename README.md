@@ -249,6 +249,9 @@ mdsh -w --pdf report.pdf report.md              # update the file and the PDF
 mdsh -n --pdf report.pdf report.md              # the output saved by -w; nothing runs
 ```
 
+`--html FILE` writes the same view as a standalone HTML page instead, with
+local images inside it, so it can be sent on its own.
+
 It's pure Go, with no external tools. Output shows in a terminal-style box,
 stderr in red, `out=screenshot` output as text, and `number_on` includes
 with a line-number gutter. [examples/report.md](examples/report.md) shows

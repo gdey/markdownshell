@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `--html FILE` writes what mdsh would print as a standalone HTML page,
+  styled like the PDF, with local images inside it. `--html -` writes it
+  to stdout.
+- The `report` package makes the reports `--pdf`, `--html` and `-n -o`
+  write (PDF, HTML or the printed markdown), so other tools such as
+  mdsh-gui make the same ones.
 - `doc.BlockAttrs` describes every block attribute (kind, allowed
   values, default, one-line help) for tools that help write them, with
   `AttrSpec.Check` to validate a value. `doc.SplitInfo` edits a fence
