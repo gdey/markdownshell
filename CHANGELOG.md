@@ -18,6 +18,10 @@ follow [Semantic Versioning](https://semver.org/).
   A copy keeps its content when the block doesn't run, and one for a
   block that doesn't exist is a warning. `doc.Document.Copies` lists them
   and `doc.Document.Warnings` holds the warnings, which the CLI prints.
+- `doc.Document.SetSource` parses an edited file again, keeping each
+  unchanged block's identity, and `run.Session.Sync` then keeps their
+  results, so a whole-file edit only clears the output of blocks that
+  changed.
 
 ### Changed
 
