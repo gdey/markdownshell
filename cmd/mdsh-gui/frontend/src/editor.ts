@@ -1,144 +1,91 @@
-// The block editor: CodeMirror on a block's text, fences included, with
-// help for the attributes in its opening fence and an optional Vim mode.
+// Help for the mdsh attributes in opening fences, and Vim's :w and :q,
+// for the markdown editors.
 
-import { Compartment, EditorState, type Extension, Prec } from "@codemirror/state";
-import { EditorView, drawSelection, highlightActiveLine, hoverTooltip, keymap, lineNumbers, type Tooltip } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { StreamLanguage, bracketMatching, defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { type EditorState, type Extension } from "@codemirror/state";
+import { EditorView, hoverTooltip, type Tooltip } from "@codemirror/view";
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { type Diagnostic, linter } from "@codemirror/lint";
-import { shell } from "@codemirror/legacy-modes/mode/shell";
-import { Vim, vim } from "@replit/codemirror-vim";
+import { Vim } from "@replit/codemirror-vim";
 
 import { App, AttrKind, type AttrSpec, type Names } from "./api.js";
-
-export interface BlockEditorOptions {
-  text: string;
-  vim: boolean;
-  attrs: AttrSpec[];
-  names: Names;
-  // save applies the edit to the document; it rejects if the text isn't
-  // one block.
-  save(text: string): Promise<void>;
-  // saveFile writes the file, for :w.
-  saveFile(): Promise<void>;
-  close(): void;
-}
-
-export interface BlockEditor {
-  view: EditorView;
-  setVim(on: boolean): void;
-  // info is the opening fence's info string and setInfo replaces it.
-  info(): string;
-  setInfo(info: string): void;
-  destroy(): void;
-}
 
 // fence matches an opening fence line: the fence, then the info string.
 const fence = /^(\s*(?:`{3,}|~{3,}))(.*)$/;
 
-// active is the editor Vim's ex commands act on.
-let active: { opts: BlockEditorOptions; view: EditorView } | null = null;
+// ExTarget is what Vim's :w and :q act on in one editor.
+export interface ExTarget {
+  view: EditorView;
+  // write applies the edit and saves the file.
+  write(): Promise<void>;
+  close(): void;
+}
+
+// active is the editor Vim's ex commands act on: the last one focused.
+let active: ExTarget | null = null;
 
 Vim.defineEx("write", "w", () => void exWrite(false));
 Vim.defineEx("wq", "wq", () => void exWrite(true));
 Vim.defineEx("xit", "x", () => void exWrite(true));
-Vim.defineEx("quit", "q", () => active?.opts.close());
+Vim.defineEx("quit", "q", () => active?.close());
 
 async function exWrite(close: boolean) {
-  if (!active) return;
-  const { opts, view } = active;
-  await opts.save(view.state.doc.toString());
-  await opts.saveFile();
-  if (close) opts.close();
+  const t = active;
+  if (!t) return;
+  await t.write();
+  if (close) t.close();
 }
 
-export function blockEditor(parent: HTMLElement, opts: BlockEditorOptions): BlockEditor {
-  const vimMode = new Compartment();
-  const escape = new Compartment();
-  const escapeKey = (on: boolean): Extension =>
-    on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]);
-  // Mod-Enter applies the edit and closes the editor, as Done does.
-  const save = () => {
-    opts.save(view.state.doc.toString()).then(opts.close, () => {});
-    return true;
-  };
-  const view = new EditorView({
-    parent,
-    state: EditorState.create({
-      doc: opts.text,
-      extensions: [
-        vimMode.of(opts.vim ? vim() : []),
-        lineNumbers(),
-        history(),
-        drawSelection(),
-        highlightActiveLine(),
-        bracketMatching(),
-        StreamLanguage.define(shell),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        Prec.high(keymap.of([{ key: "Mod-Enter", run: save }])),
-        escape.of(escapeKey(opts.vim)),
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-        autocompletion({ override: [attrCompletions(opts)], activateOnTyping: true }),
-        hoverTooltip(attrHover(opts.attrs)),
-        linter(checkInfo, { delay: 300 }),
-        EditorView.domEventHandlers({ focus: () => void (active = { opts, view }) }),
-        EditorView.theme({ "&": { fontSize: "13px" }, ".cm-content": { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }),
-      ],
-    }),
-  });
-  active = { opts, view };
-  // Start on the first line of the body, where the code is.
-  const body = view.state.doc.lines > 1 ? view.state.doc.line(2).from : 0;
-  view.dispatch({ selection: { anchor: body } });
-  view.focus();
-
-  const firstLine = () => view.state.doc.line(1);
-  return {
-    view,
-    setVim(on) {
-      view.dispatch({ effects: [vimMode.reconfigure(on ? vim() : []), escape.reconfigure(escapeKey(on))] });
-    },
-    info() {
-      return fence.exec(firstLine().text)?.[2].trim() ?? "";
-    },
-    setInfo(info) {
-      const line = firstLine();
-      const m = fence.exec(line.text);
-      if (!m) return;
-      view.dispatch({ changes: { from: line.from + m[1].length, to: line.to, insert: info } });
-    },
-    destroy() {
-      if (active?.view === view) active = null;
-      view.destroy();
-    },
-  };
+// exTarget makes an editor the one ex commands act on while it has focus.
+export function exTarget(t: () => ExTarget | null): Extension {
+  return EditorView.domEventHandlers({ focus: () => void (active = t()) });
 }
 
-// infoRange is where the info string is in the first line, or null.
-function infoRange(state: EditorState): { from: number; text: string } | null {
-  const line = state.doc.line(1);
+// forgetEx stops ex commands acting on view once it is gone.
+export function forgetEx(view: EditorView) {
+  if (active?.view === view) active = null;
+}
+
+// attrHelp is the help for mdsh attributes in opening fences: completion
+// inside {…}, hover help and underlined mistakes.
+export function attrHelp(attrs: AttrSpec[], names: () => Names): Extension {
+  return [
+    autocompletion({ override: [attrCompletions(attrs, names)], activateOnTyping: true }),
+    hoverTooltip(attrHover(attrs)),
+    linter(checkInfo, { delay: 300 }),
+  ];
+}
+
+// infoRange is where the info string is on the line holding pos, if
+// that line opens a block's fence, or null. Output and tape fences
+// carry mdsh's own attributes, not a block's.
+function infoRange(state: EditorState, pos: number): { from: number; text: string } | null {
+  const line = state.doc.lineAt(pos);
   const m = fence.exec(line.text);
-  if (!m) return null;
+  if (!m || /^\s*(output|tape)\b/.test(m[2])) return null;
   return { from: line.from + m[1].length, text: m[2] };
 }
 
+// checkInfo checks the attributes of every fence with some.
 async function checkInfo(view: EditorView): Promise<Diagnostic[]> {
-  const r = infoRange(view.state);
-  if (!r || !r.text.trim()) return [];
-  const problems = (await App.CheckInfo(r.text)) ?? [];
-  return problems.map((p) => ({
-    from: r.from + p.from,
-    to: r.from + p.to,
-    severity: p.severity === "error" ? "error" : "warning",
-    message: p.message,
-  }));
+  const out: Diagnostic[] = [];
+  const doc = view.state.doc;
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    if (!line.text.includes("{")) continue;
+    const r = infoRange(view.state, line.from);
+    if (!r || !r.text.trim()) continue;
+    const problems = (await App.CheckInfo(r.text)) ?? [];
+    for (const p of problems) {
+      out.push({ from: r.from + p.from, to: r.from + p.to, severity: p.severity === "error" ? "error" : "warning", message: p.message });
+    }
+  }
+  return out;
 }
 
 // token finds the attribute token around pos in the info string: its
 // start and text so far.
 function tokenAt(state: EditorState, pos: number): { start: number; text: string } | null {
-  const r = infoRange(state);
+  const r = infoRange(state, pos);
   if (!r || pos < r.from || pos > r.from + r.text.length) return null;
   const before = r.text.slice(0, pos - r.from);
   const open = before.lastIndexOf("{");
@@ -152,15 +99,15 @@ function tokenAt(state: EditorState, pos: number): { start: number; text: string
   return { start: r.from + start, text: before.slice(start) };
 }
 
-function attrCompletions(opts: BlockEditorOptions) {
+function attrCompletions(attrs: AttrSpec[], names: () => Names) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const tok = tokenAt(ctx.state, ctx.pos);
     if (!tok) return null;
     const eq = tok.text.indexOf("=");
     if (eq < 0) {
-      const present = new Set((infoRange(ctx.state)?.text.match(/[{\s]([#<\w-]+)/g) ?? []).map((s) => s.slice(1).replace(/^#.*/, "#")));
+      const present = new Set((infoRange(ctx.state, ctx.pos)?.text.match(/[{\s]([#<\w-]+)/g) ?? []).map((s) => s.slice(1).replace(/^#.*/, "#")));
       const include = present.has("<include");
-      const options: Completion[] = opts.attrs
+      const options: Completion[] = attrs
         .filter((a) => !!a.include === include || a.name === "<include")
         .filter((a) => !present.has(a.name) || tok.text.startsWith(a.name))
         .map((a) => ({
@@ -173,8 +120,9 @@ function attrCompletions(opts: BlockEditorOptions) {
       return { from: tok.start, options, validFor: /^[#<\w-]*$/ };
     }
     const key = tok.text.slice(0, eq);
-    const spec = opts.attrs.find((a) => a.name === key);
+    const spec = attrs.find((a) => a.name === key);
     if (!spec) return null;
+    const known = names();
     const from = tok.start + eq + 1;
     let values: Completion[] = [];
     switch (spec.kind) {
@@ -182,14 +130,14 @@ function attrCompletions(opts: BlockEditorOptions) {
         values = (spec.values ?? []).map((v) => ({ label: v, type: "enum" }));
         break;
       case AttrKind.AttrText:
-        if (key === "env") values = opts.names.envs?.map((v) => ({ label: v, type: "variable" })) ?? [];
+        if (key === "env") values = known.envs?.map((v) => ({ label: v, type: "variable" })) ?? [];
         break;
       case AttrKind.AttrCond:
         values = [
           { label: "{{$VAR}}", detail: "true unless empty, 0, false, no or off", type: "variable" },
           { label: "{{$?}}", detail: "the last block's exit status", type: "variable" },
           { label: "{{$ran?}}", detail: "whether the last block ran", type: "variable" },
-          ...(opts.names.ids ?? []).flatMap((id) => [
+          ...(known.ids ?? []).flatMap((id) => [
             { label: `{{#${id}/?}}`, detail: `#${id}'s exit status`, type: "variable" },
             { label: `{{#${id}/ran?}}`, detail: `whether #${id} ran`, type: "variable" },
           ]),
@@ -206,7 +154,7 @@ function attrCompletions(opts: BlockEditorOptions) {
 
 function attrHover(attrs: AttrSpec[]) {
   return (view: EditorView, pos: number): Tooltip | null => {
-    const r = infoRange(view.state);
+    const r = infoRange(view.state, pos);
     if (!r || pos < r.from || pos > r.from + r.text.length) return null;
     const re = /[#<\w-]+(=("[^"]*"|\S*))?/g;
     for (let m; (m = re.exec(r.text)); ) {
