@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"fmt"
@@ -38,17 +38,18 @@ func (a *App) createFile(file, template string) (string, error) {
 // template and opens it in w, as openIn does. It does nothing if the
 // user cancels.
 func (a *App) newFile(w *docWindow, template string) error {
-	d := a.app.Dialog.SaveFile().
-		SetMessage("Create a new markdown file").
-		SetButtonText("Create").
-		SetDirectory(a.startDir()).
-		SetFilename("Untitled.md").
-		CanCreateDirectories(true).
-		AddFilter("Markdown", "*.md;*.markdown")
+	var win Window
 	if w != nil {
-		d.AttachToWindow(w.win)
+		win = w.win
 	}
-	file, err := d.PromptForSingleSelection()
+	file, err := a.host.SaveFile(win, SaveFile{
+		Message: "Create a new markdown file",
+		Button:  "Create",
+		Dir:     a.startDir(),
+		Name:    "Untitled.md",
+		Filter:  "Markdown",
+		Pattern: "*.md;*.markdown",
+	})
 	if err != nil || file == "" {
 		return err
 	}
@@ -67,6 +68,6 @@ func (a *App) newFromMenu() {
 		return
 	}
 	if err := a.newFile(nil, ""); err != nil {
-		a.showError(nil, err)
+		a.host.ShowError(nil, err)
 	}
 }

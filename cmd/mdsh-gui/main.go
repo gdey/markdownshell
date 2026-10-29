@@ -24,11 +24,12 @@ import (
 
 	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/ui"
 	"github.com/gdey/markdownshell/web"
 )
 
 // The frontend is the web package: TypeScript in web/src, bundled into
-// web/bundle. The bindings in web/src/bindings are generated from App.
+// web/bundle. The bindings in web/src/bindings are generated from ui.App.
 //
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d ../../web/src/bindings
 //go:generate go run ./internal/build
@@ -129,35 +130,35 @@ func mdshGUI(o options) error {
 		args = nil
 	}
 	cwd, _ := os.Getwd()
-	a := &App{settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	g := &gui{}
+	a := ui.New(g, store, cwd, dir, o.source)
+	g.ctrl = ui.ControlOf(a)
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(web.FS)), Middleware: tabCalls},
+		Assets:      application.AssetOptions{Handler: g.ctrl.Assets(application.AssetFileServerFS(web.FS)), Middleware: ui.TabCalls},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		ShouldQuit: a.shouldQuit,
+		ShouldQuit: g.ctrl.ShouldQuit,
 	})
-	a.app = app
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { a.started.Store(true) })
-	a.menu = a.buildMenu()
-	a.buildSourceMenu()
-	a.buildLinkMenu()
+	g.app = app
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { g.started.Store(true) })
+	g.menu = g.buildMenu()
+	g.buildSourceMenu()
+	g.buildLinkMenu()
 	if runtime.GOOS == "darwin" {
-		app.Menu.Set(a.menu)
+		app.Menu.Set(g.menu)
 	}
 
-	t := a.newTab()
+	file, run := "", o.run
 	if len(args) > 0 {
-		ro := a.runOptions()
-		ro.Args, ro.Only, ro.Step, ro.StopOnError = o.run.Args, o.run.Only, o.run.Step, o.run.StopOnError
-		if err := t.open(args[0], ro); err != nil {
-			return err
-		}
+		file, run.Args = args[0], args[1:]
 	}
-	a.newWindow(t)
+	if err := g.ctrl.Start(file, run); err != nil {
+		return err
+	}
 	return app.Run()
 }
 

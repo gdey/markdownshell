@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"fmt"
@@ -54,7 +54,7 @@ func (t *docTab) emit(name string, data any) {
 	}
 	t.mu.Unlock()
 	if w := t.window(); w != nil {
-		w.win.EmitEvent(name, tabEvent{t.id, data})
+		w.win.Emit(name, tabEvent{t.id, data})
 	}
 }
 
@@ -228,26 +228,25 @@ func (t *docTab) askToSave(n *notebook.Notebook, then func()) {
 	if w == nil {
 		return
 	}
-	d := t.app.app.Dialog.Question().
-		SetTitle("Unsaved output").
-		SetMessage(fmt.Sprintf("Save the output in %s before closing?", filepath.Base(n.File()))).
-		AttachToWindow(w.win)
-	save := d.AddButton("Save")
-	save.OnClick(func() {
-		if err := n.Save(); err != nil {
-			t.app.showError(w.win, err)
-			return
-		}
-		t.letClose()
-		then()
+	t.app.host.Ask(w.win, Question{
+		Title:   "Unsaved output",
+		Message: fmt.Sprintf("Save the output in %s before closing?", filepath.Base(n.File())),
+		Buttons: []Button{
+			{Label: "Save", Default: true, Do: func() {
+				if err := n.Save(); err != nil {
+					t.app.host.ShowError(w.win, err)
+					return
+				}
+				t.letClose()
+				then()
+			}},
+			{Label: "Don't Save", Do: func() {
+				t.letClose()
+				then()
+			}},
+			{Label: "Cancel", Cancel: true},
+		},
 	})
-	d.AddButton("Don't Save").OnClick(func() {
-		t.letClose()
-		then()
-	})
-	d.SetDefaultButton(save)
-	d.SetCancelButton(d.AddButton("Cancel"))
-	d.Show()
 }
 
 func (t *docTab) letClose() {
