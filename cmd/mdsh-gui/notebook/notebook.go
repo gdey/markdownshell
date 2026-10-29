@@ -132,10 +132,10 @@ func Open(file string, opts Options) (*Notebook, error) {
 	n := &Notebook{
 		file:  abs,
 		opts:  opts,
-		md:    goldmark.New(goldmark.WithExtensions(extension.GFM)),
 		d:     d,
 		index: map[*doc.Block]int{},
 	}
+	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer()))
 	for i, b := range d.Blocks {
 		n.index[b] = i
 	}

@@ -15,6 +15,7 @@ import (
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
@@ -54,13 +55,14 @@ func mdshGUI(args []string) error {
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
+		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(assets))},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 		ShouldQuit: a.shouldQuit,
 	})
 	a.app = app
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { a.started.Store(true) })
 	a.menu = a.buildMenu()
 	a.buildSourceMenu()
 	if runtime.GOOS == "darwin" {

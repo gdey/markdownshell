@@ -58,6 +58,10 @@ follow [Semantic Versioning](https://semver.org/).
   those parts. A Theme setting picks System, Light or Dark, with code
   colors that read well in both. A confirm block's own Run button
   runs it without asking again.
+- `mdsh-gui` images: image, screenshot and recording output, and images
+  in the prose, show inline from the document's folder, which the window
+  serves and nothing outside it. Clicking an output image shows it full
+  size.
 
 ### Changed
 
