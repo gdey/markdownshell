@@ -5,8 +5,8 @@ It shows a markdown file, runs its `sh` and `zsh` blocks as you pick
 them, streams their output under them and saves it back to the file. It
 uses the same `run.Session` as `mdsh -i`.
 
-There are no `tty` blocks yet; see
-[the design](../../docs/gui/design.md) for what comes next.
+See [the design](../../docs/gui/design.md) for how it works and what
+comes next.
 
 ```sh
 mdsh-gui [file.md [args...]]
@@ -27,7 +27,10 @@ own shells.
   output that isn't saved, and closing or quitting asks first.
 - **Run:** Run All (cmd/ctrl+R, the toolbar button turns into Stop while
   blocks run), Stop (cmd/ctrl+.) and Run Options… for the file's
-  arguments, `--only`, step mode and stop on error.
+  arguments, `--only`, step mode and stop on error. A block marked
+  `tty` runs in a terminal in its card: type at it as you would in a
+  terminal. When it ends the card shows the recording, as `mdsh` saves
+  it.
 - **Editing** happens in the source view. The pencil (or `e`) on a block
   opens it with the cursor on the block's code, and clicking prose opens
   it on that text. New blocks are typed there too. Inside

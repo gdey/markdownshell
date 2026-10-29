@@ -277,3 +277,9 @@ dialog#report { width: min(560px, 92vw); }
 #rep-done { margin-top: 12px; overflow-wrap: anywhere; }
 #report label.check { margin: 0; }
 #rep-dest { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
+
+/* Terminal pane, where a tty block runs */
+:root { --term-bg: #1e1e1e; --term-fg: #d4d4d4; }
+.block .output .terminal { margin: 12px 0; padding: 6px; background: var(--term-bg); border-radius: 6px; }
+.block .output .terminal :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
+.block .output:has(.terminal) { padding: 0 12px; }
