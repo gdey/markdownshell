@@ -19,6 +19,10 @@ follow [Semantic Versioning](https://semver.org/).
   both themes, and `TestLookContrast` now checks it too.
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
+- `mdsh --serve` serves the notebook mdsh-gui shows to a web browser,
+  at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
+  address can run commands as you, so it listens on loopback by default;
+  see Serving to a browser in the README.
 
 ## [1.4.1] - 2026-11-07
 
