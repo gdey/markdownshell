@@ -49,6 +49,9 @@ hello, world
 - **A desktop app.** `mdsh-gui` opens documents in tabs, runs blocks as
   you click them and edits the source beside the rendered view, on macOS
   and Linux. See [Desktop app]({{< relref "docs/desktop" >}}).
+- **In a browser.** `mdsh --serve` shows the same notebook in a web
+  browser, on this machine by default and behind a token. See
+  [Browser]({{< relref "docs/browser" >}}).
 - **Terminal sessions.** A `tty` block runs on a real terminal and is
   recorded as a GIF; a `tape` fence types its input so it runs unattended.
 - **PDF and HTML reports.** `--pdf report.pdf` lays out the run as a PDF, in pure
