@@ -21,9 +21,9 @@ desktop app beside the command line archives:
 | `mdsh-gui_VERSION_linux_x86_64.AppImage` | Linux on x86-64. Make it executable and run it; it carries its own GTK and WebKit. |
 
 The macOS app isn't signed with an Apple Developer ID, so the first time
-you open it macOS says it can't check it. Right-click the app and choose
-Open, or open it once and then choose Open Anyway in System Settings ›
-Privacy & Security. From a terminal, `xattr -dr com.apple.quarantine
+you open it macOS says it can't check it. Open it once, then choose Open
+Anyway in System Settings › Privacy & Security; before macOS 15 you can
+instead right-click the app and choose Open. From a terminal, `xattr -dr com.apple.quarantine
 /Applications/mdsh.app` does the same.
 
 On Linux:
