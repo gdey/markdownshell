@@ -20,6 +20,13 @@ export interface Doc {
      * a run is going on
      */
     "running": boolean;
+
+    /**
+     * Fresh is set the first time Doc is asked for after a file opens
+     * in the tab, but not after it is reloaded, so the page can show
+     * the view the settings open files in.
+     */
+    "fresh": boolean;
     "run": notebook$0.RunOptions;
 
     /**

@@ -4,8 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -106,5 +110,50 @@ func TestTabLive(t *testing.T) {
 	}
 	if got := names(); len(got) != 0 {
 		t.Errorf("after the run: %v, want none", got)
+	}
+}
+
+func TestTabFresh(t *testing.T) {
+	dir := t.TempDir()
+	st, err := settings.Open(filepath.Join(dir, "gui.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, two := filepath.Join(dir, "one.md"), filepath.Join(dir, "two.md")
+	for _, f := range []string{one, two} {
+		if err := os.WriteFile(f, []byte("# Doc\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a := &App{settings: st, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	tab := &docTab{app: a, id: 1}
+	a.tabs[1] = tab
+	t.Cleanup(func() {
+		if n, err := tab.notebook(); err == nil {
+			n.Close()
+		}
+	})
+	ctx := context.WithValue(context.Background(), tabKey{}, 1)
+	for _, step := range []struct {
+		file  string
+		fresh bool
+	}{
+		{one, true},
+		{"", false},  // asked again
+		{one, false}, // reloaded
+		{two, true},
+	} {
+		if step.file != "" {
+			if err := tab.open(step.file, notebook.RunOptions{}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		d, err := a.Doc(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d.Fresh != step.fresh {
+			t.Errorf("after opening %q: fresh %v, want %v", filepath.Base(step.file), d.Fresh, step.fresh)
+		}
 	}
 }

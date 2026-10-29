@@ -71,7 +71,8 @@ Each file opens in a tab of its own, with its own shells.
   `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
   Linux): autosave after each run, Vim mode, a shell for every file,
-  the start folder and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
+  the view files open in (rendered, source or both; by default the
+  view the last tab had), the start folder and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
   config folder.
 
 If the file changes on disk, a banner offers to reload it.
@@ -123,8 +124,8 @@ Tabs drag between windows, or out into a window of their own.
 
 ![Two windows: deploy.md and disk.md in one, and onboarding.md, dragged out, in another](../../site/static/images/gui/windows.png)
 
-Settings has autosave, Vim mode, a shell for every file, the start folder
-and the theme.
+Settings has autosave, Vim mode, a shell for every file, the view files
+open in, the start folder and the theme.
 
 ![The settings window](../../site/static/images/gui/settings.png)
 

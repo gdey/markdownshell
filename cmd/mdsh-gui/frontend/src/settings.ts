@@ -11,6 +11,7 @@ function draw() {
   input("vim").checked = s.vim;
   $<HTMLSelectElement>("theme").value = s.theme;
   applyTheme(s.theme);
+  $<HTMLSelectElement>("view").value = s.view;
   input("shell").value = s.shell;
   $<HTMLSelectElement>("start-mode").value = s.startFolder ? "fixed" : "last";
   input("start-folder").value = s.startFolder;
@@ -44,6 +45,7 @@ $<HTMLSelectElement>("theme").onchange = async () => {
   applyTheme(s.theme);
   await save();
 };
+$<HTMLSelectElement>("view").onchange = () => ((s.view = $<HTMLSelectElement>("view").value), save());
 input("shell").onchange = () => ((s.shell = input("shell").value.trim()), save());
 $<HTMLSelectElement>("start-mode").onchange = async () => {
   if ($<HTMLSelectElement>("start-mode").value === "last") {

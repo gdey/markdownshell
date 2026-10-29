@@ -26,6 +26,12 @@ export interface Settings {
     "shell": string;
 
     /**
+     * View is how a file opens: "rendered", "source" or "both".
+     * Empty keeps the view the last tab had.
+     */
+    "view": string;
+
+    /**
      * StartFolder is the folder the start screen lists when the app
      * isn't started from a terminal. Empty means the last folder used.
      */

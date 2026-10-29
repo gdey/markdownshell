@@ -25,6 +25,7 @@ type docTab struct {
 	n       *notebook.Notebook // nil while the start screen shows
 	closing bool               // the user chose to close it
 	warned  bool               // file-changed was sent for the file on disk
+	fresh   bool               // a file opened and its page hasn't asked about it
 	view    View               // what the tab shows, for the View menu
 	running bool               // a run started from the tab hasn't returned
 	live    []liveEvent        // what the running run has sent so far
@@ -94,6 +95,7 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 	t.mu.Lock()
 	old := t.n
 	t.n, t.warned = n, false
+	t.fresh = old == nil || old.File() != n.File()
 	t.mu.Unlock()
 	if old != nil {
 		old.Close()
