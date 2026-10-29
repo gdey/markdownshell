@@ -12,16 +12,23 @@ comes next.
 mdsh-gui [file.md [args...] | folder]
 ```
 
-With no file, the window lists the markdown files under the current
+With no file, the start screen lists the markdown files under the current
 folder, or under `folder` when one is given (or the start folder from Settings, when started from Finder or
 the Dock) to pick from, with the description from each file's front
 matter (`description`, else `summary`, else `abstract`) under its name.
-Each file opens in a window of its own, with its
-own shells.
+Each file opens in a tab of its own, with its own shells.
 
-- **File:** New Window, Open…, Open Recent, Save, Save As…, Create
-  Report…, Reload and Close Window. Create Report… writes a PDF, HTML
-  or markdown copy, with or without code and output, from the window's
+- **Tabs:** New Tab (cmd/ctrl+T, or the + in the tab bar) opens the
+  start screen; Open…, Open Recent and dropped files open in a new tab.
+  Drag a tab to reorder it, onto another window's tab bar or page to
+  move it there, or onto its own page, or out of every window, for a
+  window of its own. A block running in it carries on. Close Tab
+  (cmd/ctrl+W, the ×, or a middle click) closes it, and the window goes
+  with its last tab. View › Show Next Tab and Show Previous Tab
+  (cmd/ctrl+shift+] and [) move between them.
+- **File:** New Tab, New Window, Open…, Open Recent, Save, Save As…,
+  Create Report…, Reload, Close Tab and Close Window (cmd/ctrl+shift+W). Create Report… writes a PDF, HTML
+  or markdown copy, with or without code and output, from the tab's
   run, a run of every block or the saved file, and shows the `mdsh`
   command that makes the same one. Dropping a markdown file on a window opens it. A • marks
   output that isn't saved, and closing or quitting asks first.

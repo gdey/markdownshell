@@ -37,7 +37,7 @@ func build() error {
 		return err
 	}
 	res := api.Build(api.BuildOptions{
-		EntryPoints: []string{"frontend/src/app.ts", "frontend/src/settings.ts"},
+		EntryPoints: []string{"frontend/src/app.ts", "frontend/src/settings.ts", "frontend/src/window.ts"},
 		Outdir:      "frontend/bundle",
 		Bundle:      true,
 		Splitting:   true,

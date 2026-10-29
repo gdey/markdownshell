@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -25,6 +26,7 @@ type Doc struct {
 	File    string              `json:"file"`
 	Dirty   bool                `json:"dirty"`
 	Changed bool                `json:"changed"`
+	Running bool                `json:"running"` // a run is going on
 	Run     notebook.RunOptions `json:"run"`
 	// Args is Run.Args as one line, quoted as a shell would need.
 	Args string `json:"args"`
@@ -32,16 +34,31 @@ type Doc struct {
 
 // Doc describes the open file. File is "" while the start screen shows.
 func (a *App) Doc(ctx context.Context) (Doc, error) {
-	dw, err := a.window(ctx)
+	t, err := a.tab(ctx)
 	if err != nil {
 		return Doc{}, err
 	}
-	n, err := dw.notebook()
+	n, err := t.notebook()
 	if err != nil {
 		return Doc{}, nil
 	}
+	t.mu.Lock()
+	running := t.running
+	t.mu.Unlock()
 	ro := n.RunOptions()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
+}
+
+// Live is what the run going on in the tab has sent so far, for a page
+// that starts partway through it.
+func (a *App) Live(ctx context.Context) ([]liveEvent, error) {
+	t, err := a.tab(ctx)
+	if err != nil {
+		return nil, err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return slices.Clone(t.live), nil
 }
 
 // Cells is the document laid out for drawing.
@@ -55,50 +72,50 @@ func (a *App) Cells(ctx context.Context) ([]notebook.Cell, error) {
 
 // RunBlock runs block i alone.
 func (a *App) RunBlock(ctx context.Context, i int) error {
-	dw, n, err := a.notebook(ctx)
+	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
 	}
-	err = n.RunBlock(i)
-	a.afterRun(dw, n)
+	err = t.run(func() error { return n.RunBlock(i) })
+	a.afterRun(t, n)
 	return err
 }
 
 // RunFrom runs block i and the blocks after it.
 func (a *App) RunFrom(ctx context.Context, i int) error {
-	dw, n, err := a.notebook(ctx)
+	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
 	}
-	err = n.RunFrom(i)
-	a.afterRun(dw, n)
+	err = t.run(func() error { return n.RunFrom(i) })
+	a.afterRun(t, n)
 	return err
 }
 
 // afterRun marks the title and saves if autosave is on. It doesn't
 // save over a file that changed on disk; the banner asks about that.
-func (a *App) afterRun(dw *docWindow, n *notebook.Notebook) {
+func (a *App) afterRun(t *docTab, n *notebook.Notebook) {
 	if a.settings.Get().Autosave && n.Dirty() && !n.Changed() {
 		if err := n.Save(); err == nil {
-			dw.saved()
+			t.saved()
 			return
 		}
 	}
-	dw.title()
+	t.changed()
 }
 
 // Stop stops the running block, answering stop if a block is waiting
 // to be confirmed.
 func (a *App) Stop(ctx context.Context) {
-	dw, err := a.window(ctx)
+	t, err := a.tab(ctx)
 	if err != nil {
 		return
 	}
 	select {
-	case dw.answers <- run.Stop:
+	case t.answers <- run.Stop:
 	default:
 	}
-	if n, err := dw.notebook(); err == nil {
+	if n, err := t.notebook(); err == nil {
 		n.Stop()
 	}
 }
@@ -106,7 +123,7 @@ func (a *App) Stop(ctx context.Context) {
 // Answer replies to the question a confirm event asked: "run", "skip"
 // or "stop".
 func (a *App) Answer(ctx context.Context, reply string) error {
-	dw, err := a.window(ctx)
+	t, err := a.tab(ctx)
 	if err != nil {
 		return err
 	}
@@ -115,26 +132,26 @@ func (a *App) Answer(ctx context.Context, reply string) error {
 		return fmt.Errorf("unknown answer %q", reply)
 	}
 	select {
-	case dw.answers <- ans:
+	case t.answers <- ans:
 		return nil
 	default:
 		return errors.New("nothing is waiting for an answer")
 	}
 }
 
-// Open asks for markdown files and opens them: the first in this
-// window if it shows the start screen, the rest in new windows.
+// Open asks for markdown files and opens them: the first in this tab if
+// it shows the start screen, the rest in new tabs.
 func (a *App) Open(ctx context.Context) error {
-	dw, err := a.window(ctx)
+	w, err := a.window(ctx)
 	if err != nil {
 		return err
 	}
-	files, err := a.openDialog(dw.win)
+	files, err := a.openDialog(w.win)
 	if err != nil {
 		return err
 	}
 	for _, f := range files {
-		if err := a.openIn(dw, f); err != nil {
+		if err := a.openIn(w, f); err != nil {
 			return err
 		}
 	}
@@ -143,39 +160,47 @@ func (a *App) Open(ctx context.Context) error {
 
 // OpenPath opens file, from the start screen.
 func (a *App) OpenPath(ctx context.Context, file string) error {
-	dw, err := a.window(ctx)
+	t, err := a.tab(ctx)
 	if err != nil {
 		return err
 	}
-	return a.openIn(dw, file)
+	if open := a.openTab(file); open != nil {
+		a.focusTab(open)
+		return nil
+	}
+	return t.open(file, notebook.RunOptions{Shell: a.settings.Get().Shell})
 }
 
 // Save writes the output into the file.
 func (a *App) Save(ctx context.Context) error {
-	dw, n, err := a.notebook(ctx)
+	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
 	}
 	if err := n.Save(); err != nil {
 		return err
 	}
-	dw.saved()
+	t.saved()
 	return nil
 }
 
 // SaveAs asks where to save the file with its output, and from then on
-// the window shows the new file. It returns false if the user cancels.
+// the tab shows the new file. It returns false if the user cancels.
 func (a *App) SaveAs(ctx context.Context) (bool, error) {
-	dw, n, err := a.notebook(ctx)
+	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return false, err
+	}
+	w := t.window()
+	if w == nil {
+		return false, errNoFile
 	}
 	file, err := a.app.Dialog.SaveFile().
 		SetMessage("Save a copy with its output").
 		SetDirectory(filepath.Dir(n.File())).
 		SetFilename(filepath.Base(n.File())).
 		AddFilter("Markdown", "*.md;*.markdown").
-		AttachToWindow(dw.win).
+		AttachToWindow(w.win).
 		PromptForSingleSelection()
 	if err != nil || file == "" {
 		return false, err
@@ -183,18 +208,18 @@ func (a *App) SaveAs(ctx context.Context) (bool, error) {
 	if err := n.SaveAs(file); err != nil {
 		return false, err
 	}
-	dw.saved()
+	t.saved()
 	a.opened(n.File())
 	return true, nil
 }
 
 // Reload reads the file from disk again, dropping output not saved.
 func (a *App) Reload(ctx context.Context) error {
-	dw, n, err := a.notebook(ctx)
+	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
 	}
-	return dw.open(n.File(), n.RunOptions())
+	return t.open(n.File(), n.RunOptions())
 }
 
 // SetRunOptions sets the arguments (one line, split as a shell would),
@@ -276,7 +301,7 @@ func (a *App) ChooseFolder(ctx context.Context) (string, error) {
 }
 
 // NewWindow opens a window with the start screen.
-func (a *App) NewWindow() { a.newWindow() }
+func (a *App) NewWindow() { a.newWindow(nil) }
 
 // BlockAttrs describes the block attributes, for completion, hover help
 // and the attribute form.
@@ -305,16 +330,16 @@ func (a *App) Text(ctx context.Context) (string, error) {
 
 // SetText replaces the whole file, as typed in the source pane.
 func (a *App) SetText(ctx context.Context, text string) error {
-	dw, n, err := a.notebook(ctx)
+	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
 	}
 	err = n.SetText(text)
-	dw.title()
+	t.changed()
 	return err
 }
 
-// View is what a window shows, for the View menu's check marks.
+// View is what a tab shows, for the View menu's check marks.
 type View struct {
 	Split    bool `json:"split"`    // the source pane
 	Rendered bool `json:"rendered"` // the rendered view
@@ -323,23 +348,26 @@ type View struct {
 	Output   bool `json:"output"`
 }
 
-// SetView notes what the calling window shows.
+// defaultView is what a new tab shows until its page says.
+var defaultView = View{Rendered: true, Code: true, Output: true}
+
+// SetView notes what the calling tab shows.
 func (a *App) SetView(ctx context.Context, v View) {
-	dw, err := a.window(ctx)
+	t, err := a.tab(ctx)
 	if err != nil {
 		return
 	}
-	dw.mu.Lock()
-	dw.view = v
-	dw.mu.Unlock()
-	if a.current() == dw {
+	t.mu.Lock()
+	t.view = v
+	t.mu.Unlock()
+	if a.currentTab() == t {
 		a.showView(v)
 	}
 }
 
 // ReportStart is what the Report dialog starts with.
 type ReportStart struct {
-	Ran   int `json:"ran"`   // runnable blocks that ran in this window
+	Ran   int `json:"ran"`   // runnable blocks that ran in this tab
 	Total int `json:"total"` // runnable blocks
 	// Dest is where a report goes unless another file is picked: beside
 	// the document, named after it, without an extension.
@@ -362,9 +390,13 @@ func (a *App) ReportStart(ctx context.Context) (ReportStart, error) {
 // ChooseReport asks where to save a report in format, starting at dest,
 // and returns the file, or "" if none was picked.
 func (a *App) ChooseReport(ctx context.Context, format report.Format, dest string) (string, error) {
-	dw, _, err := a.notebook(ctx)
+	t, _, err := a.notebook(ctx)
 	if err != nil {
 		return "", err
+	}
+	w := t.window()
+	if w == nil {
+		return "", errNoFile
 	}
 	name := map[report.Format]string{report.PDF: "PDF", report.HTML: "HTML", report.Markdown: "Markdown"}[format]
 	return a.app.Dialog.SaveFile().
@@ -372,7 +404,7 @@ func (a *App) ChooseReport(ctx context.Context, format report.Format, dest strin
 		SetDirectory(filepath.Dir(dest)).
 		SetFilename(filepath.Base(dest)).
 		AddFilter(name, "*"+format.Ext()).
-		AttachToWindow(dw.win).
+		AttachToWindow(w.win).
 		PromptForSingleSelection()
 }
 
@@ -414,4 +446,123 @@ func (a *App) SetTerminalSize(ctx context.Context, cols, rows int) {
 	if _, n, err := a.notebook(ctx); err == nil {
 		n.SetTerminalSize(cols, rows)
 	}
+}
+
+// Tabs are the calling window's tabs, for its tab bar.
+func (a *App) Tabs(ctx context.Context) (Tabs, error) {
+	w, err := a.window(ctx)
+	if err != nil {
+		return Tabs{}, err
+	}
+	return w.state(), nil
+}
+
+// NewTab opens a tab with the start screen in the calling window, after
+// the tab in front.
+func (a *App) NewTab(ctx context.Context) error {
+	w, err := a.window(ctx)
+	if err != nil {
+		return err
+	}
+	a.newTabIn(w)
+	return nil
+}
+
+// SelectTab brings tab id to the front of its window.
+func (a *App) SelectTab(id int) error {
+	t, err := a.tabByID(id)
+	if err != nil {
+		return err
+	}
+	a.selectTab(t)
+	return nil
+}
+
+// CloseTab closes tab id, asking first if it has unsaved output.
+func (a *App) CloseTab(id int) error {
+	t, err := a.tabByID(id)
+	if err != nil {
+		return err
+	}
+	go a.closeTab(t)
+	return nil
+}
+
+// DragTab notes that tab id is being dragged, so the window it is
+// dropped on can take it.
+func (a *App) DragTab(id int) error {
+	t, err := a.tabByID(id)
+	if err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.dragging = t
+	a.mu.Unlock()
+	a.app.Event.Emit("tab-drag", true)
+	return nil
+}
+
+// DropTab puts the tab being dragged in the calling window, at index i
+// of its tab bar. It does nothing if no tab is being dragged.
+func (a *App) DropTab(ctx context.Context, i int) error {
+	w, err := a.window(ctx)
+	if err != nil {
+		return err
+	}
+	a.mu.Lock()
+	t := a.dragging
+	a.dragging = nil
+	a.mu.Unlock()
+	a.app.Event.Emit("tab-drag", false)
+	if t != nil {
+		a.moveTab(t, w, i)
+		w.win.Focus()
+	}
+	return nil
+}
+
+// EndDrag ends dragging tab id. If no window took it and it was let go
+// outside its window, at x, y on the screen, it gets a window of its own
+// there.
+func (a *App) EndDrag(id int, outside bool, x, y int) error {
+	t, err := a.tabByID(id)
+	if err != nil {
+		return err
+	}
+	a.mu.Lock()
+	dropped := a.dragging != t
+	a.dragging = nil
+	w := a.tabWindow[t]
+	alone := w != nil && len(w.tabs) == 1
+	a.mu.Unlock()
+	a.app.Event.Emit("tab-drag", false)
+	if dropped || !outside || alone {
+		return nil
+	}
+	a.detach(t, x, y)
+	return nil
+}
+
+// DetachTab gives the tab being dragged a window of its own, at x, y on
+// the screen, if it shares its window. It does nothing if no tab is being
+// dragged.
+func (a *App) DetachTab(x, y int) error {
+	a.mu.Lock()
+	t := a.dragging
+	a.dragging = nil
+	w := a.tabWindow[t]
+	alone := w == nil || len(w.tabs) == 1
+	a.mu.Unlock()
+	a.app.Event.Emit("tab-drag", false)
+	if t != nil && !alone {
+		a.detach(t, x, y)
+	}
+	return nil
+}
+
+// detach moves t to a new window with its tab bar at x, y.
+func (a *App) detach(t *docTab, x, y int) {
+	nw := a.newWindow(t)
+	nw.win.SetPosition(max(0, x-120), max(0, y-16))
+	nw.win.Focus()
 }

@@ -29,7 +29,7 @@ import (
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
 //go:generate go run ./internal/build
 
-//go:embed frontend/index.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css
+//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css
 var frontend embed.FS
 
 func main() {
@@ -59,12 +59,12 @@ func mdshGUI(args []string) error {
 		args = nil
 	}
 	cwd, _ := os.Getwd()
-	a := &App{settings: store, cwd: cwd, dir: dir, windows: map[uint]*docWindow{}}
+	a := &App{settings: store, cwd: cwd, dir: dir, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(assets))},
+		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(assets)), Middleware: tabCalls},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
@@ -78,13 +78,14 @@ func mdshGUI(args []string) error {
 		app.Menu.Set(a.menu)
 	}
 
-	dw := a.newWindow()
+	t := a.newTab()
 	if len(args) > 0 {
 		ro := notebook.RunOptions{Args: args[1:], Shell: store.Get().Shell}
-		if err := dw.open(args[0], ro); err != nil {
+		if err := t.open(args[0], ro); err != nil {
 			return err
 		}
 	}
+	a.newWindow(t)
 	return app.Run()
 }
 

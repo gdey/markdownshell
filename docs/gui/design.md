@@ -10,11 +10,11 @@ mdsh-gui is a desktop notebook for mdsh files. You open a markdown runbook, run 
 - **Edit the markdown, see it rendered.** All editing happens in the source view, the whole file in a markdown editor, beside the rendered view and kept in sync with it. Clicking something in the rendered view takes you to its markdown. Editing in place in the rendered view was tried in M3 and dropped, since it was awkward next to the source (j, Oct 29).
 - **Reports are a first-class output.** One action turns a run into a PDF, HTML or markdown copy to share.
 
-Not goals for v1: multiple documents in one window (use one window per file), a plugin system, remote kernels, or languages beyond what `run` supports today (`sh`, `zsh`).
+Not goals for v1: a plugin system, remote kernels, or languages beyond what `run` supports today (`sh`, `zsh`).
 
 ## Features
 
-Every feature of `mdsh` and `mdsh -i` gets a place in the GUI. New in the GUI: save as, create report, a start screen, and editing the whole document. M1 to M6 are the milestones below.
+Every feature of `mdsh` and `mdsh -i` gets a place in the GUI. New in the GUI: save as, create report, a start screen, and editing the whole document. M1 to M7 are the milestones below.
 
 | Feature | Today (CLI / TUI) | In the GUI | When |
 | --- | --- | --- | --- |
@@ -31,6 +31,7 @@ Every feature of `mdsh` and `mdsh -i` gets a place in the GUI. New in the GUI: s
 | Images, screenshots, recordings | half-block preview, `v` | Real images in the output, click to open full size | M4 |
 | Create report | `--pdf`, `--html`, `-o`, `--hide-code`, `--hide-output`, `--no-run` | Report… dialog: format (PDF, HTML, markdown), hide code, hide output, run first or use saved output | M5 |
 | tty blocks | hand over the terminal | A terminal (xterm.js) in the block's card, on the shell's own pty | M6 |
+| Several files at once | one `mdsh` per file | Tabs: drag to reorder, onto another window to move, or away from the tab bar for a window of its own | M7 |
 | Arguments `$1…` | trailing CLI args | Command line on launch, and an Arguments field | M1 |
 | `--only`, `--stop-on-error`, `--shell` | flags | Settings (mdsh › Settings…) for defaults; Run menu for this file | M1 |
 | Open recent, drag a file in, file association | none | Start screen listing `.md` files under the current folder (shown when no file is given), Open Recent, drag and drop, file association | M1 |
@@ -78,7 +79,9 @@ Shortcuts follow the TUI where they don't clash with the OS. `j`/`k` move betwee
 The GUI is a thin layer: the frontend draws, `main.App` binds, and `notebook` holds the state. Running, rendering and PDF stay in the shared library, so the CLI, the TUI and the GUI cannot drift apart.
 
 - **Frontend** (`cmd/mdsh-gui/frontend`). TypeScript, bundled by esbuild's Go library from go generate, with no npm. CodeMirror, used by every editor, is a vendored pre-built bundle, `frontend/vendor/codemirror.js`, with the Vim extension and markdown support included; xterm.js, for tty blocks, is a second one, `frontend/vendor/xterm.js`, with its stylesheet beside it. `go run ./internal/vendorjs` rebuilds it without npm: it downloads the exact versions `frontend/vendor/package-lock.json` pins from the npm registry, checks their integrity hashes, bundles them with esbuild and copies their type declarations and licenses beside it. The app's own code bundles into `frontend/bundle/` and imports the vendored bundle as a separate file, so the two change independently. Typed bindings come from `wails3 generate bindings -ts -b -names -i`, which import the runtime Wails serves at `/wails/runtime.js`. CI checks that the vendored bundle matches its lock and the bindings and bundle are generated, and tsc type-checks against the vendored types. The frontend listens for events: `block` (started, stdout, stderr, done), `confirm`, `opened`, `saved`, `file-changed`, `menu` (a menu command for the window in front) and `settings`. A tty block's `block` events add terminal, tty (bytes, base64) and terminal-end. Events reach every window, so each keeps those its own window sent.
-- **`main.App`** (the Wails service). One per window. Menus, dialogs (open, save as, report destination), window title and dirty marker. No logic beyond calling `notebook`.
+
+  **Tabs.** A window's page (`window.html`) is the tab bar, and each tab is the document page (`index.html?tab=N`) in an iframe under it, so a tab in the background keeps its scroll, editors and terminal as they were. The tab page adds an `x-mdsh-tab` header to its calls to Go, which middleware puts in the call's context, so a call acts on its tab whichever window holds it. Go sends a tab's events wrapped with its id; the window page passes them to that tab's page alone, and everything else to every tab. Moving a tab to another window keeps its notebook and shells and loads its page again there; a run going on carries on, and the new page catches up from `Live`, what the run has sent so far, then follows a `ran` event. Dragging uses HTML drag and drop: the tab bar takes a drop to reorder or move, and while a tab is dragged the rest of every window takes it too (another window: move it there; its own: a window of its own). A tab let go outside every window also gets a window of its own.
+- **`main.App`** (the Wails service). One for the app; a call acts on the tab, or the window, it came from. Menus, dialogs (open, save as, report destination), window title and dirty marker. No logic beyond calling `notebook`.
 - **`notebook`** (no Wails import, tested on its own). The open document, its `run.Session`, results, dirty state, and the file's mtime for change detection. It gains `SaveAs`, `Report`, `Text` and `SetText` (the source view) and the terminal tty blocks run on. After a save the document is parsed again from what was written, so the source pane shows the saved output.
 - **Shared library.** Today `doc`, `run`, `render` and `pdf`. Five changes were planned, each a small PR to main that the GUI then uses (change 3 ended up in the GUI alone):
   1. Move the report pipeline that `cmd/mdsh` builds inline for `--pdf`, `-o`, `--hide-code` and `--hide-output` into a library function, so the CLI and the Report dialog share it. The `report` package makes markdown, PDF and HTML, and the CLI gains `--html` so it exports the same formats as the GUI (j, Oct 29). (#38.)
@@ -102,8 +105,8 @@ j answered the open questions on Oct 28.
 | What is a report? | An export of the run: PDF, HTML or markdown, with hide code and hide output options, like `--pdf` and `-o`. |
 | Frontend build | TypeScript with no npm. esbuild's Go library bundles it from `go generate`. CodeMirror is a vendored pre-built bundle in `frontend/vendor/`, rebuilt from a package lock by a Go tool. Typed bindings come from `wails3 generate bindings -ts`. `tsc` type-checks in CI only, through npx. |
 | Autosave | Off by default: save when asked, with a dirty marker. Autosave is a setting. |
-| Windows or tabs | One window per file for now. Keep the window state separate from the app state so tabs can be added later. |
-| Packaging | Later. The targets are `.app` and `.dmg` for macOS, Flatpak for Linux, and a Windows installer much later. |
+| Windows or tabs | Tabs, which drag between windows and out into their own (j, Oct 29). They are drawn in the window rather than using macOS's own window tabs, so they work the same on Linux. |
+| Packaging | An unsigned universal `.app` and `.dmg` for macOS, and an AppImage and a Flatpak for Linux, released under the same tag as mdsh as separate files (j, Oct 29). A Windows installer much later. |
 | Platforms | macOS and Linux. Windows is not supported for now. |
 | Where to edit | In the source view only. Clicks in the rendered view take you there. Inline editors in the rendered view were tried and dropped (Oct 29). |
 | Block attribute helper | Completion and hover help inside `{…}`, from an attribute table exported by `doc`. |
@@ -121,5 +124,6 @@ Each milestone is one PR into `gui`, one commit each, with tests passing. Librar
 5. **M4, Images.** (#37.) Serve the document's folder and show image, screenshot and recording output inline, and images in the prose. Clicking an output image shows it full size over the window; a vector image fills the window. Library change 3 is done in the GUI.
 6. **M5, Reports.** The Report dialog for PDF, HTML and markdown. It needs library change 1 (a shared report pipeline, #38) on main first.
 7. **M6, tty blocks.** A tty block runs in an xterm.js terminal in its own card, sized to fit the card (24 rows), so it records at the size it is shown at. Keys go to the block through `notebook.Type`; when it ends the card shows its recording. A tty block brings back the rendered view, as a confirm does. Library change 4 (#40).
+8. **M7, Tabs.** A window holds tabs, each with its own notebook and shells. New Tab (cmd/ctrl+T) opens the start screen; Open…, Open Recent and dropped files open in a new tab unless the tab in front shows the start screen; Close Tab (cmd/ctrl+W) asks about unsaved output, and the window closes with its last tab. Tabs drag to reorder, onto another window to move there, or away from the tab bar for a window of their own; a run carries on through a move. View › Show Next Tab and Show Previous Tab (cmd/ctrl+shift+] and [).
 
 After M5: merge `gui` into main. Packaging comes later: `.app` and `.dmg` for macOS, Flatpak for Linux, and a Windows installer much later.

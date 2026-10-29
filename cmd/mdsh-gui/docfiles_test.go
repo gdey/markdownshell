@@ -37,7 +37,7 @@ func TestDocFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	a := &App{windows: map[uint]*docWindow{1: {n: n}, 2: {}}}
+	a := &App{tabs: map[int]*docTab{1: {n: n}, 2: {}}}
 	h := a.assets(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTeapot) }))
 	get := func(path string) int {
 		rec := httptest.NewRecorder()

@@ -15,6 +15,11 @@ export interface Doc {
     "file": string;
     "dirty": boolean;
     "changed": boolean;
+
+    /**
+     * a run is going on
+     */
+    "running": boolean;
     "run": notebook$0.RunOptions;
 
     /**
@@ -28,7 +33,7 @@ export interface Doc {
  */
 export interface ReportStart {
     /**
-     * runnable blocks that ran in this window
+     * runnable blocks that ran in this tab
      */
     "ran": number;
 
@@ -69,7 +74,25 @@ export interface Start {
 }
 
 /**
- * View is what a window shows, for the View menu's check marks.
+ * Tab is a tab as the tab bar draws it.
+ */
+export interface Tab {
+    "id": number;
+    "title": string;
+    "file": string;
+    "dirty": boolean;
+}
+
+/**
+ * Tabs is what a window's tab bar shows.
+ */
+export interface Tabs {
+    "tabs": Tab[] | null;
+    "active": number;
+}
+
+/**
+ * View is what a tab shows, for the View menu's check marks.
  */
 export interface View {
     /**
@@ -84,4 +107,14 @@ export interface View {
     "outline": boolean;
     "code": boolean;
     "output": boolean;
+}
+
+/**
+ * liveEvent is an event sent while a run is going, kept so a tab drawn
+ * again partway through, as after moving to another window, can catch
+ * up.
+ */
+export interface liveEvent {
+    "name": string;
+    "data": any;
 }

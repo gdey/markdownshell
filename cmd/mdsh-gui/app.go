@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,8 +22,8 @@ import (
 	"github.com/gdey/markdownshell/run"
 )
 
-// App is the service the frontend calls. A call acts on the window it
-// came from.
+// App is the service the frontend calls. A call from a tab's page acts on
+// that tab; one from a window's tab bar, on that window.
 type App struct {
 	app      *application.App
 	settings *settings.Store
@@ -31,11 +34,15 @@ type App struct {
 	viewItems  struct{ split, rendered, outline, code, output *application.MenuItem }
 	recentMenu *application.Menu
 
-	mu       sync.Mutex
-	windows  map[uint]*docWindow
-	named    int // windows made so far, for unique names
-	prefs    *application.WebviewWindow
-	quitting bool
+	mu        sync.Mutex
+	windows   map[uint]*docWindow
+	tabs      map[int]*docTab
+	tabWindow map[*docTab]*docWindow
+	named     int // windows made so far, for unique names
+	lastTab   int // the last tab id handed out
+	dragging  *docTab
+	prefs     *application.WebviewWindow
+	quitting  bool
 
 	started atomic.Bool // the app is running, so menus change on its main thread
 }
@@ -43,8 +50,25 @@ type App struct {
 // errNoFile is returned by calls that need a file before one is open.
 var errNoFile = errors.New("no file is open")
 
-// newWindow opens a window showing the start screen.
-func (a *App) newWindow() *docWindow {
+// tabKey is the context key for the tab a call came from, which the
+// tab's page sends in the x-mdsh-tab header.
+type tabKey struct{}
+
+const tabHeader = "x-mdsh-tab"
+
+// tabCalls notes the tab each call from a tab's page came from.
+func tabCalls(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if id, err := strconv.Atoi(r.Header.Get(tabHeader)); err == nil {
+			r = r.WithContext(context.WithValue(r.Context(), tabKey{}, id))
+		}
+		next.ServeHTTP(rw, r)
+	})
+}
+
+// newWindow opens a window holding t, or a new tab showing the start
+// screen if t is nil.
+func (a *App) newWindow(t *docTab) *docWindow {
 	a.mu.Lock()
 	a.named++
 	name := fmt.Sprintf("doc-%d", a.named)
@@ -54,95 +78,289 @@ func (a *App) newWindow() *docWindow {
 		Title:          "mdsh",
 		Width:          960,
 		Height:         820,
-		URL:            "/",
+		URL:            "/window.html",
 		EnableFileDrop: true,
 	}
 	opts.Linux.Menu = a.menu
-	dw := &docWindow{app: a, answers: make(chan run.Answer), done: make(chan struct{})}
-	dw.win = a.app.Window.NewWithOptions(opts)
+	w := &docWindow{app: a}
+	w.win = a.app.Window.NewWithOptions(opts)
 	a.mu.Lock()
-	a.windows[dw.win.ID()] = dw
+	a.windows[w.win.ID()] = w
 	a.mu.Unlock()
-	dw.hook()
-	return dw
+	w.hook()
+	if t == nil {
+		t = a.newTab()
+	}
+	a.moveTab(t, w, 0)
+	return w
 }
 
-func (a *App) removeWindow(dw *docWindow) {
+// newTab makes a tab showing the start screen, in no window yet.
+func (a *App) newTab() *docTab {
+	a.mu.Lock()
+	a.lastTab++
+	t := &docTab{app: a, id: a.lastTab, answers: make(chan run.Answer), done: make(chan struct{}), view: defaultView}
+	a.tabs[t.id] = t
+	a.mu.Unlock()
+	go t.watch()
+	return t
+}
+
+// newTabIn opens a tab with the start screen in w, after its tab in
+// front.
+func (a *App) newTabIn(w *docWindow) *docTab {
+	t := a.newTab()
+	a.mu.Lock()
+	i := slices.Index(w.tabs, w.active) + 1
+	a.mu.Unlock()
+	a.moveTab(t, w, i)
+	return t
+}
+
+// cycleTab brings the tab by steps from the one in front of w forward.
+func (a *App) cycleTab(w *docWindow, by int) {
+	a.mu.Lock()
+	t := w.next(by)
+	a.mu.Unlock()
+	if t != nil {
+		a.selectTab(t)
+	}
+}
+
+// moveTab puts t in w at index i, in front, taking it out of the window
+// it was in. A window left with no tabs closes.
+func (a *App) moveTab(t *docTab, w *docWindow, i int) {
+	a.mu.Lock()
+	from := a.tabWindow[t]
+	if from != nil {
+		if j := from.remove(t); from == w && j < i {
+			i--
+		}
+	}
+	w.insert(t, i)
+	a.tabWindow[t] = w
+	empty := from != nil && from != w && len(from.tabs) == 0
+	if empty {
+		from.closing = true
+	}
+	a.mu.Unlock()
+	if from != nil && from != w {
+		if empty {
+			from.win.Close()
+		} else {
+			from.changed()
+		}
+	}
+	w.changed()
+	a.showTabView(t)
+}
+
+// selectTab brings t to the front of its window.
+func (a *App) selectTab(t *docTab) {
+	a.mu.Lock()
+	w := a.tabWindow[t]
+	if w != nil {
+		w.active = t
+	}
+	a.mu.Unlock()
+	if w != nil {
+		w.changed()
+		a.showTabView(t)
+	}
+}
+
+func (a *App) showTabView(t *docTab) {
+	t.mu.Lock()
+	v := t.view
+	t.mu.Unlock()
+	a.showView(v)
+}
+
+// closeTab closes t, asking first if it has unsaved output. Its window
+// closes with its last tab.
+func (a *App) closeTab(t *docTab) {
+	if n := t.unsaved(); n != nil {
+		a.selectTab(t)
+		t.askToSave(n, func() { a.closeTab(t) })
+		return
+	}
+	a.mu.Lock()
+	w := a.tabWindow[t]
+	last := w != nil && len(w.tabs) == 1
+	a.mu.Unlock()
+	if last {
+		// The window's closing hook lets it go, as the tab may close.
+		w.win.Close()
+		return
+	}
+	a.dropTab(t)
+	if w != nil {
+		w.changed()
+		if t := w.activeTab(); t != nil {
+			a.showTabView(t)
+		}
+	}
+}
+
+// dropTab takes t out of its window and ends its shells.
+func (a *App) dropTab(t *docTab) {
+	a.mu.Lock()
+	if w := a.tabWindow[t]; w != nil {
+		w.remove(t)
+	}
+	delete(a.tabWindow, t)
+	delete(a.tabs, t.id)
+	if a.dragging == t {
+		a.dragging = nil
+	}
+	a.mu.Unlock()
+	t.shutdown()
+}
+
+func (a *App) removeWindow(w *docWindow) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	delete(a.windows, dw.win.ID())
+	delete(a.windows, w.win.ID())
 }
 
 // window is the window a frontend call came from.
 func (a *App) window(ctx context.Context) (*docWindow, error) {
-	w, ok := ctx.Value(application.WindowKey).(application.Window)
+	win, ok := ctx.Value(application.WindowKey).(application.Window)
 	if !ok {
 		return nil, errors.New("the call came from no window")
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	dw := a.windows[w.ID()]
-	if dw == nil {
+	w := a.windows[win.ID()]
+	if w == nil {
 		return nil, errors.New("the call came from a window with no document")
 	}
-	return dw, nil
+	return w, nil
 }
 
-func (a *App) notebook(ctx context.Context) (*docWindow, *notebook.Notebook, error) {
-	dw, err := a.window(ctx)
+// tab is the tab a frontend call came from.
+func (a *App) tab(ctx context.Context) (*docTab, error) {
+	id, ok := ctx.Value(tabKey{}).(int)
+	if !ok {
+		return nil, errors.New("the call came from no tab")
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	t := a.tabs[id]
+	if t == nil {
+		return nil, fmt.Errorf("no tab %d", id)
+	}
+	return t, nil
+}
+
+// tabByID is tab id, for calls from a tab bar about one of its tabs.
+func (a *App) tabByID(id int) (*docTab, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	t := a.tabs[id]
+	if t == nil {
+		return nil, fmt.Errorf("no tab %d", id)
+	}
+	return t, nil
+}
+
+func (a *App) notebook(ctx context.Context) (*docTab, *notebook.Notebook, error) {
+	t, err := a.tab(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	n, err := dw.notebook()
-	return dw, n, err
+	n, err := t.notebook()
+	return t, n, err
 }
 
 // current is the document window in front, for menu commands, or nil.
 func (a *App) current() *docWindow {
-	w := a.app.Window.Current()
+	win := a.app.Window.Current()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if w != nil {
-		if dw := a.windows[w.ID()]; dw != nil {
-			return dw
+	if win != nil {
+		if w := a.windows[win.ID()]; w != nil {
+			return w
 		}
 	}
 	if len(a.windows) == 1 {
-		for _, dw := range a.windows {
-			return dw
+		for _, w := range a.windows {
+			return w
 		}
 	}
 	return nil
 }
 
-// openIn opens file in dw if dw shows the start screen, else in a new
-// window. A file already open in a window brings that window forward.
-func (a *App) openIn(dw *docWindow, file string) error {
+// currentTab is the tab in front of the window in front, or nil.
+func (a *App) currentTab() *docTab {
+	if w := a.current(); w != nil {
+		return w.activeTab()
+	}
+	return nil
+}
+
+// openTab is the tab file is open in, or nil.
+func (a *App) openTab(file string) *docTab {
+	abs, err := filepath.Abs(file)
+	if err != nil {
+		return nil
+	}
+	a.mu.Lock()
+	tabs := make([]*docTab, 0, len(a.tabs))
+	for _, t := range a.tabs {
+		tabs = append(tabs, t)
+	}
+	a.mu.Unlock()
+	for _, t := range tabs {
+		if t.file() == abs {
+			return t
+		}
+	}
+	return nil
+}
+
+// focusTab brings t and its window to the front.
+func (a *App) focusTab(t *docTab) {
+	a.selectTab(t)
+	if w := t.window(); w != nil {
+		w.win.Focus()
+	}
+}
+
+// openIn opens file in w: in its tab in front if that shows the start
+// screen, else in a new tab. With no window it opens a new one. A file
+// already open in a tab brings that tab forward.
+func (a *App) openIn(w *docWindow, file string) error {
 	abs, err := filepath.Abs(file)
 	if err != nil {
 		return err
 	}
-	a.mu.Lock()
-	var open *docWindow
-	for _, w := range a.windows {
-		if w.file() == abs {
-			open = w
-		}
-	}
-	a.mu.Unlock()
-	if open != nil {
-		open.win.Focus()
+	if t := a.openTab(abs); t != nil {
+		a.focusTab(t)
 		return nil
 	}
 	ro := notebook.RunOptions{Shell: a.settings.Get().Shell}
-	if dw != nil && dw.file() == "" {
-		return dw.open(abs, ro)
+	if w != nil {
+		if t := w.activeTab(); t != nil && t.file() == "" {
+			return t.open(abs, ro)
+		}
+		t := a.newTab()
+		if err := t.open(abs, ro); err != nil {
+			a.dropTab(t)
+			return err
+		}
+		a.mu.Lock()
+		i := slices.Index(w.tabs, w.active) + 1
+		a.mu.Unlock()
+		a.moveTab(t, w, i)
+		return nil
 	}
-	nw := a.newWindow()
-	if err := nw.open(abs, ro); err != nil {
-		nw.closeNow()
+	t := a.newTab()
+	if err := t.open(abs, ro); err != nil {
+		a.dropTab(t)
 		return err
 	}
+	a.newWindow(t)
 	return nil
 }
 
@@ -167,8 +385,8 @@ func (a *App) shouldQuit() bool {
 	a.mu.Lock()
 	quitting := a.quitting
 	var dirty []string
-	for _, dw := range a.windows {
-		if n, err := dw.notebook(); err == nil && n.Dirty() {
+	for _, t := range a.tabs {
+		if n, err := t.notebook(); err == nil && n.Dirty() {
 			dirty = append(dirty, filepath.Base(n.File()))
 		}
 	}
@@ -184,16 +402,7 @@ func (a *App) shouldQuit() bool {
 		quit.OnClick(func() {
 			a.mu.Lock()
 			a.quitting = true
-			windows := make([]*docWindow, 0, len(a.windows))
-			for _, dw := range a.windows {
-				windows = append(windows, dw)
-			}
 			a.mu.Unlock()
-			for _, dw := range windows {
-				dw.mu.Lock()
-				dw.closing = true
-				dw.mu.Unlock()
-			}
 			a.app.Quit()
 		})
 		d.SetCancelButton(d.AddButton("Cancel"))
@@ -216,10 +425,10 @@ func (a *App) openDialog(win application.Window) ([]string, error) {
 
 // openFromMenu runs File › Open… for the window in front.
 func (a *App) openFromMenu() {
-	dw := a.current()
+	w := a.current()
 	var win application.Window
-	if dw != nil {
-		win = dw.win
+	if w != nil {
+		win = w.win
 	}
 	files, err := a.openDialog(win)
 	if err != nil {
@@ -227,7 +436,7 @@ func (a *App) openFromMenu() {
 		return
 	}
 	for _, f := range files {
-		if err := a.openIn(dw, f); err != nil {
+		if err := a.openIn(w, f); err != nil {
 			a.showError(win, err)
 		}
 	}

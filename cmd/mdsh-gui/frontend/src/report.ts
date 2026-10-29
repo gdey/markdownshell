@@ -84,7 +84,7 @@ export async function openReport() {
   }
   if (!dest || !dest.startsWith(start.dest.replace(/[^/]*$/, ""))) dest = withExt(start.dest, format);
   $<HTMLInputElement>("rep-dest").value = tilde(dest);
-  $("rep-window").textContent = `This window's run (${start.ran} of ${start.total} ${start.total === 1 ? "block" : "blocks"} ran)`;
+  $("rep-window").textContent = `This tab's run (${start.ran} of ${start.total} ${start.total === 1 ? "block" : "blocks"} ran)`;
   $("rep-error").hidden = true;
   showForm(true);
   void drawCommand();
