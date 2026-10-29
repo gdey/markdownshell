@@ -24,6 +24,32 @@ export interface Doc {
 }
 
 /**
+ * ReportStart is what the Report dialog starts with.
+ */
+export interface ReportStart {
+    /**
+     * runnable blocks that ran in this window
+     */
+    "ran": number;
+
+    /**
+     * runnable blocks
+     */
+    "total": number;
+
+    /**
+     * Dest is where a report goes unless another file is picked: beside
+     * the document, named after it, without an extension.
+     */
+    "dest": string;
+
+    /**
+     * for showing paths as ~/…
+     */
+    "home": string;
+}
+
+/**
  * Start is what the start screen lists.
  */
 export interface Start {
