@@ -6,6 +6,36 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-29
+
+Three changes to `mdsh-gui`: links in a document now work, a setting
+picks the view files open in, and the macOS `.dmg` shows how to install.
+
+### Added
+
+- `mdsh-gui` setting **Open files in**: the rendered view, the source
+  view, or both side by side. The default, the view the last tab had,
+  keeps the 1.2.0 behavior. It applies when a file opens in a tab, not
+  on a reload or when a tab moves to another window.
+
+### Changed
+
+- The macOS `.dmg` opens on a window laid out for installing: mdsh's
+  icon and the Applications folder on either side of an arrow, with
+  notes on getting past Gatekeeper for the unsigned app (Open Anyway,
+  or `xattr`). The desktop docs now lead with Open Anyway, since macOS
+  15 dropped right-click › Open.
+
+### Fixed
+
+- `mdsh-gui` links in the rendered view are followed when clicked,
+  instead of opening the source editor. Web and mail links open in the
+  system browser, a markdown link opens in a tab (or brings forward the
+  tab it's already in), other local files open as the system would open
+  them, and `#heading` links scroll to the heading. Links have their own
+  right-click menu (Open Link, Copy Link), and nothing can navigate the
+  window away from the app, which used to leave the tab blank.
+
 ## [1.2.0] - 2026-10-29
 
 The desktop app: `mdsh-gui` opens documents in a window, with packages for
@@ -272,7 +302,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/gdey/markdownshell/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/gdey/markdownshell/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gdey/markdownshell/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gdey/markdownshell/releases/tag/v1.0.0
