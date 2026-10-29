@@ -42,3 +42,12 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build .
+      - name: Check the vendored JavaScript matches its lock
+        if: runner.os == 'Linux'
+        run: go run ./internal/vendorjs && git diff --exit-code -- frontend/vendor
+      - name: Check the bindings and bundle are generated
+        if: runner.os == 'Linux'
+        run: go generate && git diff --exit-code -- frontend
+      - name: Type-check the frontend
+        if: runner.os == 'Linux'
+        run: npx --yes --package typescript@5.9.3 tsc -p frontend

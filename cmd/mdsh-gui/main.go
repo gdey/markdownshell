@@ -20,7 +20,13 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 )
 
-//go:embed frontend
+// The frontend is TypeScript in frontend/src, bundled into frontend/bundle.
+// The bindings in frontend/src/bindings are generated from App.
+//
+//go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
+//go:generate go run ./internal/build
+
+//go:embed frontend/index.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js
 var frontend embed.FS
 
 func main() {
