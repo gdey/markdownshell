@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/notebook"
 )
 
 // assets serves the frontend, and at notebook.DocPrefix the files beside

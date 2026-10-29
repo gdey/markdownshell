@@ -6,7 +6,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/settings"
 )
 
 // send is a menu item's action: it sends action to the window in front

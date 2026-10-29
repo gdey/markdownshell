@@ -162,8 +162,8 @@ MACOSX_DEPLOYMENT_TARGET=13.0 CGO_CFLAGS=-mmacosx-version-min=13.0 \
   CGO_LDFLAGS=-mmacosx-version-min=13.0 go build .
 ```
 
-The frontend is TypeScript in `frontend/src`, bundled into
-`frontend/bundle` and embedded in the binary, so `go build` needs
+The frontend is TypeScript in `web/src` (the root `web` package), bundled into
+`web/bundle` and embedded in the binary, so `go build` needs
 nothing more. After changing the TypeScript or the Go methods the
 frontend calls, regenerate the bindings and the bundle (no npm needed):
 
@@ -172,12 +172,12 @@ go generate
 ```
 
 The code editor is CodeMirror 6 with Vim bindings, vendored as one
-bundle in `frontend/vendor/codemirror.js`. `go run ./internal/vendorjs`
-rebuilds it from the versions `frontend/vendor/package-lock.json` pins,
+bundle in `web/vendor/codemirror.js`. `go run ./internal/vendorjs`
+rebuilds it from the versions `web/vendor/package-lock.json` pins,
 again without npm. To type-check the TypeScript:
 
 ```sh
-npx --package typescript tsc -p frontend
+npx --package typescript tsc -p ../../web
 ```
 
 ## Packages
