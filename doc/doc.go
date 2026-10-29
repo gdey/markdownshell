@@ -261,6 +261,11 @@ func Parse(src []byte) (*Document, error) {
 			}
 		}
 	}
+	for _, b := range d.Blocks {
+		if b.Attrs.Has("background") && b.Attrs.Has("tty") {
+			return nil, fmt.Errorf("line %d: block %s: a background block can't be tty, since nobody is at its terminal", lineNo(src, b.Span.Start), b.ID)
+		}
+	}
 	if err := checkTapes(d); err != nil {
 		return nil, err
 	}

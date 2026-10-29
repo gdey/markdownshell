@@ -67,11 +67,13 @@ func wantStdout(t *testing.T, r map[string]*run.Result, id, want string) {
 	}
 }
 
-// A background reader in one block gets what a later block writes, and
-// a block after that can wait for it.
+// A background reader gets what a later block writes, shows it under
+// its own block, and a block after that can wait for it.
 func TestFIFOHandoff(t *testing.T) {
 	r := runFIFO(t, fifoExample(t, "handoff.md"), 10*time.Second)
-	wantStdout(t, r, "collect", "reader exited with 0\nhello through the fifo\n")
+	wantStdout(t, r, "reader", "hello through the fifo\n")
+	wantStdout(t, r, "writer", "writer done\n")
+	wantStdout(t, r, "collect", "reader exited with 0\n")
 }
 
 // A descriptor opened with exec stays open across blocks, so the reader
@@ -79,18 +81,34 @@ func TestFIFOHandoff(t *testing.T) {
 func TestFIFOHeldOpen(t *testing.T) {
 	r := runFIFO(t, fifoExample(t, "held-open.md"), 10*time.Second)
 	wantStdout(t, r, "still-open", "reader still running\n")
-	wantStdout(t, r, "close", "reader exited with 0\nfirst\nsecond\n")
+	wantStdout(t, r, "close", "reader exited with 0\n")
+	wantStdout(t, r, "reader", "first\nsecond\n")
 }
 
-// When the writer never closes, waiting for the reader blocks until the
-// block's timeout, which kills the shell and stops the run.
+// When the writer never closes, the background reader runs until its
+// timeout kills it. The run goes on past it, and keeps what it read.
 func TestFIFONeverClosed(t *testing.T) {
 	start := time.Now()
 	r := runFIFO(t, fifoExample(t, "never-closed.md"), 15*time.Second)
 	if d := time.Since(start); d > 10*time.Second {
-		t.Errorf("run took %s; the block's timeout is 2s", d)
+		t.Errorf("run took %s; the reader's timeout is 2s", d)
 	}
-	wantStdout(t, r, "writer", "writer done\n")
+	wantStdout(t, r, "after", "the run went on\n")
+	rd := r["reader"]
+	wantStdout(t, r, "reader", "only line\n")
+	if rd.Exited || rd.Running || rd.Err == nil || !strings.Contains(rd.Err.Error(), "timed out") {
+		t.Errorf("reader: exited %v, running %v, err %v; want a timeout of the block alone", rd.Exited, rd.Running, rd.Err)
+	}
+}
+
+// A shell's own wait on a reader that never gets end of file blocks
+// until the block's timeout, which kills the shell and stops the run.
+func TestFIFOWaitNeverEnds(t *testing.T) {
+	src := "```sh {#mk}\nmkfifo pipe\ncat pipe > got.txt &\nREADER=$!\n```\n" +
+		"```sh {#open}\nexec 3>pipe\necho one >&3\n```\n" +
+		"```sh {#wait timeout=1s}\nwait $READER\n```\n" +
+		"```sh {#after}\necho after\n```\n"
+	r := runFIFO(t, src, 10*time.Second)
 	w := r["wait"]
 	if !w.Exited || w.Err == nil || !strings.Contains(w.Err.Error(), "timed out") {
 		t.Errorf("wait: exited %v, err %v; want a timeout that ended the shell", w.Exited, w.Err)
@@ -139,9 +157,10 @@ func TestFIFOAcrossEnvs(t *testing.T) {
 	wantStdout(t, r, "collect", "one\n")
 }
 
-// A background job writes to its shell's stdout, which mdsh reads for
-// whichever block is running at the time. So what the job prints after
-// its own block ended shows up in a later block's output.
+// A job started with & writes to its shell's stdout, which mdsh reads
+// for whichever block is running at the time. So what the job prints
+// after its own block ended shows up in a later block's output. A
+// background block keeps its output apart instead.
 func TestBackgroundOutputLandsInRunningBlock(t *testing.T) {
 	src := "```sh {#bg}\n(sleep 0.3; echo late) &\necho bg\n```\n" +
 		"```sh {#next}\nsleep 1; echo next\n```\n"

@@ -9,13 +9,21 @@ it. A block that opens the FIFO with `exec 3>pipe` gives the shell
 itself a descriptor for it, and the shell outlives the block, so the
 FIFO stays open across blocks until something closes it.
 
-Start a background reader, as in [handoff.md](handoff.md).
+Make the FIFO and start a background reader, as in
+[handoff.md](handoff.md).
 
-```sh {#reader}
-rm -f pipe got.txt
+```sh {#setup}
+rm -f pipe
 mkfifo pipe
-cat pipe > got.txt &
-READER=$!
+```
+
+```sh {#reader background}
+cat pipe
+```
+
+```output {for=reader exit=0}
+first
+second
 ```
 
 Open the FIFO on descriptor 3 and write a line. The block ends, but
@@ -38,7 +46,7 @@ a `wait` here would block for good (see
 reader is still there.
 
 ```sh {#still-open}
-kill -0 "$READER" && echo "reader still running"
+kill -0 "$MDSH_BG_reader" && echo "reader still running"
 ```
 
 ```output {for=still-open exit=0}
@@ -46,18 +54,15 @@ reader still running
 ```
 
 Closing descriptor 3 is the end of file. Now `wait` returns, and the
-reader got both lines.
+reader shows both lines.
 
 ```sh {#close}
 exec 3>&-
-wait "$READER"
+wait "$MDSH_BG_reader"
 echo "reader exited with $?"
-cat got.txt
-rm -f pipe got.txt
+rm -f pipe
 ```
 
 ```output {for=close exit=0}
 reader exited with 0
-first
-second
 ```

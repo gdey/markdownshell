@@ -26,6 +26,7 @@ type Session struct {
 	lookup   doc.Lookup
 	wanted   map[string][]string
 	tty      bool // whether the shells have terminals of their own
+	jobs     []*bgJob
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -122,8 +123,15 @@ func (s *Session) Sync() error {
 	return nil
 }
 
-// Close ends the session's shells.
-func (s *Session) Close() { s.stack.Close() }
+// Close ends the session's shells, and any background block still
+// running, which it reports as killed.
+func (s *Session) Close() {
+	for _, j := range s.jobs {
+		j.job.Kill()
+	}
+	s.Reap()
+	s.stack.Close()
+}
 
 func (s *Session) emit(e Event) {
 	if s.opts.OnEvent != nil {
@@ -138,6 +146,7 @@ func (s *Session) emit(e Event) {
 func (s *Session) RunFrom(ctx context.Context, from int) error {
 	d, opts := s.d, s.opts
 	for i := from; i < len(d.Blocks); i++ {
+		s.Reap()
 		b := d.Blocks[i]
 		if b.IsInclude() {
 			if r := s.results[i]; r.Ran {
@@ -177,7 +186,7 @@ func (s *Session) RunFrom(ctx context.Context, from int) error {
 			break
 		}
 	}
-	return nil
+	return s.Wait(ctx)
 }
 
 // RunBlock runs block i alone and returns its new result. It runs the
@@ -190,6 +199,7 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 	if i < 0 || i >= len(s.d.Blocks) {
 		return nil, fmt.Errorf("no block %d", i)
 	}
+	s.Reap()
 	b := s.d.Blocks[i]
 	r := &Result{Block: b}
 	switch {
@@ -224,6 +234,10 @@ func (s *Session) confirm(b *doc.Block) (Answer, error) {
 
 func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	s.emit(Event{Kind: Started, Block: b})
+	if b.Attrs.Has("background") {
+		s.background(ctx, b, r)
+		return
+	}
 	runBlock(ctx, s.stack, s.d, b, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
 	s.emit(Event{Kind: Done, Block: b, Result: r})
 }

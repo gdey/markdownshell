@@ -411,3 +411,10 @@ func TestCopies(t *testing.T) {
 		t.Errorf("warnings = %q", d.Warnings)
 	}
 }
+
+func TestBackgroundNotTTY(t *testing.T) {
+	_, err := Parse([]byte("```sh {#a background tty}\nx\n```\n"))
+	if err == nil || !strings.Contains(err.Error(), "background") {
+		t.Errorf("err = %v, want background and tty refused", err)
+	}
+}

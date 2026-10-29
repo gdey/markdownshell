@@ -8,10 +8,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A block marked `background` starts and the run goes on to the next
+  block. Its output is kept apart from other blocks', its process ID is
+  in `$MDSH_BG_<id>` for `wait`, `timeout=` kills just that block, and
+  after the last block mdsh waits for it (until its timeout, or 5s) and
+  then kills it. `run.Result.Running`, `Session.Reap` and `Session.Wait`
+  let front ends follow background blocks, and `env.Shell.Background`
+  starts one.
 - `examples/fifo` hands data between blocks through named pipes: a
   background reader fed by later blocks, a writer held open across
-  blocks, and one never closed, which only a block timeout ends. Tests
-  in `run` pin down what happens in each case.
+  blocks, and one never closed, which only a timeout ends. Tests in
+  `run` pin down what happens in each case.
 - `run.Options.Terminal` runs blocks marked `tty` on a terminal the
   caller draws itself, such as a pane in a window, with keys on a
   channel and the size it reports. `env.Shell.RunTerminal` does the
@@ -42,6 +49,11 @@ follow [Semantic Versioning](https://semver.org/).
 - The output right after a block holds at most one stdout part and one
   stderr fence. A second `output` fence for the same block used to be
   replaced along with the first; it is now a copy.
+
+### Fixed
+
+- When a block's `timeout=` stops the run, mdsh says it timed out,
+  instead of blaming `exit` or `set -e`.
 
 ## [1.1.0] - 2026-10-28
 

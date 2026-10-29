@@ -4,26 +4,31 @@ title: Handing data between blocks through a FIFO
 ---
 # Handing data between blocks through a FIFO
 
-Blocks without `env=` run one after another in the same shell, so a
-job one block starts in the background is still running while the
-blocks below it run. That makes a named pipe (a FIFO) a way to hand
-data from later blocks to an earlier one.
+Blocks without `env=` run one after another in the same shell. A block
+marked `background` starts and then the run goes straight on to the
+next block, so it can read from a named pipe (a FIFO) that later
+blocks write to.
 
-First make the FIFO and start a reader on it. Opening a FIFO for
-reading waits until something opens it for writing, so the reader has
-to go in the background (`&`); in the foreground this block would
-wait forever. `$!` keeps the reader's process ID for later.
+First make the FIFO, in a block of its own: a background block runs
+alongside the blocks after it, so if it made the FIFO itself, the
+writer could get there first and write to a plain file instead.
 
-```sh {#reader}
-rm -f pipe got.txt
+Opening the FIFO for reading waits until something opens it for
+writing, so the reader is a `background` block; without that, it would
+wait forever and the run would never get to the writer. Whatever it
+prints is kept apart and shows up under it, once it ends.
+
+```sh {#setup}
+rm -f pipe
 mkfifo pipe
-cat pipe > got.txt &
-READER=$!
-echo "reader started"
+```
+
+```sh {#reader background}
+cat pipe
 ```
 
 ```output {for=reader exit=0}
-reader started
+hello through the fifo
 ```
 
 A block further down writes to it. `> pipe` opens the FIFO, the write
@@ -39,19 +44,16 @@ echo "writer done"
 writer done
 ```
 
-The reader is a job of this shell, so a later block can `wait` for it.
-Once it has seen end of file it exits, and `got.txt` holds what came
-through. Without the `wait`, this block could read `got.txt` before
-`cat` had written it.
+The reader is a job of this shell, and mdsh keeps its process ID in
+`$MDSH_BG_reader`, so a later block can `wait` for it. Once it has seen
+end of file it ends, and `wait` gives its exit status.
 
 ```sh {#collect}
-wait "$READER"
+wait "$MDSH_BG_reader"
 echo "reader exited with $?"
-cat got.txt
-rm -f pipe got.txt
+rm -f pipe
 ```
 
 ```output {for=collect exit=0}
 reader exited with 0
-hello through the fifo
 ```
