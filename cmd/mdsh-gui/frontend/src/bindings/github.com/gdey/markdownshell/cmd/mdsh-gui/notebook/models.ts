@@ -47,6 +47,12 @@ export interface Cell {
     "failed": boolean;
 
     /**
+     * Running is true while a background block is still going; its
+     * output and status come in when it ends.
+     */
+    "running": boolean;
+
+    /**
      * From and To are the cell's bytes in the file, output included.
      */
     "from": number;

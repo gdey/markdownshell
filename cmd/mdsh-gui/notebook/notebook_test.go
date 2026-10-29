@@ -1,11 +1,13 @@
 package notebook
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gdey/markdownshell/run"
 )
@@ -271,4 +273,85 @@ func TestRunOptions(t *testing.T) {
 	if n.RunOptions().Only != "args" {
 		t.Errorf("RunOptions = %+v", n.RunOptions())
 	}
+}
+
+// A background block returns at once and shows as running; the
+// notebook checks on it while nothing runs and fills in its output when
+// it ends.
+func TestBackgroundBlock(t *testing.T) {
+	src := "```sh {#bg background}\nsleep 0.3; echo from bg\n```\n\n```sh {#fg}\necho fg\n```\n"
+	var mu sync.Mutex
+	var kinds []string
+	done := make(chan struct{}, 1)
+	n, err := Open(write(t, src), Options{OnEvent: func(e Event) {
+		mu.Lock()
+		kinds = append(kinds, fmt.Sprintf("%s %d", e.Kind, e.Block))
+		mu.Unlock()
+		if e.Kind == "done" && e.Block == 0 {
+			done <- struct{}{}
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if c := blockCell(t, n.Cells(), "bg"); !c.Running || c.Ran {
+		t.Errorf("bg cell after RunBlock: %+v; want running", c)
+	}
+	if err := n.RunBlock(1); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the background block never ended")
+	}
+	// The cell is filled in once reap has folded the result in.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		c := blockCell(t, n.Cells(), "bg")
+		if !c.Running && strings.Contains(c.Output, "from bg") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("bg cell after it ended: %+v", c)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got, want := strings.Join(kinds, ","), "background 0,started 1,stdout 1,done 1,done 0"; got != want {
+		t.Errorf("events = %s, want %s", got, want)
+	}
+}
+
+// Closing a notebook kills a background block still running, without
+// waiting for it.
+func TestBackgroundClose(t *testing.T) {
+	n, err := Open(write(t, "```sh {#bg background}\nsleep 60\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	n.Close()
+	if d := time.Since(start); d > 5*time.Second {
+		t.Errorf("Close took %s", d)
+	}
+}
+
+func blockCell(t *testing.T, cells []Cell, id string) Cell {
+	t.Helper()
+	for _, c := range cells {
+		if c.ID == id {
+			return c
+		}
+	}
+	t.Fatalf("no cell %s", id)
+	return Cell{}
 }

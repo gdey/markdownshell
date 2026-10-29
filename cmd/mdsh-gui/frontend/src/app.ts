@@ -122,10 +122,10 @@ function drawProse(c: Cell): HTMLElement {
 
 function drawBlock(c: Cell): HTMLElement {
   const name = el("span", { className: "name" }, c.id ?? "", el("span", { className: "muted" }, " · " + (c.lang ?? "") + (c.attrs ? " · " + c.attrs : "")));
-  const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.ran ? "exit " + c.status : "");
+  const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
   const block = el(
     "section",
-    { className: "block" + (c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
+    { className: "block" + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
     el(
       "div",
       { className: "head" },
@@ -149,6 +149,17 @@ function drawBlock(c: Cell): HTMLElement {
     if (!(e.target as HTMLElement).closest("button")) void showInSource(block, c.line, false);
   };
   return block;
+}
+
+// backgroundNote is what a background block's card says while it runs.
+const backgroundNote = "running in the background…";
+
+// backgroundStatus counts the background blocks still running in the
+// status line, unless a run is going.
+function backgroundStatus() {
+  if (running) return;
+  const n = document.querySelectorAll("#doc .block.background").length;
+  status(n ? n + " in background" : "");
 }
 
 // viewImage shows an output image full size over the window, until a
@@ -199,6 +210,7 @@ async function start(method: "RunBlock" | "RunFrom", block: number) {
   }
   busy(false);
   await refresh();
+  backgroundStatus();
 }
 
 // Editing happens in the source pane. The pencil and a click on prose
@@ -391,7 +403,7 @@ function drawOutline() {
   for (const e of document.querySelectorAll<HTMLElement>("#doc > section")) {
     if (e.classList.contains("block")) {
       const ask = e.querySelector<HTMLElement>(".ask");
-      const mark = ask && !ask.hidden ? "?" : e.querySelector(".live") && running ? "…" : e.classList.contains("failed") ? "✗" : e.classList.contains("ran") ? "✓" : "";
+      const mark = ask && !ask.hidden ? "?" : (e.querySelector(".live") && running) || e.classList.contains("background") ? "…" : e.classList.contains("failed") ? "✗" : e.classList.contains("ran") ? "✓" : "";
       const name = e.querySelector(".name")?.firstChild?.textContent ?? "";
       items.push(outlineItem(name, level + 1, e, "step" + (mark === "✗" ? " bad" : mark === "✓" ? " ok" : ""), mark));
       continue;
@@ -626,6 +638,14 @@ Events.On(
     if (!block) return;
     const out = block.querySelector(".output")!;
     switch (e.kind) {
+      case "background":
+        // The block runs on while others do; done comes when it ends.
+        block.querySelector<HTMLElement>(".ask")!.hidden = true;
+        block.classList.remove("ran", "failed");
+        block.classList.add("background");
+        block.querySelector(".exit")!.textContent = backgroundNote;
+        out.replaceChildren();
+        break;
       case "started":
         block.querySelector<HTMLElement>(".ask")!.hidden = true;
         out.replaceChildren(el("pre", { className: "live" }));
@@ -637,6 +657,9 @@ Events.On(
         break;
       case "done":
         $("dirty").hidden = false;
+        // A background block can end while nothing runs, so nothing
+        // else would draw its output.
+        if (block.classList.contains("background") && !running) void refresh().then(backgroundStatus);
         break;
       case "terminal":
         // The block runs in its card, so show it, as a confirm does.

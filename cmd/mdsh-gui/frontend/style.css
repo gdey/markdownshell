@@ -209,6 +209,8 @@ th { background: var(--code-bg); }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block.ran { border-left: 3px solid var(--ok); }
 .block.failed { border-left: 3px solid var(--bad); }
+.block.background { border-left: 3px dashed var(--accent); }
+.block.background .exit { color: var(--muted); }
 .block .head { display: flex; gap: 4px; align-items: center; padding: 4px 8px 4px 12px; font-size: 13px; }
 .block .head .name { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .block .exit { color: var(--ok); margin-right: 8px; }
