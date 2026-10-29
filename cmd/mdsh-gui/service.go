@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -333,4 +335,67 @@ func (a *App) SetView(ctx context.Context, v View) {
 	if a.current() == dw {
 		a.showView(v)
 	}
+}
+
+// ReportStart is what the Report dialog starts with.
+type ReportStart struct {
+	Ran   int `json:"ran"`   // runnable blocks that ran in this window
+	Total int `json:"total"` // runnable blocks
+	// Dest is where a report goes unless another file is picked: beside
+	// the document, named after it, without an extension.
+	Dest string `json:"dest"`
+	Home string `json:"home"` // for showing paths as ~/…
+}
+
+// ReportStart reads what the Report dialog shows when it opens.
+func (a *App) ReportStart(ctx context.Context) (ReportStart, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return ReportStart{}, err
+	}
+	ran, total := n.Ran()
+	file := n.File()
+	home, _ := os.UserHomeDir()
+	return ReportStart{Ran: ran, Total: total, Dest: strings.TrimSuffix(file, filepath.Ext(file)), Home: home}, nil
+}
+
+// ChooseReport asks where to save a report in format, starting at dest,
+// and returns the file, or "" if none was picked.
+func (a *App) ChooseReport(ctx context.Context, format report.Format, dest string) (string, error) {
+	dw, _, err := a.notebook(ctx)
+	if err != nil {
+		return "", err
+	}
+	name := map[report.Format]string{report.PDF: "PDF", report.HTML: "HTML", report.Markdown: "Markdown"}[format]
+	return a.app.Dialog.SaveFile().
+		SetMessage("Save the report").
+		SetDirectory(filepath.Dir(dest)).
+		SetFilename(filepath.Base(dest)).
+		AddFilter(name, "*"+format.Ext()).
+		AttachToWindow(dw.win).
+		PromptForSingleSelection()
+}
+
+// ReportCommand is the mdsh command that makes the report r describes.
+func (a *App) ReportCommand(ctx context.Context, r notebook.Report) (string, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return "", err
+	}
+	home, _ := os.UserHomeDir()
+	return n.ReportCommand(r, home), nil
+}
+
+// CreateReport writes the report r describes.
+func (a *App) CreateReport(ctx context.Context, r notebook.Report) error {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	return n.WriteReport(r)
+}
+
+// Reveal shows file in the file manager.
+func (a *App) Reveal(file string) error {
+	return a.app.Env.OpenFileManager(file, true)
 }

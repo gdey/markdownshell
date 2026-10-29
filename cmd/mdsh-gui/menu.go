@@ -88,7 +88,7 @@ func (a *App) buildMenu() *application.Menu {
 	file.AddSeparator()
 	file.Add("Save").SetAccelerator("CmdOrCtrl+S").OnClick(send("save"))
 	file.Add("Save As…").SetAccelerator("CmdOrCtrl+Shift+S").OnClick(send("saveas"))
-	file.Add("Create Report…").SetEnabled(false) // M5
+	file.Add("Create Report…").OnClick(send("report"))
 	file.Add("Reload").OnClick(send("reload"))
 	file.AddSeparator()
 	file.Add("Close Window").SetAccelerator("CmdOrCtrl+W").OnClick(func(*application.Context) {

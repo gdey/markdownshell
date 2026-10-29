@@ -20,6 +20,9 @@ import * as settings$0 from "./settings/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as doc$0 from "../../doc/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as report$0 from "../../report/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -64,6 +67,21 @@ export function ChooseFolder(): $CancellablePromise<string> {
 }
 
 /**
+ * ChooseReport asks where to save a report in format, starting at dest,
+ * and returns the file, or "" if none was picked.
+ */
+export function ChooseReport(format: report$0.Format, dest: string): $CancellablePromise<string> {
+    return $Call.ByName("main.App.ChooseReport", format, dest);
+}
+
+/**
+ * CreateReport writes the report r describes.
+ */
+export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
+    return $Call.ByName("main.App.CreateReport", r);
+}
+
+/**
  * Doc describes the open file. File is "" while the start screen shows.
  */
 export function Doc(): $CancellablePromise<$models.Doc> {
@@ -104,6 +122,27 @@ export function OpenPath(file: string): $CancellablePromise<void> {
  */
 export function Reload(): $CancellablePromise<void> {
     return $Call.ByName("main.App.Reload");
+}
+
+/**
+ * ReportCommand is the mdsh command that makes the report r describes.
+ */
+export function ReportCommand(r: notebook$0.Report): $CancellablePromise<string> {
+    return $Call.ByName("main.App.ReportCommand", r);
+}
+
+/**
+ * ReportStart reads what the Report dialog shows when it opens.
+ */
+export function ReportStart(): $CancellablePromise<$models.ReportStart> {
+    return $Call.ByName("main.App.ReportStart");
+}
+
+/**
+ * Reveal shows file in the file manager.
+ */
+export function Reveal(file: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.Reveal", file);
 }
 
 /**
