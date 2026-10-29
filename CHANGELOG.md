@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `run.Options.Terminal` runs blocks marked `tty` on a terminal the
+  caller draws itself, such as a pane in a window, with keys on a
+  channel and the size it reports. `env.Shell.RunTerminal` does the
+  running.
 - `--html FILE` writes what mdsh would print as a standalone HTML page,
   styled like the PDF, with local images inside it. `--html -` writes it
   to stdout.

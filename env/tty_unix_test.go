@@ -236,3 +236,71 @@ func TestRunScriptedShowsLastOutput(t *testing.T) {
 		}
 	}
 }
+
+// TestRunTerminal runs a script on a terminal mdsh draws itself: keys
+// come on a channel, and the size can change while it runs.
+func TestRunTerminal(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	var (
+		mu    sync.Mutex
+		out   bytes.Buffer
+		cols  = 100
+		keys  = make(chan []byte, 1)
+		sized = make(chan struct{}, 1)
+	)
+	shown := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return out.Write(p)
+	})
+	term := Terminal{
+		Keys: keys,
+		Out:  shown,
+		Size: func() (int, int) {
+			mu.Lock()
+			defer mu.Unlock()
+			return cols, 30
+		},
+		Resized: sized,
+	}
+	go func() {
+		for end := time.Now().Add(20 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			mu.Lock()
+			ready := strings.Contains(out.String(), "ready")
+			if ready {
+				cols = 120
+			}
+			mu.Unlock()
+			if ready {
+				sized <- struct{}{}
+				keys <- []byte("typed\r")
+				return
+			}
+		}
+	}()
+	var rec bytes.Buffer
+	script := "test -t 0 && echo terminal ok\nstty size\necho ready\nread -r l; X=$l\nstty size\n"
+	status, _, err := sh.RunTerminal(context.Background(), script, term, &rec)
+	if err != nil || status != 0 {
+		t.Fatalf("status %d, err %v", status, err)
+	}
+	mu.Lock()
+	got := out.String()
+	mu.Unlock()
+	for _, want := range []string{"terminal ok", "30 100", "typed", "30 120"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("screen %q, want %q in it", got, want)
+		}
+	}
+	if !strings.Contains(rec.String(), "terminal ok") {
+		t.Errorf("recorded %q", rec.String())
+	}
+	var x bytes.Buffer
+	if _, _, err := sh.Run(context.Background(), `echo "$X"`, &x, io.Discard); err != nil || x.String() != "typed\n" {
+		t.Errorf("X = %q, err %v", x.String(), err)
+	}
+}
