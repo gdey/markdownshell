@@ -135,12 +135,28 @@ function drawBlock(c: Cell): HTMLElement {
     el("div", { className: "ask", hidden: true }),
     el("div", { className: "output", innerHTML: c.output ?? "" }),
   );
+  block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
+    const img = (e.target as HTMLElement).closest("img");
+    if (img) viewImage(img);
+  };
   block.dataset.block = String(c.block);
   block.onclick = (e) => {
     select(blocks().indexOf(block), false);
     if (!(e.target as HTMLElement).closest("button")) void showInSource(block, c.line, false);
   };
   return block;
+}
+
+// viewImage shows an output image full size over the window, until a
+// click or esc.
+function viewImage(img: HTMLImageElement) {
+  const viewer = $<HTMLDialogElement>("viewer");
+  const big = viewer.querySelector("img")!;
+  big.src = img.src;
+  big.alt = img.alt;
+  big.classList.toggle("vector", /\.svg$/i.test(new URL(img.src).pathname));
+  viewer.onclick = () => viewer.close();
+  viewer.showModal();
 }
 
 const blocks = () => [...document.querySelectorAll<HTMLElement>("#doc .block")];
