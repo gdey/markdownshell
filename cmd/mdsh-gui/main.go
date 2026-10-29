@@ -27,7 +27,7 @@ import (
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
 //go:generate go run ./internal/build
 
-//go:embed frontend/index.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js
+//go:embed frontend/index.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css
 var frontend embed.FS
 
 func main() {

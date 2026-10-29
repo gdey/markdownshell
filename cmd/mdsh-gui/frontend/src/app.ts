@@ -6,6 +6,7 @@ import { $, el, iconButton, icons, svg } from "./dom.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
+import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
@@ -88,6 +89,7 @@ function drawOptions() {
 
 function drawDoc() {
   const main = $("doc");
+  closeTerminal();
   main.replaceChildren();
   for (const c of cells) {
     const e = c.block < 0 ? drawProse(c) : drawBlock(c);
@@ -97,6 +99,7 @@ function drawDoc() {
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
   drawOutline();
+  sizeTerminal();
 }
 
 // drawProse draws one top-level block of prose. Clicking it shows its
@@ -613,6 +616,7 @@ interface BlockEvent {
   kind: string;
   block: number;
   data?: string;
+  bytes?: string; // base64
 }
 
 Events.On(
@@ -633,6 +637,16 @@ Events.On(
         break;
       case "done":
         $("dirty").hidden = false;
+        break;
+      case "terminal":
+        // The block runs in its card, so show it, as a confirm does.
+        if (!view.rendered) toggle("rendered", true);
+        openTerminal(e.block);
+        break;
+      case "tty":
+        return writeTerminal(e.block, e.bytes);
+      case "terminal-end":
+        endTerminal(e.block);
         break;
     }
     if (e.kind !== "stdout" && e.kind !== "stderr") drawOutline();
@@ -698,6 +712,11 @@ Events.On("settings", (ev: { data: Settings }) => {
 });
 
 $("run-all").onclick = () => void actions.runall();
+let resizeTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => doc.file && sizeTerminal(), 200);
+});
 initReport({
   dirty: () => !$("dirty").hidden,
   before: applySource,
@@ -719,7 +738,7 @@ $("keep").onclick = () => {
 document.addEventListener("keydown", (e) => {
   if (!doc.file || e.metaKey || e.ctrlKey || e.altKey) return;
   const target = e.target as HTMLElement | null;
-  if (target?.closest?.("input, textarea, select, dialog, [contenteditable], .cm-editor")) return;
+  if (target?.closest?.("input, textarea, select, dialog, [contenteditable], .cm-editor, .terminal")) return;
   const all = blocks();
   const current = () => Number(all[selected].dataset.block);
   switch (e.key) {

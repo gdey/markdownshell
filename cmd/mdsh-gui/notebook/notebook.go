@@ -52,9 +52,13 @@ type Cell struct {
 
 // Event is what OnEvent reports while a block runs.
 type Event struct {
-	Kind  string `json:"kind"` // started, stdout, stderr or done
+	// Kind is started, stdout, stderr or done; or, for a tty block,
+	// terminal (it takes the terminal pane), tty (it showed Bytes there)
+	// and terminal-end.
+	Kind  string `json:"kind"`
 	Block int    `json:"block"`
 	Data  string `json:"data,omitempty"`
+	Bytes []byte `json:"bytes,omitempty"`
 }
 
 // RunOptions are the per-file choices mdsh takes as flags.
@@ -87,6 +91,7 @@ type Notebook struct {
 	file string
 	opts Options
 	md   goldmark.Markdown
+	term *terminal
 
 	mu      sync.Mutex // guards the fields below
 	d       *doc.Document
@@ -134,6 +139,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		opts:  opts,
 		d:     d,
 		index: map[*doc.Block]int{},
+		term:  newTerminal(),
 	}
 	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer()))
 	for i, b := range d.Blocks {
@@ -161,6 +167,8 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		Environ:     os.Environ(),
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
+		Terminal:    n.term.env(n.emit),
+		TakeTTY:     n.takeTTY,
 	})
 }
 

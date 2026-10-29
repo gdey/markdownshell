@@ -399,3 +399,19 @@ func (a *App) CreateReport(ctx context.Context, r notebook.Report) error {
 func (a *App) Reveal(file string) error {
 	return a.app.Env.OpenFileManager(file, true)
 }
+
+// Type sends keys typed in the terminal pane to the tty block running in
+// it.
+func (a *App) Type(ctx context.Context, keys string) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.Type(keys)
+	}
+}
+
+// SetTerminalSize sets the terminal pane's size in cells, which the
+// window works out from its width.
+func (a *App) SetTerminalSize(ctx context.Context, cols, rows int) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.SetTerminalSize(cols, rows)
+	}
+}

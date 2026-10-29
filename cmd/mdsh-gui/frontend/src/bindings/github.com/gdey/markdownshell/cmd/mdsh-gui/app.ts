@@ -192,6 +192,14 @@ export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
 }
 
 /**
+ * SetTerminalSize sets the terminal pane's size in cells, which the
+ * window works out from its width.
+ */
+export function SetTerminalSize(cols: number, rows: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetTerminalSize", cols, rows);
+}
+
+/**
  * SetText replaces the whole file, as typed in the source pane.
  */
 export function SetText(text: string): $CancellablePromise<void> {
@@ -233,4 +241,12 @@ export function Stop(): $CancellablePromise<void> {
  */
 export function Text(): $CancellablePromise<string> {
     return $Call.ByName("main.App.Text");
+}
+
+/**
+ * Type sends keys typed in the terminal pane to the tty block running in
+ * it.
+ */
+export function Type(keys: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.Type", keys);
 }
