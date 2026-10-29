@@ -33,6 +33,7 @@ var (
 	stderrStyle = lipgloss.NewStyle().Foreground(failCol)
 	savedStyle  = lipgloss.NewStyle().Foreground(dimCol)
 	tagStyle    = lipgloss.NewStyle().Foreground(dimCol)
+	bannerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(runningCol).Padding(0, 1)
 )
 
 // refresh redraws the document into the viewport, noting where each
@@ -41,6 +42,7 @@ func (m *Model) refresh() {
 	if !m.ready {
 		return
 	}
+	m.vp.Height = m.vpHeight()
 	var buf strings.Builder
 	m.tops, m.bots = map[int]int{}, map[int]int{}
 	line, blank := 0, true
