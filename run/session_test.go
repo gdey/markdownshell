@@ -137,3 +137,39 @@ func TestSessionSync(t *testing.T) {
 		t.Errorf("Sync after adding tty = %v, want ErrRestart", err)
 	}
 }
+
+func TestSessionSyncSource(t *testing.T) {
+	d := parse(t, "```sh {#a}\necho a\n```\n\n```sh {#b}\necho b\n```\n")
+	s, err := run.NewSession(d, run.Options{Environ: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.RunFrom(context.Background(), 0); err != nil {
+		t.Fatal(err)
+	}
+	a, b := s.Results()[0], s.Results()[1]
+
+	// b moves first, a is edited and c is new.
+	if err := d.SetSource([]byte("```sh {#b}\necho b\n```\n\n```sh {#a}\necho A\n```\n\n```sh {#c}\necho c\n```\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	rs := s.Results()
+	if len(rs) != 3 || rs[0] != b || string(b.Stdout) != "b\n" {
+		t.Errorf("the unchanged block lost its result")
+	}
+	if rs[1] == a || rs[1].Ran || rs[2].Ran {
+		t.Errorf("edited and new blocks should start with no result")
+	}
+	for i, r := range rs {
+		if r.Block != d.Blocks[i] {
+			t.Errorf("result %d is for the wrong block", i)
+		}
+	}
+	if r, err := s.RunBlock(context.Background(), 2); err != nil || string(r.Stdout) != "c\n" {
+		t.Errorf("new block: stdout %q, err %v", r.Stdout, err)
+	}
+}

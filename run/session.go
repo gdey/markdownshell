@@ -93,14 +93,28 @@ func (s *Session) Results() []*Result { return s.results }
 var ErrRestart = errors.New("the first tty block needs mdsh to start again")
 
 // Sync catches the session up with changes to the document since it
-// started: blocks appended, as by doc.AppendBlock, and blocks edited in
-// place, as by doc.Document.SetBlock. Call it while nothing runs.
+// started: blocks appended, as by doc.AppendBlock, blocks edited in
+// place, as by doc.Document.SetBlock, and a new source, as by
+// doc.Document.SetSource. A block that kept its identity keeps its
+// result, wherever it moved; a new block starts with none. Call it
+// while nothing runs.
 func (s *Session) Sync() error {
-	for i := len(s.results); i < len(s.d.Blocks); i++ {
-		b := s.d.Blocks[i]
-		s.results = append(s.results, &Result{Block: b})
-		s.selected[b] = true
+	byBlock := make(map[*doc.Block]*Result, len(s.results))
+	for _, r := range s.results {
+		byBlock[r.Block] = r
 	}
+	results := make([]*Result, len(s.d.Blocks))
+	for i, b := range s.d.Blocks {
+		if r, ok := byBlock[b]; ok {
+			results[i] = r
+			continue
+		}
+		results[i] = &Result{Block: b}
+		if _, ok := s.selected[b]; !ok {
+			s.selected[b] = true
+		}
+	}
+	s.results = results
 	s.refs()
 	if hasTTY(s.d) && !s.tty {
 		return ErrRestart
