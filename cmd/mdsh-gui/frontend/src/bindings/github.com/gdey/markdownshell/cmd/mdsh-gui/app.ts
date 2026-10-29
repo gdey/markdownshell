@@ -257,7 +257,7 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
 
 /**
  * SetSettings saves the settings the Settings window edits: autosave,
- * Vim mode, shell and the start folder. Open windows hear of it with a
+ * Vim mode, theme, shell, the view files open in and the start folder. Open windows hear of it with a
  * "settings" event.
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {

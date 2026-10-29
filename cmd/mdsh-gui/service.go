@@ -23,11 +23,15 @@ import (
 
 // Doc is what the frontend shows about the open file.
 type Doc struct {
-	File    string              `json:"file"`
-	Dirty   bool                `json:"dirty"`
-	Changed bool                `json:"changed"`
-	Running bool                `json:"running"` // a run is going on
-	Run     notebook.RunOptions `json:"run"`
+	File    string `json:"file"`
+	Dirty   bool   `json:"dirty"`
+	Changed bool   `json:"changed"`
+	Running bool   `json:"running"` // a run is going on
+	// Fresh is set the first time Doc is asked for after a file opens
+	// in the tab, but not after it is reloaded, so the page can show
+	// the view the settings open files in.
+	Fresh bool                `json:"fresh"`
+	Run   notebook.RunOptions `json:"run"`
 	// Args is Run.Args as one line, quoted as a shell would need.
 	Args string `json:"args"`
 }
@@ -43,10 +47,11 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 		return Doc{}, nil
 	}
 	t.mu.Lock()
-	running := t.running
+	running, fresh := t.running, t.fresh
+	t.fresh = false
 	t.mu.Unlock()
 	ro := n.RunOptions()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -269,7 +274,7 @@ func (a *App) StartScreen() (Start, error) {
 func (a *App) Settings() settings.Settings { return a.settings.Get() }
 
 // SetSettings saves the settings the Settings window edits: autosave,
-// Vim mode, shell and the start folder. Open windows hear of it with a
+// Vim mode, theme, shell, the view files open in and the start folder. Open windows hear of it with a
 // "settings" event.
 func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) {
@@ -277,6 +282,10 @@ func (a *App) SetSettings(s settings.Settings) error {
 		cur.Theme = ""
 		if s.Theme == "light" || s.Theme == "dark" {
 			cur.Theme = s.Theme
+		}
+		cur.View = ""
+		if s.View == "rendered" || s.View == "source" || s.View == "both" {
+			cur.View = s.View
 		}
 	})
 	if err == nil {

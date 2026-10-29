@@ -11,7 +11,7 @@ import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal }
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "" };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "" };
 let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
@@ -74,6 +74,7 @@ async function refresh() {
   drawOptions();
   cells = (await App.Cells()) ?? [];
   drawDoc();
+  if (doc.fresh) openView();
   if (doc.running && !ranHere) await catchUp();
   known = await names();
   await loadSource();
@@ -527,6 +528,14 @@ function applyView() {
     // Only a convenience: the next tab starts with the default view.
   }
   void App.SetView(view).catch(() => {});
+}
+
+// openView shows the view the settings open files in, if they name one.
+function openView() {
+  const v = settings.view;
+  if (v !== "rendered" && v !== "source" && v !== "both") return;
+  view = { ...view, split: v !== "rendered", rendered: v !== "source" };
+  applyView();
 }
 
 function toggle(key: keyof View, on = !view[key]) {
