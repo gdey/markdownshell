@@ -58,6 +58,10 @@ follow [Semantic Versioning](https://semver.org/).
   in the prose, show inline from the document's folder, which the window
   serves and nothing outside it. Clicking an output image shows it full
   size.
+- `mdsh-gui` reports: File › Create Report… writes a PDF, HTML or
+  markdown report of the window's run, a run of every block, or the
+  saved file, with code and output shown or hidden. It shows the
+  matching `mdsh` command, and offers to show the file in its folder.
 
 ### Changed
 

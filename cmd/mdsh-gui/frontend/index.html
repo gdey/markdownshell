@@ -78,6 +78,54 @@
       </div>
     </form>
   </dialog>
+  <dialog id="report">
+    <form method="dialog">
+      <h2>Create report</h2>
+      <div id="report-form">
+        <div class="row">
+          <span class="label">Format</span>
+          <span class="seg" role="radiogroup" aria-label="Format">
+            <button type="button" data-format="pdf" role="radio">PDF</button>
+            <button type="button" data-format="html" role="radio">HTML</button>
+            <button type="button" data-format="markdown" role="radio">Markdown</button>
+          </span>
+        </div>
+        <div class="row">
+          <span class="label">Show</span>
+          <div class="choices">
+            <label class="check"><input id="rep-code" type="checkbox" checked> Code blocks</label>
+            <label class="check"><input id="rep-output" type="checkbox" checked> Output</label>
+          </div>
+        </div>
+        <div class="row">
+          <span class="label">Output from</span>
+          <div class="choices">
+            <label class="check"><input type="radio" name="rep-from" value="window" checked> <span id="rep-window">This window's run</span></label>
+            <label class="check"><input type="radio" name="rep-from" value="run"> Run all blocks first</label>
+            <label class="check"><input type="radio" name="rep-from" value="saved"> Saved output only (like <code>--no-run</code>)</label>
+          </div>
+        </div>
+        <div class="row">
+          <span class="label">Save to</span>
+          <div class="dest">
+            <input id="rep-dest" type="text" spellcheck="false">
+            <button type="button" id="rep-choose">Choose…</button>
+          </div>
+        </div>
+        <p class="command muted"><span id="rep-same">Same as</span> <code id="rep-cmd"></code></p>
+      </div>
+      <p id="rep-done" hidden></p>
+      <p id="rep-error" class="error" hidden></p>
+      <div class="buttons" id="rep-buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="rep-ok" value="ok" class="primary">Create report</button>
+      </div>
+      <div class="buttons" id="rep-after" hidden>
+        <button type="button" id="rep-reveal">Show in Folder</button>
+        <button value="done" class="primary">Done</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="viewer" title="Click or press esc to close"><img alt=""></dialog>
 </body>
 </html>
