@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -47,10 +48,24 @@ type Event struct {
 	Data  string `json:"data,omitempty"`
 }
 
+// RunOptions are the per-file choices mdsh takes as flags.
+type RunOptions struct {
+	// Args are the positional parameters, $1 and on.
+	Args []string `json:"args"`
+	// Only runs the named block and the earlier blocks in its env chain,
+	// like --only.
+	Only string `json:"only"`
+	// Step asks before every block, like --step.
+	Step bool `json:"step"`
+	// StopOnError stops at the first failing block, like --stop-on-error.
+	StopOnError bool `json:"stopOnError"`
+	// Shell overrides the front matter's shell, like --shell.
+	Shell string `json:"shell"`
+}
+
 // Options configure a Notebook.
 type Options struct {
-	// Args are the positional parameters, $1 and on.
-	Args []string
+	Run RunOptions
 	// OnEvent, if set, is called as blocks start, write and finish.
 	OnEvent func(Event)
 	// Confirm is asked before a block marked confirm runs. If it is nil
@@ -71,6 +86,23 @@ type Notebook struct {
 	index   map[*doc.Block]int
 	cancel  context.CancelFunc
 	running bool
+	dirty   bool      // output changed since the last save
+	stamp   fileStamp // the file as last read or written
+}
+
+// fileStamp is what Changed compares to notice the file changing on
+// disk.
+type fileStamp struct {
+	mod  time.Time
+	size int64
+}
+
+func stampOf(file string) fileStamp {
+	fi, err := os.Stat(file)
+	if err != nil {
+		return fileStamp{}
+	}
+	return fileStamp{fi.ModTime(), fi.Size()}
 }
 
 // Open reads and parses file and readies its envs.
@@ -97,14 +129,8 @@ func Open(file string, opts Options) (*Notebook, error) {
 	for i, b := range d.Blocks {
 		n.index[b] = i
 	}
-	sess, err := run.NewSession(d, run.Options{
-		File:    abs,
-		LinkDir: filepath.Dir(abs),
-		Args:    opts.Args,
-		Environ: os.Environ(),
-		OnEvent: n.event,
-		Confirm: n.confirm,
-	})
+	n.stamp = stampOf(abs)
+	sess, err := n.newSession(opts.Run)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +139,67 @@ func Open(file string, opts Options) (*Notebook, error) {
 	return n, nil
 }
 
+func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
+	return run.NewSession(n.d, run.Options{
+		File:        n.file,
+		LinkDir:     filepath.Dir(n.file),
+		Args:        ro.Args,
+		Only:        ro.Only,
+		Step:        ro.Step,
+		StopOnError: ro.StopOnError,
+		Shell:       ro.Shell,
+		Environ:     os.Environ(),
+		OnEvent:     n.event,
+		Confirm:     n.confirm,
+	})
+}
+
 // File is the document's absolute path.
-func (n *Notebook) File() string { return n.file }
+func (n *Notebook) File() string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.file
+}
+
+// RunOptions are the options blocks run with.
+func (n *Notebook) RunOptions() RunOptions {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.opts.Run
+}
+
+// SetRunOptions changes the options blocks run with. The shells start
+// again, since arguments and the shell are fixed when they start, but
+// the output shown so far is kept.
+func (n *Notebook) SetRunOptions(ro RunOptions) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return ErrBusy
+	}
+	sess, err := n.newSession(ro)
+	if err != nil {
+		return err
+	}
+	n.sess.Close()
+	n.sess, n.opts.Run = sess, ro
+	return nil
+}
+
+// Dirty reports whether output changed since the file was last saved.
+func (n *Notebook) Dirty() bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.dirty
+}
+
+// Changed reports whether the file changed on disk since it was read or
+// last saved.
+func (n *Notebook) Changed() bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return stampOf(n.file) != n.stamp
+}
 
 // Close ends the shells blocks ran in, stopping any block that runs.
 func (n *Notebook) Close() {
@@ -228,8 +313,46 @@ func (n *Notebook) Save() error {
 	if n.running {
 		return ErrBusy
 	}
+	return n.write(n.file)
+}
+
+// SaveAs writes the document with its output to file, which becomes the
+// notebook's file. If file is in another folder the shells start again
+// there, as they would for a file opened from that folder.
+func (n *Notebook) SaveAs(file string) error {
+	abs, err := filepath.Abs(file)
+	if err != nil {
+		return err
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return ErrBusy
+	}
+	if err := n.write(abs); err != nil {
+		return err
+	}
+	moved := filepath.Dir(abs) != filepath.Dir(n.file)
+	n.file = abs
+	if moved {
+		sess, err := n.newSession(n.opts.Run)
+		if err != nil {
+			return err
+		}
+		n.sess.Close()
+		n.sess = sess
+	}
+	return nil
+}
+
+func (n *Notebook) write(file string) error {
 	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: os.Environ()})
-	return os.WriteFile(n.file, out, 0o644)
+	if err := os.WriteFile(file, out, 0o644); err != nil {
+		return err
+	}
+	n.dirty = false
+	n.stamp = stampOf(file)
+	return nil
 }
 
 // event runs on the run's goroutine.
@@ -238,6 +361,7 @@ func (n *Notebook) event(e run.Event) {
 	i := n.index[e.Block]
 	if e.Kind == run.Done {
 		n.results[i] = e.Result
+		n.dirty = true
 	}
 	n.mu.Unlock()
 	if n.opts.OnEvent == nil {

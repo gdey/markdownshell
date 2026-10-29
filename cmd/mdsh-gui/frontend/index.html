@@ -7,23 +7,58 @@
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
-<body>
-  <header>
+<body data-file-drop-target>
+  <header id="toolbar" hidden>
     <span id="file"></span>
+    <span id="dirty" title="Output not saved" hidden>•</span>
+    <button id="options" class="chip" title="Run options" hidden></button>
     <span id="status"></span>
-    <button id="open">Open…</button>
-    <button id="run-all" disabled>Run all</button>
-    <button id="stop" disabled>Stop</button>
-    <button id="save" disabled>Save</button>
+    <button id="run-all" class="primary" disabled>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+      <span>Run all</span>
+    </button>
   </header>
-  <div id="confirm" hidden>
-    <span id="question"></span>
-    <button data-answer="run">Run</button>
-    <button data-answer="skip">Skip</button>
-    <button data-answer="stop">Stop</button>
+  <div id="changed" class="banner" hidden>
+    <span id="changed-text"></span>
+    <button id="reload">Reload</button>
+    <button id="keep">Keep mine</button>
   </div>
-  <main id="doc">
-    <p class="empty">Open a markdown file to run its code blocks.</p>
+
+  <main id="doc" hidden></main>
+
+  <main id="start" hidden>
+    <h1>Open a runbook</h1>
+    <div class="start-bar">
+      <input id="filter" type="search" placeholder="Filter files" autocomplete="off" spellcheck="false">
+      <button id="open-other">Open…</button>
+    </div>
+    <p id="start-dir" class="muted"></p>
+    <section id="recent-list" hidden>
+      <h2>Recent</h2>
+      <ul class="files"></ul>
+    </section>
+    <section id="file-list"></section>
+    <p id="start-empty" class="muted" hidden>No markdown files here. Use Open… or drop a file on the window.</p>
   </main>
+
+  <dialog id="run-options">
+    <form method="dialog">
+      <h2>Run options</h2>
+      <p class="muted">For this file, until it closes. The shells start again when these change.</p>
+      <label>Arguments ($1 and on)
+        <input id="opt-args" type="text" spellcheck="false" placeholder="e.g. prod 'two words'">
+      </label>
+      <label>Only run
+        <select id="opt-only"></select>
+      </label>
+      <label class="check"><input id="opt-step" type="checkbox"> Ask before every block (step mode)</label>
+      <label class="check"><input id="opt-stop" type="checkbox"> Stop at the first failing block</label>
+      <p id="opt-error" class="error" hidden></p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="opt-ok" value="ok" class="primary">Apply</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>
