@@ -241,6 +241,8 @@ button.file { display: flex; width: 100%; gap: 12px; justify-content: space-betw
 ul.files li:first-child button.file { border-radius: 6px 6px 0 0; }
 ul.files li:last-child button.file { border-radius: 0 0 6px 6px; }
 .fname { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleft { display: flex; flex-direction: column; min-width: 0; }
+button.file .fdesc { font-size: 12px; }
 
 /* Dialogs */
 dialog { border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--fg); padding: 20px 24px; width: min(440px, 90vw); }

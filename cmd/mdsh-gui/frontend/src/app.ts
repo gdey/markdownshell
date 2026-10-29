@@ -536,8 +536,10 @@ async function drawStart() {
   $("filter").focus();
 }
 
-function fileRow(path: string, label: string, detail: string): HTMLElement {
-  const b = el("button", { className: "file", title: path }, el("span", { className: "fname" }, label), el("span", { className: "muted" }, detail));
+function fileRow(path: string, label: string, detail: string, desc = ""): HTMLElement {
+  const name = el("span", { className: "fname" }, label);
+  const left = desc ? el("span", { className: "fleft" }, name, el("span", { className: "fdesc muted", title: desc }, desc)) : name;
+  const b = el("button", { className: "file", title: path }, left, el("span", { className: "muted" }, detail));
   b.onclick = () => openPath(path);
   return el("li", {}, b);
 }
@@ -552,7 +554,7 @@ function filterStart() {
     .replaceChildren(...recent.map((p) => fileRow(p, p.split(/[\\/]/).pop() ?? p, tilde(p.replace(/[\\/][^\\/]*$/, "")))));
   const groups = new Map<string, NonNullable<Start["files"]>>();
   for (const f of startScreen.files ?? []) {
-    if (!match(f.rel)) continue;
+    if (!match(f.rel) && !match(f.description ?? "")) continue;
     const i = f.rel.lastIndexOf("/");
     const dir = i < 0 ? "" : f.rel.slice(0, i);
     if (!groups.has(dir)) groups.set(dir, []);
@@ -563,7 +565,7 @@ function filterStart() {
   for (const [dir, files] of groups) {
     list.append(
       el("h2", {}, dir === "" ? "This folder" : dir + "/"),
-      el("ul", { className: "files" }, ...files.map((f) => fileRow(f.path, f.rel.slice(dir === "" ? 0 : dir.length + 1), blocksLabel(f.blocks) + " · " + ago(f.mod)))),
+      el("ul", { className: "files" }, ...files.map((f) => fileRow(f.path, f.rel.slice(dir === "" ? 0 : dir.length + 1), blocksLabel(f.blocks) + " · " + ago(f.mod), f.description))),
     );
   }
   $("start-empty").hidden = groups.size > 0 || recent.length > 0;
