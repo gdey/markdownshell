@@ -33,6 +33,7 @@ import (
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/serve"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
 	"github.com/gdey/markdownshell/tui"
@@ -111,6 +112,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mdsh [run] [flags] file.md [args...]")
+		fmt.Fprintln(stderr, "       mdsh --serve[=host:port] [file.md [args...] | folder]")
 		fmt.Fprintln(stderr, "       mdsh completion bash|zsh")
 		fmt.Fprintln(stderr, "       mdsh lsp")
 		fmt.Fprintln(stderr, "       mdsh ctl COMMAND ...  (from inside a block; mdsh ctl help lists them)")
@@ -134,6 +136,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
+	var serveOn serveFlag
+	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"); anyone who can reach it with its token can run commands as you")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	auditFile := fs.String("audit", "", "write an audit log of the run to this file, one JSON object per line")
 	// Files are read as the flag is parsed, so a pipe such as
@@ -172,13 +176,21 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	default:
 		return fmt.Errorf("--color must be auto, always or never, got %q", *color)
 	}
+	set := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	if serveOn.on {
+		for _, name := range []string{"i", "autosave", "w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output", "stop-on-error", "yes", "step", "audit"} {
+			if set[name] {
+				return fmt.Errorf("-%s can't be used with --serve", name)
+			}
+		}
+		return serveCmd(serveOn.addr, fs.Arg(0), fs.Args()[min(1, fs.NArg()):], sources.String(), stderr)
+	}
 	if fs.NArg() < 1 && !*interactive {
 		fs.Usage()
 		return errors.New("no file given")
 	}
 	if *interactive {
-		set := map[string]bool{}
-		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 		for _, name := range []string{"w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output", "audit"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with -i", name)
