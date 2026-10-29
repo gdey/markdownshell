@@ -12,6 +12,18 @@ follow [Semantic Versioning](https://semver.org/).
   values, default, one-line help) for tools that help write them, with
   `AttrSpec.Check` to validate a value. `doc.SplitInfo` edits a fence
   info string in place, keeping unknown attributes and their order.
+- Output copies: an `output {for=id}` fence, or an `mdsh:output` region,
+  that isn't right after block `id` is a copy of its output, refilled on
+  every run like a placeholder. `stream=stderr` copies the stderr fence.
+  A copy keeps its content when the block doesn't run, and one for a
+  block that doesn't exist is a warning. `doc.Document.Copies` lists them
+  and `doc.Document.Warnings` holds the warnings, which the CLI prints.
+
+### Changed
+
+- The output right after a block holds at most one stdout part and one
+  stderr fence. A second `output` fence for the same block used to be
+  replaced along with the first; it is now a copy.
 
 ## [1.1.0] - 2026-10-28
 

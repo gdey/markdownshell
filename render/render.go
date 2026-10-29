@@ -4,6 +4,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -62,7 +63,7 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 	}
 	prose := func(from, to int) {
 		for _, k := range keep(from, to, cuts) {
-			writeProse(buf, d, k.Start, k.End, results, lookup, opts.WriteBack)
+			writeProse(buf, d, k.Start, k.End, results, lookup, opts)
 		}
 	}
 	// Display conditions are checked after the block, so {{$?}} is its
@@ -209,27 +210,101 @@ func lineEnd(src []byte, pos int) int {
 	return len(src)
 }
 
-// writeProse writes src[from:to], filling in the placeholders inside it.
-// A placeholder takes its value from lookup, else keeps its stored value.
-// {{$?}} is the status of the last block above it that ran.
-func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run.Result, lookup doc.Lookup, writeBack bool) {
-	for _, p := range d.Placeholders {
-		if p.Span.Start < from || p.Span.End > to {
-			continue
+// writeProse writes src[from:to], filling in the placeholders and output
+// copies inside it. A placeholder takes its value from lookup, else keeps
+// its stored value. {{$?}} is the status of the last block above it that
+// ran.
+func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run.Result, lookup doc.Lookup, opts Options) {
+	p, c := 0, 0
+	for {
+		for p < len(d.Placeholders) && d.Placeholders[p].Span.Start < from {
+			p++
 		}
-		buf.Write(d.Src[from:p.Span.Start])
-		v, ok := run.LookupAt(lookup, d, results, p.Span.Start)(p.Ref)
-		if !ok {
-			v = p.Value
+		for c < len(d.Copies) && d.Copies[c].Span.Start < from {
+			c++
 		}
-		if writeBack {
-			buf.WriteString(p.Source(v))
-		} else {
-			buf.WriteString(v)
+		var ph *doc.Placeholder
+		var cp *doc.Copy
+		if p < len(d.Placeholders) && d.Placeholders[p].Span.End <= to {
+			ph = d.Placeholders[p]
 		}
-		from = p.Span.End
+		if c < len(d.Copies) && d.Copies[c].Span.End <= to && (ph == nil || d.Copies[c].Span.Start < ph.Span.Start) {
+			cp, ph = d.Copies[c], nil
+		}
+		switch {
+		case ph != nil:
+			buf.Write(d.Src[from:ph.Span.Start])
+			v, ok := run.LookupAt(lookup, d, results, ph.Span.Start)(ph.Ref)
+			if !ok {
+				v = ph.Value
+			}
+			if opts.WriteBack {
+				buf.WriteString(ph.Source(v))
+			} else {
+				buf.WriteString(v)
+			}
+			from = ph.Span.End
+		case cp != nil:
+			buf.Write(d.Src[from:cp.Span.Start])
+			from = cp.Span.End
+			if text, ok := copyText(d, cp, results, lookup, opts); ok {
+				buf.WriteString(text)
+			} else if from < to {
+				from = min(skipBlankLine(d.Src, from), to)
+			}
+		default:
+			buf.Write(d.Src[from:to])
+			return
+		}
 	}
-	buf.Write(d.Src[from:to])
+}
+
+// copyText renders output copy c: the output its block wrote in this
+// run, else what c holds now. ok is false when c isn't printed, because
+// the output is hidden or empty.
+func copyText(d *doc.Document, c *doc.Copy, results []*run.Result, lookup doc.Lookup, opts Options) (text string, ok bool) {
+	if opts.HideOutput && !opts.WriteBack {
+		return "", false
+	}
+	i := slices.IndexFunc(d.Blocks, func(b *doc.Block) bool { return b.ID == c.For })
+	if i < 0 || d.Blocks[i].IsInclude() || d.Blocks[i].IsTape() {
+		return string(d.Src[c.Span.Start:c.Span.End]), true
+	}
+	b := d.Blocks[i]
+	if cond, ok := b.Cond("show-output"); ok && !opts.WriteBack && !cond.Eval(run.LookupAt(lookup, d, results, b.Output.End)) {
+		return "", false
+	}
+	if i >= len(results) || results[i] == nil || !results[i].Ran {
+		return string(d.Src[c.Span.Start:c.Span.End]), true
+	}
+	r := results[i]
+	main, stderr := outputParts(r, showStderr(d, b, r, run.LookupAt(lookup, d, results, b.Output.End)))
+	out := main
+	if c.Stream == "stderr" {
+		out = stderr
+	}
+	if out == "" {
+		if !opts.WriteBack {
+			return "", false
+		}
+		// Keep an empty copy, so the next run can fill it.
+		switch {
+		case c.Stream == "stderr":
+			out = Fence("output", fmt.Sprintf("for=%s stream=stderr", attrValue(b.ID)), "")
+		case run.OutKind(b) == "text":
+			out = Fence("output", fmt.Sprintf("for=%s exit=%d", attrValue(b.ID), r.Status), "")
+		default:
+			out = doc.RegionStart(b.ID) + "\n" + doc.RegionEnd + "\n"
+		}
+	}
+	out = indent(out, c.Prefix)
+	if c.Lead != "" {
+		out = c.Lead + strings.TrimPrefix(out, c.Prefix)
+	}
+	if end := d.Src[c.Span.Start:c.Span.End]; !bytes.HasSuffix(end, []byte("\n")) {
+		out = strings.TrimSuffix(out, "\n")
+	}
+	return out, true
 }
 
 // dropGap drops the blank lines, which may hold only prefix, at the start
@@ -268,6 +343,16 @@ func Prose(d *doc.Document, results []*run.Result, env []string) []byte {
 // stderr is included only when withStderr is set; mdsh's own errors
 // always are. It returns "" when there is nothing to show.
 func Output(r *run.Result, withStderr bool) string {
+	main, stderr := outputParts(r, withStderr)
+	if main != "" && stderr != "" {
+		return main + "\n" + stderr
+	}
+	return main + stderr
+}
+
+// outputParts renders r's output as Output does, in two parts: stdout
+// (a fence, or a region for markdown and images) and the stderr fence.
+func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 	var b strings.Builder
 	id := r.Block.ID
 	stderr := ""
@@ -309,12 +394,9 @@ func Output(r *run.Result, withStderr bool) string {
 		}
 	}
 	if stderr != "" {
-		if b.Len() > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(Fence("output", fmt.Sprintf("for=%s stream=stderr", attrValue(id)), stderr))
+		errFence = Fence("output", fmt.Sprintf("for=%s stream=stderr", attrValue(id)), stderr)
 	}
-	return b.String()
+	return b.String(), errFence
 }
 
 // writeInclude writes include block b with the lines r read as its body.

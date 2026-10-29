@@ -160,6 +160,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", displayName(file), err)
 	}
+	for _, w := range d.Warnings {
+		fmt.Fprintf(stderr, "mdsh: %s: warning: %s\n", displayName(file), w)
+	}
 
 	styled := *color == "always" || (*color == "auto" && isTerminal(stdout) && os.Getenv("NO_COLOR") == "")
 	// show prints the rendered markdown, or lays it out as a PDF with

@@ -372,3 +372,42 @@ func TestTapeRefs(t *testing.T) {
 		t.Error("Expand of an unknown ref succeeded")
 	}
 }
+
+func TestCopies(t *testing.T) {
+	src := "```sh {#a}\necho a\n```\n\n```output {for=a exit=0}\na\n```\n\n" +
+		"```output {for=a exit=0}\na\n```\n\n" +
+		"```sh {#b out=markdown}\necho b\n```\n\n" +
+		"```output {for=a stream=stderr}\noops\n```\n\n" +
+		"- Table:\n\n  <!-- mdsh:output for=\"b\" -->\n  b\n  <!-- /mdsh:output -->\n\n" +
+		"> ```output {for=nope}\n> x\n> ```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Copies) != 4 {
+		t.Fatalf("copies = %d, want 4", len(d.Copies))
+	}
+	want := []Copy{
+		{For: "a"},
+		{For: "a", Stream: "stderr"},
+		{For: "b", Region: true, Prefix: "  "},
+		{For: "nope", Prefix: "> "},
+	}
+	for i, c := range d.Copies {
+		got := *c
+		got.Span = Span{}
+		if got != want[i] {
+			t.Errorf("copy %d = %+v, want %+v", i, got, want[i])
+		}
+	}
+	if s := string(src[d.Copies[2].Span.Start:d.Copies[2].Span.End]); !strings.HasPrefix(s, "  <!--") || !strings.HasSuffix(s, "-->\n") {
+		t.Errorf("region copy span = %q", s)
+	}
+	// The real output is still the block's own.
+	if s := string(src[d.Blocks[0].Output.Start:d.Blocks[0].Output.End]); s != "\n```output {for=a exit=0}\na\n```\n" {
+		t.Errorf("a's output = %q", s)
+	}
+	if len(d.Warnings) != 1 || !strings.Contains(d.Warnings[0], `"nope"`) {
+		t.Errorf("warnings = %q", d.Warnings)
+	}
+}

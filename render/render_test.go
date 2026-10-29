@@ -131,3 +131,57 @@ func TestRecordingLink(t *testing.T) {
 		}
 	}
 }
+
+func TestCopies(t *testing.T) {
+	src := "```sh {#a}\necho a\n```\n\n```output {for=a exit=0}\nold\n```\n\n" +
+		"```sh {#b out=markdown}\necho b\n```\n\n" +
+		"Summary:\n\n" +
+		"```output {for=a exit=0}\nold\n```\n\n" +
+		"```output {for=a stream=stderr}\nold err\n```\n\n" +
+		"- B:\n\n  <!-- mdsh:output for=\"b\" -->\n  old b\n  <!-- /mdsh:output -->\n\n" +
+		"```output {for=c exit=0}\nkept\n```\n\nend\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Status: 2, Stdout: []byte("new\n"), Stderr: []byte("new err\n")},
+		{Block: d.Blocks[1], Ran: true, Stdout: []byte("| b |\n")},
+	}
+	want := "```sh {#a}\necho a\n```\n\n```output {for=a exit=2}\nnew\n```\n\n```output {for=a stream=stderr}\nnew err\n```\n\n" +
+		"```sh {#b out=markdown}\necho b\n```\n\n<!-- mdsh:output for=\"b\" -->\n| b |\n<!-- /mdsh:output -->\n\n" +
+		"Summary:\n\n" +
+		"```output {for=a exit=2}\nnew\n```\n\n" +
+		"```output {for=a stream=stderr}\nnew err\n```\n\n" +
+		"- B:\n\n  <!-- mdsh:output for=\"b\" -->\n  | b |\n  <!-- /mdsh:output -->\n\n" +
+		"```output {for=c exit=0}\nkept\n```\n\nend\n"
+	if got := string(Markdown(d, results, Options{WriteBack: true})); got != want {
+		t.Errorf("write-back:\ngot  %q\nwant %q", got, want)
+	}
+	// Blocks that didn't run keep their copies as they are.
+	if got := string(Markdown(d, nil, Options{WriteBack: true})); got != src {
+		t.Errorf("no results:\ngot  %q\nwant %q", got, src)
+	}
+	// Hidden output hides the copies too.
+	if got := string(Markdown(d, results, Options{HideOutput: true})); strings.Contains(got, "new") || strings.Contains(got, "old") || !strings.Contains(got, "Summary:\n\n- B:\n\nend") {
+		t.Errorf("hide output: %q", got)
+	}
+}
+
+func TestEmptyCopy(t *testing.T) {
+	src := "```sh {#a}\ntrue\n```\n\nA:\n\n```output {for=a exit=0}\nold\n```\n\n```output {for=a stream=stderr}\nold\n```\n\nend\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{{Block: d.Blocks[0], Ran: true}}
+	// Write-back keeps empty copies, so a later run can fill them.
+	want := "```sh {#a}\ntrue\n```\n\nA:\n\n```output {for=a exit=0}\n```\n\n```output {for=a stream=stderr}\n```\n\nend\n"
+	if got := string(Markdown(d, results, Options{WriteBack: true})); got != want {
+		t.Errorf("write-back:\ngot  %q\nwant %q", got, want)
+	}
+	// Printing leaves them out.
+	if got, want := string(Markdown(d, results, Options{})), "```sh {#a}\ntrue\n```\n\nA:\n\nend\n"; got != want {
+		t.Errorf("print:\ngot  %q\nwant %q", got, want)
+	}
+}
