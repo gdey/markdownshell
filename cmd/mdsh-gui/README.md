@@ -5,7 +5,7 @@ It shows a markdown file, runs its `sh` and `zsh` blocks as you pick
 them, streams their output under them and saves it back to the file. It
 uses the same `run.Session` as `mdsh -i`.
 
-There is no editing, no images and no `tty` blocks yet; see
+There is no prose editing, no images and no `tty` blocks yet; see
 [the design](../../docs/gui/design.md) for what comes next.
 
 ```sh
@@ -23,10 +23,18 @@ own shells.
 - **Run:** Run All (cmd/ctrl+R, the toolbar button turns into Stop while
   blocks run), Stop (cmd/ctrl+.) and Run Options… for the file's
   arguments, `--only`, step mode and stop on error.
-- **Keys:** `j`/`k` select a block, `enter` runs it and `a` runs from it.
+- **Editing:** the pencil icon (or `e`) opens a block in a code editor,
+  fences and attributes included, and **Add block** adds one at the end.
+  Inside `{…}` the editor completes attribute names and values, explains
+  an attribute on hover and underlines mistakes, and the sliders icon
+  opens a form over the attributes. Cmd/ctrl+enter applies the edit.
+  Vim key bindings are a setting.
+- **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
+  `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
-  Linux): autosave after each run, a shell for every file and the start
-  folder. They are kept in `mdsh/gui.json` in the user's config folder.
+  Linux): autosave after each run, Vim mode, a shell for every file and
+  the start folder. They are kept in `mdsh/gui.json` in the user's
+  config folder.
 
 If the file changes on disk, a banner offers to reload it.
 
@@ -45,6 +53,20 @@ cd cmd/mdsh-gui
 go build .
 ```
 
-The frontend is plain HTML, CSS and JavaScript in `frontend/`, embedded
-in the binary. It needs no npm build: it calls Go by name through the
-runtime Wails serves at `/wails/runtime.js`.
+The frontend is TypeScript in `frontend/src`, bundled into
+`frontend/bundle` and embedded in the binary, so `go build` needs
+nothing more. After changing the TypeScript or the Go methods the
+frontend calls, regenerate the bindings and the bundle (no npm needed):
+
+```sh
+go generate
+```
+
+The code editor is CodeMirror 6 with Vim bindings, vendored as one
+bundle in `frontend/vendor/codemirror.js`. `go run ./internal/vendorjs`
+rebuilds it from the versions `frontend/vendor/package-lock.json` pins,
+again without npm. To type-check the TypeScript:
+
+```sh
+npx --package typescript tsc -p frontend
+```
