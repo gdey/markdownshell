@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,9 @@ type Cell struct {
 	ID   string `json:"id,omitempty"`
 	Lang string `json:"lang,omitempty"`
 	Body string `json:"body,omitempty"`
+	// Attrs are the block's attributes other than its id, as written,
+	// such as confirm timeout=5m.
+	Attrs string `json:"attrs,omitempty"`
 	// Output is the block's output, saved or from this session, rendered.
 	Output string `json:"output,omitempty"`
 	// Ran is true when the block ran this session; Status and Failed say
@@ -240,6 +244,7 @@ func (n *Notebook) Cells() []Cell {
 			ID:     b.ID,
 			Lang:   b.Lang,
 			Body:   b.Body,
+			Attrs:  attrsText(b.Info),
 			Output: n.html(pieces[3*i+2]),
 			Ran:    r.Ran,
 			Status: r.Status,
@@ -249,6 +254,12 @@ func (n *Notebook) Cells() []Cell {
 	prose.Write(pieces[len(pieces)-1])
 	flush()
 	return cells
+}
+
+func attrsText(info string) string {
+	in := doc.SplitInfo(info)
+	in.Del("#")
+	return strings.Join(in.Tokens, " ")
 }
 
 func (n *Notebook) html(md []byte) string {

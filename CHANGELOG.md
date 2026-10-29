@@ -21,6 +21,12 @@ follow [Semantic Versioning](https://semver.org/).
   with a prompt before closing unsaved output, a banner when the file
   changes on disk, run options (arguments, only, step mode, stop on
   error) and a Settings window (autosave, shell, start folder).
+- `mdsh-gui` block editing: edit a block in a CodeMirror editor, fences
+  and attributes included, or add one at the end. The editor completes
+  attribute names and values, explains them on hover, underlines
+  mistakes and has a form over the attributes. Vim key bindings are a
+  setting. The frontend is now TypeScript, bundled by esbuild from
+  `go generate`, with CodeMirror vendored without npm.
 
 ## [1.1.0] - 2026-10-28
 

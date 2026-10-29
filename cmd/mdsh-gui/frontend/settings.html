@@ -5,12 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings</title>
   <link rel="stylesheet" href="style.css">
-  <script type="module" src="settings.js"></script>
+  <script type="module" src="bundle/settings.js"></script>
 </head>
 <body>
   <main class="settings">
     <label class="check"><input id="autosave" type="checkbox"> Save the file after each run</label>
     <p class="muted">Off by default: the window shows • while output isn't saved.</p>
+
+    <label class="check"><input id="vim" type="checkbox"> Vim key bindings in the code editor</label>
+    <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
 
     <label>Shell for every file
       <input id="shell" type="text" spellcheck="false" placeholder="From the file's front matter (default)">
