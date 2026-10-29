@@ -145,6 +145,14 @@ export function Names(): $CancellablePromise<notebook$0.Names> {
 }
 
 /**
+ * NewFile asks where to make a new markdown file and opens it: in this
+ * tab if it shows the start screen, else in a new tab.
+ */
+export function NewFile(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NewFile");
+}
+
+/**
  * NewTab opens a tab with the start screen in the calling window, after
  * the tab in front.
  */
