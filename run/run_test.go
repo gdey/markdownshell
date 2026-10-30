@@ -85,6 +85,37 @@ func TestShareExclusions(t *testing.T) {
 	}
 }
 
+func TestSource(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "defs.sh"), []byte("greet() { echo hi $1; }"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := "---\nmdsh:\n  env:\n    source: [defs.sh]\n---\n" +
+		"```sh {#a}\ngreet a; flag\n```\n" +
+		"```sh {#b env=sub share=}\ngreet b; flag\n```\n"
+	_, results := runDoc(t, src, run.Options{
+		File:   filepath.Join(dir, "doc.md"),
+		Source: "flag() { echo flag; }",
+	})
+	want := map[string]string{"a": "hi a\nflag\n", "b": "hi b\nflag\n"}
+	r := byID(results)
+	for id, w := range want {
+		if got := string(r[id].Stdout); got != w {
+			t.Errorf("%s stdout = %q, want %q (stderr %q, err %v)", id, got, w, r[id].Stderr, r[id].Err)
+		}
+	}
+}
+
+func TestSourceMissing(t *testing.T) {
+	d, err := doc.Parse([]byte("---\nmdsh:\n  env:\n    source: [nope.sh]\n---\n```sh\ntrue\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run.Run(context.Background(), d, run.Options{Dir: t.TempDir()}); err == nil || !strings.Contains(err.Error(), "nope.sh") {
+		t.Errorf("err = %v, want one naming nope.sh", err)
+	}
+}
+
 func TestFailureContinuesByDefault(t *testing.T) {
 	_, results := runDoc(t, "```sh {#a}\nfalse\n```\n```sh {#b}\necho b\n```\n", run.Options{})
 	r := byID(results)

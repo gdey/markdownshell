@@ -21,6 +21,11 @@ follow [Semantic Versioning](https://semver.org/).
   block placeholders, and starts the shells again, as if nothing had
   run. Includes keep their lines. It isn't saved until you save, and
   with the source view open, undo there brings the output back.
+- `--source FILE` and `env.source` in the front matter source files into
+  every shell, sub-envs included, before its first block, so blocks can
+  use aliases and functions. `--source` reads its file once, so
+  `mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }` in
+  `~/.zshrc` gives blocks the ones defined in the calling shell.
 
 ## [1.2.1] - 2026-10-29
 

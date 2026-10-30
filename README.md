@@ -185,6 +185,7 @@ mdsh --pdf notes.pdf notes.md   # what it would print, as a PDF
 mdsh --only greet notes.md # one block, plus what it depends on
 mdsh --yes notes.md        # run confirm blocks without asking
 mdsh --step notes.md       # ask before every block: run, skip or stop
+mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
 ```
 
@@ -506,3 +507,15 @@ An explicit `exit` ends the shell and stops the run. Blocks can use
 `$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, the script's arguments as `$1`…,
 and the helpers `md_h1`, `md_h2`, `md_h3`, `md_table [-F SEP] [-s N]` (TSV
 on stdin) and `md_code`.
+
+Blocks don't see the aliases and functions of the shell mdsh was started
+from, since a child process only inherits exported variables. To use them,
+source them into every shell (sub-envs too) with `--source FILE` or with
+`source:` under `env:` in the front matter. This wrapper in `~/.zshrc`
+passes along whatever your shell has defined when you run mdsh:
+
+```zsh
+mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
+```
+
+In bash, use `<(alias -p; declare -f)`.

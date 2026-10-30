@@ -1,7 +1,11 @@
 package env
 
 import (
+	"bytes"
+	"context"
+	"io"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -29,5 +33,21 @@ func TestFilter(t *testing.T) {
 				t.Errorf("Filter(%q) = %v, want %v", tt.share, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestInit(t *testing.T) {
+	sh, err := Start(Config{Init: "alias hi='echo hi'\nfalse"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sh.Close()
+	var out bytes.Buffer
+	if rc, _, err := sh.Run(context.Background(), "hi there", &out, io.Discard); err != nil || rc != 0 || out.String() != "hi there\n" {
+		t.Errorf("rc %d, err %v, out %q", rc, err, out.String())
+	}
+
+	if _, err := Start(Config{Init: "echo oops >&2; exit 3"}); err == nil || !strings.Contains(err.Error(), "oops") {
+		t.Errorf("err = %v, want the Init's stderr", err)
 	}
 }

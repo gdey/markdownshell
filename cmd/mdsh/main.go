@@ -105,6 +105,18 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them")
 	showVersion := fs.Bool("version", false, "print the version and exit")
+	// Files are read as the flag is parsed, so a pipe such as
+	// <(alias -L) is read once, however many shells start.
+	var sources strings.Builder
+	fs.Func("source", "source this file into every shell before blocks run, such as aliases and functions (repeatable)", func(p string) error {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		sources.Write(src)
+		sources.WriteString("\n")
+		return nil
+	})
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -132,7 +144,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 				return fmt.Errorf("-%s can't be used with -i", name)
 			}
 		}
-		return interactiveCmd(fs.Arg(0), fs.Args()[1:], *stop, *step, *yes, stdin, stdout)
+		return interactiveCmd(fs.Arg(0), fs.Args()[1:], sources.String(), *stop, *step, *yes, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -231,6 +243,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		StopOnError: *stop,
 		Only:        *only,
 		Step:        *step,
+		Source:      sources.String(),
 	}
 	if file != "" {
 		if abs, err := filepath.Abs(file); err == nil {
@@ -454,7 +467,7 @@ func (s *streamer) finish(results []*run.Result) error {
 
 // interactiveCmd opens file in the TUI. Output is saved to the file
 // after every block that runs.
-func interactiveCmd(file string, args []string, stop, step, yes bool, stdin io.Reader, stdout io.Writer) error {
+func interactiveCmd(file string, args []string, source string, stop, step, yes bool, stdin io.Reader, stdout io.Writer) error {
 	if file == "-" {
 		return errors.New("-i needs a file, not stdin")
 	}
@@ -493,6 +506,7 @@ func interactiveCmd(file string, args []string, stop, step, yes bool, stdin io.R
 			LinkDir:     filepath.Dir(abs),
 			Args:        args,
 			Environ:     os.Environ(),
+			Source:      source,
 			StopOnError: stop,
 			Step:        step,
 		},

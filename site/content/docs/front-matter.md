@@ -19,6 +19,7 @@ mdsh:
   show_stderr: false
   env:
     share: [PATH, HOME]
+    source: [~/.zsh_aliases]
 ---
 ```
 
@@ -36,6 +37,7 @@ closing line, the `---` is just a thematic break.
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
 | `env.share` | list of variable names, `...`, `-NAME` | all | Variables passed from mdsh's environment into the shell, and the default `share=` for sub-envs |
+| `env.source` | list of file paths | none | Files sourced into every shell before its first block, such as aliases and functions |
 
 ### `shell`
 
@@ -109,6 +111,24 @@ mdsh:
   env:
     share: [..., -AWS_SECRET_ACCESS_KEY, -GITHUB_TOKEN]
 ```
+
+### `env.source`
+
+Files sourced into every shell mdsh starts, the top level and each
+sub-env, before the shell's first block. Use it for aliases and functions
+that blocks call. A path starting with `~/` is in your home directory, and
+other relative paths are relative to the document. A missing file stops
+the run before any block runs. A file's exit status is ignored, but one
+that ends the shell, with `exit`, is an error.
+
+```yaml
+mdsh:
+  env:
+    source: [~/.zsh_aliases, lib/helpers.sh]
+```
+
+Files given with `--source` are sourced after these. See
+[Aliases and functions]({{< relref "environments#aliases-and-functions" >}}).
 
 ## Unknown keys
 

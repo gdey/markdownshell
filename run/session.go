@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
@@ -46,6 +47,10 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	init, err := sources(d, opts)
+	if err != nil {
+		return nil, err
+	}
 	s := &Session{
 		d:        d,
 		opts:     opts,
@@ -56,6 +61,7 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Dir:  opts.Dir,
 			Args: opts.Args,
 			TTY:  hasTTY(d),
+			Init: init,
 		}),
 		tty: hasTTY(d),
 	}
@@ -64,6 +70,45 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 	s.results = Includes(d, opts)
 	s.refs()
 	return s, nil
+}
+
+// sources reads the files the front matter's env.source names into one
+// script, followed by opts.Source.
+func sources(d *doc.Document, opts Options) (string, error) {
+	base := opts.Dir
+	if opts.File != "" {
+		base = filepath.Dir(opts.File)
+	}
+	var scripts []string
+	for _, p := range d.Options.Env.Source {
+		if rest, ok := strings.CutPrefix(p, "~/"); ok {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("env.source %s: %w", p, err)
+			}
+			p = filepath.Join(home, rest)
+		} else if !filepath.IsAbs(p) && base != "" {
+			p = filepath.Join(base, p)
+		}
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return "", fmt.Errorf("env.source: %w", err)
+		}
+		scripts = append(scripts, string(src))
+	}
+	return joinScripts(append(scripts, opts.Source)...), nil
+}
+
+// joinScripts joins scripts, ending each with a newline.
+func joinScripts(scripts ...string) string {
+	var b strings.Builder
+	for _, s := range scripts {
+		b.WriteString(s)
+		if s != "" && !strings.HasSuffix(s, "\n") {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
 
 // refs notes the variables other blocks read from each block and readies

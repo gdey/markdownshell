@@ -76,6 +76,10 @@ type Config struct {
 	// TTY gives the shell a pseudo-terminal of its own as its
 	// controlling terminal, so RunTTY can run blocks on it.
 	TTY bool
+	// Init runs in the shell once it starts, before any block, such as
+	// aliases and functions to define. Its exit status is ignored, but
+	// an Init that ends the shell is an error.
+	Init string
 }
 
 // Start launches a shell.
@@ -152,6 +156,16 @@ func Start(cfg Config) (*Shell, error) {
 	if _, _, err := s.Run(context.Background(), init, io.Discard, io.Discard); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("starting %s: %w", cfg.Path, err)
+	}
+	if cfg.Init != "" {
+		var errb bytes.Buffer
+		if _, _, err := s.Run(context.Background(), cfg.Init, io.Discard, &errb); err != nil {
+			s.Close()
+			if msg := strings.TrimSpace(errb.String()); msg != "" {
+				err = fmt.Errorf("%w: %s", err, msg)
+			}
+			return nil, fmt.Errorf("sourcing files in %s: %w", cfg.Path, err)
+		}
 	}
 	return s, nil
 }

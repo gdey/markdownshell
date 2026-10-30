@@ -41,6 +41,10 @@ type Options struct {
 	Environ []string
 	// Shell overrides the front matter's shell.
 	Shell string
+	// Source runs in every shell as it starts, after the files the
+	// front matter's env.source names, such as aliases and functions
+	// read from the files given to --source.
+	Source string
 	// StopOnError stops at the first failing block, whatever the front
 	// matter says.
 	StopOnError bool
