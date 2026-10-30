@@ -28,6 +28,7 @@ import (
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/serve"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/tui"
 )
@@ -84,6 +85,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mdsh [run] [flags] file.md [args...]")
+		fmt.Fprintln(stderr, "       mdsh --serve[=host:port] [file.md [args...] | folder]")
 		fmt.Fprintln(stderr, "       mdsh completion bash|zsh")
 		fmt.Fprintln(stderr, "       use - as the file to read markdown from stdin")
 		fs.PrintDefaults()
@@ -104,6 +106,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them")
+	var serveOn serveFlag
+	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"); anyone who can reach it with its token can run commands as you")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -120,13 +124,21 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("--color must be auto, always or never, got %q", *color)
 	}
+	set := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	if serveOn.on {
+		for _, name := range []string{"i", "w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output", "stop-on-error", "yes", "step"} {
+			if set[name] {
+				return fmt.Errorf("-%s can't be used with --serve", name)
+			}
+		}
+		return serveCmd(serveOn.addr, fs.Arg(0), fs.Args()[min(1, fs.NArg()):], stderr)
+	}
 	if fs.NArg() < 1 {
 		fs.Usage()
 		return errors.New("no file given")
 	}
 	if *interactive {
-		set := map[string]bool{}
-		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 		for _, name := range []string{"w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with -i", name)
