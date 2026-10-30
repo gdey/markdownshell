@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // linkKind is what following a link does.
@@ -74,50 +72,9 @@ func (a *App) openLink(t *docTab, href string) error {
 	}
 	switch kind {
 	case linkWeb:
-		return a.app.Browser.OpenURL(target)
+		return a.host.OpenURL(target)
 	case linkDoc:
 		return a.openIn(t.window(), target)
 	}
-	return a.app.Browser.OpenFile(target)
-}
-
-// buildLinkMenu makes the right-click menu of a link in the rendered
-// view, in place of the web view's, whose Open Link would load the link
-// over the app's page. The frontend gives the link's href as the
-// menu's data.
-func (a *App) buildLinkMenu() {
-	m := application.NewContextMenu("link")
-	m.Add("Open Link").OnClick(func(c *application.Context) {
-		t := a.currentTab()
-		if t == nil {
-			return
-		}
-		if err := a.openLink(t, menuHref(c)); err != nil {
-			var win application.Window
-			if w := t.window(); w != nil {
-				win = w.win
-			}
-			a.showError(win, err)
-		}
-	})
-	m.Add("Copy Link").OnClick(func(c *application.Context) {
-		href := menuHref(c)
-		if t := a.currentTab(); t != nil {
-			if _, target, err := linkTarget(t.file(), href); err == nil {
-				href = target
-			}
-		}
-		a.app.Clipboard.SetText(href)
-	})
-	m.Update()
-}
-
-// menuHref is the href the frontend gave a link's menu, as a quoted CSS
-// string.
-func menuHref(c *application.Context) string {
-	s := strings.TrimSpace(c.ContextMenuData())
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		s = s[1 : len(s)-1]
-	}
-	return s
+	return a.host.OpenFile(target)
 }

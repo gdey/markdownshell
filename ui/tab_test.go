@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"context"
@@ -54,7 +54,7 @@ func TestWindowTabs(t *testing.T) {
 
 func TestTabCalls(t *testing.T) {
 	var got any
-	h := tabCalls(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { got = r.Context().Value(tabKey{}) }))
+	h := TabCalls(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { got = r.Context().Value(tabKey{}) }))
 	r := httptest.NewRequest("POST", "/wails/runtime", nil)
 	r.Header.Set(tabHeader, "7")
 	h.ServeHTTP(httptest.NewRecorder(), r)
@@ -125,7 +125,7 @@ func TestTabFresh(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	a := &App{settings: st, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	a := &App{host: quietHost{}, settings: st, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
 	tab := &docTab{app: a, id: 1}
 	a.tabs[1] = tab
 	t.Cleanup(func() {
@@ -157,3 +157,8 @@ func TestTabFresh(t *testing.T) {
 		}
 	}
 }
+
+// quietHost is a Host with no menus to tell; it has nothing else.
+type quietHost struct{ Host }
+
+func (quietHost) RecentChanged() {}

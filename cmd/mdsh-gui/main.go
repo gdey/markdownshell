@@ -19,13 +19,13 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/ui"
 	"github.com/gdey/markdownshell/web"
 )
 
 // The frontend is the web package: TypeScript in web/src, bundled into
-// web/bundle. The bindings in web/src/bindings are generated from App.
+// web/bundle. The bindings in web/src/bindings are generated from ui.App.
 //
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d ../../web/src/bindings
 //go:generate go run ./internal/build
@@ -60,34 +60,35 @@ func mdshGUI(args []string) error {
 		args = nil
 	}
 	cwd, _ := os.Getwd()
-	a := &App{settings: store, cwd: cwd, dir: dir, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	g := &gui{}
+	a := ui.New(g, store, cwd, dir)
+	g.ctrl = ui.ControlOf(a)
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(web.FS)), Middleware: tabCalls},
+		Assets:      application.AssetOptions{Handler: g.ctrl.Assets(application.AssetFileServerFS(web.FS)), Middleware: ui.TabCalls},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		ShouldQuit: a.shouldQuit,
+		ShouldQuit: g.ctrl.ShouldQuit,
 	})
-	a.app = app
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { a.started.Store(true) })
-	a.menu = a.buildMenu()
-	a.buildSourceMenu()
-	a.buildLinkMenu()
+	g.app = app
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { g.started.Store(true) })
+	g.menu = g.buildMenu()
+	g.buildSourceMenu()
+	g.buildLinkMenu()
 	if runtime.GOOS == "darwin" {
-		app.Menu.Set(a.menu)
+		app.Menu.Set(g.menu)
 	}
 
-	t := a.newTab()
+	file, fileArgs := "", []string(nil)
 	if len(args) > 0 {
-		ro := notebook.RunOptions{Args: args[1:], Shell: store.Get().Shell}
-		if err := t.open(args[0], ro); err != nil {
-			return err
-		}
+		file, fileArgs = args[0], args[1:]
 	}
-	a.newWindow(t)
+	if err := g.ctrl.Start(file, fileArgs); err != nil {
+		return err
+	}
 	return app.Run()
 }
 
