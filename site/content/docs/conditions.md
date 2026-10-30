@@ -15,6 +15,7 @@ with `==` or `!=`, or negated with `!`:
 | `!{{$QUIET}}` | the opposite |
 | `{{#detect/env(OS)}}==Linux` | block `detect` left `OS` set to `Linux` |
 | `true`, `false` | always, never |
+| `once` | in `run=` only: the block has no output yet |
 
 Use them in `run=`, `show=`, `show-output=` and `show-stderr=`, and to show
 or hide whole stretches of the document:
@@ -24,6 +25,11 @@ or hide whole stretches of the document:
 Prose and blocks here are printed only when DEBUG is set.
 <!-- mdsh:end -->
 ```
+
+`run=once` runs a block only while it has no output: none saved after it
+in the file, and none from running it earlier in the same `mdsh -i` or
+`mdsh-gui` session. Use it for a slow setup or a one-time fetch; delete
+its output to run it again. Picking the block by hand still runs it.
 
 Sections nest, and their comment lines never appear in printed output. Only
 `run=` changes what runs; the others change what is printed, and `-w` keeps

@@ -52,6 +52,29 @@ follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
+- `textbox` blocks: ```` ```textbox {#host lines=1 placeholder="Which host?"} ````
+  holds text rather than code. `mdsh-gui` draws it as a box to type in
+  and saves what is typed into the block's body; `lines=` is the most
+  lines it holds and `placeholder=` shows while it is empty.
+- `choice` blocks list options as task list items:
+  `mode=dropdown` (the default), `radio` or `multi`. `mdsh-gui` draws
+  the control and writes the picks back as `[x]`.
+- `var=name` on a textbox or choice binds `$MDSH_VAR_name` to its text or
+  checked options, for blocks and for conditions such as
+  `run={{$MDSH_VAR_env}}==prod`. Only the first input binding a name
+  counts; mdsh warns about later ones, and `mdsh-gui` marks them, with
+  `!` in the outline.
+- `$MDSH_MODE` tells a block how it is being run: `running` from the
+  command line, `interactive` in `mdsh -i` and `mdsh-gui`, `report` for
+  `--pdf` and `--html`. Conditions read it too, so
+  `<!-- mdsh:if {{$MDSH_MODE}}!=report -->` leaves a part out of reports.
+- `mdsh-gui`: task list checkboxes in the rendered view check and
+  uncheck the item in the file. A table cell starting with `[ ]` or
+  `- [ ]` shows a checkbox too, and so does a block's `out=markdown`
+  output, until the block runs again.
+- `run=once` runs a block only while it has no output, saved in the file
+  or from an earlier run in the same `mdsh -i` or `mdsh-gui` session.
+  Running the block by hand still runs it.
 
 ### Fixed
 

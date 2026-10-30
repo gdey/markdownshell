@@ -36,6 +36,7 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 	if opts.Environ == nil {
 		opts.Environ = os.Environ()
 	}
+	opts.Environ = WithMode(opts.Environ, mode(opts.Mode))
 	if opts.Dir == "" && opts.File != "" {
 		opts.Dir = filepath.Dir(opts.File)
 	}
@@ -190,7 +191,7 @@ func (s *Session) emit(e Event) {
 }
 
 // RunFrom runs the blocks from index from to the end, the way Run does:
-// it honors skip, run=, Only, confirm and step mode, and stops when a
+// it honors skip, run= (once included), Only, confirm and step mode, and stops when a
 // block ends its shell or fails with on_error stop. Blocks it runs again
 // get new results.
 func (s *Session) RunFrom(ctx context.Context, from int) error {
@@ -210,7 +211,7 @@ func (s *Session) RunFrom(ctx context.Context, from int) error {
 			s.results[i] = r
 			continue
 		}
-		if c, ok := b.Cond("run"); ok && !c.Eval(LookupAt(s.lookup, d, s.results, b.Span.Start)) {
+		if c, ok := b.Cond("run"); ok && (c.Once && s.hasOutput(i) || !c.Eval(LookupAt(s.lookup, d, s.results, b.Span.Start))) {
 			r.Skipped = true
 			s.results[i] = r
 			continue
@@ -237,6 +238,13 @@ func (s *Session) RunFrom(ctx context.Context, from int) error {
 		}
 	}
 	return s.Wait(ctx)
+}
+
+// hasOutput reports whether block i has output, for run=once: saved
+// after it in the file, or from running earlier in this session.
+func (s *Session) hasOutput(i int) bool {
+	r := s.results[i]
+	return s.d.Blocks[i].HasOutput() || r != nil && r.Ran
 }
 
 // RunBlock runs block i alone and returns its new result. It runs the

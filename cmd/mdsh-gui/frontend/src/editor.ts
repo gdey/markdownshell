@@ -72,6 +72,7 @@ function infoRange(state: EditorState, pos: number): { from: number; text: strin
 async function checkInfo(view: EditorView): Promise<Diagnostic[]> {
   const out: Diagnostic[] = [];
   const doc = view.state.doc;
+  const vars = new Map<string, number>(); // var= names, and the line binding each
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
     if (!line.text.includes("{")) continue;
@@ -81,6 +82,13 @@ async function checkInfo(view: EditorView): Promise<Diagnostic[]> {
     for (const p of problems) {
       out.push({ from: r.from + p.from, to: r.from + p.to, severity: p.severity === "error" ? "error" : "warning", message: p.message });
     }
+    // Only one textbox or choice can bind a variable, or the last would
+    // quietly win.
+    const v = /^\s*(?:textbox|choice)\b/.test(r.text) && !r.text.includes("<include") ? /[{\s]var="?([A-Za-z0-9_]+)"?/.exec(r.text) : null;
+    if (!v) continue;
+    const first = vars.get(v[1]);
+    if (first === undefined) vars.set(v[1], n);
+    else out.push({ from: r.from + v.index + 1, to: r.from + v.index + v[0].length, severity: "error", message: `var=${v[1]} is already bound on line ${first}, so this one is ignored` });
   }
   return out;
 }
@@ -102,6 +110,10 @@ function tokenAt(state: EditorState, pos: number): { start: number; text: string
   return { start: r.from + start, text: before.slice(start) };
 }
 
+// inputAttrs are the attributes, besides their own, that mean something
+// on a textbox or a choice.
+const inputAttrs = new Set(["#", "show"]);
+
 function attrCompletions(attrs: AttrSpec[], names: () => Names) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const tok = tokenAt(ctx.state, ctx.pos);
@@ -110,8 +122,9 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
     if (eq < 0) {
       const present = new Set((infoRange(ctx.state, ctx.pos)?.text.match(/[{\s]([#<\w-]+)/g) ?? []).map((s) => s.slice(1).replace(/^#.*/, "#")));
       const include = present.has("<include");
+      const input = include ? "" : (/^\s*(textbox|choice)\b/.exec(infoRange(ctx.state, ctx.pos)?.text ?? "")?.[1] ?? "");
       const options: Completion[] = attrs
-        .filter((a) => !!a.include === include || a.name === "<include")
+        .filter((a) => (input ? !!a.inputs?.includes(input) || inputAttrs.has(a.name) : !a.inputs && (!!a.include === include || a.name === "<include")))
         .filter((a) => !present.has(a.name) || tok.text.startsWith(a.name))
         .map((a) => ({
           label: a.name === "#" ? "#id" : a.name,
@@ -145,6 +158,7 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
             { label: `{{#${id}/ran?}}`, detail: `whether #${id} ran`, type: "variable" },
           ]),
         ];
+        if (key === "run") values.push({ label: "once", detail: "only while the block has no output", type: "constant" });
         break;
       case AttrKind.AttrDuration:
         values = ["30s", "5m", "1h"].map((v) => ({ label: v, type: "constant" }));

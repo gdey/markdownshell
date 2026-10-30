@@ -40,6 +40,9 @@ type Block struct {
 	// when the fence opens on the same line as its list item, such as
 	// "- " or "> 1. ". Empty otherwise.
 	Lead string
+	// VarTaken says why an input's var= binds nothing: an earlier input
+	// binds the same name. Empty otherwise.
+	VarTaken string
 
 	quote, col int // the container: block quote depth and list content column
 	// outMain and outErr are set once Output holds a stdout part (a
@@ -121,6 +124,7 @@ func Parse(src []byte) (*Document, error) {
 	}
 
 	ids := map[string]bool{}
+	vars := map[string]string{} // var= names, and the input that binds each
 	includes, tapes := 0, 0
 	var last *Block
 	var open []*Section
@@ -192,6 +196,16 @@ func Parse(src []byte) (*Document, error) {
 				return nil, fmt.Errorf("line %d: duplicate block id %q", lineNo(src, pos), b.ID)
 			}
 			ids[b.ID] = true
+			if v := b.Attrs["var"]; v != "" && b.IsInput() {
+				// Only one input can set a variable: the first. Later
+				// ones are flagged and bind nothing.
+				if first, ok := vars[v]; ok {
+					b.VarTaken = fmt.Sprintf("var=%s is already bound by %s, so this one is ignored", v, first)
+					d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(src, pos), b.VarTaken))
+				} else {
+					vars[v] = fmt.Sprintf("%q on line %d", b.ID, lineNo(src, pos))
+				}
+			}
 			b.Output = Span{next, next}
 			d.Blocks = append(d.Blocks, b)
 			last = b
@@ -223,6 +237,9 @@ func Parse(src []byte) (*Document, error) {
 		if text, isIf, isEnd := sectionLine(line); isIf || isEnd {
 			if isIf {
 				c, err := ParseCond(text)
+				if err == nil && c.Once {
+					err = errOnce
+				}
 				if err != nil {
 					return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
 				}
@@ -255,7 +272,11 @@ func Parse(src []byte) (*Document, error) {
 		}
 		for _, a := range condAttrs {
 			if v, ok := b.Attrs[a]; ok {
-				if _, err := ParseCond(v); err != nil {
+				c, err := ParseCond(v)
+				if err == nil && c.Once && a != "run" {
+					err = errOnce
+				}
+				if err != nil {
 					return nil, fmt.Errorf("line %d: block %s: %s=: %w", lineNo(src, b.Span.Start), b.ID, a, err)
 				}
 			}

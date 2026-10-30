@@ -430,6 +430,7 @@ compared with `==` or `!=`, or negated with `!`:
 | `{{$err?}}`, `{{#build/err?}}` | the same statuses: true when non-zero, so when the block failed |
 | `{{$ran?}}`, `{{#build/ran?}}` | the last runnable block, or block `build`, ran (not skipped) |
 | `true`, `false` | always, never |
+| `once` | in `run=` only: the block has no output yet |
 
 Use them in `run=`, `show=`, `show-output=` and `show-stderr=`, and to
 show or hide whole stretches of the document:
@@ -448,6 +449,11 @@ are checked after the block runs, so there it is the block's own status:
 names the block instead. `{{$ran?}}` works the same way, so
 `run=!{{$ran?}}` is a fallback for a block that was skipped, and
 `{{$err?}}` is another name for `{{$?}}` that reads well as a condition.
+
+`run=once` runs a block only while it has no output: none saved after it
+in the file, and none from running it earlier in the same `mdsh -i` or
+`mdsh-gui` session. Use it for a slow setup or a one-time fetch; delete
+its output to run it again. Picking the block by hand still runs it.
 
 Sections nest, and their comment lines never appear in printed output.
 `show=`, `show-output=` and sections only change what is printed: `-w`
@@ -504,7 +510,10 @@ fails, unless `show-stderr` (or `show_stderr: true` under `mdsh:` in the
 front matter) says otherwise.
 
 An explicit `exit` ends the shell and stops the run. Blocks can use
-`$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, the script's arguments as `$1`…,
+`$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, `$MDSH_MODE` (`running`,
+`interactive` or `report`, also readable in conditions as
+`{{$MDSH_MODE}}`), `$MDSH_VAR_name` for each `textbox` or `choice` block
+with `var=name`, the script's arguments as `$1`…,
 and the helpers `md_h1`, `md_h2`, `md_h3`, `md_table [-F SEP] [-s N]` (TSV
 on stdin) and `md_code`.
 

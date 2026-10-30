@@ -173,3 +173,33 @@ func TestSessionSyncSource(t *testing.T) {
 		t.Errorf("new block: stdout %q, err %v", r.Stdout, err)
 	}
 }
+
+func TestSessionRunOnce(t *testing.T) {
+	d := parse(t, "```sh {#a run=once}\necho a\n```\n\n"+
+		"```sh {#b run=once}\necho b\n```\n```output {for=b}\nold\n```\n")
+	s, err := run.NewSession(d, run.Options{Environ: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+
+	// a has no output, so it runs; b has saved output, so it doesn't.
+	if err := s.RunFrom(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if a, b := s.Results()[0], s.Results()[1]; !a.Ran || !b.Skipped {
+		t.Fatalf("first run: a ran=%v, b skipped=%v", a.Ran, b.Skipped)
+	}
+	// Now a has output from this session.
+	if err := s.RunFrom(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if a := s.Results()[0]; a.Ran || !a.Skipped {
+		t.Errorf("second run: a ran again")
+	}
+	// Asked for by name, it runs.
+	if r, _ := s.RunBlock(ctx, 1); !r.Ran || string(r.Stdout) != "b\n" {
+		t.Errorf("RunBlock(b): ran=%v stdout=%q", r.Ran, r.Stdout)
+	}
+}

@@ -65,6 +65,21 @@ Each file opens in a tab of its own, with its own shells.
   attribute on hover and underlines mistakes. Vim key bindings are a
   setting; with them, `:w` saves and `:RunBlock` runs the block at the
   cursor, as cmd/ctrl+enter does.
+- **Checkboxes, textboxes and choices:** task list items (`- [ ] label`)
+  in the rendered view check and uncheck in the file when clicked, and
+  so do table cells that start with `[ ]` or `- [ ]` (GitHub shows
+  those as text). Checkboxes in a block's output, such as
+  `out=markdown`'s, work the same way until the block runs again and
+  rewrites them. A
+  `textbox` block (```` ```textbox {#host lines=3 placeholder="Which host?"} ````)
+  is a box to type in, at most `lines` lines high, showing `placeholder`
+  while empty; what is typed goes into the block's body. A `choice`
+  block lists its options as task list items and is drawn as a
+  dropdown, radio buttons or checkboxes (`mode=dropdown`, `radio` or
+  `multi`). With `var=name`, blocks and conditions read the text or
+  picks as `$MDSH_VAR_name`; a later input reusing a name is marked, with
+  `!` in the outline, and ignored. All are edits like typing in the source
+  view: Save writes them.
 - **Links** in the rendered view open when clicked: web links in the
   browser, a markdown file in a new tab (or the tab it's already open
   in), any other file as the system would open it, and `#heading`

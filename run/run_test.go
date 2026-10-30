@@ -579,3 +579,54 @@ func TestOverstrikeOutput(t *testing.T) {
 		t.Errorf("stderr = %q", got)
 	}
 }
+
+func TestMode(t *testing.T) {
+	src := "```sh {#a}\necho \"$MDSH_MODE\"\nsh -c 'echo \"$MDSH_MODE\"'\n```\n" +
+		"```sh {#b run={{$MDSH_MODE}}==report}\necho report only\n```\n"
+	for _, c := range []struct {
+		mode, want string
+		b          bool
+	}{
+		{"", "running", false},
+		{run.ModeInteractive, "interactive", false},
+		{run.ModeReport, "report", true},
+	} {
+		// An outer MDSH_MODE doesn't leak in.
+		_, results := runDoc(t, src, run.Options{Mode: c.mode, Environ: []string{"PATH=" + os.Getenv("PATH"), "MDSH_MODE=outer"}})
+		r := byID(results)
+		if want := c.want + "\n" + c.want + "\n"; string(r["a"].Stdout) != want {
+			t.Errorf("mode %q: stdout = %q, want %q", c.mode, r["a"].Stdout, want)
+		}
+		if r["b"].Ran != c.b {
+			t.Errorf("mode %q: b ran = %v", c.mode, r["b"].Ran)
+		}
+	}
+	if got := run.WithMode([]string{"A=1", "MDSH_MODE=x"}, "report"); strings.Join(got, " ") != "A=1 MDSH_MODE=report" {
+		t.Errorf("WithMode = %q", got)
+	}
+}
+
+func TestInputVars(t *testing.T) {
+	src := "```textbox {#host var=host}\ndb1 'x'\n```\n" +
+		"```textbox {#notes lines=3 var=notes}\nfirst\n\nthird\n```\n" +
+		"```textbox {#plain}\nnot bound\n```\n" +
+		"```choice {#env mode=radio var=env}\n- [ ] staging\n- [x] prod\n```\n" +
+		"```choice {#regions mode=multi var=regions}\n- [x] us\n- [ ] eu\n- [X] ap\n```\n" +
+		"```sh {#a}\necho \"$MDSH_VAR_host|$MDSH_VAR_notes|$MDSH_VAR_env|$MDSH_VAR_regions|${MDSH_VAR_plain-unset}\"\nsh -c 'echo \"$MDSH_VAR_env\"'\n```\n" +
+		"```sh {#prod run={{$MDSH_VAR_env}}==prod}\necho prod\n```\n" +
+		"```sh {#staging run={{$MDSH_VAR_env}}==staging}\necho staging\n```\n" +
+		"```sh {#z}\necho $MDSH_VAR_notes\n: ${MDSH_UNSET_Q?boom}\n```\n"
+	_, results := runDoc(t, src, run.Options{})
+	r := byID(results)
+	if want := "db1 'x'|first\n\nthird|prod|us\nap|unset\nprod\n"; string(r["a"].Stdout) != want {
+		t.Errorf("a stdout = %q, want %q", r["a"].Stdout, want)
+	}
+	// The prelude stays on the block's first line, so errors name the
+	// block's own lines.
+	if got := string(r["z"].Stderr); !strings.Contains(got, " 2: ") {
+		t.Errorf("z stderr = %q, want an error on line 2", got)
+	}
+	if !r["prod"].Ran || r["staging"].Ran {
+		t.Errorf("prod ran %v, staging ran %v", r["prod"].Ran, r["staging"].Ran)
+	}
+}

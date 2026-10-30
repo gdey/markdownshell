@@ -40,6 +40,8 @@ var inserts = []struct{ label, name string }{
 	{"sh Block", "sh"},
 	{"sh Block, Confirm First", "sh-confirm"},
 	{"zsh Block", "zsh"},
+	{"Textbox", "textbox"},
+	{"Choice", "choice"},
 }
 
 // buildSourceMenu makes the source view's right-click menu: the edit

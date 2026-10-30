@@ -268,6 +268,13 @@ export function SelectTab(id: number): $CancellablePromise<void> {
 }
 
 /**
+ * SetChoice checks the options of choice block i as picked in it.
+ */
+export function SetChoice(i: number, checked: boolean[] | null): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetChoice", i, checked);
+}
+
+/**
  * SetRunOptions sets the arguments (one line, split as a shell would),
  * --only, --step and --stop-on-error for this file.
  */
@@ -286,6 +293,14 @@ export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
 }
 
 /**
+ * SetTask checks or unchecks task list item task, as numbered by the
+ * cells' tasks, in the file.
+ */
+export function SetTask(task: number, done: boolean): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetTask", task, done);
+}
+
+/**
  * SetTerminalSize sets the terminal pane's size in cells, which the
  * window works out from its width.
  */
@@ -298,6 +313,13 @@ export function SetTerminalSize(cols: number, rows: number): $CancellablePromise
  */
 export function SetText(text: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetText", text);
+}
+
+/**
+ * SetTextbox replaces the text of textbox block i, as typed in it.
+ */
+export function SetTextbox(i: number, text: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetTextbox", i, text);
 }
 
 /**

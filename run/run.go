@@ -71,7 +71,22 @@ type Options struct {
 	// end that draws on the terminal can step aside. The block runs once
 	// it returns, and calls the function it returned when done with TTY.
 	TakeTTY func(*doc.Block) (giveBack func())
+	// Mode is $MDSH_MODE: ModeRunning, ModeInteractive or ModeReport.
+	// Defaults to ModeRunning.
+	Mode string
 }
+
+// The values of $MDSH_MODE, which tells blocks how they are being run.
+const (
+	// ModeRunning is a run from the command line, such as mdsh doc.md or
+	// mdsh -w doc.md. It is the default.
+	ModeRunning = "running"
+	// ModeInteractive is a run where someone picks blocks as they go:
+	// mdsh -i and mdsh-gui.
+	ModeInteractive = "interactive"
+	// ModeReport is a run for a report, such as mdsh --pdf.
+	ModeReport = "report"
+)
 
 // Answer is a reply to Confirm.
 type Answer int
@@ -175,7 +190,8 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 }
 
 // NewLookup resolves refs for conditions and placeholders: {{$VAR}} from
-// environ (unless environ is nil), {{#block/env(VAR)}}, {{#block/?}} and
+// environ (unless environ is nil), {{$MDSH_VAR_name}} from the textbox or
+// choice in d that binds it with var=, {{#block/env(VAR)}}, {{#block/?}} and
 // {{#block/ran?}} from the block's result, and otherwise from a value a
 // placeholder stored in the file. It reads results as they are when it
 // is called, so it sees blocks that finish after it is made. {{$?}} and
@@ -192,6 +208,14 @@ func NewLookup(d *doc.Document, results []*Result, environ []string) doc.Lookup 
 		}
 	}
 	return func(ref doc.Ref) (string, bool) {
+		if ref.BlockID == "" && !ref.Fact() && strings.HasPrefix(ref.Var, doc.VarPrefix) {
+			// An input's var=, as it is in the document now.
+			for _, b := range d.Blocks {
+				if name, value, ok := b.Var(); ok && name == ref.Var {
+					return value, true
+				}
+			}
+		}
 		if ref.BlockID == "" && !ref.Fact() && caller != nil {
 			return caller[ref.Var], true
 		}
@@ -299,23 +323,23 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	switch {
 	case !b.Attrs.Has("tty"):
 		if kind, _ := outKind(b); kind == "image" {
-			r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+			r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(d, b, opts)+b.Body, out, errw)
 			break
 		}
 		// Text output is shown as text, so backspace overstrikes, as
 		// man prints bold and underline, are applied.
 		o, ew := &overstrikeWriter{w: out}, &overstrikeWriter{w: errw}
-		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, o, ew)
+		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(d, b, opts)+b.Body, o, ew)
 		o.Flush()
 		ew.Flush()
 	case taped != nil:
 		// The tape types for the block, so it needs no terminal. It
 		// runs on a fixed size, so it records the same anywhere.
-		rec, err = runTaped(ctx, e.Shell, prelude(b, opts)+b.Body, taped, lookup, r, opts)
+		rec, err = runTaped(ctx, e.Shell, prelude(d, b, opts)+b.Body, taped, lookup, r, opts)
 	case opts.TTY == nil && opts.Terminal != nil:
 		rec = termrec.NewRecorder(opts.Terminal.Dims())
 		giveBack := takeTTY(b, opts)
-		r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(b, opts)+b.Body, *opts.Terminal, rec)
+		r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(d, b, opts)+b.Body, *opts.Terminal, rec)
 		giveBack()
 	case opts.TTY == nil:
 		err = ErrNoTTY
@@ -328,7 +352,7 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 		}
 		rec = termrec.NewRecorder(cols, rows)
 		giveBack := takeTTY(b, opts)
-		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, prelude(b, opts)+b.Body, opts.TTY, rec)
+		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, prelude(d, b, opts)+b.Body, opts.TTY, rec)
 		giveBack()
 	}
 	r.Stdout, r.Stderr = stdout.Bytes(), stderr.Bytes()
@@ -385,15 +409,57 @@ func captureVars(ctx context.Context, sh *env.Shell, vars []string) (map[string]
 	return out, nil
 }
 
-// prelude sets the MDSH_ variables. It shares the body's first line so
-// line numbers in shell errors match the block.
-func prelude(b *doc.Block, opts Options) string {
+// prelude sets the MDSH_ variables, the MDSH_VAR_ ones that inputs bind
+// with var= among them. It shares the body's first line so line numbers
+// in shell errors match the block.
+func prelude(d *doc.Document, b *doc.Block, opts Options) string {
 	dir := opts.Dir
 	if dir == "" {
 		dir, _ = os.Getwd()
 	}
-	return fmt.Sprintf("MDSH_BLOCK=%s MDSH_FILE=%s MDSH_DIR=%s; export MDSH_BLOCK MDSH_FILE MDSH_DIR; ",
-		quote(b.ID), quote(opts.File), quote(dir))
+	names := []string{"MDSH_BLOCK", "MDSH_FILE", "MDSH_DIR", "MDSH_MODE"}
+	set := fmt.Sprintf("MDSH_BLOCK=%s MDSH_FILE=%s MDSH_DIR=%s MDSH_MODE=%s", quote(b.ID), quote(opts.File), quote(dir), quote(mode(opts.Mode)))
+	for _, in := range d.Blocks {
+		if name, value, ok := in.Var(); ok {
+			names = append(names, name)
+			set += " " + name + "=" + oneLine(value)
+		}
+	}
+	return set + "; export " + strings.Join(names, " ") + "; "
+}
+
+// oneLine quotes s for the shell without a newline, so the prelude stays
+// on the body's first line: a value of several lines is printed by
+// printf, one quoted line at a time.
+func oneLine(s string) string {
+	if !strings.Contains(s, "\n") {
+		return quote(s)
+	}
+	var lines []string
+	for _, l := range strings.Split(s, "\n") {
+		lines = append(lines, quote(l))
+	}
+	return `"$(printf '%s\n' ` + strings.Join(lines, " ") + `)"`
+}
+
+// mode is the value of $MDSH_MODE for Options.Mode.
+func mode(m string) string {
+	if m == "" {
+		return ModeRunning
+	}
+	return m
+}
+
+// WithMode is environ with MDSH_MODE set to mode, so conditions such as
+// show={{$MDSH_MODE}}!=report can read it.
+func WithMode(environ []string, mode string) []string {
+	out := make([]string, 0, len(environ)+1)
+	for _, kv := range environ {
+		if !strings.HasPrefix(kv, "MDSH_MODE=") {
+			out = append(out, kv)
+		}
+	}
+	return append(out, "MDSH_MODE="+mode)
 }
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

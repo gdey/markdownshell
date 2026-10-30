@@ -3,6 +3,7 @@ package doc
 import (
 	_ "embed"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -167,6 +168,7 @@ func TestParseCond(t *testing.T) {
 		"{{#d/env(OS)}}==Linux": true, "{{#d/env(OS)}}==Darwin": false, "{{#d/env(OS)}}!=Darwin": true,
 		"{{$?}}==0": true, "{{$?}}": false, "{{#d/?}}!=0": true,
 		"{{$err?}}": false, "{{#d/err?}}": true, "{{$ran?}}": true, "!{{#d/ran?}}": false,
+		"once": true, // the runner checks for output
 	} {
 		c, err := ParseCond(s)
 		if err != nil {
@@ -199,6 +201,8 @@ func TestParseSections(t *testing.T) {
 		"<!-- mdsh:if X -->\n<!-- mdsh:end -->\n",
 		"```sh {#a show=nope}\n```\n",
 		"```sh {#a run={{#zz/env(X)}}}\n```\n",
+		"```sh {#a show=once}\n```\n",
+		"<!-- mdsh:if once -->\n<!-- mdsh:end -->\n",
 	} {
 		if _, err := Parse([]byte(bad)); err == nil {
 			t.Errorf("Parse(%q) should fail", bad)
@@ -416,5 +420,27 @@ func TestBackgroundNotTTY(t *testing.T) {
 	_, err := Parse([]byte("```sh {#a background tty}\nx\n```\n"))
 	if err == nil || !strings.Contains(err.Error(), "background") {
 		t.Errorf("err = %v, want background and tty refused", err)
+	}
+}
+
+func TestDuplicateVar(t *testing.T) {
+	src := "```textbox {#a var=env}\n```\n\n```choice {#b var=env}\n- [ ] x\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `var=env is already bound by "a" on line 1, so this one is ignored`
+	if b := d.Block("b"); b.VarTaken != want || !slices.Equal(d.Warnings, []string{"line 4: " + want}) {
+		t.Errorf("VarTaken = %q, warnings %q", b.VarTaken, d.Warnings)
+	}
+	if _, _, ok := d.Block("b").Var(); ok {
+		t.Error("b binds env too")
+	}
+	if name, _, ok := d.Block("a").Var(); !ok || name != "MDSH_VAR_env" {
+		t.Errorf("a binds %q, %v", name, ok)
+	}
+	// var= on other blocks binds nothing, so it doesn't clash.
+	if _, err := Parse([]byte("```textbox {var=env}\n```\n```sh {var=env}\n```\n")); err != nil {
+		t.Error(err)
 	}
 }

@@ -84,4 +84,18 @@ export interface AttrSpec {
      * blocks take none of the others.
      */
     "include"?: boolean;
+
+    /**
+     * Inputs are the input block languages, textbox and choice, that
+     * the attribute is for. Empty for the attributes of other blocks.
+     */
+    "inputs"?: string[] | null;
+}
+
+/**
+ * Option is one of a choice's options.
+ */
+export interface Option {
+    "label": string;
+    "checked": boolean;
 }
