@@ -262,6 +262,20 @@ th { background: var(--code-bg); }
 .block .output pre { background: none; padding: 4px 0 10px; }
 .block .output img, .prose img { max-width: 100%; height: auto; }
 .block .output img { display: block; margin: 12px 0; cursor: zoom-in; }
+/* Task list items, textboxes and choices are edited in place. */
+.prose input[type="checkbox"]:not(:disabled) { cursor: pointer; }
+.textbox-cell { margin: 16px 0; }
+.textbox { display: block; box-sizing: border-box; width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.5; resize: none; }
+.textbox:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.textbox::placeholder { color: var(--muted); }
+.choice-cell { margin: 16px 0; }
+.input-cell.taken .name { color: var(--bad); }
+.input-cell.taken .textbox, .input-cell.taken .choice-select { border-color: var(--bad); }
+.input-cell .problem { margin: 4px 0 0; font-size: 12px; color: var(--bad); }
+.textbox-cell .name, .choice-cell .name { display: block; margin: 0 0 4px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.choice-select { min-width: 240px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+.choice-options { display: flex; flex-direction: column; gap: 2px; }
+.choice-options label { display: flex; gap: 6px; margin: 0; font-size: inherit; align-items: center; cursor: pointer; }
 #viewer { width: fit-content; max-width: 96vw; max-height: 96vh; padding: 0; border: 1px solid var(--border); background: var(--bg); cursor: zoom-out; outline: none; }
 #viewer::backdrop { background: rgb(0 0 0 / 0.6); }
 #viewer img { display: block; max-width: 94vw; max-height: 94vh; }

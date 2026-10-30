@@ -69,3 +69,28 @@ func TestReportCommand(t *testing.T) {
 		}
 	}
 }
+
+// TestReportMode checks that a report's conditions see $MDSH_MODE
+// report, while the window sees interactive.
+func TestReportMode(t *testing.T) {
+	src := "Kept.\n\n<!-- mdsh:if {{$MDSH_MODE}}!=report -->\nWindow only.\n<!-- mdsh:end -->\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var html string
+	for _, c := range n.Cells() {
+		html += c.HTML
+	}
+	if !strings.Contains(html, "Window only.") {
+		t.Errorf("window: %s", html)
+	}
+	md, err := n.MakeReport(Report{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(md); strings.Contains(s, "Window only.") || !strings.Contains(s, "Kept.") {
+		t.Errorf("report:\n%s", s)
+	}
+}

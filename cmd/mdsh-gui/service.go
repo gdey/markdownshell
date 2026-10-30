@@ -393,6 +393,40 @@ func (a *App) SetText(ctx context.Context, text string) error {
 	return err
 }
 
+// SetTask checks or unchecks task list item task, as numbered by the
+// cells' tasks, in the file.
+func (a *App) SetTask(ctx context.Context, task int, done bool) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetTask(task, done)
+	t.changed()
+	return err
+}
+
+// SetTextbox replaces the text of textbox block i, as typed in it.
+func (a *App) SetTextbox(ctx context.Context, i int, text string) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetTextbox(i, text)
+	t.changed()
+	return err
+}
+
+// SetChoice checks the options of choice block i as picked in it.
+func (a *App) SetChoice(ctx context.Context, i int, checked []bool) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetChoice(i, checked)
+	t.changed()
+	return err
+}
+
 // View is what a tab shows, for the View menu's check marks.
 type View struct {
 	Split    bool `json:"split"`    // the source pane

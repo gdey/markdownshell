@@ -391,6 +391,29 @@ func TestHTML(t *testing.T) {
 	}
 }
 
+func TestMode(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "in.md")
+	os.WriteFile(in, []byte("```sh {#a}\necho \"mode=$MDSH_MODE\"\n```\n\n```sh {#b show={{$MDSH_MODE}}!=report}\necho not in reports\n```\n"), 0o644)
+	for _, c := range []struct {
+		args   []string
+		want   string
+		shownB bool
+	}{
+		{[]string{"--color=never", in}, "mode=running", true},
+		{[]string{"--html", "-", in}, "mode=report", false},
+		{[]string{"-n", "--html", "-", in}, "", false},
+	} {
+		var stdout, stderr bytes.Buffer
+		if rc := mdsh(c.args, nil, &stdout, &stderr); rc != 0 || !strings.Contains(stdout.String(), c.want) {
+			t.Errorf("%v: rc = %d, stdout %q, want %s", c.args, rc, stdout.String(), c.want)
+		}
+		if shown := strings.Contains(stdout.String(), "echo not in reports"); shown != c.shownB {
+			t.Errorf("%v: block b shown = %v", c.args, shown)
+		}
+	}
+}
+
 // TestPDFExamples checks that the examples still lay out as PDFs.
 func TestPDFExamples(t *testing.T) {
 	for _, name := range []string{"hello.md", "include.md", "report.md", "terminal.md"} {

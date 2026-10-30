@@ -8,7 +8,8 @@ import (
 )
 
 // TestBlockAttrsMatchSpec keeps BlockAttrs in step with the attribute
-// table in docs/spec.md and the include attributes it describes.
+// table in docs/spec.md and the include and textbox attributes it
+// describes.
 func TestBlockAttrsMatchSpec(t *testing.T) {
 	spec, err := os.ReadFile("../docs/spec.md")
 	if err != nil {
@@ -26,7 +27,7 @@ func TestBlockAttrsMatchSpec(t *testing.T) {
 		}
 		want = append(want, name)
 	}
-	want = append(want, IncludeAttr, "file", "from", "to", "number_on")
+	want = append(want, IncludeAttr, "file", "from", "to", "number_on", "lines", "mode", "placeholder", "var")
 	var got []string
 	for _, s := range BlockAttrs {
 		got = append(got, s.Name)
@@ -53,6 +54,8 @@ func TestAttrCheck(t *testing.T) {
 		{"run", "{{$DEBUG}}", true, true},
 		{"run", "{{$DEBUG", true, false},
 		{"run", "", false, false},
+		{"run", "once", true, true},
+		{"show", "once", true, false},
 		{"out", "markdown", true, true},
 		{"out", "image:plots/a.png", true, true},
 		{"out", "image:", true, false},

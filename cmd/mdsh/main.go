@@ -162,6 +162,12 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if *htmlFile != "" {
 		reportFile, format = *htmlFile, report.HTML
 	}
+	// mode is $MDSH_MODE, for blocks and for conditions such as
+	// show={{$MDSH_MODE}}!=report.
+	mode := run.ModeRunning
+	if reportFile != "" {
+		mode = run.ModeReport
+	}
 	if target == "-" && *write {
 		return errors.New("-w needs a file, not stdin; use -o to name one")
 	}
@@ -208,7 +214,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 		return writeFile(reportFile, out, 0o644)
 	}
-	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: os.Environ()}
+	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: run.WithMode(os.Environ(), mode)}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are
@@ -244,6 +250,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		Only:        *only,
 		Step:        *step,
 		Source:      sources.String(),
+		Environ:     reportOpts.Env,
+		Mode:        mode,
 	}
 	if file != "" {
 		if abs, err := filepath.Abs(file); err == nil {
@@ -329,7 +337,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	if *write {
-		out := render.Markdown(d, results, render.Options{WriteBack: true, Env: os.Environ()})
+		out := render.Markdown(d, results, render.Options{WriteBack: true, Env: reportOpts.Env})
 		mode := os.FileMode(0o644)
 		if info, err := os.Stat(file); err == nil {
 			mode = info.Mode().Perm()
@@ -505,10 +513,11 @@ func interactiveCmd(file string, args []string, source string, stop, step, yes b
 			File:        abs,
 			LinkDir:     filepath.Dir(abs),
 			Args:        args,
-			Environ:     os.Environ(),
+			Environ:     run.WithMode(os.Environ(), run.ModeInteractive),
 			Source:      source,
 			StopOnError: stop,
 			Step:        step,
+			Mode:        run.ModeInteractive,
 		},
 		Yes:      yes,
 		Save:     func(out []byte) error { return writeFile(abs, out, 0o644) },

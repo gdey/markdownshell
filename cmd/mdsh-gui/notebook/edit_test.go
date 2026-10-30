@@ -18,6 +18,11 @@ func TestCheckInfo(t *testing.T) {
 		{`go {<include #x file=x.go tty}`, "13-15 error, 26-29 error"},
 		{`sh {file=x}`, "4-10 warning"},
 		{`sh {run={{$X}`, "4-12 error"},
+		{`textbox {#host lines=-1 placeholder="Which host?" show={{$X}}}`, ""},
+		{`textbox {lines=x tty}`, "9-16 error, 17-20 warning"},
+		{`sh {lines=3}`, "4-11 warning"},
+		{`choice {#env mode=radio var=env placeholder=Pick}`, ""},
+		{`choice {mode=list lines=2 var=a-b}`, "8-17 error, 18-25 warning, 26-33 error"},
 	} {
 		var got []string
 		for _, p := range CheckInfo(c.info) {
