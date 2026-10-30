@@ -519,7 +519,7 @@ func interactiveCmd(file string, args []string, source string, stop, step, yes, 
 		}
 	}
 	if conf, err := os.UserConfigDir(); err == nil {
-		c.Recent = filepath.Join(conf, "mdsh", "tui.json")
+		c.State = filepath.Join(conf, "mdsh", "tui.json")
 	}
 	style := "light"
 	if lipgloss.HasDarkBackground() {

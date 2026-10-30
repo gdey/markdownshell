@@ -96,7 +96,7 @@ func (m *Model) markdown(md string) string {
 	}
 	out := md
 	if md != "" {
-		r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(m.opts.Style), glamour.WithWordWrap(max(m.width-4, 20)))
+		r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(m.opts.Style), glamour.WithWordWrap(max(m.docWidth()-4, 20)))
 		if err == nil {
 			if s, err := r.Render(md); err == nil {
 				out = strings.Trim(s, "\n")
@@ -146,16 +146,36 @@ func (m *Model) block(i int) string {
 			body = strings.TrimRight(render.NumberLines(body, max(inc.From, 1)), "\n")
 		}
 	}
-	w := max(m.width-4, 10)
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(border).
-		Padding(0, 1).
-		MarginLeft(2).
-		Width(w - 2).
-		Render(clean(body))
-
-	out := head + "\n" + box
+	w := max(m.docWidth()-4, 10)
+	out := head
+	if !m.shown.HideCode {
+		out += "\n" + lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(border).
+			Padding(0, 1).
+			MarginLeft(2).
+			Width(w-2).
+			Render(clean(body))
+	}
+	// A confirm question is asked in the block's card, under its code, as
+	// in mdsh-gui.
+	// So is the question whether to run a block another depends on.
+	if m.prompt != nil && m.prompt.block == b {
+		q := b.Attrs["confirm"]
+		if q == "" {
+			q = "Run this block?"
+		}
+		keys := "[r]un  s[k]ip  [o]nly blocks without saved output  [s]top"
+		if m.prompt.of != nil {
+			q = fmt.Sprintf("%s depends on this block, which hasn't run. Run it first?", m.d.Label(m.prompt.of))
+			keys = "[r]un  s[k]ip  [s]top"
+		}
+		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Width(w-2).Render(
+			promptStyle.Render(q)+"\n"+helpStyle.Render(keys))
+	}
+	if m.shown.HideOutput {
+		return out
+	}
 	if o := m.output(i, r, w); o != "" {
 		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Render(o)
 	}

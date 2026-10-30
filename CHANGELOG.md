@@ -81,12 +81,18 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh -i`: `W` saves as another file and follows it, ctrl+s saves,
   and a banner says when the file changed on disk, with `R` to reload
   it and `M` to keep yours.
+- `mdsh -i`: an outline of the headings and blocks, with each block's
+  state, beside the document (`o`), and `C` and `O` to hide the code and
+  the output of blocks, as in `mdsh-gui`'s View menu. The view is kept
+  for the next file.
 
 ### Changed
 
 - `mdsh -i` saves when asked (`w`), as `mdsh-gui` does, and marks
   output not saved with a •. `--autosave` saves after every block that
   runs, as before.
+- `mdsh -i` asks a confirm question in the block's card, under its
+  code, rather than in the footer.
 - `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
 - Folding in `mdsh-gui`: a block's code and its output each fold to one
   line, and a heading folds its section. `collapse[=COND]`,
