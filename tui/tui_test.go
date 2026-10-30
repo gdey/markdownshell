@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -491,7 +492,7 @@ func newTestApp(t *testing.T) (*app, string) {
 	os.MkdirAll(filepath.Join(dir, "sub"), 0o755)
 	os.WriteFile(filepath.Join(dir, "sub", "b.md"), []byte("```sh\necho b\n```\n"), 0o644)
 	recent := filepath.Join(t.TempDir(), "tui.json")
-	a, err := newApp(Config{Dir: dir, Recent: recent, Open: func(file string) (*doc.Document, Options, error) {
+	a, err := newApp(Config{Dir: dir, State: recent, Open: func(file string) (*doc.Document, Options, error) {
 		src, err := os.ReadFile(file)
 		if err != nil {
 			return nil, Options{}, err
@@ -519,7 +520,7 @@ func do(a *app, msg tea.Msg) {
 		msg = nil
 		if cmd != nil {
 			switch next := cmd().(type) {
-			case openMsg, backMsg, savedAsMsg:
+			case openMsg, backMsg, savedAsMsg, viewMsg:
 				msg = next
 			}
 		}
@@ -552,7 +553,7 @@ func TestStartScreen(t *testing.T) {
 	if a.doc == nil || a.doc.opts.Run.File != filepath.Join(dir, "a.md") {
 		t.Fatal("enter didn't open a.md")
 	}
-	if !strings.Contains(a.View(), "q close") {
+	if !a.doc.back {
 		t.Error("q should go back to the start screen")
 	}
 	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
@@ -563,7 +564,7 @@ func TestStartScreen(t *testing.T) {
 	if i, j := strings.Index(v, "Recent"), strings.Index(v, "This folder"); i < 0 || j < i {
 		t.Errorf("a.md isn't listed as recent first:\n%s", v)
 	}
-	if got := loadRecent(a.c.Recent); len(got) != 1 || got[0] != filepath.Join(dir, "a.md") {
+	if got := loadState(a.c.State).Recent; len(got) != 1 || got[0] != filepath.Join(dir, "a.md") {
 		t.Errorf("recent files kept: %v", got)
 	}
 }
@@ -582,5 +583,88 @@ func TestSaveAsAnotherFolderReopens(t *testing.T) {
 	}
 	if !strings.Contains(a.View(), "hi") {
 		t.Error("the new file doesn't show the output saved")
+	}
+}
+
+func TestOutline(t *testing.T) {
+	src := "---\ntitle: x\n# not a heading\n---\n# Ops\n\n## Disk ##\n\n```sh {#disk}\n# a comment, not a heading\necho freed\n```\n\n```text\n# nor this\n```\n\n#not-a-heading\n\n## Other\n\n```sh {#two}\nexit 3\n```\n"
+	m, _ := newModel(t, src, Options{})
+	var got []string
+	for _, e := range m.entries() {
+		if e.level > 0 {
+			got = append(got, fmt.Sprintf("h%d %s", e.level, e.text))
+		} else {
+			got = append(got, "#"+m.d.Blocks[e.block].ID)
+		}
+	}
+	if want := "h1 Ops|h2 Disk|#disk|h2 Other|#two"; strings.Join(got, "|") != want {
+		t.Errorf("outline entries:\n got %s\nwant %s", strings.Join(got, "|"), want)
+	}
+
+	press(m, "j", "enter")
+	pump(t, m)
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	v := m.View()
+	if !strings.Contains(v, "✗ #two") || !strings.Contains(v, "│") {
+		t.Errorf("outline doesn't show #two failed:\n%s", v)
+	}
+	if msg, ok := cmd().(viewMsg); !ok || !msg.Outline {
+		t.Errorf("o sent %#v", msg)
+	}
+}
+
+func TestHideCodeAndOutput(t *testing.T) {
+	m, _ := newModel(t, twoBlocks, Options{})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	if !strings.Contains(v, "X=hi; echo $X") || !strings.Contains(v, "\n    hi") {
+		t.Fatalf("code or output missing:\n%s", v)
+	}
+	press(m, "C")
+	if v := m.View(); strings.Contains(v, "X=hi; echo $X") || !strings.Contains(v, "#one") {
+		t.Errorf("C didn't hide the code but keep the block:\n%s", v)
+	}
+	press(m, "C", "O")
+	if v := m.View(); !strings.Contains(v, "X=hi; echo $X") || strings.Contains(v, "\n    hi") {
+		t.Errorf("O didn't hide the output:\n%s", v)
+	}
+}
+
+func TestConfirmInCard(t *testing.T) {
+	src := "```sh {#disk confirm=\"Free up disk space?\"}\necho freed\n```\n\nAfter.\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	q, code, after := strings.Index(v, "Free up disk space?"), strings.Index(v, "echo freed"), strings.Index(v, "After.")
+	if q < 0 || !(code < q && q < after) {
+		t.Errorf("the question isn't under the block's code:\n%s", v)
+	}
+	press(m, "r")
+	pump(t, m)
+}
+
+func TestViewKept(t *testing.T) {
+	a, _ := newTestApp(t)
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("C")})
+	if !loadState(a.c.State).View.HideCode {
+		t.Fatal("the view wasn't kept")
+	}
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	if !a.doc.shown.HideCode {
+		t.Error("the next file didn't open in the view kept")
+	}
+}
+
+func TestStatusBeatsLongPath(t *testing.T) {
+	m, _ := newModel(t, twoBlocks, Options{})
+	m.opts.Run.File = "/" + strings.Repeat("very-long-folder/", 8) + "doc.md"
+	m.status = "the status"
+	line := strings.SplitN(m.footer(), "\n", 2)[0]
+	if !strings.Contains(line, "the status") || !strings.Contains(line, "/doc.md") {
+		t.Errorf("status line: %q", line)
 	}
 }

@@ -23,9 +23,10 @@ type Config struct {
 	// markdown files under Dir, and q in a file goes back to it.
 	File string
 	Dir  string
-	// Recent is the file that keeps the files opened most recently, which
-	// the start screen lists first. Empty keeps none.
-	Recent string
+	// State is the file that keeps the files opened most recently, which
+	// the start screen lists first, and the view the last file was left
+	// in. Empty keeps neither.
+	State string
 }
 
 // Run shows the file, or the start screen, full screen until the user
@@ -45,11 +46,11 @@ const MaxRecent = 10
 
 // app is the TUI: a file, or the start screen. It is a tea.Model.
 type app struct {
-	c      Config
-	doc    *Model // nil while the start screen shows
-	start  *start
-	recent []string
-	size   tea.WindowSizeMsg
+	c     Config
+	doc   *Model // nil while the start screen shows
+	start *start
+	st    state
+	size  tea.WindowSizeMsg
 }
 
 // openMsg asks the app to open a file, or the same one again.
@@ -62,11 +63,11 @@ type backMsg struct{}
 type savedAsMsg struct{ file string }
 
 func newApp(c Config) (*app, error) {
-	a := &app{c: c, recent: loadRecent(c.Recent)}
+	a := &app{c: c, st: loadState(c.State)}
 	if c.File != "" {
 		return a, a.open(c.File)
 	}
-	a.start = newStart(c.Dir, a.recent)
+	a.start = newStart(c.Dir, a.st.Recent)
 	return a, nil
 }
 
@@ -76,6 +77,7 @@ func (a *app) open(file string) error {
 	if err != nil {
 		return err
 	}
+	opts.View = a.st.View
 	m, err := New(d, opts)
 	if err != nil {
 		return err
@@ -96,12 +98,12 @@ func (a *app) close() {
 
 // opened puts file first in the recent files.
 func (a *app) opened(file string) {
-	a.recent = slices.DeleteFunc(a.recent, func(f string) bool { return f == file })
-	a.recent = append([]string{file}, a.recent...)
-	if len(a.recent) > MaxRecent {
-		a.recent = a.recent[:MaxRecent]
+	a.st.Recent = slices.DeleteFunc(a.st.Recent, func(f string) bool { return f == file })
+	a.st.Recent = append([]string{file}, a.st.Recent...)
+	if len(a.st.Recent) > MaxRecent {
+		a.st.Recent = a.st.Recent[:MaxRecent]
 	}
-	saveRecent(a.c.Recent, a.recent)
+	saveState(a.c.State, a.st)
 }
 
 func (a *app) Init() tea.Cmd {
@@ -129,11 +131,15 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.doc.Init()
 	case backMsg:
 		a.close()
-		a.start = newStart(a.c.Dir, a.recent)
+		a.start = newStart(a.c.Dir, a.st.Recent)
 		a.start.Update(a.size)
 		return a, nil
 	case savedAsMsg:
 		a.opened(msg.file)
+		return a, nil
+	case viewMsg:
+		a.st.View = View(msg)
+		saveState(a.c.State, a.st)
 		return a, nil
 	}
 	if a.doc != nil {
@@ -151,30 +157,37 @@ func (a *app) View() string {
 	return a.start.View()
 }
 
-// loadRecent reads the recent files kept in file, leaving out those gone.
-func loadRecent(file string) []string {
-	var r struct{ Recent []string }
+// state is what the TUI keeps between runs: the files opened most
+// recently, newest first, and the view the last file was left in.
+type state struct {
+	Recent []string `json:"recent"`
+	View   View     `json:"view"`
+}
+
+// loadState reads the state kept in file, leaving out recent files that
+// are gone.
+func loadState(file string) state {
+	var st state
 	if file == "" {
-		return nil
+		return st
 	}
-	if b, err := os.ReadFile(file); err != nil || json.Unmarshal(b, &r) != nil {
-		return nil
+	if b, err := os.ReadFile(file); err != nil || json.Unmarshal(b, &st) != nil {
+		return state{}
 	}
-	return slices.DeleteFunc(r.Recent, func(f string) bool {
+	st.Recent = slices.DeleteFunc(st.Recent, func(f string) bool {
 		_, err := os.Stat(f)
 		return err != nil
 	})
+	return st
 }
 
-// saveRecent keeps the recent files in file. It is best effort: the
-// start screen just won't list them.
-func saveRecent(file string, recent []string) {
+// saveState keeps st in file. It is best effort: without it the start
+// screen just won't list recent files, and files open in the usual view.
+func saveState(file string, st state) {
 	if file == "" {
 		return
 	}
-	b, err := json.MarshalIndent(struct {
-		Recent []string `json:"recent"`
-	}{recent}, "", "  ")
+	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
 	}
