@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/run"
 )
 

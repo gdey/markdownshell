@@ -3,10 +3,10 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as library$0 from "./library/models.js";
+import * as library$0 from "../../library/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as notebook$0 from "./notebook/models.js";
+import * as notebook$0 from "../../notebook/models.js";
 
 /**
  * Doc is what the frontend shows about the open file.

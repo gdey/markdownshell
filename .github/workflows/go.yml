@@ -44,10 +44,10 @@ jobs:
       - run: go build .
       - name: Check the vendored JavaScript matches its lock
         if: runner.os == 'Linux'
-        run: go run ./internal/vendorjs && git diff --exit-code -- frontend/vendor
+        run: go run ./internal/vendorjs && git diff --exit-code -- ../../web/vendor
       - name: Check the bindings and bundle are generated
         if: runner.os == 'Linux'
-        run: go generate && git diff --exit-code -- frontend
+        run: go generate && git diff --exit-code -- ../../web
       - name: Type-check the frontend
         if: runner.os == 'Linux'
-        run: npx --yes --package typescript@5.9.3 tsc -p frontend
+        run: npx --yes --package typescript@5.9.3 tsc -p ../../web

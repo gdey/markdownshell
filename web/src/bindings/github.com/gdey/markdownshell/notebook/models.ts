@@ -3,7 +3,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as report$0 from "../../../report/models.js";
+import * as report$0 from "../report/models.js";
 
 /**
  * Cell is one piece of the document as the frontend draws it: a

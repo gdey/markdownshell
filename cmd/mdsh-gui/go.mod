@@ -6,8 +6,6 @@ require (
 	github.com/evanw/esbuild v0.28.2
 	github.com/gdey/markdownshell v0.0.0
 	github.com/wailsapp/wails/v3 v3.0.0
-	github.com/yuin/goldmark v1.7.17
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -20,10 +18,12 @@ require (
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/yuin/goldmark v1.7.17 // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 // The GUI is built from the same tree as the library it shows.

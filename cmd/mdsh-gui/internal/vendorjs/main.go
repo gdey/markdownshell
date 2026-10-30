@@ -1,11 +1,11 @@
 // Command vendorjs rebuilds the JavaScript bundles mdsh-gui vendors,
-// frontend/vendor/codemirror.js and frontend/vendor/xterm.js, without npm.
-// It downloads the exact package versions frontend/vendor/package-lock.json
+// web/vendor/codemirror.js and web/vendor/xterm.js, without npm.
+// It downloads the exact package versions web/vendor/package-lock.json
 // pins from the npm registry, checks each against the lock's integrity
 // hash, bundles each entry file with esbuild, copies xterm's stylesheet
-// to frontend/vendor/xterm.css, and copies the packages' type
-// declarations to frontend/vendor/types for tsc and their licenses to
-// frontend/vendor/licenses.
+// to web/vendor/xterm.css, and copies the packages' type
+// declarations to web/vendor/types for tsc and their licenses to
+// web/vendor/licenses.
 //
 // Run it from cmd/mdsh-gui when the lock changes:
 //
@@ -35,7 +35,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-const vendor = "frontend/vendor"
+const vendor = "../../web/vendor"
 
 // typesOnly are packages whose code the webview already has; only their
 // types are vendored.
@@ -47,7 +47,7 @@ var keepTypes = map[string]func(string) bool{
 	"@codemirror/legacy-modes": func(p string) bool { return strings.HasPrefix(p, "mode/shell.") },
 }
 
-// bundles are the entry files in frontend/vendor and the bundles made
+// bundles are the entry files in web/vendor and the bundles made
 // from them there.
 var bundles = []struct{ entry, out string }{
 	{"entry.js", "codemirror.js"},
@@ -55,7 +55,7 @@ var bundles = []struct{ entry, out string }{
 }
 
 // styles are stylesheets copied from the packages, by package path, to
-// frontend/vendor.
+// web/vendor.
 var styles = map[string]string{"@xterm/xterm/css/xterm.css": "xterm.css"}
 
 type lock struct {
@@ -124,7 +124,7 @@ func vendorJS() error {
 	return nil
 }
 
-// bundle bundles entry into out, both in frontend/vendor.
+// bundle bundles entry into out, both in web/vendor.
 func bundle(modules, entry, out string) error {
 	if err := checkExports(modules, entry); err != nil {
 		return err
