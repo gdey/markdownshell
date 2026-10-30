@@ -165,6 +165,9 @@ follow [Semantic Versioning](https://semver.org/).
   state, beside the document (`o`), and `C` and `O` to hide the code and
   the output of blocks, as in `mdsh-gui`'s View menu. The view is kept
   for the next file.
+- `mdsh -i`: `E` edits the whole file in `$EDITOR`, at the block under
+  the cursor, as it would be saved. Blocks whose code didn't change keep
+  their output, wherever they moved, as in `mdsh-gui`'s source view.
 
 ### Changed
 

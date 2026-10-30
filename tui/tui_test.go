@@ -727,3 +727,44 @@ func TestOutlineNamesUnnamedBlocksByLine(t *testing.T) {
 		t.Errorf("outline:\n%s", v)
 	}
 }
+
+func TestEditFile(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	press(m, "enter")
+	pump(t, m)
+	press(m, "j")
+	text, line := m.fileText()
+	if !strings.Contains(text, "{for=one exit=0}\nhi\n") {
+		t.Fatalf("the editor doesn't get the output not saved:\n%s", text)
+	}
+	if got := strings.Split(text, "\n")[line-1]; got != "```sh {#two}" {
+		t.Errorf("line %d is %q, want #two's fence", line, got)
+	}
+	if !takesLine("/usr/bin/vim") || takesLine("code") {
+		t.Error("takesLine")
+	}
+
+	// A new block before both, #one moved, #two edited: #one keeps its
+	// output, and the cursor stays on #two.
+	edited := strings.Replace(text, "# Title\n", "# Title\n\n```sh {#zero}\necho zero\n```\n", 1)
+	edited = strings.Replace(edited, "echo \"$X again\"", "echo \"$X once more\"", 1)
+	f := filepath.Join(t.TempDir(), "file.md")
+	os.WriteFile(f, []byte(edited), 0o644)
+	m.Update(editedMsg{block: -1, file: f, text: text})
+	if len(m.d.Blocks) != 3 || len(m.results) != 3 {
+		t.Fatalf("blocks %d, results %d", len(m.d.Blocks), len(m.results))
+	}
+	if !m.results[1].Ran || m.results[0].Ran || m.results[2].Ran {
+		t.Errorf("results kept: zero %v, one %v, two %v", m.results[0].Ran, m.results[1].Ran, m.results[2].Ran)
+	}
+	if m.cur() != 2 || !m.dirty {
+		t.Errorf("cursor on %d, dirty %v", m.cur(), m.dirty)
+	}
+	if strings.Contains(read(t, file), "zero") {
+		t.Error("saved without w")
+	}
+	press(m, "w")
+	if got := read(t, file); !strings.Contains(got, "echo zero") || !strings.Contains(got, "{for=one exit=0}\nhi\n") {
+		t.Errorf("saved file:\n%s", got)
+	}
+}
