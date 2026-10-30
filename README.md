@@ -215,7 +215,8 @@ recently first, then the rest grouped by folder, each with its block
 count, when it changed and the `description` (else `summary`, else
 `abstract`) from its front matter. Typing filters the list by path and
 description, and enter opens the file picked; `q` goes back to the list.
-Recent files are kept in `mdsh/tui.json` in the user's config folder. Blocks keep
+Recent files, and the view the last file was left in, are kept in
+`mdsh/tui.json` in the user's config folder. Blocks keep
 their envs between runs, the same as in one `mdsh` run, so running a
 block again runs it in the env as the earlier runs left it, and replaces
 its output.
@@ -231,6 +232,8 @@ its output.
 | `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
 | `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
 | `v` | show the block's image or recording full screen; enter goes back |
+| `o` | show or hide the outline: the headings and blocks down the left, with each block's state (✓ ran, ✗ failed, ? waiting for an answer, … running) |
+| `C` / `O` | hide or show the code / the output of blocks |
 | `w` or ctrl+s | save now |
 | `W` | save as: type a path (relative to the file's folder); mdsh follows the new file. In another folder it opens it again, with fresh shells |
 | `R` | reload the file from disk, dropping output not saved |
@@ -240,8 +243,8 @@ its output.
 
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
-under `--step` or `step: true` when running with `a`, ask in the footer
-with the same choices as on the command line. `--yes`, `--stop-on-error`
+under `--step` or `step: true` when running with `a`, ask in the
+block's card, under its code, with the same choices as on the command line. `--yes`, `--stop-on-error`
 and block arguments work as usual. A `tty` block gets the whole terminal
 while it runs, and the TUI comes back when you press enter after it ends;
 a taped block's run is shown the same way. Images and recordings

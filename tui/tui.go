@@ -19,6 +19,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
@@ -50,6 +51,8 @@ type Options struct {
 	// Style is the glamour style prose is drawn in, such as "dark",
 	// "light" or "notty".
 	Style string
+	// View is how the file is shown at first.
+	View View
 }
 
 // Model is the TUI's state. It is a tea.Model.
@@ -108,6 +111,9 @@ type Model struct {
 	saveAs    textinput.Model
 	naming    bool
 	overwrite string // the existing file enter again overwrites
+
+	// shown is how the file is shown: the outline, code and output.
+	shown View
 
 	// back is set when the TUI came from the start screen: q goes back
 	// to it rather than quitting.
@@ -219,6 +225,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		index:  map[*doc.Block]int{},
 		events: make(chan tea.Msg, 64),
 		done:   make(chan struct{}),
+		shown:  opts.View,
 		active: -1,
 		live:   map[int][]chunk{},
 		bg:     map[int]bool{},
@@ -566,6 +573,12 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.changed {
 			m.keepMine()
 		}
+	case "o":
+		return m, m.toggle(&m.shown.Outline)
+	case "C":
+		return m, m.toggle(&m.shown.HideCode)
+	case "O":
+		return m, m.toggle(&m.shown.HideOutput)
 	case "i", ":":
 		if m.running {
 			m.status = "a block is running; ctrl+c stops it"
@@ -974,10 +987,10 @@ func (m *Model) resize(w, h int) {
 	}
 	m.width, m.height = w, h
 	if !m.ready {
-		m.vp = viewport.New(w, m.vpHeight())
+		m.vp = viewport.New(m.docWidth(), m.vpHeight())
 		m.ready = true
 	} else {
-		m.vp.Width, m.vp.Height = w, m.vpHeight()
+		m.vp.Width, m.vp.Height = m.docWidth(), m.vpHeight()
 	}
 	m.refresh()
 }
@@ -997,7 +1010,12 @@ func (m *Model) View() string {
 	if !m.ready {
 		return "loading…"
 	}
-	view := m.vp.View() + "\n" + m.footer()
+	view := m.vp.View()
+	if m.showOutline() {
+		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
+		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
+	}
+	view += "\n" + m.footer()
 	if m.changed {
 		view = bannerStyle.Width(m.width).Render("The file changed on disk.  R reload it · M keep yours") + "\n" + view
 	}
@@ -1023,10 +1041,16 @@ func (m *Model) footer() string {
 		}
 		status += fmt.Sprintf("%d in background", n)
 	}
-	line1 := titleStyle.Render(name) + state
+	rest := state
 	if status != "" {
-		line1 += "  " + statusStyle.Render(status)
+		rest += "  " + statusStyle.Render(status)
 	}
+	// A long path gives way to the status: it loses its start.
+	if room := max(m.width-lipgloss.Width(rest), 12); len([]rune(name)) > room {
+		r := []rune(name)
+		name = "…" + string(r[len(r)-room+1:])
+	}
+	line1 := titleStyle.Render(name) + rest
 	var help string
 	switch {
 	case m.typing:
@@ -1036,17 +1060,13 @@ func (m *Model) footer() string {
 	case m.prompt != nil && m.prompt.of != nil:
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", m.d.Label(m.prompt.of), m.d.Label(m.prompt.block)))
 	case m.prompt != nil:
-		q := m.prompt.block.Attrs["confirm"]
-		if q == "" {
-			q = "Run this block?"
-		}
-		help = promptStyle.Render(fmt.Sprintf("%s  [r]un  s[k]ip  [o]nly blocks without saved output  [s]top", q))
+		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a run from here · s run section · i new · e edit · v view · w save · W save as · q " + m.quitWord())
+		help = helpStyle.Render("j/k move · enter run · a from here · s section · i new · e edit · v view · o outline · C code · O output · w save · W save as · q " + m.quitWord())
 	}
-	return line1 + "\n" + help
+	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }
 
 const footerLines = 2
