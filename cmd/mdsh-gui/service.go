@@ -109,6 +109,18 @@ func (a *App) afterRun(t *docTab, n *notebook.Notebook) {
 	t.changed()
 }
 
+// ClearOutputs takes every block's output out of the document and
+// starts its shells again.
+func (a *App) ClearOutputs(ctx context.Context) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.ClearOutputs()
+	t.changed()
+	return err
+}
+
 // Stop stops the running block, answering stop if a block is waiting
 // to be confirmed.
 func (a *App) Stop(ctx context.Context) {

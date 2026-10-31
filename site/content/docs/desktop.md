@@ -50,7 +50,8 @@ mdsh-gui notes.md staging # open a file; $1 is staging
   to reorder it, onto another window to move it there, or away from the
   tab bar for a window of its own; a block running in it carries on.
 - **Running.** Every block has run and run-from-here buttons, and Run All
-  runs the document. Output streams in under the block. A block marked
+  runs the document. Output streams in under the block. Run › Clear All
+  Outputs takes all output out of the document, as if nothing had run. A block marked
   `confirm` asks in its card; a `tty` block runs in a terminal in its
   card and is recorded, as `mdsh` records it. A `background` block runs on
   while the next ones do, and its output shows when it ends.

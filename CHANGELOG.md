@@ -16,6 +16,11 @@ follow [Semantic Versioning](https://semver.org/).
   run's current step (▶, or ? while it waits for an answer) and each
   block running in the background (◐), and a click on one jumps to
   it. The outline marks them the same way, instead of … for both.
+- `mdsh-gui` **Run › Clear All Outputs** takes every block's output out
+  of the document, empties output copies and the stored values of
+  block placeholders, and starts the shells again, as if nothing had
+  run. Includes keep their lines. It isn't saved until you save, and
+  with the source view open, undo there brings the output back.
 
 ## [1.2.1] - 2026-10-29
 

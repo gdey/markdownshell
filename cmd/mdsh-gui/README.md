@@ -33,8 +33,12 @@ Each file opens in a tab of its own, with its own shells.
   command that makes the same one. Dropping a markdown file on a window opens it. A • marks
   output that isn't saved, and closing or quitting asks first.
 - **Run:** Run All (cmd/ctrl+R, the toolbar button turns into Stop while
-  blocks run), Stop (cmd/ctrl+.) and Run Options… for the file's
-  arguments, `--only`, step mode and stop on error. A block marked
+  blocks run), Stop (cmd/ctrl+.), Clear All Outputs and Run Options…
+  for the file's arguments, `--only`, step mode and stop on error.
+  Clear All Outputs takes every block's output, output copy and stored
+  block value out of the document and starts the shells again, as if
+  nothing had run. It isn't saved until you save; with the source view
+  open, undo there brings the output back. A block marked
   `tty` runs in a terminal in its card: type at it as you would in a
   terminal. When it ends the card shows the recording, as `mdsh` saves
   it. A block marked `background` starts and lets other blocks run: its
