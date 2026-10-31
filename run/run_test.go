@@ -568,3 +568,14 @@ func TestTakeTTY(t *testing.T) {
 		t.Errorf("the tape's run wasn't shown on the terminal: %q", shown)
 	}
 }
+
+func TestOverstrikeOutput(t *testing.T) {
+	_, results := runDoc(t, "```sh {#a}\nprintf 'N\\bNA\\bAM\\bME\\bE _\\bx\\n'\nprintf 'e\\be\\n' >&2\n```\n", run.Options{})
+	r := byID(results)["a"]
+	if got := string(r.Stdout); got != "NAME x\n" {
+		t.Errorf("stdout = %q", got)
+	}
+	if got := string(r.Stderr); got != "e\n" {
+		t.Errorf("stderr = %q", got)
+	}
+}

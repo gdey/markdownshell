@@ -132,6 +132,9 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 	r, b := j.r, j.r.Block
 	r.Running = false
 	r.Stdout, r.Stderr = j.job.Output()
+	if kind, _ := outKind(b); kind != "image" {
+		r.Stdout, r.Stderr = Overstrike(r.Stdout), Overstrike(r.Stderr)
+	}
 	r.Status = status
 	if errors.Is(err, env.ErrKilled) {
 		switch {

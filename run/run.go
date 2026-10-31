@@ -298,7 +298,16 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	var rec *termrec.Recorder
 	switch {
 	case !b.Attrs.Has("tty"):
-		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+		if kind, _ := outKind(b); kind == "image" {
+			r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, out, errw)
+			break
+		}
+		// Text output is shown as text, so backspace overstrikes, as
+		// man prints bold and underline, are applied.
+		o, ew := &overstrikeWriter{w: out}, &overstrikeWriter{w: errw}
+		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(b, opts)+b.Body, o, ew)
+		o.Flush()
+		ew.Flush()
 	case taped != nil:
 		// The tape types for the block, so it needs no terminal. It
 		// runs on a fixed size, so it records the same anywhere.

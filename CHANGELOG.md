@@ -50,6 +50,10 @@ follow [Semantic Versioning](https://semver.org/).
 - A block's errors name it `block` instead of the runner's temp file,
   so `/var/folders/…/mdsh-123/block.sh:2: no such file or directory`
   reads `block:2: no such file or directory`.
+- Output of programs that print bold and underline with backspaces,
+  such as `man`, is no longer garbled: `N\bN` is saved as `N` and
+  `_\bx` as `x`, in every front end. Blocks with `out=image` are left
+  as they are.
 
 ## [1.2.1] - 2026-10-29
 
