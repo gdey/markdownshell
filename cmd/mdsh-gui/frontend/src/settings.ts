@@ -24,6 +24,7 @@ for (const t of tabs) t.onclick = () => showTab(t.dataset.tab!);
 function draw() {
   input("autosave").checked = s.autosave;
   input("vim").checked = s.vim;
+  input("spellcheck").checked = !s.noSpellCheck;
   select("theme").value = s.theme;
   applyTheme(s.theme);
   select("view").value = s.view;
@@ -70,6 +71,7 @@ async function choose() {
 
 input("autosave").onchange = () => ((s.autosave = input("autosave").checked), save());
 input("vim").onchange = () => ((s.vim = input("vim").checked), save());
+input("spellcheck").onchange = () => ((s.noSpellCheck = !input("spellcheck").checked), save());
 select("theme").onchange = async () => {
   s.theme = select("theme").value;
   applyTheme(s.theme);

@@ -12,11 +12,14 @@ import { el, iconButton, type icons } from "./dom.js";
 import { type ExTarget, attrHelp, clickFocus, exTarget, forgetEx } from "./editor.js";
 import { codeLanguages } from "./highlight.js";
 import { Synced } from "./sync.js";
+import { spellCheck } from "./spell.js";
 import { editorLook } from "./theme.js";
 
 export interface MarkdownEditorOptions {
   text: string;
   vim: boolean;
+  // spellCheck checks the prose's spelling.
+  spellCheck?: boolean;
   attrs: AttrSpec[];
   names: () => Names;
   // lineNumbers is on for the source pane.
@@ -40,6 +43,7 @@ export interface MarkdownEditorOptions {
 export interface MarkdownEditor {
   view: EditorView;
   setVim(on: boolean): void;
+  setSpellCheck(on: boolean): void;
   // pending is whether something was typed since the text last came
   // from Go or went to it.
   readonly pending: boolean;
@@ -88,6 +92,7 @@ function modEnter(opts: MarkdownEditorOptions): () => boolean {
 
 export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions): MarkdownEditor {
   const vimMode = new Compartment();
+  const spell = new Compartment();
   const escape = new Compartment();
   const escapeKey = (on: boolean): Extension => (on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]));
   let quiet = false; // load is changing the text
@@ -99,6 +104,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
       doc: opts.text,
       extensions: [
         vimMode.of(opts.vim ? vim() : []),
+        spell.of(spellCheck(!!opts.spellCheck)),
         opts.lineNumbers ? lineNumbers() : [],
         opts.extensions ?? [],
         history(),
@@ -130,6 +136,9 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
     view,
     setVim(on) {
       view.dispatch({ effects: [vimMode.reconfigure(on ? vim() : []), escape.reconfigure(escapeKey(on))] });
+    },
+    setSpellCheck(on) {
+      view.dispatch({ effects: spell.reconfigure(spellCheck(on)) });
     },
     get pending() {
       return sync.pending;

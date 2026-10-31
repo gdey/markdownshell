@@ -180,6 +180,9 @@ follow [Semantic Versioning](https://semver.org/).
   view to share the width between them.
 - `terminal:` front matter, with `cols:` and `rows:`, sets the size of
   the terminal `mdsh-gui` runs `tty` blocks on.
+- `mdsh-gui` checks the spelling of the prose in the source view with
+  the system's spell checker, leaving out code, links and HTML. A
+  setting turns it off.
 
 ### Changed
 
