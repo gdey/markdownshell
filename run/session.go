@@ -1,9 +1,11 @@
 package run
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/termrec"
 )
 
 // Session runs a document's blocks, keeping each env's shell alive from
@@ -62,10 +65,10 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
 			Dir:  opts.Dir,
 			Args: opts.Args,
-			TTY:  hasTTY(d),
+			TTY:  hasTTY(d) || opts.PTY,
 			Init: init,
 		}),
-		tty: hasTTY(d),
+		tty: hasTTY(d) || opts.PTY,
 	}
 	// Includes are part of the document, not steps of the run, so they
 	// are read whatever runs.
@@ -199,6 +202,27 @@ func (s *Session) readInclude(b *doc.Block) *Result {
 	includeBlock(b, r, s.opts)
 	return r
 }
+
+// Ask runs script in the shell of the document's top-level env, where
+// blocks with no env= run, and returns what it printed. It sees what
+// blocks left there, such as the directory and variables, and should
+// change none of it, so put it in a subshell. Call it while nothing
+// runs; ending ctx ends the shell.
+func (s *Session) Ask(ctx context.Context, script string) (string, error) {
+	e, err := s.stack.Get(ctx, "", s.d.Options.Env.Share)
+	if err != nil {
+		return "", err
+	}
+	var out bytes.Buffer
+	if _, _, err := e.Shell.Run(ctx, script, &out, io.Discard); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+// PTY reports whether the session's shells have terminals of their own,
+// which RunTyped needs.
+func (s *Session) PTY() bool { return s.tty }
 
 // Close ends the session's shells, and any background block still
 // running, which it reports as killed.
@@ -425,6 +449,60 @@ func (s *Session) depend(dep, b *doc.Block) (Answer, error) {
 		return Stop, fmt.Errorf("%w: %s depends on %s, which hasn't run", ErrNoConfirm, s.d.Label(b), s.d.Label(dep))
 	}
 	return s.opts.Depend(dep, b), nil
+}
+
+// RunTyped runs block i on Terminal, as if it had been typed there: what
+// is typed in the terminal goes to it, and it shows what it writes. A
+// block that switched to the terminal's alternate screen, as vim or top
+// do, gets its session as a recording, the way a tty block does, and
+// RunTyped reports it as full screen. Any other block gets the text it
+// showed as its stdout. It runs with the shell's job control on, where
+// the shell has it, so ctrl+z stops it, ending the run with status 128 plus SIGTSTP,
+// and fg in a later RunTyped brings it back. The session needs
+// Options.PTY, or a tty block, and Options.Terminal.
+func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bool, err error) {
+	if i < 0 || i >= len(s.d.Blocks) {
+		return nil, false, fmt.Errorf("no block %d", i)
+	}
+	b := s.d.Blocks[i]
+	if !Runnable(b) {
+		return s.results[i], false, fmt.Errorf("mdsh can't run %s blocks", b.Lang)
+	}
+	if s.opts.Terminal == nil {
+		return s.results[i], false, ErrNoTTY
+	}
+	s.Reap()
+	r = &Result{Block: b, Ran: true}
+	s.results[i] = r
+	s.emit(Event{Kind: Started, Block: b})
+	defer func() { s.emit(Event{Kind: Done, Block: b, Result: r}) }()
+	e, err := envFor(ctx, s.stack, s.d, b)
+	if err != nil {
+		r.Err = err
+		return r, false, nil
+	}
+	t := *s.opts.Terminal
+	// Typed at a prompt, it gets the shell's job control: ctrl+z stops
+	// it, and jobs, fg and bg in a later block see it.
+	t.JobControl = true
+	rec := termrec.NewRecorder(t.Dims())
+	giveBack := takeTTY(b, s.opts)
+	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(s.d, b, s.opts)+b.Body, t, rec)
+	giveBack()
+	if err != nil && !errors.Is(err, env.ErrExited) {
+		r.Err = err
+	}
+	shown := rec.Recording()
+	if !shown.FullScreen() {
+		r.Stdout = []byte(shown.Text())
+		return r, false, ctx.Err()
+	}
+	img, err := saveRecording(b, shown, s.opts)
+	r.Image = img
+	if r.Err == nil {
+		r.Err = err
+	}
+	return r, true, ctx.Err()
 }
 
 func (s *Session) confirm(b *doc.Block) (Answer, error) {

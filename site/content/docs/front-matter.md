@@ -17,6 +17,9 @@ mdsh:
   step: false
   interpolate: true
   show_stderr: false
+  terminal:
+    cols: 100
+    rows: 30
   env:
     share: [PATH, HOME]
     source: [~/.zsh_aliases]
@@ -36,6 +39,7 @@ closing line, the `---` is just a thematic break.
 | `step` | `true`, `false` | `false` | Ask before running each block, as if every block were marked `confirm` |
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
+| `terminal.cols`, `terminal.rows` | cells | fit the window, 24 | In mdsh-gui, the size of the terminal `tty` blocks run on |
 | `env.share` | list of variable names, `...`, `-NAME` | all | Variables passed from mdsh's environment into the shell, and the default `share=` for sub-envs |
 | `env.source` | list of file paths | none | Files sourced into every shell before its first block, such as aliases and functions |
 
@@ -68,6 +72,17 @@ aren't asked about.
 The `--step` flag turns it on for one run without editing the file, and
 `--yes` answers run to every question. It works with `--pdf` too: mdsh asks
 about each block, then writes the PDF.
+
+### `terminal`
+
+In mdsh-gui a `tty` block runs on a terminal in its card, as wide as the
+card and 24 lines high. `cols:` and `rows:` under `terminal:` set that
+size instead, so the block, and its recording, come out the same in any
+window; a terminal wider than its card scrolls. The History pane takes
+the width too, while its height is what you drag it to. Either may be
+left out, and 0 is the same. `cols` goes up to 1000 and `rows` to 500.
+`mdsh` itself runs `tty` blocks on the terminal it is in, at that
+terminal's size.
 
 ### `interpolate`
 

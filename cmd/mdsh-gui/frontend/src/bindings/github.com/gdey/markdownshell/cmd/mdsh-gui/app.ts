@@ -148,6 +148,38 @@ export function EndDrag(id: number, outside: boolean, x: number, y: number): $Ca
 }
 
 /**
+ * HistoryComplete reports whether input is a whole command, so enter
+ * runs it, rather than starting another line.
+ */
+export function HistoryComplete(input: string): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.HistoryComplete", input);
+}
+
+/**
+ * HistoryCompletions completes the word at the end of before, what is
+ * typed in the History pane up to the cursor, for Tab.
+ */
+export function HistoryCompletions(before: string): $CancellablePromise<notebook$0.Completion> {
+    return $Call.ByName("main.App.HistoryCompletions", before);
+}
+
+/**
+ * HistoryEnter takes what was typed in the History pane: a note is added
+ * to the file as prose, and a command is added as a block and run.
+ */
+export function HistoryEnter(input: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.HistoryEnter", input);
+}
+
+/**
+ * HistoryPrompt is the shell's PS1 and PS2, expanded, for the History
+ * pane's prompt.
+ */
+export function HistoryPrompt(): $CancellablePromise<notebook$0.Prompt> {
+    return $Call.ByName("main.App.HistoryPrompt");
+}
+
+/**
  * Live is what the run going on in the tab has sent so far, for a page
  * that starts partway through it.
  */
@@ -255,6 +287,14 @@ export function ReportStart(): $CancellablePromise<$models.ReportStart> {
 }
 
 /**
+ * RestartShells starts the file's shells again, as if nothing had run,
+ * without changing the file.
+ */
+export function RestartShells(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.RestartShells");
+}
+
+/**
  * Reveal shows file in the file manager.
  */
 export function Reveal(file: string): $CancellablePromise<void> {
@@ -318,6 +358,16 @@ export function SetChoice(i: number, checked: boolean[] | null): $CancellablePro
  */
 export function SetFolds(folds: notebook$0.Fold[] | null): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetFolds", folds);
+}
+
+/**
+ * SetHistory turns the History pane on or off for the file. Turning it
+ * on may start the shells again, so commands can run on a terminal; it
+ * reports whether it did. The shells read the rc file Settings names as
+ * it is now.
+ */
+export function SetHistory(on: boolean): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.SetHistory", on);
 }
 
 /**

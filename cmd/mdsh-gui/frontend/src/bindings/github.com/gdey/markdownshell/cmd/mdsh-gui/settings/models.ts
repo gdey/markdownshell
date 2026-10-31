@@ -26,6 +26,12 @@ export interface Settings {
     "shell": string;
 
     /**
+     * HistoryRC is a file, such as ~/.zshrc, the shells read while the
+     * History pane is on. Empty reads none.
+     */
+    "historyRC": string;
+
+    /**
      * View is how a file opens: "rendered", "source" or "both".
      * Empty keeps the view the last tab had.
      */

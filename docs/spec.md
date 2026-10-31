@@ -34,6 +34,9 @@ mdsh:
   step: false
   interpolate: true
   show_stderr: false
+  terminal:
+    cols: 100
+    rows: 30
   env:
     share: [PATH, HOME]
 ---

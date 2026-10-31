@@ -35,6 +35,12 @@ type Doc struct {
 	Run   notebook.RunOptions `json:"run"`
 	// Args is Run.Args as one line, quoted as a shell would need.
 	Args string `json:"args"`
+	// History is set while the History pane is on for the file.
+	History bool `json:"history"`
+	// TermCols and TermRows are the terminal size the front matter asks
+	// for, 0 where it doesn't.
+	TermCols int `json:"termCols"`
+	TermRows int `json:"termRows"`
 }
 
 // Doc describes the open file. File is "" while the start screen shows.
@@ -52,7 +58,8 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	t.fresh = false
 	t.mu.Unlock()
 	ro := n.RunOptions()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
+	cols, rows := n.TerminalSize()
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -130,6 +137,18 @@ func (a *App) ClearOutputs(ctx context.Context) error {
 		return err
 	}
 	err = n.ClearOutputs()
+	t.changed()
+	return err
+}
+
+// RestartShells starts the file's shells again, as if nothing had run,
+// without changing the file.
+func (a *App) RestartShells(ctx context.Context) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.Restart()
 	t.changed()
 	return err
 }
@@ -290,6 +309,61 @@ func (a *App) SetRunOptions(ctx context.Context, args, only string, step, stopOn
 	return n.SetRunOptions(ro)
 }
 
+// SetHistory turns the History pane on or off for the file. Turning it
+// on may start the shells again, so commands can run on a terminal; it
+// reports whether it did. The shells read the rc file Settings names as
+// it is now.
+func (a *App) SetHistory(ctx context.Context, on bool) (bool, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return false, err
+	}
+	n.SetHistoryRC(a.settings.Get().HistoryRC)
+	return n.SetHistory(on)
+}
+
+// HistoryEnter takes what was typed in the History pane: a note is added
+// to the file as prose, and a command is added as a block and run.
+func (a *App) HistoryEnter(ctx context.Context, input string) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = t.run(func() error { return n.Enter(input) })
+	a.afterRun(t, n)
+	return err
+}
+
+// HistoryComplete reports whether input is a whole command, so enter
+// runs it, rather than starting another line.
+func (a *App) HistoryComplete(ctx context.Context, input string) bool {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return true
+	}
+	return n.Complete(input)
+}
+
+// HistoryCompletions completes the word at the end of before, what is
+// typed in the History pane up to the cursor, for Tab.
+func (a *App) HistoryCompletions(ctx context.Context, before string) (notebook.Completion, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Completion{}, err
+	}
+	return n.Completions(before)
+}
+
+// HistoryPrompt is the shell's PS1 and PS2, expanded, for the History
+// pane's prompt.
+func (a *App) HistoryPrompt(ctx context.Context) (notebook.Prompt, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Prompt{}, err
+	}
+	return n.Prompt()
+}
+
 // Start is what the start screen lists.
 type Start struct {
 	Dir    string         `json:"dir"`
@@ -328,6 +402,7 @@ func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) {
 		cur.Autosave, cur.Vim, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.Shell, s.StartFolder
 		cur.TemplateFolder = s.TemplateFolder
+		cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
 		cur.Theme = ""
 		if s.Theme == "light" || s.Theme == "dark" {
 			cur.Theme = s.Theme
@@ -545,6 +620,7 @@ type View struct {
 	Outline  bool `json:"outline"`
 	Code     bool `json:"code"`
 	Output   bool `json:"output"`
+	History  bool `json:"history"` // the History pane
 }
 
 // defaultView is what a new tab shows until its page says.

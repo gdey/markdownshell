@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -302,5 +303,141 @@ func TestRunTerminal(t *testing.T) {
 	var x bytes.Buffer
 	if _, _, err := sh.Run(context.Background(), `echo "$X"`, &x, io.Discard); err != nil || x.String() != "typed\n" {
 		t.Errorf("X = %q, err %v", x.String(), err)
+	}
+}
+
+// TestRunTerminalSuspend: ctrl+z, and a program that stops itself as
+// vim does on ctrl+z, have no shell with job control to come back to, so
+// the stop signals are ignored rather than stopping the block for good.
+// (Linux already drops them for the shell's orphaned process group;
+// macOS stops a program that sends one to itself.)
+func TestRunTerminalSuspend(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	var (
+		mu   sync.Mutex
+		out  bytes.Buffer
+		keys = make(chan []byte, 2)
+	)
+	shown := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return out.Write(p)
+	})
+	go func() {
+		for end := time.Now().Add(20 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+			mu.Lock()
+			ready := strings.Contains(out.String(), "ready")
+			mu.Unlock()
+			if ready {
+				keys <- []byte("\x1a")
+				time.Sleep(200 * time.Millisecond)
+				keys <- []byte("on\r")
+				return
+			}
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	script := "sh -c 'kill -TSTP 0; echo ready; read -r l; echo carried $l'\n"
+	status, _, err := sh.RunTerminal(ctx, script, Terminal{Keys: keys, Out: shown}, io.Discard)
+	mu.Lock()
+	screen := out.String()
+	mu.Unlock()
+	if err != nil || status != 0 {
+		t.Fatalf("status %d, err %v; screen %q", status, err, screen)
+	}
+	if !strings.Contains(screen, "carried on") {
+		t.Errorf("screen %q", screen)
+	}
+	// The shell is still good for the next block, and stops as usual.
+	var o bytes.Buffer
+	if _, _, err := sh.Run(context.Background(), "trap; echo next", &o, io.Discard); err != nil || !strings.HasSuffix(o.String(), "next\n") || strings.Contains(o.String(), "TSTP") {
+		t.Errorf("next block: %q, %v", o.String(), err)
+	}
+}
+
+// TestRunTerminalJobs: with job control, ctrl+z stops the command and
+// the block ends, and fg in the next block brings it back.
+func TestRunTerminalJobs(t *testing.T) {
+	for _, path := range []string{"/bin/sh", "bash", "zsh"} {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			if _, err := exec.LookPath(path); err != nil {
+				t.Skip(err)
+			}
+			if path == "zsh" {
+				t.Skip("zsh has no job control unless interactive; TestRunTerminalSuspend covers ctrl+z being ignored")
+			}
+			sh, err := Start(Config{Path: path, Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+			if err != nil {
+				t.Skip("no pseudo-terminals:", err)
+			}
+			defer sh.Close()
+			var (
+				mu  sync.Mutex
+				out bytes.Buffer
+			)
+			shown := writerFunc(func(p []byte) (int, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				return out.Write(p)
+			})
+			// type sends keys once the screen shows want.
+			typeAfter := func(want string, keys ...string) chan []byte {
+				ch := make(chan []byte, len(keys))
+				go func() {
+					for end := time.Now().Add(10 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+						mu.Lock()
+						ok := strings.Contains(out.String(), want)
+						mu.Unlock()
+						if ok {
+							for _, k := range keys {
+								ch <- []byte(k)
+								time.Sleep(100 * time.Millisecond)
+							}
+							return
+						}
+					}
+				}()
+				return ch
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			term := Terminal{Out: shown, JobControl: true}
+			// Some shells can't do job control without being
+			// interactive, such as bash; there ctrl+z
+			// is ignored, as TestRunTerminalSuspend checks.
+			var o bytes.Buffer
+			if _, _, err := sh.RunTerminal(ctx, ":\n", term, io.Discard); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := sh.Run(ctx, "echo $__mdsh_jobs", &o, io.Discard); err != nil || o.String() != "yes\n" {
+				t.Skipf("no job control here: %q, %v", o.String(), err)
+			}
+			term.Keys = typeAfter("ready", "\x1a")
+			status, _, err := sh.RunTerminal(ctx, "sh -c 'echo ready; read -r l; echo carried $l'\n", term, io.Discard)
+			if err != nil || status == 0 {
+				t.Fatalf("stopping: status %d, err %v; screen %q", status, err, out.String())
+			}
+			mu.Lock()
+			out.Reset()
+			mu.Unlock()
+			term.Keys = typeAfter("", "on\r")
+			status, _, err = sh.RunTerminal(ctx, "fg >/dev/null\n", term, io.Discard)
+			mu.Lock()
+			screen := out.String()
+			mu.Unlock()
+			if err != nil || status != 0 || !strings.Contains(screen, "carried on") {
+				t.Fatalf("fg: status %d, err %v; screen %q", status, err, screen)
+			}
+			// Job control is off again for other blocks.
+			o.Reset()
+			if _, _, err := sh.Run(context.Background(), "case $- in *m*) echo on;; *) echo off;; esac", &o, io.Discard); err != nil || o.String() != "off\n" {
+				t.Errorf("after: %q, %v", o.String(), err)
+			}
+		})
 	}
 }

@@ -119,6 +119,19 @@ func TestParseBadOnError(t *testing.T) {
 	}
 }
 
+func TestParseTerminal(t *testing.T) {
+	d, err := Parse([]byte("---\nmdsh:\n  terminal:\n    cols: 120\n    rows: 40\n---\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := d.Options.Terminal; got.Cols != 120 || got.Rows != 40 {
+		t.Errorf("Terminal = %+v", got)
+	}
+	if _, err := Parse([]byte("---\nmdsh:\n  terminal:\n    rows: -1\n---\n")); err == nil {
+		t.Error("rows -1: want error")
+	}
+}
+
 func TestPlaceholders(t *testing.T) {
 	src := "```sh {#setup}\nexport G=hi\n```\n\n" +
 		"Say {{#setup/env(G)}} and {{#setup/env(G):\"old \\\"q\\\"\"}}, not `{{#setup/env(G)}}`.\n\n" +

@@ -156,6 +156,15 @@ export interface ChoiceCell {
 }
 
 /**
+ * Completion is what Tab offers in the History pane for the word before
+ * the cursor: each of Items replaces Word, the end of what was typed.
+ */
+export interface Completion {
+    "word": string;
+    "items": string[] | null;
+}
+
+/**
  * Fold is a fold made by hand in the rendered view, for SetFolds to
  * write to the file.
  */
@@ -239,6 +248,16 @@ export interface Problem {
      */
     "severity": string;
     "message": string;
+}
+
+/**
+ * Prompt is the shell's prompts, PS1 and PS2, expanded as the shell
+ * would show them, with their colors as ANSI escapes. Empty means the
+ * shell has none.
+ */
+export interface Prompt {
+    "ps1": string;
+    "ps2": string;
 }
 
 /**

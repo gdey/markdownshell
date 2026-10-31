@@ -5,16 +5,29 @@
 import { Terminal } from "@xterm/xterm";
 import { App } from "./api.js";
 
-const rows = 24;
+const defaultRows = 24;
 const fontSize = 13;
 const fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 let term: Terminal | null = null;
 let block = -1;
 
-// cols is how many cells fit across a block's output, so the terminal
-// fills the card.
+// wanted is the size the file's front matter asks for, under
+// mdsh: terminal:, with 0 where it leaves it to the window.
+export const wanted = { cols: 0, rows: 0 };
+
+// wantTerminalSize sets wanted, from the open file.
+export function wantTerminalSize(cols: number, rows: number) {
+  wanted.cols = cols > 0 ? cols : 0;
+  wanted.rows = rows > 0 ? rows : 0;
+}
+
+const rows = () => wanted.rows || defaultRows;
+
+// cols is the front matter's width, or how many cells fit across a
+// block's output, so the terminal fills the card.
 function cols(): number {
+  if (wanted.cols) return wanted.cols;
   const card = document.querySelector<HTMLElement>(".block") ?? document.getElementById("doc");
   const ctx = document.createElement("canvas").getContext("2d");
   if (!card || !ctx) return 80;
@@ -29,7 +42,7 @@ function cols(): number {
 // sizeTerminal tells Go the terminal's size, from the window's width, so
 // the next tty block runs and records at the size it is shown at.
 export function sizeTerminal() {
-  App.SetTerminalSize(cols(), rows).catch(() => {});
+  App.SetTerminalSize(cols(), rows()).catch(() => {});
 }
 
 function colors(): Record<string, string> {
@@ -48,7 +61,7 @@ export function openTerminal(i: number) {
   host.className = "terminal";
   out.replaceChildren(host);
   block = i;
-  term = new Terminal({ cols: cols(), rows, fontSize, fontFamily, cursorBlink: true, theme: colors(), scrollback: 1000 });
+  term = new Terminal({ cols: cols(), rows: rows(), fontSize, fontFamily, cursorBlink: true, theme: colors(), scrollback: 1000 });
   term.open(host);
   term.onData((keys) => App.Type(keys).catch(() => {}));
   term.focus();

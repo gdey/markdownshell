@@ -9,11 +9,12 @@ import (
 	"strings"
 )
 
-// AppendBlock adds a fenced block of lang holding body to the end of d,
-// after a blank line, and returns it. Earlier blocks keep their spans, so
-// results for them stay valid. It fails if the end of d would swallow
-// the block, such as an unclosed fence.
-func (d *Document) AppendBlock(lang, body string) (*Block, error) {
+// AppendBlock adds a fenced block holding body to the end of d, after a
+// blank line, and returns it. info is the fence's info string: a
+// language, such as sh, and any attributes. Earlier blocks keep their
+// spans, so results for them stay valid. It fails if the end of d would
+// swallow the block, such as an unclosed fence.
+func (d *Document) AppendBlock(info, body string) (*Block, error) {
 	if body == "" {
 		return nil, errors.New("empty block")
 	}
@@ -25,7 +26,7 @@ func (d *Document) AppendBlock(lang, body string) (*Block, error) {
 		fence += "`"
 	}
 	src := bytes.TrimRight(d.Src, "\n")
-	src = append(append([]byte(nil), src...), "\n\n"+fence+lang+"\n"+body+fence+"\n"...)
+	src = append(append([]byte(nil), src...), "\n\n"+fence+info+"\n"+body+fence+"\n"...)
 	if len(bytes.TrimSpace(d.Src)) == 0 {
 		src = src[2:]
 	}
@@ -37,7 +38,7 @@ func (d *Document) AppendBlock(lang, body string) (*Block, error) {
 		return nil, fmt.Errorf("the end of the document doesn't take a new block")
 	}
 	b := nd.Blocks[len(nd.Blocks)-1]
-	if b.Prefix != "" || b.Lang != lang {
+	if b.Prefix != "" || b.Info != info {
 		return nil, fmt.Errorf("the end of the document doesn't take a new block")
 	}
 	d.Src = src

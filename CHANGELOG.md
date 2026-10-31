@@ -122,6 +122,24 @@ follow [Semantic Versioning](https://semver.org/).
 - `run=once` runs a block only while it has no output, saved in the file
   or from an earlier run in the same `mdsh -i` or `mdsh-gui` session.
   Running the block by hand still runs it.
+- `mdsh-gui` **History** pane (View › History, cmd/ctrl+shift+H): a
+  terminal along the bottom of the window. A command typed there runs
+  in the file's shell, on a terminal, and is added to the end of the
+  file as a `#history-N` block with its output; a full-screen one, such
+  as `vi`, is kept as a `tty` block with its recording. A line starting
+  with `#` is added as prose. Tab completes commands, files and
+  variables, and the pane's top edge drags to resize it. The prompt is
+  the shell's own `PS1`/`PS2`, and a Settings entry names an rc file,
+  such as `~/.zshrc`, for the shells to read while History is on.
+  Commands get job control (ctrl+Z, `jobs`, `fg`, `bg`) in shells
+  that allow it without being interactive, such as dash, and a trailing `&` adds the command as a `background` block.
+  Closed, the pane is a status bar with stop, restart-the-shells and
+  open buttons; it slides open from there.
+- `tty` blocks ignore ctrl+Z, which used to stop them for good.
+- `mdsh-gui`: drag the line between the source view and the rendered
+  view to share the width between them.
+- `terminal:` front matter, with `cols:` and `rows:`, sets the size of
+  the terminal `mdsh-gui` runs `tty` blocks on.
 
 ### Changed
 
