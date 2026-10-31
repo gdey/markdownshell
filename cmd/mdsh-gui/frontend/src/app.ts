@@ -265,6 +265,7 @@ function runAllButton() {
 
 function busy(on: boolean) {
   running = on;
+  if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   runAllButton();
   for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run")) x.disabled = on;
 }
@@ -470,10 +471,11 @@ function syncScroll(from: "source" | "doc") {
 
 // The outline drawer: the headings and blocks, to jump around long
 // runbooks. Each block shows its state: ✓ ran, ? waiting for an answer,
-// ✗ failed, … running. The selected block has a play button, which
-// runs it as its card's does.
+// ✗ failed, ▶ the run's current step, ◐ running in the background. The
+// selected block has a play button, which runs it as its card's does.
 
 function drawOutline() {
+  drawRunning();
   const nav = $("outline");
   if (!view.outline) return;
   const items: HTMLElement[] = [];
@@ -481,9 +483,11 @@ function drawOutline() {
   for (const e of document.querySelectorAll<HTMLElement>("#doc > section")) {
     if (e.classList.contains("block")) {
       const ask = e.querySelector<HTMLElement>(".ask");
-      const mark = ask && !ask.hidden ? "?" : (e.querySelector(".live") && running) || e.classList.contains("background") ? "…" : e.classList.contains("failed") ? "✗" : e.classList.contains("ran") ? "✓" : "";
+      const mark = blockMark(e);
       const name = e.querySelector(".name")?.firstChild?.textContent ?? "";
-      const item = outlineItem(name, level + 1, e, "step" + (mark === "✗" ? " bad" : mark === "✓" ? " ok" : ""), mark);
+      const item = outlineItem(name, level + 1, e, "step" + markClass(mark), mark);
+      if (mark === "▶") item.title = name + " (running now)";
+      else if (mark === "◐") item.title = name + " (running in the background)";
       const block = Number(e.dataset.block);
       const play = iconButton("play", "Run this block (enter)", () => start("RunBlock", block));
       play.classList.add("run");
@@ -508,23 +512,63 @@ function markOutline() {
   for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) row.classList.toggle("active", row.dataset.block === b);
 }
 
+// blockMark is the mark for a block card's state: ? waiting for an
+// answer, ▶ the run's current step, ◐ running in the background, ✗
+// failed, ✓ ran.
+function blockMark(e: HTMLElement): string {
+  const ask = e.querySelector<HTMLElement>(".ask");
+  if (ask && !ask.hidden) return "?";
+  if (e.classList.contains("now")) return "▶";
+  if (e.classList.contains("background")) return "◐";
+  if (e.classList.contains("failed")) return "✗";
+  return e.classList.contains("ran") ? "✓" : "";
+}
+
+function markClass(mark: string): string {
+  return { "✗": " bad", "✓": " ok", "▶": " now", "◐": " bg", "?": " now" }[mark] ?? "";
+}
+
 function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string): HTMLElement {
   const b = el("button", { className: "item " + kind, title: text }, el("span", { className: "mark" }, mark), el("span", { className: "text" }, text));
   b.style.paddingLeft = 8 + (level - 1) * 12 + "px";
-  b.onclick = () => {
-    // Both panes go to the entry, so neither follows the other meanwhile.
-    holdScroll();
-    target.scrollIntoView({ block: "start", behavior: "smooth" });
-    const i = blocks().indexOf(target);
-    if (i >= 0) select(i, false);
-    const cell = target.closest<HTMLElement>("[data-line]");
-    if (source && cell) {
-      const cm = source.view;
-      const line = cm.state.doc.line(Math.min(Number(cell.dataset.line), cm.state.doc.lines));
-      cm.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "start" }) });
-    }
-  };
+  b.onclick = () => jumpTo(target);
   return b;
+}
+
+// jumpTo brings target to the top of the rendered view and its markdown
+// to the top of the source pane, and selects it if it is a block.
+function jumpTo(target: HTMLElement) {
+  // Both panes go to the entry, so neither follows the other meanwhile.
+  holdScroll();
+  target.scrollIntoView({ block: "start", behavior: "smooth" });
+  const i = blocks().indexOf(target);
+  if (i >= 0) select(i, false);
+  const cell = target.closest<HTMLElement>("[data-line]");
+  if (source && cell) {
+    const cm = source.view;
+    const line = cm.state.doc.line(Math.min(Number(cell.dataset.line), cm.state.doc.lines));
+    cm.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "start" }) });
+  }
+}
+
+// drawRunning lists the blocks running now in the toolbar: the run's
+// current step first (or the block waiting for an answer), then the
+// ones in the background. A click on one jumps to it.
+function drawRunning() {
+  const all = blocks();
+  const now = all.filter((e) => "?▶".includes(blockMark(e) || "x"));
+  const bg = all.filter((e) => blockMark(e) === "◐");
+  const chip = (e: HTMLElement) => {
+    const mark = blockMark(e);
+    const name = e.querySelector(".name")?.firstChild?.textContent || "block " + (all.indexOf(e) + 1);
+    const why = mark === "?" ? "waiting for an answer" : mark === "▶" ? "running now" : "running in the background";
+    const b = el("button", { className: "chip" + markClass(mark), title: name + ": " + why + ". Click to go to it." }, el("span", { className: "mark" }, mark), name);
+    b.onclick = () => jumpTo(e);
+    return b;
+  };
+  const list = $("running");
+  list.replaceChildren(...now.map(chip), ...bg.map(chip));
+  list.hidden = list.childElementCount === 0;
 }
 
 // applyView shows what view says, and keeps it for the next window.
@@ -750,6 +794,8 @@ function onBlock(e: BlockEvent) {
       out.replaceChildren();
       break;
     case "started":
+      for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
+      block.classList.add("now");
       block.querySelector<HTMLElement>(".ask")!.hidden = true;
       out.replaceChildren(el("pre", { className: "live" }));
       block.scrollIntoView({ block: "nearest" });
@@ -760,9 +806,17 @@ function onBlock(e: BlockEvent) {
       break;
     case "done":
       $("dirty").hidden = false;
+      block.classList.remove("now");
       // A background block can end while nothing runs, so nothing
       // else would draw its output.
-      if (block.classList.contains("background") && !running) void refresh().then(backgroundStatus);
+      if (block.classList.contains("background")) {
+        if (!running) void refresh().then(backgroundStatus);
+        else {
+          // Its result shows when the run ends and the page redraws.
+          block.classList.remove("background");
+          block.querySelector(".exit")!.textContent = "";
+        }
+      }
       break;
     case "terminal":
       // The block runs in its card, so show it, as a confirm does.
@@ -787,6 +841,7 @@ function onConfirm({ block, question }: Question) {
   const info = el("span", { className: "info", title: "This block is marked confirm, so it waits for you before it runs." }, svg(icons.info));
   const answer = (reply: string) => async () => {
     ask.hidden = true;
+    drawOutline();
     await App.Answer(reply).catch(fail);
   };
   const run = el("button", { className: "primary" }, "Run");

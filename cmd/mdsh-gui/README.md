@@ -96,6 +96,8 @@ until it ends. A `confirm` block asks in its card before it runs.
 The outline lists the headings and blocks, with a mark for each block's
 state. The selected block, or the one the source pane's cursor is in,
 has a play button in the outline that runs it.
+While blocks run, the toolbar lists them, the run's current step (▶)
+first and then those in the background (◐); click one to go to it.
 
 ![The outline beside the document, with a check by each block that ran](../../site/static/images/gui/outline.png)
 

@@ -159,6 +159,12 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px; }
 #outline .mark { flex: none; width: 1em; text-align: center; color: var(--muted); }
 #outline .ok .mark { color: var(--ok); }
 #outline .bad .mark { color: var(--bad); }
+#outline .now .mark, #running .now .mark { color: var(--accent); }
+#outline .bg .mark, #running .bg .mark { color: var(--muted); }
+#outline .item.now .text { color: var(--fg); font-weight: 600; }
+#running { display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
+#running .chip { flex: none; max-width: 160px; display: inline-flex; gap: 4px; align-items: center; }
+#running .chip.now { color: var(--fg); border-color: var(--accent); }
 #outline p { padding: 0 12px; }
 #outline .row { display: flex; align-items: center; }
 #outline .row .item { flex: 1; min-width: 0; }
