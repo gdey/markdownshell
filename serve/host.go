@@ -51,10 +51,14 @@ type message struct {
 
 func (s *Server) newWindow(doc bool) *window {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.lastID++
 	w := &window{s: s, id: s.lastID, doc: doc, conns: map[*conn]bool{}, title: "mdsh"}
 	s.windows[w.id] = w
+	c := s.stdio
+	s.mu.Unlock()
+	if doc && c != nil {
+		c.attach(w)
+	}
 	return w
 }
 
