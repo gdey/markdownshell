@@ -31,7 +31,8 @@ type Options struct {
 	// Run are the options every run uses. Run.File must be set. The TUI
 	// sets Confirm and OnEvent itself.
 	Run run.Options
-	// Yes runs confirm blocks, and every block in step mode, without
+	// Yes runs confirm blocks, every block in step mode, and the
+	// blocks depends= names, without
 	// asking.
 	Yes bool
 	// Save writes the document's new contents to Run.File.
@@ -123,6 +124,9 @@ type eventMsg run.Event
 
 type confirmMsg struct {
 	block *doc.Block
+	// of, for a dependency's question, is the block that depends on
+	// block.
+	of    *doc.Block
 	reply chan run.Answer
 }
 
@@ -218,6 +222,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	ro := opts.Run
 	ro.OnEvent = func(e run.Event) { m.events <- eventMsg(e) }
 	ro.Confirm = m.confirm
+	ro.Depend = m.depend
 	if ro.TTY != nil {
 		ro.TakeTTY = m.takeTTY
 	}
@@ -267,6 +272,16 @@ func (m *Model) confirm(b *doc.Block) run.Answer {
 	return <-reply
 }
 
+// depend asks whether to run dep, which b depends on, first.
+func (m *Model) depend(dep, b *doc.Block) run.Answer {
+	if m.opts.Yes {
+		return run.Go
+	}
+	reply := make(chan run.Answer)
+	m.events <- confirmMsg{block: dep, of: b, reply: reply}
+	return <-reply
+}
+
 // takeTTY hands the terminal to block b, from the run's goroutine, and
 // returns once the TUI has stepped aside.
 func (m *Model) takeTTY(b *doc.Block) func() {
@@ -312,7 +327,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.tick()
 	case confirmMsg:
 		i := m.index[msg.block]
-		if m.skipSaved && m.hasOutput(i) {
+		if m.skipSaved && m.hasOutput(i) && msg.of == nil {
 			msg.reply <- run.Skip
 		} else {
 			m.prompt = &msg
@@ -621,6 +636,9 @@ func (m *Model) answer(key string) {
 	case "k":
 		a = run.Skip
 	case "o":
+		if m.prompt.of != nil {
+			return
+		}
 		m.skipSaved = true
 		a = run.Go
 		if m.hasOutput(m.index[m.prompt.block]) {
@@ -784,6 +802,8 @@ func (m *Model) footer() string {
 	switch {
 	case m.typing:
 		help = m.input.View()
+	case m.prompt != nil && m.prompt.of != nil:
+		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", m.d.Label(m.prompt.of), m.d.Label(m.prompt.block)))
 	case m.prompt != nil:
 		q := m.prompt.block.Attrs["confirm"]
 		if q == "" {

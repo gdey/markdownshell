@@ -143,7 +143,9 @@ Run All streams each block's output in under it as it runs.
 ![A run in progress: the build block's output so far, with Stop in the toolbar](../../site/static/images/gui/running.png)
 
 A `background` block runs on while the next ones do, with a dashed edge
-until it ends. A `confirm` block asks in its card before it runs.
+until it ends. A `confirm` block asks in its card before it runs, and
+so does a block that a block you run names in `depends=` and that hasn't
+run yet.
 
 ![A background block still running, and a confirm block asking "Ship the site to production?" with Run, Skip and Stop](../../site/static/images/gui/confirm.png)
 

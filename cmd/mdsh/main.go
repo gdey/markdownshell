@@ -99,7 +99,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	htmlFile := fs.String("html", "", "write what would be printed to this HTML file instead (- for stdout)")
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
 	stop := fs.Bool("stop-on-error", false, "stop at the first failing block")
-	yes := fs.Bool("yes", false, "run blocks marked confirm without asking")
+	yes := fs.Bool("yes", false, "run blocks marked confirm, and the blocks depends= names, without asking")
 	step := fs.Bool("step", false, "ask before running each block, as if every block were marked confirm")
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
@@ -307,6 +307,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 	if *yes {
 		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
+		opts.Depend = func(_, _ *doc.Block) run.Answer { return run.Go }
 	} else if tty != nil {
 		p := newPrompter(tty, tty)
 		p.d = d
@@ -314,12 +315,17 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		// hidden.
 		p.quiet = live != nil && !*hideCode
 		opts.Confirm = p.confirm
+		opts.Depend = p.depend
 	}
 	if live != nil && opts.Confirm != nil {
-		confirm := opts.Confirm
+		confirm, depend := opts.Confirm, opts.Depend
 		opts.Confirm = func(b *doc.Block) run.Answer {
 			live.upTo(b)
 			return confirm(b)
+		}
+		opts.Depend = func(dep, b *doc.Block) run.Answer {
+			live.upTo(b)
+			return depend(dep, b)
 		}
 	}
 
@@ -566,6 +572,30 @@ func newPrompter(in io.Reader, out io.Writer) *prompter {
 
 // confirm shows block b and asks whether to run it, skip it or stop.
 // Pressing enter stops, so it is the safe choice.
+// depend asks whether to run dep, which b depends on, first.
+func (p *prompter) depend(dep, b *doc.Block) run.Answer {
+	fmt.Fprintf(p.out, "\n--- block %s depends on %s, which hasn't run ---\n", p.label(b), p.label(dep))
+	if !p.quiet || dep.Span.Start > b.Span.Start {
+		// A later block hasn't been printed yet.
+		fmt.Fprintf(p.out, "%s---\n", dep.Body)
+	}
+	for {
+		fmt.Fprintf(p.out, "Run %s first? [r]un / s[k]ip / [s]top: ", p.label(dep))
+		line, err := p.in.ReadString('\n')
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "r", "run", "y", "yes":
+			return run.Go
+		case "k", "skip":
+			return run.Skip
+		case "s", "stop", "n", "no", "":
+			return run.Stop
+		}
+		if err != nil {
+			return run.Stop
+		}
+	}
+}
+
 func (p *prompter) confirm(b *doc.Block) run.Answer {
 	if p.skipSaved && b.HasOutput() {
 		fmt.Fprintf(p.out, "--- block %s: skipped, keeping its saved output ---\n", p.label(b))

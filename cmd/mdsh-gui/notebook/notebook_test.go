@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -565,5 +566,34 @@ func TestIncludeFresh(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("typed include not shown: %+v", n.Cells())
+	}
+}
+
+func TestDepend(t *testing.T) {
+	file := write(t, "```sh {#build confirm}\necho built\n```\n\n```sh {#deploy depends=build}\necho deploy\n```\n")
+	var asked []string
+	n, err := Open(file, Options{
+		Confirm: func(i int, q string) run.Answer {
+			asked = append(asked, fmt.Sprintf("confirm %d", i))
+			return run.Stop
+		},
+		Depend: func(i, of int, q string) run.Answer {
+			asked = append(asked, fmt.Sprintf("depend %d of %d: %s", i, of, q))
+			return run.Go
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(1); err != nil {
+		t.Fatal(err)
+	}
+	// Saying to run build answers its confirm too.
+	if want := []string{"depend 0 of 1: deploy depends on this block, which hasn't run yet. Run it first?"}; !slices.Equal(asked, want) {
+		t.Errorf("asked %q, want %q", asked, want)
+	}
+	if c := n.Cells(); !c[0].Ran || !c[1].Ran {
+		t.Errorf("build ran %v, deploy ran %v", c[0].Ran, c[1].Ran)
 	}
 }

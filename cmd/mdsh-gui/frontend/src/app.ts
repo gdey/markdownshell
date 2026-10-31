@@ -1346,6 +1346,8 @@ interface BlockEvent {
 interface Question {
   block: number;
   question: string;
+  // of, when set, is the block that depends on block, which hasn't run.
+  of?: number;
 }
 
 // liveColors is the ANSI state of each stream of a running block's
@@ -1413,13 +1415,17 @@ function onBlock(e: BlockEvent) {
   if (e.kind !== "stdout" && e.kind !== "stderr") drawOutline();
 }
 
-function onConfirm({ block, question }: Question) {
+function onConfirm({ block, question, of }: Question) {
   const card = document.getElementById("block-" + block);
   if (!card) return;
   // The question is asked in the block's card, so show it.
   if (!view.rendered) toggle("rendered", true);
   const ask = card.querySelector<HTMLElement>(".ask")!;
-  const info = el("span", { className: "info", title: "This block is marked confirm, so it waits for you before it runs." }, svg(icons.info));
+  const why =
+    of === undefined
+      ? "This block is marked confirm, so it waits for you before it runs."
+      : "A block you ran lists this one in depends=, and it hasn't run in this session.";
+  const info = el("span", { className: "info", title: why }, svg(icons.info));
   const answer = (reply: string) => async () => {
     ask.hidden = true;
     drawOutline();

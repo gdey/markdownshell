@@ -116,6 +116,10 @@ type Options struct {
 	// Confirm is asked before a block marked confirm runs. If it is nil
 	// such blocks don't run.
 	Confirm func(block int, question string) run.Answer
+	// Depend is asked before running block, which block of depends on
+	// and which hasn't run in this session. If it is nil, block of
+	// doesn't run.
+	Depend func(block, of int, question string) run.Answer
 }
 
 // Notebook is an open document.
@@ -215,6 +219,7 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		Environ:     environ(),
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
+		Depend:      n.depend,
 		Terminal:    n.term.env(n.emit),
 		TakeTTY:     n.takeTTY,
 		Mode:        run.ModeInteractive,
@@ -631,6 +636,17 @@ func (n *Notebook) event(e run.Event) {
 		kind = "background"
 	}
 	n.opts.OnEvent(Event{Kind: kind, Block: i, Data: string(e.Data)})
+}
+
+func (n *Notebook) depend(dep, b *doc.Block) run.Answer {
+	if n.opts.Depend == nil {
+		return run.Stop
+	}
+	n.mu.Lock()
+	i, of := n.index[dep], n.index[b]
+	n.mu.Unlock()
+	q := fmt.Sprintf("%s depends on this block, which hasn't run yet. Run it first?", n.d.Label(b))
+	return n.opts.Depend(i, of, q)
 }
 
 func (n *Notebook) confirm(b *doc.Block) run.Answer {

@@ -88,6 +88,7 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 		Run:     ro,
 		OnEvent: func(e notebook.Event) { t.emit("block", e) },
 		Confirm: t.confirm,
+		Depend:  t.depend,
 	})
 	if err != nil {
 		return err
@@ -133,7 +134,18 @@ func (t *docTab) changed() {
 // confirm asks the frontend, from the run's goroutine, and waits for
 // Answer.
 func (t *docTab) confirm(block int, question string) run.Answer {
-	t.emit("confirm", map[string]any{"block": block, "question": question})
+	return t.ask(map[string]any{"block": block, "question": question})
+}
+
+// depend asks the frontend whether to run block, which block of
+// depends on, first, as confirm does.
+func (t *docTab) depend(block, of int, question string) run.Answer {
+	return t.ask(map[string]any{"block": block, "of": of, "question": question})
+}
+
+// ask sends the frontend a confirm event and waits for Answer.
+func (t *docTab) ask(q map[string]any) run.Answer {
+	t.emit("confirm", q)
 	select {
 	case a := <-t.answers:
 		t.mu.Lock()

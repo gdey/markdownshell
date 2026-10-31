@@ -60,6 +60,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "env", Kind: AttrText, Default: "top-level env", Help: "Run in a named sub-env; a/b stacks b on a"},
 	{Name: "share", Kind: AttrList, Default: "front matter env.share, else all", Help: "Exported variables a new sub-env gets from its parent; empty for none"},
 	{Name: "on_error", Kind: AttrChoice, Values: []string{"stop", "continue"}, Default: "front matter on_error", Help: "Stop the run if this block fails, or go on"},
+	{Name: "depends", Kind: AttrList, Default: "none", Help: "Blocks to run first, in order: each one that hasn't run this session is asked about"},
 	{Name: "confirm", Kind: AttrText, Bare: true, Default: "off", Help: "Ask before running, with this question if given"},
 	{Name: "timeout", Kind: AttrDuration, Default: "none", Help: "Kill the block's shell after this long; stops the run. A background block is killed alone"},
 	{Name: "background", Kind: AttrFlag, Default: "off", Help: "Start the block and go on to the next; its output is kept apart, and the run waits for it at the end"},

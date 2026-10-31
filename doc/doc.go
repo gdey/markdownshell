@@ -304,6 +304,9 @@ func Parse(src []byte) (*Document, error) {
 	if err := checkTapes(d); err != nil {
 		return nil, err
 	}
+	if err := checkDepends(d); err != nil {
+		return nil, err
+	}
 	for _, p := range d.Placeholders {
 		if p.BlockID != "" && !ids[p.BlockID] {
 			return nil, fmt.Errorf("line %d: placeholder refers to unknown block %q", lineNo(src, p.Span.Start), p.BlockID)
