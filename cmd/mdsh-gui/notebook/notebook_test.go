@@ -419,3 +419,62 @@ func TestClearOutputs(t *testing.T) {
 		t.Errorf("hello cell after running again = %+v", c)
 	}
 }
+
+// After Save As in the same folder, assets go to the new file's assets
+// folder, and the ones made before are copied there with their links.
+func TestSaveAsAssets(t *testing.T) {
+	const pics = "```sh {#old out=screenshot}\necho old\n```\n\n```sh {#now out=screenshot}\necho now\n```\n\n```sh {#later out=screenshot}\necho later\n```\n"
+	file := write(t, pics)
+	dir := filepath.Dir(file)
+	// old ran and was saved before this session.
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	n.Close()
+
+	n, err = Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(1); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(dir, "copy.md")
+	if err := n.SaveAs(other); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.RunBlock(2); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"old", "now", "later"} {
+		link := fmt.Sprintf("![%s](copy.md.assets/%s.svg)", id, id)
+		if !strings.Contains(string(got), link) {
+			t.Errorf("the copy lacks %s:\n%s", link, got)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "copy.md.assets", id+".svg")); err != nil {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "doc.md.assets", "later.svg")); err == nil {
+		t.Error("a block run after Save As wrote to the old assets folder")
+	}
+	orig, _ := os.ReadFile(file)
+	if !strings.Contains(string(orig), "![old](doc.md.assets/old.svg)") || strings.Contains(string(orig), "copy.md") {
+		t.Errorf("SaveAs changed the original file:\n%s", orig)
+	}
+}

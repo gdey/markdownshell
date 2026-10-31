@@ -432,20 +432,97 @@ func (n *Notebook) SaveAs(file string) error {
 		return ErrBusy
 	}
 	n.waitReap()
+	if abs != n.file {
+		if err := n.moveAssets(abs); err != nil {
+			return err
+		}
+	}
 	if err := n.write(abs); err != nil {
 		return err
 	}
 	moved := filepath.Dir(abs) != filepath.Dir(n.file)
 	n.file = abs
-	if moved {
-		sess, err := n.newSession(n.opts.Run)
+	if !moved {
+		n.sess.SetFile(abs)
+		return nil
+	}
+	sess, err := n.newSession(n.opts.Run)
+	if err != nil {
+		return err
+	}
+	n.closeSession()
+	n.sess = sess
+	return nil
+}
+
+// moveAssets readies the output for its new home at file: it copies the
+// files in n.file's assets folder (<doc>.assets) to file's, and points
+// the output's links into the old folder at the new one. The old folder
+// stays, since the old file still links to it.
+func (n *Notebook) moveAssets(file string) error {
+	from, to := n.file+".assets", file+".assets"
+	if err := copyDir(from, to); err != nil {
+		return fmt.Errorf("copying %s: %w", filepath.Base(from), err)
+	}
+	oldLink := filepath.Base(n.file) + ".assets/"
+	newLink := filepath.Base(file) + ".assets/"
+	for _, r := range n.results {
+		if r != nil && strings.HasPrefix(r.Image, oldLink) {
+			r.Image = newLink + strings.TrimPrefix(r.Image, oldLink)
+		}
+	}
+	if err := n.fold(); err != nil {
+		return err
+	}
+	// Output saved before this session has no result to change.
+	src := n.d.Src
+	var out []byte
+	last := 0
+	for _, b := range n.d.Blocks {
+		if !b.HasOutput() {
+			continue
+		}
+		out = append(out, src[last:b.Output.Start]...)
+		out = append(out, bytes.ReplaceAll(src[b.Output.Start:b.Output.End], []byte("]("+oldLink), []byte("]("+newLink))...)
+		last = b.Output.End
+	}
+	out = append(out, src[last:]...)
+	if bytes.Equal(out, src) {
+		return nil
+	}
+	if err := n.d.SetSource(out); err != nil {
+		return err
+	}
+	return n.sync()
+}
+
+// copyDir copies the files in from, and in its folders, to to. It does
+// nothing if from doesn't exist.
+func copyDir(from, to string) error {
+	if _, err := os.Stat(from); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return filepath.WalkDir(from, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		n.closeSession()
-		n.sess = sess
-	}
-	return nil
+		rel, err := filepath.Rel(from, path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(to, rel)
+		if d.IsDir() {
+			return os.MkdirAll(dst, 0o755)
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dst, data, 0o644)
+	})
 }
 
 func (n *Notebook) write(file string) error {
