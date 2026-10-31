@@ -44,8 +44,15 @@ var typesOnly = map[string]bool{"@wailsio/runtime": true}
 // keepTypes limits which declarations of a package are copied, for
 // packages with many modules the frontend doesn't use.
 var keepTypes = map[string]func(string) bool{
-	"@codemirror/legacy-modes": func(p string) bool { return strings.HasPrefix(p, "mode/shell.") },
+	"@codemirror/legacy-modes": func(p string) bool {
+		mode, ok := strings.CutPrefix(p, "mode/")
+		return ok && slices.Contains(legacyModes, strings.Split(mode, ".")[0])
+	},
 }
+
+// legacyModes are the modules of @codemirror/legacy-modes entry.js
+// exports, for highlighting code blocks.
+var legacyModes = []string{"shell", "go", "python", "javascript", "yaml", "toml", "rust", "ruby", "lua", "perl", "swift", "sql", "diff", "dockerfile", "properties", "css", "clike"}
 
 // bundles are the entry files in frontend/vendor and the bundles made
 // from them there.

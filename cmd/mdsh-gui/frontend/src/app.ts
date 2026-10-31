@@ -4,6 +4,7 @@ import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Doc, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
+import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
@@ -124,6 +125,7 @@ function drawDoc() {
 function drawProse(c: Cell): HTMLElement {
   // goldmark's HTML, with raw HTML in the markdown left out.
   const s = el("section", { className: "prose", innerHTML: c.html ?? "", title: "Click to show it in the source" });
+  highlightProse(s);
   s.onclick = () => {
     if (window.getSelection()?.toString()) return;
     void showInSource(s, c.line, true);
@@ -132,7 +134,8 @@ function drawProse(c: Cell): HTMLElement {
 }
 
 function drawBlock(c: Cell): HTMLElement {
-  const name = el("span", { className: "name" }, c.id ?? "", el("span", { className: "muted" }, " · " + (c.lang ?? "") + (c.attrs ? " · " + c.attrs : "")));
+  // The outline names a block by the .name's first child.
+  const name = el("span", { className: "name" }, el("span", { className: "id" }, c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
   const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
   const block = el(
     "section",
@@ -146,10 +149,11 @@ function drawBlock(c: Cell): HTMLElement {
       iconButton("play", "Run this block (enter)", () => start("RunBlock", c.block)),
       iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
     ),
-    el("pre", { className: "code", textContent: c.body ?? "" }),
+    el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))),
     el("div", { className: "ask", hidden: true }),
     el("div", { className: "output", innerHTML: c.output ?? "" }),
   );
+  colorOutput(block.querySelector(".output")!);
   block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
     const img = (e.target as HTMLElement).closest("img");
     if (img) viewImage(img);
@@ -830,6 +834,10 @@ interface Question {
   question: string;
 }
 
+// liveColors is the ANSI state of each stream of a running block's
+// output.
+const liveColors = new WeakMap<HTMLElement, Record<string, Ansi>>();
+
 function onBlock(e: BlockEvent) {
   const block = document.getElementById("block-" + e.block);
   if (!block) return;
@@ -851,9 +859,15 @@ function onBlock(e: BlockEvent) {
       block.scrollIntoView({ block: "nearest" });
       break;
     case "stdout":
-    case "stderr":
-      out.querySelector(".live")?.append(el("span", { className: e.kind, textContent: e.data ?? "" }));
+    case "stderr": {
+      const live = out.querySelector<HTMLElement>(".live");
+      if (!live) break;
+      // Each stream keeps its own colors between pieces.
+      const streams = (liveColors.get(live) ?? liveColors.set(live, {}).get(live))!;
+      const ansi = (streams[e.kind] ??= new Ansi());
+      live.append(el("span", { className: e.kind }, ...ansi.write(e.data ?? "")));
       break;
+    }
     case "done":
       $("dirty").hidden = false;
       block.classList.remove("now");

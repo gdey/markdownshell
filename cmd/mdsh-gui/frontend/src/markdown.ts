@@ -4,14 +4,13 @@
 import { Compartment, EditorSelection, EditorState, type Extension, Prec, type StateCommand } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, MatchDecorator, ViewPlugin, type ViewUpdate, drawSelection, highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { LanguageDescription, LanguageSupport, StreamLanguage } from "@codemirror/language";
 import { markdown, markdownKeymap } from "@codemirror/lang-markdown";
-import { shell } from "@codemirror/legacy-modes/mode/shell";
 import { vim } from "@replit/codemirror-vim";
 
 import type { AttrSpec, Names } from "./api.js";
 import { el, iconButton, type icons } from "./dom.js";
 import { type ExTarget, attrHelp, exTarget, forgetEx } from "./editor.js";
+import { codeLanguages } from "./highlight.js";
 import { editorLook } from "./theme.js";
 
 export interface MarkdownEditorOptions {
@@ -41,9 +40,6 @@ export interface MarkdownEditor {
   setText(text: string): void;
   destroy(): void;
 }
-
-const sh = new LanguageSupport(StreamLanguage.define(shell));
-const codeLanguages = [LanguageDescription.of({ name: "sh", alias: ["zsh", "bash", "shell"], support: sh })];
 
 // attrMarks highlights the {…} of mdsh attributes on opening fences.
 const attrMarks = ViewPlugin.fromClass(

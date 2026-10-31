@@ -78,6 +78,9 @@ Each file opens in a tab of its own, with its own shells.
 - **Outline** (the sidebar button or cmd/ctrl+shift+O): headings and
   blocks with their state, to jump around in both panes. View › Show Code and Show
   Output hide those parts of the blocks.
+- **Code and output:** code is highlighted in both views, with line
+  numbers in the rendered view, for shell and the common languages, and
+  ANSI colors in a block's output are drawn as colors.
 - **Images:** image, screenshot and recording output shows in the
   block, and so do images in the prose, from the document's folder.
   Click an output image to see it full size.
