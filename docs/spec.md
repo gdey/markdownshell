@@ -186,6 +186,61 @@ Settled on 2026-10-27.
 - **Output copies:** an `output {for=id}` fence or region that isn't right after block `id` is refilled from it on every run, like a placeholder. Settled on 2026-10-29.
 - **Includes:** a block marked `<include` with `file=`, `from=`, `to=` (1-based, inclusive) and `number_on`; mdsh writes the lines into the block's body, and the fence's language is the language. Include blocks never run and have no name.
 
+## Collections (proposed, 2026-10-31)
+
+A folder of runbooks can describe itself so the GUI's start screen shows
+it as a collection, with an icon, a color, a background, a description
+and tags, instead of a bare folder name.
+
+**File.** `.mdsh.yaml` in the folder. YAML because front matter is
+already YAML (`gopkg.in/yaml.v3`); the GUI's own `gui.json` is app state,
+not something people write by hand. Hidden, so it doesn't clutter `ls` or
+the folder in an editor, and it is never mistaken for a runbook.
+
+```yaml
+# .mdsh.yaml
+title: Deploys            # shown instead of the folder name
+description: Ship, roll back and check the prod stack.
+icon: rocket.svg          # an image path, or one emoji: "🚀"
+color: "#3b82f6"          # any CSS color: hex, rgb(), or a name
+background: banner.png    # image behind the collection's header
+tags: [ops, prod]
+```
+
+Every key is optional. Unknown keys are ignored, so later versions can
+add some. A file that doesn't parse is ignored and the folder shows as a
+plain folder; the GUI says why in the header's tooltip.
+
+**Paths.** `icon` and `background` are relative to the folder holding
+`.mdsh.yaml`, with forward slashes, and must stay inside it (after
+resolving symlinks); a path that leaves the folder, or an absolute path,
+is ignored. That way a config can only show images that belong to the
+collection, and the GUI serves just those files.
+
+**Nesting.** Each folder's config describes that folder only: a
+subfolder without its own `.mdsh.yaml` shows as a plain folder, not in
+its parent's colors. Tags are the exception: a file's tags are its
+folder's tags plus those of every collection above it, plus the
+`tags:` in its own front matter (the key Jekyll, Hugo and Obsidian use).
+So filtering on `ops` finds every runbook anywhere under a folder
+tagged `ops`.
+
+**Start screen.** Folders are still listed in path order. A collection's
+heading becomes a header: icon, title, description and tag chips, the
+color as an accent bar and tint, the background image behind it (dimmed
+so the text stays readable in both themes). The filter box matches
+titles, descriptions and tags; `#ops` matches only the tag. Clicking a
+tag chip puts `#ops` in the filter.
+
+**CLI.** None in the first version; `mdsh ls [dir]` printing collections
+and their files, with `--tag`, can follow if wanted.
+
+**Code.** Parsing and tag inheritance live in a new top-level package,
+`collection`, so a later `mdsh ls` can share it. The GUI's `library`
+package attaches a `Collection` to each folder in the listing, and its
+asset handler serves the icon and background files the current listing
+names.
+
 ## Not pursued
 
 Ideas we looked at and decided against, with the reasons, so they aren't
