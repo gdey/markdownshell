@@ -97,6 +97,17 @@ Each file opens in a tab of its own, with its own shells.
 - **Code and output:** code is highlighted in both views, with line
   numbers in the rendered view, for shell and the common languages, and
   ANSI colors in a block's output are drawn as colors.
+- **Folding:** the arrow by a block's code or output folds it to its
+  first line, and the arrow by a heading folds its section, down to the
+  next heading of the same or a higher level. The outline's arrows fold
+  sections too. `collapse`, `collapse-output` and a
+  `<!-- mdsh:collapse -->` line in a section say what starts folded; they
+  take conditions, so `{{$MDSH_VAR_name}}` can fold or unfold a part as an
+  input changes. Folding by hand lasts while the tab is open and never
+  changes the file. The source view folds headings and fences in its
+  gutter, apart from the rendered view. View › Folding collapses all
+  blocks or sections, expands all, and copies the folds from one view to
+  the other.
 - **Images:** image, screenshot and recording output shows in the
   block, and so do images in the prose, from the document's folder.
   Click an output image to see it full size.

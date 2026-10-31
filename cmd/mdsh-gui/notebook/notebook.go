@@ -57,6 +57,17 @@ type Cell struct {
 	// Running is true while a background block is still going; its
 	// output and status come in when it ends.
 	Running bool `json:"running"`
+	// Heading is the level of a prose cell that is a heading, 1 to 6;
+	// its section runs to the next heading of the same or a higher level.
+	Heading int `json:"heading,omitempty"`
+	// Collapsed is true when the view should open with a block's code, or
+	// a heading's section, folded: collapse= holds, or an mdsh:collapse
+	// line in the section does. CollapsedOutput is collapse-output='s.
+	Collapsed       bool `json:"collapsed,omitempty"`
+	CollapsedOutput bool `json:"collapsedOutput,omitempty"`
+	// OutputLine is the line a block's saved output starts on, counting
+	// from 1, or 0 when it has none, for folding it in the source.
+	OutputLine int `json:"outputLine,omitempty"`
 	// From and To are the cell's bytes in the file, output included.
 	From int `json:"from"`
 	To   int `json:"to"`
