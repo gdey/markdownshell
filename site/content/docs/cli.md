@@ -19,6 +19,7 @@ weight: 50
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
 | `mdsh --step doc.md` | Asks before every block: run, skip or stop | Per flags |
+| `mdsh --source defs.zsh doc.md` | Sources `defs.zsh` into every shell before its first block; repeatable | Per flags |
 | `mdsh -i doc.md` | A full-screen UI: pick blocks and run them, see [Interactive mode]({{< relref "interactive" >}}) | Yes: output saved after each block |
 | `mdsh completion bash\|zsh` | A completion script | No |
 | `mdsh --version` | The version | No |
@@ -34,5 +35,9 @@ weight: 50
   [PDF output]({{< relref "pdf" >}}) for what goes on the page and an example.
 - `--html` does the same as an HTML page, with local images inside it and
   raw HTML from the document left out. It can't be used with `--pdf`.
+- `--source FILE` is read once, when mdsh starts, so a pipe works:
+  `mdsh --source <(alias -L; typeset -f) doc.md` gives blocks the aliases
+  and functions of the shell you run it from. See
+  [Environments]({{< relref "environments#aliases-and-functions" >}}).
 - Output is styled when stdout is a terminal. `--color=never`, `--no-color`
   or `NO_COLOR` turn that off.

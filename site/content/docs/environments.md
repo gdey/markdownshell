@@ -16,7 +16,9 @@ over like lines of one script.
   passes all, `share=...,-TOKEN` passes all but `TOKEN`, and `share=`
   (empty) starts clean. Variables only flow down.
 - **Never shared.** Unexported variables, functions, aliases and the
-  working directory. Every env starts in the document's directory.
+  working directory. Every env starts in the document's directory. Files
+  named by `--source` and `env.source` are sourced into every env, though;
+  see [Aliases and functions](#aliases-and-functions).
 
 ````markdown
 ```sh {#setup}
@@ -32,6 +34,34 @@ echo "GREETING=$GREETING NAME=${NAME:-unset}"
 GREETING=hello NAME=unset
 ```
 ````
+
+## Aliases and functions
+
+A shell's aliases and functions aren't part of its environment, so blocks
+don't see the ones defined in the shell mdsh was started from. To give
+them to blocks, source them into every shell mdsh starts, sub-envs
+included, before their first block:
+
+- `env.source` in the [front matter]({{< relref "front-matter#envsource" >}})
+  names files that belong with the document, so anyone who runs it gets
+  them, the desktop app included.
+- `--source FILE` on the command line adds a file for one run. It's read
+  once, so a pipe works. This wrapper in `~/.zshrc` passes along whatever
+  your shell has defined each time you run mdsh:
+
+  ```zsh
+  mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
+  ```
+
+  The desktop app's Settings window can add it for you: check **Give
+  blocks your zsh aliases and functions**. It goes between marker
+  comments at the end of `~/.zshrc`, and unchecking it takes it out.
+  In bash, use `<(alias -p; declare -f)`. Bash only expands aliases in a
+  script after `shopt -s expand_aliases`.
+
+`typeset -f` lists every function, including a plugin manager's own, so a
+document that relies on a few is easier to share with those few in a file
+named by `env.source`.
 
 ## Failures
 

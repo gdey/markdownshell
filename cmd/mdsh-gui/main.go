@@ -1,7 +1,7 @@
 // Command mdsh-gui opens markdown files in windows and runs their code
 // blocks as you pick them, like mdsh -i does in a terminal.
 //
-//	mdsh-gui [file.md [args...] | folder]
+//	mdsh-gui [flags] [file.md [args...] | folder]
 //	mdsh-gui --version
 //
 // With no file, the window lists the markdown files under the current
@@ -11,12 +11,15 @@ package main
 import (
 	"embed"
 	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -38,16 +41,79 @@ var frontend embed.FS
 var version = "dev"
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--version" {
+	o, err := parseFlags(os.Args[1:], os.Stderr)
+	switch {
+	case errors.Is(err, flag.ErrHelp):
+		return
+	case err != nil:
+		fmt.Fprintln(os.Stderr, "mdsh-gui:", err)
+		os.Exit(2)
+	case o.version:
 		fmt.Println("mdsh-gui", version)
 		return
 	}
-	if err := mdshGUI(os.Args[1:]); err != nil {
+	if err := mdshGUI(o); err != nil {
 		log.Fatal("mdsh-gui: ", err)
 	}
 }
 
-func mdshGUI(args []string) error {
+// options are what the command line asks for.
+type options struct {
+	version bool
+	// source is the files given to --source, read once, as mdsh does,
+	// so a process substitution like <(alias -L) works.
+	source string
+	// run are the choices for the file named on the command line.
+	run notebook.RunOptions
+	// args are the file (or folder) and its arguments.
+	args []string
+}
+
+// parseFlags reads the flags, which mirror mdsh's where they make sense
+// for a window. Flags come before the file; what follows the file is
+// its arguments.
+func parseFlags(args []string, stderr io.Writer) (options, error) {
+	var o options
+	fs := flag.NewFlagSet("mdsh-gui", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: mdsh-gui [flags] [file.md [args...] | folder]")
+		fmt.Fprintln(stderr, "       with no file, the window lists the markdown files under folder (default .)")
+		fs.PrintDefaults()
+	}
+	var sources strings.Builder
+	fs.Func("source", "source this file into every shell before blocks run, such as aliases and functions (repeatable; applies to every file opened)", func(p string) error {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		sources.Write(src)
+		sources.WriteString("\n")
+		return nil
+	})
+	fs.StringVar(&o.run.Only, "only", "", "run only this block, plus earlier blocks in its env chain")
+	fs.BoolVar(&o.run.StopOnError, "stop-on-error", false, "stop at the first failing block")
+	fs.BoolVar(&o.run.Step, "step", false, "ask before running each block, as if every block were marked confirm")
+	fs.BoolVar(&o.version, "version", false, "print the version and exit")
+	if err := fs.Parse(args); err != nil {
+		return o, err
+	}
+	o.source, o.args = sources.String(), fs.Args()
+	if len(o.args) > 0 {
+		o.run.Args = o.args[1:]
+	}
+	set := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	for _, name := range []string{"only", "stop-on-error", "step"} {
+		if set[name] && len(o.args) == 0 {
+			return o, fmt.Errorf("--%s needs a file", name)
+		}
+	}
+	return o, nil
+}
+
+func mdshGUI(o options) error {
+	args := o.args
 	assets, err := fs.Sub(frontend, "frontend")
 	if err != nil {
 		return err
@@ -65,10 +131,13 @@ func mdshGUI(args []string) error {
 		return err
 	}
 	if dir != "" {
+		if o.run.Only != "" || o.run.Step || o.run.StopOnError {
+			return errors.New("--only, --step and --stop-on-error need a file, not a folder")
+		}
 		args = nil
 	}
 	cwd, _ := os.Getwd()
-	a := &App{settings: store, cwd: cwd, dir: dir, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	a := &App{settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
@@ -90,7 +159,8 @@ func mdshGUI(args []string) error {
 
 	t := a.newTab()
 	if len(args) > 0 {
-		ro := notebook.RunOptions{Args: args[1:], Shell: store.Get().Shell}
+		ro := a.runOptions()
+		ro.Args, ro.Only, ro.Step, ro.StopOnError = o.run.Args, o.run.Only, o.run.Step, o.run.StopOnError
 		if err := t.open(args[0], ro); err != nil {
 			return err
 		}

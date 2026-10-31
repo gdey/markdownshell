@@ -9,8 +9,16 @@ See [the design](../../docs/gui/design.md) for how it works and what
 comes next.
 
 ```sh
-mdsh-gui [file.md [args...] | folder]
+mdsh-gui [flags] [file.md [args...] | folder]
 ```
+
+Flags come before the file, as with `mdsh`; `mdsh-gui --help` lists them.
+`--source FILE` (repeatable) sources a file into every shell of every
+file opened, before its first block. It's read once at startup, so
+`mdsh-gui --source <(alias -L; typeset -f) notes.md` gives blocks the
+calling shell's aliases and functions. `--only`, `--step` and
+`--stop-on-error` set the Run Options of the file named on the command
+line.
 
 With no file, the start screen lists the markdown files under the current
 folder, or under `folder` when one is given (or the start folder from Settings, when started from Finder or
@@ -77,7 +85,12 @@ Each file opens in a tab of its own, with its own shells.
   Linux): autosave after each run, Vim mode, a shell for every file,
   the view files open in (rendered, source or both; by default the
   view the last tab had), the start folder and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
-  config folder.
+  config folder. One more, **Give blocks your zsh aliases and
+  functions**, adds an `mdsh` function to `~/.zshrc` (or
+  `$ZDOTDIR/.zshrc`) between marker comments, and unchecking it takes
+  it out. The function runs the CLI with
+  `--source <(alias -L; typeset -f)`; the app itself isn't started from
+  a shell, so it can't see them.
 
 If the file changes on disk, a banner offers to reload it.
 

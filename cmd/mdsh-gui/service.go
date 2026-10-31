@@ -14,6 +14,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/library"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/zshrc"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
@@ -185,7 +186,7 @@ func (a *App) OpenPath(ctx context.Context, file string) error {
 		a.focusTab(open)
 		return nil
 	}
-	return t.open(file, notebook.RunOptions{Shell: a.settings.Get().Shell})
+	return t.open(file, a.runOptions())
 }
 
 // Save writes the output into the file.
@@ -304,6 +305,38 @@ func (a *App) SetSettings(s settings.Settings) error {
 		a.app.Event.Emit("settings", a.settings.Get())
 	}
 	return err
+}
+
+// ZshWrapper is whether the user's .zshrc has the mdsh function that
+// gives blocks the calling shell's aliases and functions.
+type ZshWrapper struct {
+	Path string `json:"path"` // the .zshrc
+	Home string `json:"home"` // for showing Path as ~/…
+	On   bool   `json:"on"`
+}
+
+// ZshWrapperState reads the user's .zshrc for the mdsh function.
+func (a *App) ZshWrapperState() (ZshWrapper, error) {
+	path, err := zshrc.Path()
+	if err != nil {
+		return ZshWrapper{}, err
+	}
+	on, err := zshrc.Installed(path)
+	home, _ := os.UserHomeDir()
+	return ZshWrapper{Path: path, Home: home, On: on}, err
+}
+
+// SetZshWrapper adds the mdsh function to the user's .zshrc, or takes it
+// out, and returns the new state.
+func (a *App) SetZshWrapper(on bool) (ZshWrapper, error) {
+	path, err := zshrc.Path()
+	if err != nil {
+		return ZshWrapper{}, err
+	}
+	if err := zshrc.Set(path, on); err != nil {
+		return ZshWrapper{}, err
+	}
+	return a.ZshWrapperState()
 }
 
 // ChooseFolder asks for a folder and returns it, or "" if none was

@@ -275,6 +275,34 @@ func TestRunOptions(t *testing.T) {
 	}
 }
 
+// Source runs in the shell before the first block, as --source does.
+func TestRunOptionsSource(t *testing.T) {
+	var mu sync.Mutex
+	var out strings.Builder
+	n, err := Open(write(t, "```sh\ngreet\n```\n"), Options{
+		Run: RunOptions{Source: "greet() { echo hi from source; }"},
+		OnEvent: func(e Event) {
+			mu.Lock()
+			defer mu.Unlock()
+			if e.Kind == "stdout" {
+				out.WriteString(e.Data)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if got, want := out.String(), "hi from source\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
 // A background block returns at once and shows as running; the
 // notebook checks on it while nothing runs and fills in its output when
 // it ends.

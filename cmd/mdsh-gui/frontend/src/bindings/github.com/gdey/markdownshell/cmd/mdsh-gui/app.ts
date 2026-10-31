@@ -295,6 +295,14 @@ export function SetView(v: $models.View): $CancellablePromise<void> {
 }
 
 /**
+ * SetZshWrapper adds the mdsh function to the user's .zshrc, or takes it
+ * out, and returns the new state.
+ */
+export function SetZshWrapper(on: boolean): $CancellablePromise<$models.ZshWrapper> {
+    return $Call.ByName("main.App.SetZshWrapper", on);
+}
+
+/**
  * Settings are the app-wide settings.
  */
 export function Settings(): $CancellablePromise<settings$0.Settings> {
@@ -337,4 +345,11 @@ export function Text(): $CancellablePromise<string> {
  */
 export function Type(keys: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.Type", keys);
+}
+
+/**
+ * ZshWrapperState reads the user's .zshrc for the mdsh function.
+ */
+export function ZshWrapperState(): $CancellablePromise<$models.ZshWrapper> {
+    return $Call.ByName("main.App.ZshWrapperState");
 }

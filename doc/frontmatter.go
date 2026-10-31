@@ -28,6 +28,10 @@ type Options struct {
 		// Share lists the variables passed into the top-level env from
 		// the caller, and the default for sub-envs. Nil means all.
 		Share []string `yaml:"share"`
+		// Source lists files sourced into every shell as it starts,
+		// such as aliases and functions. A leading ~/ is the home
+		// directory; other relative paths are relative to the document.
+		Source []string `yaml:"source"`
 	} `yaml:"env"`
 }
 

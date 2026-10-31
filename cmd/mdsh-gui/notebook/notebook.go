@@ -78,6 +78,9 @@ type RunOptions struct {
 	StopOnError bool `json:"stopOnError"`
 	// Shell overrides the front matter's shell, like --shell.
 	Shell string `json:"shell"`
+	// Source runs in every shell as it starts, like the files given to
+	// mdsh --source. It isn't sent to the window.
+	Source string `json:"-"`
 }
 
 // Options configure a Notebook.
@@ -183,6 +186,7 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		Step:        ro.Step,
 		StopOnError: ro.StopOnError,
 		Shell:       ro.Shell,
+		Source:      ro.Source,
 		Environ:     os.Environ(),
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
