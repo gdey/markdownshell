@@ -35,6 +35,14 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui` Run › Run Current Block (cmd/ctrl+enter) runs the block
   the source view's cursor is in: on its fence, in its body or in its
   output. Without the source view it runs the selected card.
+- `mdsh-gui` highlights code in the rendered view as the source view
+  does, with line numbers, in block cards and in the prose's code
+  blocks. Both views now know Go, Python, JavaScript, TypeScript, JSON,
+  YAML, TOML, Rust, Ruby, Lua, Perl, Swift, SQL, diff, Dockerfile, INI,
+  CSS, C, C++, Java and Kotlin besides shell. Block cards show the
+  block's language and exit status as badges and label their output.
+- `mdsh-gui` shows the ANSI colors and bold, italic and underline in a
+  block's output, saved or live, instead of the escape codes.
 
 ### Fixed
 
