@@ -16,6 +16,12 @@ export interface Settings {
     "vim": boolean;
 
     /**
+     * NoSpellCheck turns off spell checking of the prose in the code
+     * editor, which is on by default.
+     */
+    "noSpellCheck": boolean;
+
+    /**
      * Theme is "light" or "dark"; empty follows the system.
      */
     "theme": string;

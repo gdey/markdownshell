@@ -11,11 +11,14 @@ import type { AttrSpec, Names } from "./api.js";
 import { el, iconButton, type icons } from "./dom.js";
 import { type ExTarget, attrHelp, exTarget, forgetEx } from "./editor.js";
 import { codeLanguages } from "./highlight.js";
+import { spellCheck } from "./spell.js";
 import { editorLook } from "./theme.js";
 
 export interface MarkdownEditorOptions {
   text: string;
   vim: boolean;
+  // spellCheck checks the prose's spelling.
+  spellCheck?: boolean;
   attrs: AttrSpec[];
   names: () => Names;
   // lineNumbers is on for the source pane.
@@ -39,6 +42,7 @@ export interface MarkdownEditorOptions {
 export interface MarkdownEditor {
   view: EditorView;
   setVim(on: boolean): void;
+  setSpellCheck(on: boolean): void;
   // setText replaces the text without calling onChange.
   setText(text: string): void;
   destroy(): void;
@@ -78,6 +82,7 @@ function modEnter(opts: MarkdownEditorOptions): () => boolean {
 
 export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions): MarkdownEditor {
   const vimMode = new Compartment();
+  const spell = new Compartment();
   const escape = new Compartment();
   const escapeKey = (on: boolean): Extension => (on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]));
   let quiet = false; // setText is changing the text
@@ -88,6 +93,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
       doc: opts.text,
       extensions: [
         vimMode.of(opts.vim ? vim() : []),
+        spell.of(spellCheck(!!opts.spellCheck)),
         opts.lineNumbers ? lineNumbers() : [],
         opts.extensions ?? [],
         history(),
@@ -115,6 +121,9 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
     view,
     setVim(on) {
       view.dispatch({ effects: [vimMode.reconfigure(on ? vim() : []), escape.reconfigure(escapeKey(on))] });
+    },
+    setSpellCheck(on) {
+      view.dispatch({ effects: spell.reconfigure(spellCheck(on)) });
     },
     setText(text) {
       const old = view.state.doc.toString();

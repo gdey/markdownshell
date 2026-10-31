@@ -44,6 +44,9 @@ follow [Semantic Versioning](https://semver.org/).
   block's language and exit status as badges and label their output.
 - `mdsh-gui` shows the ANSI colors and bold, italic and underline in a
   block's output, saved or live, instead of the escape codes.
+- `mdsh-gui` checks the spelling of the prose in the source view with
+  the system's spell checker, leaving out code, links and HTML. A
+  setting turns it off.
 
 ### Fixed
 

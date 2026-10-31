@@ -88,7 +88,8 @@ Each file opens in a tab of its own, with its own shells.
 - **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
   `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
-  Linux): autosave after each run, Vim mode, a shell for every file,
+  Linux): autosave after each run, Vim mode, spell checking of the prose in the
+  source view (on by default; not code, links or HTML), a shell for every file,
   the view files open in (rendered, source or both; by default the
   view the last tab had), the start folder and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
   config folder. One more, **Give blocks your zsh aliases and

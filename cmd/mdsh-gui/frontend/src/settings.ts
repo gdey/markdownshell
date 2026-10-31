@@ -10,6 +10,7 @@ const input = (id: string) => $<HTMLInputElement>(id);
 function draw() {
   input("autosave").checked = s.autosave;
   input("vim").checked = s.vim;
+  input("spellcheck").checked = !s.noSpellCheck;
   $<HTMLSelectElement>("theme").value = s.theme;
   applyTheme(s.theme);
   $<HTMLSelectElement>("view").value = s.view;
@@ -53,6 +54,7 @@ async function choose() {
 
 input("autosave").onchange = () => ((s.autosave = input("autosave").checked), save());
 input("vim").onchange = () => ((s.vim = input("vim").checked), save());
+input("spellcheck").onchange = () => ((s.noSpellCheck = !input("spellcheck").checked), save());
 $<HTMLSelectElement>("theme").onchange = async () => {
   s.theme = $<HTMLSelectElement>("theme").value;
   applyTheme(s.theme);
