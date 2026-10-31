@@ -43,10 +43,20 @@ func blocksCmd(args []string, stdout io.Writer) error {
 	if err != nil {
 		return nil
 	}
+	// Blocks with names people gave them first, then the ones mdsh
+	// named.
+	var made []string
 	for _, b := range d.Blocks {
-		if run.Runnable(b) {
+		switch {
+		case !run.Runnable(b):
+		case b.Named() && !doc.GeneratedID(b.ID):
 			fmt.Fprintln(stdout, b.ID)
+		default:
+			made = append(made, b.ID)
 		}
+	}
+	for _, id := range made {
+		fmt.Fprintln(stdout, id)
 	}
 	return nil
 }

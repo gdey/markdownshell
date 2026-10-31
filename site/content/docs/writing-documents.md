@@ -33,7 +33,7 @@ hello from a sub-env
 
 ## Rules
 
-- `#name` gives a block an id. Unlabeled blocks get `block-N` by position.
+- `#name` gives a block an id. When mdsh saves the file (`-w`, or a save in `mdsh -i` or mdsh-gui), it gives each unlabeled block an id of its own, such as `#block-0192f3a4-7c1e-7b2a-9d3e-5f6a7b8c9d0e`, so the id stays the same when blocks move. Until then an unlabeled block is `block-N` by position. Give a block a name to refer to it by something readable.
   Ids must be unique.
 - Every `sh` and `zsh` block runs. Other languages are left alone, and
   `skip` turns a block off.
@@ -51,7 +51,7 @@ hello from a sub-env
 
 | Attribute | Meaning |
 | --- | --- |
-| `#id` | Block name (default `block-N`) |
+| `#id` | Block name. An unnamed block gets `block-<uuid>`, written into its fence when mdsh saves the file |
 | `skip` | Don't run |
 | `run=COND` | Run only if the condition holds |
 | `show=COND` | Print the code only if the condition holds |

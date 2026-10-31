@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -107,6 +108,40 @@ func TestWriteShowsFailure(t *testing.T) {
 	}
 	if s := errb.String(); !strings.Contains(s, "a: failed") || !strings.Contains(s, "out\n") || !strings.Contains(s, "oops\n") {
 		t.Errorf("stderr = %q", s)
+	}
+}
+
+// TestWriteNamesBlocks checks that -w writes an id into each unnamed
+// block and -o leaves the source as it is.
+func TestWriteNamesBlocks(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "d.md")
+	src := "```sh\necho hi\n```\n\n```sh {#a}\ntrue\n```\n"
+	os.WriteFile(f, []byte(src), 0o644)
+	var errb bytes.Buffer
+	if rc := mdsh([]string{"-o", filepath.Join(dir, "out.md"), f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
+		t.Fatalf("-o: rc = %d: %s", rc, errb.String())
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "out.md")); !strings.Contains(string(got), "```output {for=block-1 exit=0}") {
+		t.Errorf("-o wrote:\n%s", got)
+	}
+	if rc := mdsh([]string{"-w", f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
+		t.Fatalf("-w: rc = %d: %s", rc, errb.String())
+	}
+	if !strings.Contains(errb.String(), "block at line 1: ok\n") || !strings.Contains(errb.String(), "a: ok\n") {
+		t.Errorf("stderr = %q", errb.String())
+	}
+	got, _ := os.ReadFile(f)
+	m := regexp.MustCompile("^```sh \\{#(block-[0-9a-f-]{36})\\}\necho hi\n```\n\n```output \\{for=(block-[0-9a-f-]{36}) exit=0\\}\nhi\n```\n\n```sh \\{#a\\}\n").FindStringSubmatch(string(got))
+	if m == nil || m[1] != m[2] {
+		t.Fatalf("-w wrote:\n%s", got)
+	}
+	// The next save keeps the id.
+	if rc := mdsh([]string{"-w", f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
+		t.Fatalf("-w again: rc = %d", rc)
+	}
+	if again, _ := os.ReadFile(f); string(again) != string(got) {
+		t.Errorf("second -w changed the file:\n%s", again)
 	}
 }
 

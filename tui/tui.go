@@ -140,16 +140,16 @@ const reapEvery = 250 * time.Millisecond
 // for it to finish, and then for enter, so the block's last screen can be
 // read before the TUI draws over it.
 type handOff struct {
-	block      *doc.Block
+	label      string // the block, as doc.Document.Label names it
 	tty        *os.File
 	start, end chan struct{}
 }
 
 func (h *handOff) Run() error {
-	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s runs on the terminal ---\r\n", h.block.ID)
+	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s runs on the terminal ---\r\n", h.label)
 	close(h.start)
 	<-h.end
-	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s is done; press enter to go back ---", h.block.ID)
+	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s is done; press enter to go back ---", h.label)
 	bufio.NewReader(h.tty).ReadString('\n')
 	return nil
 }
@@ -270,7 +270,7 @@ func (m *Model) confirm(b *doc.Block) run.Answer {
 // takeTTY hands the terminal to block b, from the run's goroutine, and
 // returns once the TUI has stepped aside.
 func (m *Model) takeTTY(b *doc.Block) func() {
-	h := &handOff{block: b, tty: m.opts.Run.TTY, start: make(chan struct{}), end: make(chan struct{})}
+	h := &handOff{label: m.d.Label(b), tty: m.opts.Run.TTY, start: make(chan struct{}), end: make(chan struct{})}
 	m.events <- h
 	<-h.start
 	return func() { close(h.end) }
@@ -670,6 +670,14 @@ func (m *Model) save(force bool) {
 	if info, err := os.Stat(file); err == nil && !info.ModTime().Equal(m.mtime) && !force {
 		m.status = "the file changed on disk; press w twice to overwrite it"
 		m.forceArm = true
+		return
+	}
+	renames, err := run.NameBlocks(m.d, m.results, m.opts.Run)
+	if err == nil && len(renames) > 0 {
+		err = m.sess.Sync()
+	}
+	if err != nil {
+		m.status = "save: " + err.Error()
 		return
 	}
 	out := render.Markdown(m.d, m.results, render.Options{WriteBack: true, Env: m.opts.Run.Environ})
