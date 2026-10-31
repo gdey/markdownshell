@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `mdsh-gui`: the active block (the selected card, or the block the
+  source pane's cursor is in) has a play button by its name in the
+  outline, which runs it as the card's play button does. Moving the
+  cursor into a block in the source pane now selects its card.
+
 ## [1.2.1] - 2026-10-29
 
 Three changes to `mdsh-gui`: links in a document now work, a setting

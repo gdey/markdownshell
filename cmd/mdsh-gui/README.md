@@ -94,7 +94,8 @@ until it ends. A `confirm` block asks in its card before it runs.
 ![A background block still running, and a confirm block asking "Ship the site to production?" with Run, Skip and Stop](../../site/static/images/gui/confirm.png)
 
 The outline lists the headings and blocks, with a mark for each block's
-state.
+state. The selected block, or the one the source pane's cursor is in,
+has a play button in the outline that runs it.
 
 ![The outline beside the document, with a check by each block that ran](../../site/static/images/gui/outline.png)
 

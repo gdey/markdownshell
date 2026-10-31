@@ -250,6 +250,7 @@ function select(i: number, scroll = true) {
   const all = blocks();
   for (const b of all) b.classList.remove("selected");
   selected = i;
+  markOutline();
   if (i < 0 || i >= all.length) return;
   all[i].classList.add("selected");
   if (scroll) all[i].scrollIntoView({ block: "nearest" });
@@ -265,7 +266,7 @@ function runAllButton() {
 function busy(on: boolean) {
   running = on;
   runAllButton();
-  for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button")) x.disabled = on;
+  for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run")) x.disabled = on;
 }
 
 async function start(method: "RunBlock" | "RunFrom", block: number) {
@@ -426,10 +427,14 @@ function cellAt(line: number): HTMLElement | null {
   return found;
 }
 
-// markCurrent marks the cell the source pane's cursor is in.
+// markCurrent marks the cell the source pane's cursor is in. A block
+// the cursor is in becomes the selected one, so the rendered view, the
+// outline and enter all go by the same block.
 function markCurrent(line: number) {
   for (const e of document.querySelectorAll("#doc > .current")) e.classList.remove("current");
-  cellAt(line)?.classList.add("current");
+  const cell = cellAt(line);
+  cell?.classList.add("current");
+  if (cell?.classList.contains("block")) select(blocks().indexOf(cell), false);
 }
 
 // syncScroll scrolls one side of the split view to match the other.
@@ -465,7 +470,8 @@ function syncScroll(from: "source" | "doc") {
 
 // The outline drawer: the headings and blocks, to jump around long
 // runbooks. Each block shows its state: ✓ ran, ? waiting for an answer,
-// ✗ failed, … running.
+// ✗ failed, … running. The selected block has a play button, which
+// runs it as its card's does.
 
 function drawOutline() {
   const nav = $("outline");
@@ -477,7 +483,14 @@ function drawOutline() {
       const ask = e.querySelector<HTMLElement>(".ask");
       const mark = ask && !ask.hidden ? "?" : (e.querySelector(".live") && running) || e.classList.contains("background") ? "…" : e.classList.contains("failed") ? "✗" : e.classList.contains("ran") ? "✓" : "";
       const name = e.querySelector(".name")?.firstChild?.textContent ?? "";
-      items.push(outlineItem(name, level + 1, e, "step" + (mark === "✗" ? " bad" : mark === "✓" ? " ok" : ""), mark));
+      const item = outlineItem(name, level + 1, e, "step" + (mark === "✗" ? " bad" : mark === "✓" ? " ok" : ""), mark);
+      const block = Number(e.dataset.block);
+      const play = iconButton("play", "Run this block (enter)", () => start("RunBlock", block));
+      play.classList.add("run");
+      play.disabled = running;
+      const row = el("div", { className: "row" }, item, play);
+      row.dataset.block = String(block);
+      items.push(row);
       continue;
     }
     for (const h of e.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")) {
@@ -486,6 +499,13 @@ function drawOutline() {
     }
   }
   nav.replaceChildren(...(items.length ? items : [el("p", { className: "muted" }, "No headings or blocks")]));
+  markOutline();
+}
+
+// markOutline shows the play button on the selected block's entry.
+function markOutline() {
+  const b = blocks()[selected]?.dataset.block;
+  for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) row.classList.toggle("active", row.dataset.block === b);
 }
 
 function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string): HTMLElement {
