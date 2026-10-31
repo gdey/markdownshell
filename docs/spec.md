@@ -185,3 +185,46 @@ Settled on 2026-10-27.
 - **Placeholders:** `{{#block/env(VAR)}}` in prose, on by default, `interpolate: false` to turn off.
 - **Output copies:** an `output {for=id}` fence or region that isn't right after block `id` is refilled from it on every run, like a placeholder. Settled on 2026-10-29.
 - **Includes:** a block marked `<include` with `file=`, `from=`, `to=` (1-based, inclusive) and `number_on`; mdsh writes the lines into the block's body, and the fence's language is the language. Include blocks never run and have no name.
+
+## Not pursued
+
+Ideas we looked at and decided against, with the reasons, so they aren't
+picked up again without a new argument.
+
+### Runnable blocks in generated output (2026-10-31)
+
+**The idea.** A block with `out=markdown` can print fenced `sh` or `zsh`
+blocks. Today they land in its `<!-- mdsh:output -->` region and print as
+plain code. The idea was to make them real blocks, with ids, a Run button
+in the GUI and saved output, that never run on their own: only when picked
+one at a time. The use case was prechecks a block could detect for the
+env it runs in, such as one check per service it finds.
+
+**Why not.**
+
+- **You can't read the file and know what runs.** What a document can
+  run would depend on what an earlier run printed. A runbook should be
+  reviewable as written.
+- **Ids stop being stable.** Generated ids can clash with written ones,
+  and with each other. Placeholders and conditions that name a generated
+  block can't be checked until its parent has run, so an unknown id would
+  have to stop being an error everywhere, or the parent would have to
+  declare the ids it makes.
+- **Re-runs throw work away.** Re-running the parent rewrites its region,
+  which drops the generated blocks, their saved output, and any edits.
+- **Regions would have to nest.** Every region closes with the same
+  `<!-- /mdsh:output -->` line, so saving a generated block's own
+  `out=markdown` output means changing how regions are found, plus a
+  depth limit for blocks that print blocks.
+- **Every front end gets a new case.** The CLI, TUI, GUI, reports, the
+  outline, the session's sync, and editing would all need rules for
+  blocks that come and go. That is several PRs of complexity for one use
+  case.
+- **It's code written by code.** It would want its own confirm step
+  anyway.
+
+**Instead.** Write the prechecks as ordinary blocks and gate each one
+with `run=` on an environment variable or a detected fact, as
+[Optional prechecks](../README.md#optional-prechecks) shows. They stay
+visible and reviewable, keep stable ids, and a full run includes them.
+Generated output stays plain markdown: fences in it print as code.
