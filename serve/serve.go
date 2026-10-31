@@ -70,7 +70,8 @@ type Server struct {
 	lastID  uint
 	asks    map[int]*ask
 	lastAsk int
-	active  uint // the window that last made a call
+	active  uint   // the window that last made a call
+	stdio   *stdio // the client on stdin and stdout, for ServeStdio
 }
 
 // New makes a Server for opts. Serve or ListenAndServe start it.
@@ -353,12 +354,7 @@ func (s *Server) call(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	if id, err := strconv.ParseUint(r.Header.Get(windowHeader), 10, 0); err == nil {
-		ctx = context.WithValue(ctx, windowKey{}, uint(id))
-		s.mu.Lock()
-		if win := s.windows[uint(id)]; win != nil && win.doc {
-			s.active = win.id
-		}
-		s.mu.Unlock()
+		ctx = s.fromWindow(ctx, uint(id))
 	}
 	out, err := s.invoke(ctx, req)
 	if err != nil {
@@ -372,6 +368,17 @@ func (s *Server) call(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(out)
+}
+
+// fromWindow returns ctx for a call from window id, which becomes the
+// window in front.
+func (s *Server) fromWindow(ctx context.Context, id uint) context.Context {
+	s.mu.Lock()
+	if win := s.windows[id]; win != nil && win.doc {
+		s.active = win.id
+	}
+	s.mu.Unlock()
+	return context.WithValue(ctx, windowKey{}, id)
 }
 
 // events sends the events for a window to its page over a WebSocket.
@@ -427,12 +434,6 @@ func (s *Server) answer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.mu.Lock()
-	a := s.asks[req.ID]
-	delete(s.asks, req.ID)
-	s.mu.Unlock()
-	if a != nil {
-		a.reply <- req.Value
-	}
+	s.answerAsk(req.ID, req.Value)
 	w.WriteHeader(http.StatusNoContent)
 }
