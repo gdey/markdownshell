@@ -60,6 +60,9 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 				cuts = append(cuts, doc.Span{Start: s.If.Start, End: s.End.End})
 			}
 		}
+		for _, f := range d.Folds {
+			cuts = append(cuts, f.Span)
+		}
 	}
 	prose := func(from, to int) {
 		for _, k := range keep(from, to, cuts) {

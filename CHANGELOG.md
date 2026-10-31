@@ -52,6 +52,12 @@ follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
+- Folding in `mdsh-gui`: a block's code and its output each fold to one
+  line, and a heading folds its section. `collapse[=COND]`,
+  `collapse-output[=COND]` and `<!-- mdsh:collapse [COND] -->` lines say
+  what starts folded; printing leaves the lines out. The source view
+  folds headings and fences on its own, and View › Folding copies folds
+  between the two views.
 - `textbox` blocks: ```` ```textbox {#host lines=1 placeholder="Which host?"} ````
   holds text rather than code. `mdsh-gui` draws it as a box to type in
   and saves what is typed into the block's body; `lines=` is the most

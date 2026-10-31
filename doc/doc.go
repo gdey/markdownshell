@@ -65,6 +65,8 @@ type Document struct {
 	// Sections are the mdsh:if ... mdsh:end sections, in order of their
 	// if lines. They may nest.
 	Sections []*Section
+	// Folds are the mdsh:collapse lines, in order.
+	Folds []*Fold
 	// Copies are the output fences and regions in the prose that aren't
 	// right after the block they are for, in order. A run refills them.
 	Copies []*Copy
@@ -233,6 +235,18 @@ func Parse(src []byte) (*Document, error) {
 
 		if !blank(rest) {
 			last = nil
+		}
+		if text, ok := foldLine(line); ok {
+			c, err := ParseCond(text)
+			if err == nil && c.Once {
+				err = errOnce
+			}
+			if err != nil {
+				return nil, fmt.Errorf("line %d: mdsh:collapse: %w", lineNo(src, pos), err)
+			}
+			d.Folds = append(d.Folds, &Fold{Span: Span{pos, end}, Cond: c})
+			pos = end
+			continue
 		}
 		if text, isIf, isEnd := sectionLine(line); isIf || isEnd {
 			if isIf {
