@@ -1,5 +1,5 @@
-// Help for the mdsh attributes in opening fences, and Vim's :w and :q,
-// for the markdown editors.
+// Help for the mdsh attributes in opening fences, and Vim's :w, :q and
+// :RunBlock, for the markdown editors.
 
 import { type EditorState, type Extension } from "@codemirror/state";
 import { EditorView, hoverTooltip, type Tooltip } from "@codemirror/view";
@@ -18,6 +18,8 @@ export interface ExTarget {
   // write applies the edit and saves the file.
   write(): Promise<void>;
   close(): void;
+  // run runs the block at the cursor, for :RunBlock.
+  run?(): void;
 }
 
 // active is the editor Vim's ex commands act on: the last one focused.
@@ -27,6 +29,7 @@ Vim.defineEx("write", "w", () => void exWrite(false));
 Vim.defineEx("wq", "wq", () => void exWrite(true));
 Vim.defineEx("xit", "x", () => void exWrite(true));
 Vim.defineEx("quit", "q", () => active?.close());
+Vim.defineEx("RunBlock", "RunBlock", () => active?.run?.());
 
 async function exWrite(close: boolean) {
   const t = active;
