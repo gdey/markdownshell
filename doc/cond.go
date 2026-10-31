@@ -137,7 +137,7 @@ func truthy(v string) bool {
 }
 
 // The block attributes that hold conditions.
-var condAttrs = []string{"run", "show", "show-output", "show-stderr"}
+var condAttrs = []string{"run", "show", "show-output", "show-stderr", "collapse", "collapse-output"}
 
 // Cond returns the condition in a block attribute, and whether it is set.
 // Parse has already checked that it is valid.
@@ -162,6 +162,32 @@ const (
 	ifOpen  = "<!-- mdsh:if "
 	ifClose = "<!-- mdsh:end -->"
 )
+
+// Fold is a <!-- mdsh:collapse --> line, optionally with a condition,
+// as in <!-- mdsh:collapse {{$MDSH_VAR_verbose}}!=yes -->. When the
+// condition holds, mdsh-gui opens the file with the section of the
+// heading above the line folded. Printing leaves the line out.
+type Fold struct {
+	Span Span // the line
+	Cond Cond
+}
+
+const foldOpen = "<!-- mdsh:collapse"
+
+// foldLine reports whether line is an mdsh:collapse line, and its
+// condition, empty when it has none.
+func foldLine(line []byte) (cond string, ok bool) {
+	l := string(bytes.TrimSpace(line))
+	rest, ok := strings.CutPrefix(l, foldOpen)
+	if !ok || !strings.HasSuffix(rest, "-->") {
+		return "", false
+	}
+	rest = rest[:len(rest)-3]
+	if rest != "" && rest[0] != ' ' && rest[0] != '\t' {
+		return "", false // such as mdsh:collapsed
+	}
+	return strings.TrimSpace(rest), true
+}
 
 // sectionLine reports whether line opens or closes a section.
 func sectionLine(line []byte) (cond string, open, close bool) {
@@ -192,6 +218,11 @@ func (d *Document) Refs() []Ref {
 	for _, s := range d.Sections {
 		if s.Cond.Ref != nil {
 			refs = append(refs, *s.Cond.Ref)
+		}
+	}
+	for _, f := range d.Folds {
+		if f.Cond.Ref != nil {
+			refs = append(refs, *f.Cond.Ref)
 		}
 	}
 	// An included tape's lines are read when the document runs; see

@@ -4,6 +4,7 @@ import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
+import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
 import { initReport, openReport } from "./report.js";
@@ -106,9 +107,20 @@ function drawDoc() {
   const restore = anchor();
   closeTerminal();
   main.replaceChildren();
+  const seen = new Map<string, number>();
   for (const c of cells) {
-    main.append(drawCell(c));
+    const e = drawCell(c);
+    if (c.heading) {
+      // A heading is known by its level and text, and which one it is
+      // of those alike, so its fold outlives edits elsewhere.
+      const name = c.heading + ":" + (e.querySelector("h1, h2, h3, h4, h5, h6")?.textContent ?? "");
+      const nth = seen.get(name) ?? 0;
+      seen.set(name, nth + 1);
+      e.dataset.fold = "section:" + name + ":" + nth;
+    }
+    main.append(e);
   }
+  applyFolds();
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
   drawOutline();
@@ -193,6 +205,18 @@ function drawProse(c: Cell): HTMLElement {
     void showInSource(s, c.line, true);
   };
   enableTasks(s, c.tasks);
+  if (c.heading) {
+    s.classList.add("heading-cell");
+    s.dataset.level = String(c.heading);
+    s.dataset.foldDefault = c.collapsed ? "1" : "";
+    const note = el("button", { className: "fold-note", title: "Unfold this section" });
+    note.onclick = (e) => {
+      e.stopPropagation();
+      foldSection(s, false);
+    };
+    s.prepend(foldButton("Fold or unfold this section", () => foldSection(s)));
+    s.append(note);
+  }
   return s;
 }
 
@@ -325,11 +349,26 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
     // Each card's handlers hold its cell, so update them in place.
     fresh.forEach((c, i) => {
       const changed = c.block < 0 && !c.textbox && !c.choice && c.html !== cells[i].html;
-      Object.assign(cells[i], c);
+      // Go leaves out fields that are false, so clear the fold flags first.
+      Object.assign(cells[i], { collapsed: false, collapsedOutput: false }, c);
       const card = $("doc").children[i] as HTMLElement | undefined;
-      if (card && changed) card.replaceWith(drawCell(cells[i]));
-      else if (card) card.dataset.line = String(c.line);
+      if (card && changed) {
+        const fold = card.dataset.fold;
+        const fresh = drawCell(cells[i]);
+        if (fold) fresh.dataset.fold = fold;
+        card.replaceWith(fresh);
+      } else if (card) {
+        card.dataset.line = String(c.line);
+        // A var= input can change what mdsh:collapse and collapse= say.
+        if (c.heading) card.dataset.foldDefault = c.collapsed ? "1" : "";
+        if (c.block >= 0) {
+          card.dataset.foldCode = c.collapsed ? "1" : "";
+          card.dataset.foldOutput = c.collapsedOutput ? "1" : "";
+        }
+      }
     });
+    applyFolds();
+    drawOutline();
   }
   await loadSource();
   markRunLines();
@@ -352,11 +391,13 @@ function drawBlock(c: Cell): HTMLElement {
       iconButton("play", "Run this block (enter)", () => start("RunBlock", c.block)),
       iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
     ),
-    el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))),
+    foldPart("code", el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))), () => foldBlock(block, "code")),
     el("div", { className: "ask", hidden: true }),
-    el("div", { className: "output", innerHTML: c.output ?? "" }),
+    foldPart("output", el("div", { className: "output", innerHTML: c.output ?? "" }), () => foldBlock(block, "output")),
   );
   colorOutput(block.querySelector(".output")!);
+  block.dataset.foldCode = c.collapsed ? "1" : "";
+  block.dataset.foldOutput = c.collapsedOutput ? "1" : "";
   // Checkboxes in output, such as out=markdown's, are edited in place
   // too, until the block runs again.
   enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
@@ -370,6 +411,184 @@ function drawBlock(c: Cell): HTMLElement {
     if (!(e.target as HTMLElement).closest("button, input")) void showInSource(block, c.line, false);
   };
   return block;
+}
+
+// Folds in the rendered view. A block's code and its output each fold
+// to their first line, and a heading folds its section, down to the next
+// heading of the same or a higher level. collapse=, collapse-output= and
+// mdsh:collapse lines say how the file opens; a click lasts while the
+// tab is open, and is never written to the file. The source pane keeps
+// folds of its own, and the Folding menu copies them either way.
+
+// folds are the clicked folds, by key: the block's id and part, or the
+// heading's dataset.fold. The rest are as the file says.
+const folds = new Map<string, boolean>();
+
+type Part = "code" | "output";
+
+const partKey = (block: HTMLElement, part: Part) => part + ":" + (block.querySelector(".name")?.firstChild?.textContent ?? block.dataset.block);
+
+function blockFolded(block: HTMLElement, part: Part): boolean {
+  return folds.get(partKey(block, part)) ?? !!block.dataset[part === "code" ? "foldCode" : "foldOutput"];
+}
+
+function sectionFolded(cell: HTMLElement): boolean {
+  return folds.get(cell.dataset.fold ?? "") ?? !!cell.dataset.foldDefault;
+}
+
+function foldButton(title: string, onclick: () => void): HTMLButtonElement {
+  const b = el("button", { className: "fold", title }, svg(icons.chevron));
+  b.setAttribute("aria-label", title);
+  b.onclick = (e) => {
+    e.stopPropagation();
+    onclick();
+  };
+  return b;
+}
+
+// foldPart wraps a block's code or output with its fold button and the
+// one line it shows when folded.
+function foldPart(part: Part, full: HTMLElement, toggle: () => void): HTMLElement {
+  const summary = el("div", { className: "fold-summary", hidden: true, title: "Unfold" });
+  summary.onclick = (e) => {
+    e.stopPropagation();
+    toggle();
+  };
+  return el("div", { className: "part " + part + "-part" }, foldButton(part === "code" ? "Fold or unfold the code" : "Fold or unfold the output", toggle), full, summary);
+}
+
+function foldBlock(block: HTMLElement, part: Part, on = !blockFolded(block, part)) {
+  folds.set(partKey(block, part), on);
+  drawPart(block, part);
+}
+
+function foldSection(cell: HTMLElement, on = !sectionFolded(cell)) {
+  folds.set(cell.dataset.fold ?? "", on);
+  applyFolds();
+  drawOutline();
+}
+
+// drawPart shows a block's code or output whole, or as its first line.
+function drawPart(block: HTMLElement, part: Part) {
+  const wrap = block.querySelector<HTMLElement>("." + part + "-part");
+  if (!wrap) return;
+  const on = blockFolded(block, part);
+  wrap.classList.toggle("folded", on);
+  const summary = wrap.querySelector<HTMLElement>(".fold-summary")!;
+  summary.hidden = !on;
+  if (on) summarize(wrap.children[1] as HTMLElement, summary);
+}
+
+// summarize puts full's first line in summary, and how much more there is.
+function summarize(full: HTMLElement, summary: HTMLElement) {
+  // Highlighted code is one element per line, with no newlines between.
+  const rows = full.querySelectorAll(".line");
+  const text = rows.length ? [...rows].map((r) => r.textContent ?? "") : (full.textContent ?? "").split("\n");
+  const lines = text.filter((l) => l.trim());
+  const images = full.querySelectorAll("img").length;
+  let more = lines.length > 1 ? " … " + (lines.length - 1) + (lines.length === 2 ? " more line" : " more lines") : "";
+  if (images) more += " … " + images + (images === 1 ? " image" : " images");
+  summary.replaceChildren(el("span", { className: "first" }, lines[0] ?? (images ? "" : "empty")), el("span", { className: "muted" }, more));
+}
+
+// applyFolds draws every fold: each block's parts, and the sections,
+// hiding the cells under a folded heading.
+function applyFolds() {
+  const doc = $("doc");
+  for (const b of doc.querySelectorAll<HTMLElement>(":scope > .block")) {
+    drawPart(b, "code");
+    drawPart(b, "output");
+  }
+  const open: { level: number; folded: boolean; cell: HTMLElement; hidden: number }[] = [];
+  const headings: typeof open = [];
+  for (const e of doc.children as HTMLCollectionOf<HTMLElement>) {
+    const level = Number(e.dataset.level ?? 0);
+    if (level) while (open.length && open[open.length - 1].level >= level) open.pop();
+    const owner = open.find((h) => h.folded);
+    e.classList.toggle("in-fold", !!owner);
+    if (owner) owner.hidden++;
+    if (level) {
+      const h = { level, folded: sectionFolded(e), cell: e, hidden: 0 };
+      e.classList.toggle("folded", h.folded);
+      open.push(h);
+      headings.push(h);
+    }
+  }
+  for (const h of headings) {
+    const note = h.cell.querySelector<HTMLElement>(".fold-note");
+    if (note) note.textContent = h.folded && h.hidden ? "… " + h.hidden + (h.hidden === 1 ? " part" : " parts") : "";
+  }
+  // A selected block that a fold hides is selected no longer.
+  const current = doc.querySelector<HTMLElement>(".block.selected");
+  if (current) select(current.classList.contains("in-fold") ? -1 : blocks().indexOf(current), false);
+}
+
+// reveal unfolds the sections that hide cell, so it can be shown, as
+// when a block asks before it runs or the toolbar jumps to it.
+function reveal(cell: HTMLElement) {
+  if (!cell.classList.contains("in-fold")) return;
+  let level = Number(cell.dataset.level ?? 0) || 7;
+  for (let e = cell.previousElementSibling as HTMLElement | null; e && level > 1; e = e.previousElementSibling as HTMLElement | null) {
+    const l = Number(e.dataset.level ?? 0);
+    if (!l || l >= level) continue;
+    level = l;
+    if (sectionFolded(e)) folds.set(e.dataset.fold ?? "", false);
+  }
+  applyFolds();
+  drawOutline();
+}
+
+// foldAll folds or unfolds every block's code and output, or every
+// section.
+function foldAll(what: "blocks" | "sections", on: boolean) {
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    if (what === "blocks" && e.classList.contains("block")) {
+      folds.set(partKey(e, "code"), on);
+      folds.set(partKey(e, "output"), on);
+    }
+    if (what === "sections" && e.dataset.fold) folds.set(e.dataset.fold, on);
+  }
+  applyFolds();
+  drawOutline();
+}
+
+// renderedFoldLines are the source lines of the rendered view's folds,
+// or, with fromFile, of the folds the file asks for.
+function renderedFoldLines(fromFile: boolean): number[] {
+  const lines: number[] = [];
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    const c = cells.find((c) => String(c.line) === e.dataset.line);
+    if (!c) continue;
+    if (c.heading && (fromFile ? c.collapsed : sectionFolded(e))) lines.push(c.line);
+    if (c.block >= 0) {
+      if (fromFile ? c.collapsed : blockFolded(e, "code")) lines.push(c.line);
+      if (c.outputLine && (fromFile ? c.collapsedOutput : blockFolded(e, "output"))) lines.push(c.outputLine);
+    }
+  }
+  return lines;
+}
+
+async function foldsToSource() {
+  if (!view.split) toggle("split", true);
+  await loadSource();
+  if (source) setSourceFolds(source.view, renderedFoldLines(false));
+}
+
+function foldsToRendered() {
+  if (!source) return status("open the source view to copy its folds");
+  const lines = new Set(sourceFolds(source.view));
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    const c = cells.find((c) => String(c.line) === e.dataset.line);
+    if (!c) continue;
+    if (c.heading && e.dataset.fold) folds.set(e.dataset.fold, lines.has(c.line));
+    if (c.block >= 0) {
+      folds.set(partKey(e, "code"), lines.has(c.line));
+      folds.set(partKey(e, "output"), !!c.outputLine && lines.has(c.outputLine));
+    }
+  }
+  if (!view.rendered) toggle("rendered", true);
+  applyFolds();
+  drawOutline();
 }
 
 // followLinks makes a click on a link in the rendered view follow it,
@@ -454,7 +673,8 @@ function viewImage(img: HTMLImageElement) {
   viewer.showModal();
 }
 
-const blocks = () => [...document.querySelectorAll<HTMLElement>("#doc .block")];
+// blocks are the blocks j and k move between: those no fold hides.
+const blocks = () => [...document.querySelectorAll<HTMLElement>("#doc .block:not(.in-fold)")];
 
 function select(i: number, scroll = true) {
   const all = blocks();
@@ -558,7 +778,7 @@ function openSource() {
     attrs,
     names: () => known,
     lineNumbers: true,
-    extensions: [runGutter((line) => void runLine(line))],
+    extensions: [runGutter((line) => void runLine(line)), sourceFolding()],
     onChange() {
       sourcePending = true;
       clearTimeout(sourceTimer);
@@ -582,6 +802,7 @@ function closeSource() {
   void applySource();
   source.destroy();
   source = null;
+  sourceFoldsFor = "";
   $("source-bar").replaceChildren();
 }
 
@@ -607,14 +828,25 @@ async function applySource() {
   markCurrent(source.view.state.doc.lineAt(source.view.state.selection.main.head).number);
 }
 
+// sourceFoldsFor is the file whose folds the source pane opened with.
+let sourceFoldsFor = "";
+
 async function loadSource() {
   if (!source || sourcePending || doc.file === "") return;
+  const marks = foldMarks(source.view);
   try {
     source.setText(await App.Text());
   } catch (err) {
     fail(err);
   }
   markRunLines();
+  // The pane opens with the folds the file asks for, then keeps its own.
+  if (sourceFoldsFor !== doc.file) {
+    sourceFoldsFor = doc.file;
+    setSourceFolds(source.view, renderedFoldLines(true));
+  } else {
+    restoreFolds(source.view, marks);
+  }
 }
 
 // markRunLines puts a run button on each runnable block's first line.
@@ -730,7 +962,7 @@ function drawOutline() {
   if (!view.outline) return;
   const items: HTMLElement[] = [];
   let level = 0;
-  for (const e of document.querySelectorAll<HTMLElement>("#doc > section")) {
+  for (const e of document.querySelectorAll<HTMLElement>("#doc > section:not(.in-fold)")) {
     if (e.classList.contains("input-cell")) {
       // An input whose var= binds nothing is marked !.
       const taken = e.classList.contains("taken");
@@ -756,7 +988,20 @@ function drawOutline() {
     }
     for (const h of e.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")) {
       level = Number(h.tagName[1]);
-      items.push(outlineItem(h.textContent ?? "", level, h, "heading", ""));
+      const item = outlineItem(h.textContent ?? "", level, h, "heading", "");
+      if (e.dataset.fold) {
+        // The mark folds the section, in the outline and the view.
+        const mark = item.querySelector<HTMLElement>(".mark")!;
+        mark.replaceChildren(svg(icons.chevron));
+        mark.classList.add("fold");
+        mark.classList.toggle("closed", sectionFolded(e));
+        mark.title = "Fold or unfold this section";
+        mark.onclick = (ev) => {
+          ev.stopPropagation();
+          foldSection(e);
+        };
+      }
+      items.push(item);
     }
   }
   nav.replaceChildren(...(items.length ? items : [el("p", { className: "muted" }, "No headings or blocks")]));
@@ -795,6 +1040,7 @@ function outlineItem(text: string, level: number, target: HTMLElement, kind: str
 // jumpTo brings target to the top of the rendered view and its markdown
 // to the top of the source pane, and selects it if it is a block.
 function jumpTo(target: HTMLElement) {
+  reveal(target.closest<HTMLElement>("#doc > *") ?? target);
   // Both panes go to the entry, so neither follows the other meanwhile.
   holdScroll();
   target.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -812,7 +1058,8 @@ function jumpTo(target: HTMLElement) {
 // current step first (or the block waiting for an answer), then the
 // ones in the background. A click on one jumps to it.
 function drawRunning() {
-  const all = blocks();
+  // Blocks in folded sections run too.
+  const all = [...document.querySelectorAll<HTMLElement>("#doc .block")];
   const now = all.filter((e) => "?▶".includes(blockMark(e) || "x"));
   const bg = all.filter((e) => blockMark(e) === "◐");
   const chip = (e: HTMLElement) => {
@@ -925,6 +1172,14 @@ const actions: Record<string, () => Promise<void> | void> = {
   outline: () => toggle("outline"),
   code: () => toggle("code"),
   output: () => toggle("output"),
+  foldblocks: () => foldAll("blocks", true),
+  foldsections: () => foldAll("sections", true),
+  unfoldall() {
+    foldAll("blocks", false);
+    foldAll("sections", false);
+  },
+  foldstosource: () => foldsToSource(),
+  foldstorendered: () => foldsToRendered(),
 };
 
 // Run options
@@ -1125,6 +1380,7 @@ function onBlock(e: BlockEvent) {
       const streams = (liveColors.get(live) ?? liveColors.set(live, {}).get(live))!;
       const ansi = (streams[e.kind] ??= new Ansi());
       live.append(el("span", { className: e.kind }, ...ansi.write(e.data ?? "")));
+      if (blockFolded(block, "output")) drawPart(block, "output");
       if (block === following) followOutput();
       break;
     }
@@ -1177,6 +1433,7 @@ function onConfirm({ block, question }: Question) {
   stop.onclick = answer("stop");
   ask.replaceChildren(info, el("span", { className: "question" }, question), run, skip, stop);
   ask.hidden = false;
+  reveal(card);
   card.scrollIntoView({ block: "center" });
   status("waiting for you");
   drawOutline();

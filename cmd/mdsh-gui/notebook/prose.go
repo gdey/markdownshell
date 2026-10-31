@@ -54,23 +54,43 @@ func (n *Notebook) Cells() []Cell {
 			continue
 		}
 		r := n.results[i]
+		after := run.LookupAt(l.lookup, d, n.results, b.Output.End)
+		outLine := 0
+		if b.Output.End > b.Span.End {
+			outLine = lineNo(d.Src, b.Span.End+leadingBlank(d.Src[b.Span.End:b.Output.End]))
+		}
 		l.cells = append(l.cells, Cell{
-			Block:       i,
-			ID:          b.ID,
-			Lang:        b.Lang,
-			Body:        b.Body,
-			Attrs:       attrsText(b.Info),
-			Output:      n.html(out),
-			OutputTasks: tasksIn(l.tasks, b.Output),
-			Ran:         r.Ran,
-			Status:      r.Status,
-			Failed:      r.Failed(),
-			Running:     n.bg[b],
-			From:        span.Start,
-			To:          span.End,
+			Collapsed:       holds(b, "collapse", after),
+			CollapsedOutput: holds(b, "collapse-output", after),
+			OutputLine:      outLine,
+			Block:           i,
+			ID:              b.ID,
+			Lang:            b.Lang,
+			Body:            b.Body,
+			Attrs:           attrsText(b.Info),
+			Output:          n.html(out),
+			OutputTasks:     tasksIn(l.tasks, b.Output),
+			Ran:             r.Ran,
+			Status:          r.Status,
+			Failed:          r.Failed(),
+			Running:         n.bg[b],
+			From:            span.Start,
+			To:              span.End,
 		})
 	}
 	l.prose(pos, len(d.Src))
+	// An mdsh:collapse line folds the section of the heading above it.
+	for _, f := range d.Folds {
+		if !f.Cond.Eval(run.LookupAt(l.lookup, d, n.results, f.Span.Start)) {
+			continue
+		}
+		for i := len(l.cells) - 1; i >= 0; i-- {
+			if c := &l.cells[i]; c.Heading > 0 && c.From <= f.Span.Start {
+				c.Collapsed = true
+				break
+			}
+		}
+	}
 	pos, line := 0, 1
 	for i := range l.cells {
 		c := &l.cells[i]
@@ -102,10 +122,15 @@ func (l *layout) prose(from, to int) {
 		return
 	}
 	starts := []int{from + leadingBlank(src[from:to])}
+	headings := map[int]int{} // start: level
 	root := l.n.md.Parser().Parse(text.NewReader(src[from:to]))
 	for c := root.FirstChild(); c != nil; c = c.NextSibling() {
 		if s, ok := firstLine(c, src[from:to]); ok {
-			starts = append(starts, from+lineStart(src[from:to], s))
+			start := from + lineStart(src[from:to], s)
+			starts = append(starts, start)
+			if h, ok := c.(*ast.Heading); ok {
+				headings[start] = h.Level
+			}
 		}
 	}
 	slices.Sort(starts)
@@ -117,13 +142,14 @@ func (l *layout) prose(from, to int) {
 		}
 		e = s + trimBlankLines(src[s:e])
 		if e > s {
-			l.part(doc.Span{Start: s, End: e})
+			l.part(doc.Span{Start: s, End: e}, headings[s])
 		}
 	}
 }
 
-// part adds the prose at span, leaving out what is cut.
-func (l *layout) part(span doc.Span) {
+// part adds the prose at span, leaving out what is cut. heading is its
+// level if it is a heading.
+func (l *layout) part(span doc.Span, heading int) {
 	d := l.n.d
 	var md bytes.Buffer
 	var tasks []int
@@ -152,7 +178,18 @@ func (l *layout) part(span doc.Span) {
 		md.WriteString("\n\n")
 		md.Write(l.refs)
 	}
-	l.cells = append(l.cells, Cell{Block: -1, HTML: l.n.html(md.Bytes()), Tasks: tasks, From: span.Start, To: span.End})
+	l.cells = append(l.cells, Cell{Block: -1, HTML: l.n.html(md.Bytes()), Tasks: tasks, Heading: heading, From: span.Start, To: span.End})
+}
+
+// holds reports whether b's attr is set and its condition holds.
+func holds(b *doc.Block, attr string, lookup doc.Lookup) bool {
+	c, ok := b.Cond(attr)
+	return ok && c.Eval(lookup)
+}
+
+// lineNo is the line pos is on, counting from 1.
+func lineNo(src []byte, pos int) int {
+	return bytes.Count(src[:pos], []byte("\n")) + 1
 }
 
 // firstLine is where the first line of source under node starts, as an
@@ -194,7 +231,7 @@ func linkRefs(src []byte) []byte {
 var linkRef = regexp.MustCompile(`(?m)^ {0,3}\[[^\]\n]+\]:[ \t]*\S.*$`)
 
 // cuts are the parts of d printing leaves out: the lines of mdsh:if
-// sections, and the whole of those that are off. Cells start after the
+// sections, the whole of those that are off, and mdsh:collapse lines. Cells start after the
 // shebang and front matter.
 func cuts(d *doc.Document, results []*run.Result, lookup doc.Lookup) []doc.Span {
 	var cuts []doc.Span
@@ -204,6 +241,9 @@ func cuts(d *doc.Document, results []*run.Result, lookup doc.Lookup) []doc.Span 
 		} else {
 			cuts = append(cuts, doc.Span{Start: s.If.Start, End: s.End.End})
 		}
+	}
+	for _, f := range d.Folds {
+		cuts = append(cuts, f.Span)
 	}
 	return cuts
 }

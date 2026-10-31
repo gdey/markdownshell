@@ -36,6 +36,8 @@ export const icons = {
   fence: '<path d="M2 2.5h12v11H2zm1.4 1.4v8.2h9.2V3.9zm1.4 1.5 2.3 2.3-2.3 2.3-.9-.9 1.4-1.4-1.4-1.4zm3 3.7h3.4v1.2H7.8z"/>',
   mdsh: '<path d="M2 2.5h12v11H2zm1.4 1.4v8.2h9.2V3.9zM6 5.5l4.5 2.5L6 10.5z"/>',
   sidebar: '<path d="M1.5 2.5h13v11h-13zm1.4 1.4v8.2h3.2V3.9zm4.6 0v8.2h5.6V3.9z"/>',
+  // A fold: open points down, and CSS turns it right when closed.
+  chevron: '<path d="M3.7 5.6 8 9.9l4.3-4.3 1 1L8 11.9 2.7 6.6z"/>',
   rendered: '<path d="M3.5 1.5h6l3.5 3.5v9.5h-9.5zm1.4 1.4v10.2h6.7V6H8.5V2.9z"/>',
 };
 

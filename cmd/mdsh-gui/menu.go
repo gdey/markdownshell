@@ -146,6 +146,15 @@ func (a *App) buildMenu() *application.Menu {
 	view.AddSeparator()
 	a.viewItems.code = view.AddCheckbox("Show Code", true).OnClick(send("code"))
 	a.viewItems.output = view.AddCheckbox("Show Output", true).OnClick(send("output"))
+	// Folds in the rendered view, and copying them to and from the
+	// source view, which keeps its own.
+	folding := view.AddSubmenu("Folding")
+	folding.Add("Collapse All Blocks").OnClick(send("foldblocks"))
+	folding.Add("Collapse All Sections").OnClick(send("foldsections"))
+	folding.Add("Expand All").OnClick(send("unfoldall"))
+	folding.AddSeparator()
+	folding.Add("Copy Folds to Source View").OnClick(send("foldstosource"))
+	folding.Add("Copy Folds to Rendered View").OnClick(send("foldstorendered"))
 	view.AddSeparator()
 	view.AddRole(application.ZoomIn)
 	view.AddRole(application.ZoomOut)

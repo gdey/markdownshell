@@ -279,6 +279,8 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 | `show=COND` | Print the code only if the condition holds |
 | `show-output=COND` | Print the output only if the condition holds |
 | `show-stderr[=COND]` | Show stderr (by default it only shows when the block fails) |
+| `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
+| `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent (default all; empty for none) |
 | `on_error=stop` | Stop the run if this block fails |
@@ -456,6 +458,10 @@ in the file, and none from running it earlier in the same `mdsh -i` or
 its output to run it again. Picking the block by hand still runs it.
 
 Sections nest, and their comment lines never appear in printed output.
+A `<!-- mdsh:collapse -->` line, optionally with a condition, makes
+mdsh-gui open with the heading section it is in folded. With an input's
+`var=`, `<!-- mdsh:collapse {{$MDSH_VAR_details}}!=yes -->` keeps a
+section folded until someone picks yes.
 `show=`, `show-output=` and sections only change what is printed: `-w`
 keeps everything in the file. Use `run=` to keep a block from running.
 

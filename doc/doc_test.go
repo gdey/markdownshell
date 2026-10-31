@@ -210,6 +210,36 @@ func TestParseSections(t *testing.T) {
 	}
 }
 
+func TestParseFolds(t *testing.T) {
+	src := "# A\n<!-- mdsh:collapse -->\n## B\n  <!-- mdsh:collapse {{$X}}!=yes -->\n<!-- mdsh:collapsed -->\n```sh {#a collapse collapse-output={{$?}}==0}\n<!-- mdsh:collapse -->\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Folds) != 2 {
+		t.Fatalf("folds = %+v", d.Folds)
+	}
+	if f := d.Folds[0]; string(d.Src[f.Span.Start:f.Span.End]) != "<!-- mdsh:collapse -->\n" || f.Cond.Ref != nil || f.Cond.Value != "true" {
+		t.Errorf("fold 0 = %+v", f)
+	}
+	if f := d.Folds[1]; f.Cond.Ref == nil || f.Cond.Ref.Var != "X" || f.Cond.Op != "!=" {
+		t.Errorf("fold 1 = %+v", f)
+	}
+	if c, ok := d.Blocks[0].Cond("collapse"); !ok || !c.Eval(nil) {
+		t.Errorf("collapse = %+v, %v", c, ok)
+	}
+	for _, bad := range []string{
+		"<!-- mdsh:collapse nope -->\n",
+		"<!-- mdsh:collapse once -->\n",
+		"```sh {#a collapse=nope}\n```\n",
+		"```sh {#a collapse-output=once}\n```\n",
+	} {
+		if _, err := Parse([]byte(bad)); err == nil {
+			t.Errorf("Parse(%q) should fail", bad)
+		}
+	}
+}
+
 func TestCallerPlaceholder(t *testing.T) {
 	d, err := Parse([]byte("hi {{$USER}} and {{$HOME:\"/h\"}}\n"))
 	if err != nil {
