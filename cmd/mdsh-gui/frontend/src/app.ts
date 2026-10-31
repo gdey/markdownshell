@@ -418,6 +418,42 @@ async function runLine(line: number) {
   if (c) await start("RunBlock", c.block);
 }
 
+// runCurrent runs the block the source pane's cursor is in: on its
+// fence, in its body or in its output. Without the source pane it runs
+// the selected card, as enter does. It goes through RunBlock, as the
+// card's play button does.
+async function runCurrent() {
+  if (running || !doc.file) return;
+  if (!source) {
+    const all = blocks();
+    if (selected >= 0 && selected < all.length) await start("RunBlock", Number(all[selected].dataset.block));
+    else status("no block selected");
+    return;
+  }
+  await applySource();
+  const cm = source.view.state;
+  const c = blockAtLine(cm.doc.toString(), cm.doc.lineAt(cm.selection.main.head).number);
+  if (c) await start("RunBlock", c.block);
+  else status("the cursor isn't in a block that runs");
+}
+
+// blockAtLine is the runnable cell of text, the file's text, whose lines
+// hold line, counted from 1. Cells count in bytes, so the text is too.
+function blockAtLine(text: string, line: number): Cell | undefined {
+  const bytes = new TextEncoder().encode(text);
+  const newlines = (from: number, to: number) => {
+    let n = 0;
+    for (let i = from; i < to; i++) if (bytes[i] === 10) n++;
+    return n;
+  };
+  return cells.find((c) => {
+    if (c.block < 0 || line < c.line) return false;
+    const to = Math.min(c.to, bytes.length);
+    const last = c.line + newlines(c.from, to) - (to > c.from && bytes[to - 1] === 10 ? 1 : 0);
+    return line <= last;
+  });
+}
+
 // cellAt is the drawn cell holding line, or the last one before it.
 function cellAt(line: number): HTMLElement | null {
   let found: HTMLElement | null = null;
@@ -648,6 +684,7 @@ const actions: Record<string, () => Promise<void> | void> = {
     }
     await refresh();
   },
+  runcurrent: () => runCurrent(),
   report: () => (doc.file && !running ? openReport() : undefined),
   stop: () => App.Stop(),
   runoptions: () => openRunOptions(),

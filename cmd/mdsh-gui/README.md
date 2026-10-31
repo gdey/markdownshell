@@ -40,7 +40,9 @@ Each file opens in a tab of its own, with its own shells.
   run, a run of every block or the saved file, and shows the `mdsh`
   command that makes the same one. Dropping a markdown file on a window opens it. A • marks
   output that isn't saved, and closing or quitting asks first.
-- **Run:** Run All (cmd/ctrl+R, the toolbar button turns into Stop while
+- **Run:** Run Current Block (cmd/ctrl+enter: the block the source
+  view's cursor is in, or the selected card without the source view),
+  Run All (cmd/ctrl+R, the toolbar button turns into Stop while
   blocks run), Stop (cmd/ctrl+.), Clear All Outputs and Run Options…
   for the file's arguments, `--only`, step mode and stop on error.
   Clear All Outputs takes every block's output, output copy and stored

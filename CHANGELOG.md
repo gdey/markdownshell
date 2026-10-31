@@ -32,6 +32,9 @@ follow [Semantic Versioning](https://semver.org/).
   argument as a file, so `--source` was opened as one.
 - `mdsh-gui` setting **Give blocks your zsh aliases and functions** adds
   that function to `~/.zshrc`, or takes it out.
+- `mdsh-gui` Run › Run Current Block (cmd/ctrl+enter) runs the block
+  the source view's cursor is in: on its fence, in its body or in its
+  output. Without the source view it runs the selected card.
 
 ### Fixed
 

@@ -127,6 +127,7 @@ func (a *App) buildMenu() *application.Menu {
 	}
 
 	run := m.AddSubmenu("Run")
+	run.Add("Run Current Block").SetAccelerator("CmdOrCtrl+Enter").OnClick(send("runcurrent"))
 	run.Add("Run All").SetAccelerator("CmdOrCtrl+R").OnClick(send("runall"))
 	run.Add("Stop").SetAccelerator("CmdOrCtrl+.").OnClick(send("stop"))
 	run.Add("Clear All Outputs").OnClick(send("clearoutputs"))
