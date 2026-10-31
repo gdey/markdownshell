@@ -33,6 +33,12 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui` setting **Give blocks your zsh aliases and functions** adds
   that function to `~/.zshrc`, or takes it out.
 
+### Fixed
+
+- A block's errors name it `block` instead of the runner's temp file,
+  so `/var/folders/…/mdsh-123/block.sh:2: no such file or directory`
+  reads `block:2: no such file or directory`.
+
 ## [1.2.1] - 2026-10-29
 
 Three changes to `mdsh-gui`: links in a document now work, a setting

@@ -196,10 +196,15 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		return 2, false, err
 	}
 
+	// The shell names the block by its temp file in errors, such as
+	// "/tmp/mdsh-1/block.sh:2: command not found"; call it "block", as
+	// check does.
+	errw := newRenamer(stderr, f, "block")
 	s.out.attach(stdout)
-	s.errs.attach(stderr)
+	s.errs.attach(errw)
 	defer s.out.attach(nil)
 	defer s.errs.attach(nil)
+	defer errw.Flush()
 
 	cmd := fmt.Sprintf(". %s </dev/null\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark)
 	if onTTY {
