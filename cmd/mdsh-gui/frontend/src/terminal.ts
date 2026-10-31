@@ -52,7 +52,6 @@ export function openTerminal(i: number) {
   term.open(host);
   term.onData((keys) => App.Type(keys).catch(() => {}));
   term.focus();
-  card.scrollIntoView({ block: "nearest" });
 }
 
 // writeTerminal shows what block i wrote to its terminal.
