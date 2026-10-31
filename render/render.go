@@ -380,8 +380,14 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 			if f := r.Block.Attrs["frame"]; f != "" && run.OutKind(r.Block) == "recording" {
 				link += "#frame=" + f
 			}
+			// The alt text is the block's name, or what the output is
+			// when mdsh made the name up.
+			alt := id
+			if !r.Block.Named() || doc.GeneratedID(id) {
+				alt = run.OutKind(r.Block)
+			}
 			b.WriteString(doc.RegionStart(id) + "\n")
-			fmt.Fprintf(&b, "![%s](%s)\n", id, link)
+			fmt.Fprintf(&b, "![%s](%s)\n", alt, link)
 			b.WriteString(doc.RegionEnd + "\n")
 		}
 	default:

@@ -273,7 +273,7 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 
 | Attribute | Meaning |
 | --- | --- |
-| `#id` | Block name (default `block-N`) |
+| `#id` | Block name. An unnamed block gets `block-<uuid>`, written into its fence when mdsh saves the file |
 | `skip` | Don't run |
 | `run=COND` | Run only if the condition holds |
 | `show=COND` | Print the code only if the condition holds |

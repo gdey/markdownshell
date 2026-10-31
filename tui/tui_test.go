@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -273,9 +274,10 @@ func TestTypeNewBlock(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	pump(t, m)
 	got := read(t, file)
-	want := "```sh\necho \"$X typed\"\n```\n\n```output {for=block-3 exit=0}\nhi typed\n```\n"
-	if !strings.HasSuffix(got, want) {
-		t.Errorf("new block not appended and run:\n%s", got)
+	// Saving names the new block.
+	want := regexp.MustCompile("```sh \\{#(block-[0-9a-f-]{36})\\}\necho \"\\$X typed\"\n```\n\n```output \\{for=(block-[0-9a-f-]{36}) exit=0\\}\nhi typed\n```\n$")
+	if g := want.FindStringSubmatch(got); g == nil || g[1] != g[2] {
+		t.Errorf("new block not appended, run and named:\n%s", got)
 	}
 	if m.cur() != 2 {
 		t.Errorf("cursor on block %d, want the new one", m.cur())

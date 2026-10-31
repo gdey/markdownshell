@@ -45,6 +45,25 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui` shows the ANSI colors and bold, italic and underline in a
   block's output, saved or live, instead of the escape codes.
 
+### Changed
+
+- **Documents will have their unnamed blocks renamed from `block-N` to
+  `block-<uuid>`.** The next time mdsh saves a file (`-w`, or a save in
+  `mdsh -i` or `mdsh-gui`), every runnable block without an `#id` gets
+  one written into its fence, such as
+  `sh {#block-0192f3a4-7c1e-7b2a-9d3e-5f6a7b8c9d0e}`, a UUIDv7. Ids no
+  longer change when blocks are added or moved, so diffs stay small.
+  The same save rewrites everything that named the old `block-N`: the
+  block's saved output, output copies, tapes, placeholders and
+  conditions such as `{{#block-3/?}}`, and its image and recording
+  files in `<doc>.assets/`, which are renamed to match. `-o` leaves the
+  source file and its blocks as they are. Scripts that call
+  `mdsh --only block-3` need the new id, or better, a name for the
+  block.
+- Messages and the GUI name a block whose id mdsh made up by its line,
+  as in `block at line 12: ok`, and the image alt text is the kind of
+  output rather than the id. Shell completion lists named blocks first.
+
 ### Fixed
 
 - A block's errors name it `block` instead of the runner's temp file,

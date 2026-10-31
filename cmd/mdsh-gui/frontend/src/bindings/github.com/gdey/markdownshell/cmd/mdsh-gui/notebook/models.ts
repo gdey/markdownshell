@@ -24,6 +24,12 @@ export interface Cell {
      * ID, Lang and Body describe a block.
      */
     "id"?: string;
+
+    /**
+     * Name is how the block is shown: its id, or "line N" when mdsh
+     * made the id up; see doc.Document.Label.
+     */
+    "name"?: string;
     "lang"?: string;
     "body"?: string;
 
