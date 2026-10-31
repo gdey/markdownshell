@@ -38,7 +38,7 @@ func TestBlocksCmd(t *testing.T) {
 	if rc := mdsh([]string{"__blocks", f}, nil, &out, &bytes.Buffer{}); rc != 0 {
 		t.Fatalf("rc = %d", rc)
 	}
-	if got := out.String(); got != "a\nblock-3\nz\n" {
+	if got := out.String(); got != "a\nz\nblock-3\n" {
 		t.Errorf("blocks = %q", got)
 	}
 }

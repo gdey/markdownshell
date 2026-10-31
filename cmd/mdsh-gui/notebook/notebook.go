@@ -38,7 +38,10 @@ type Cell struct {
 	// buttons or checkboxes.
 	Choice *ChoiceCell `json:"choice,omitempty"`
 	// ID, Lang and Body describe a block.
-	ID   string `json:"id,omitempty"`
+	ID string `json:"id,omitempty"`
+	// Name is how the block is shown: its id, or "line N" when mdsh
+	// made the id up; see doc.Document.Label.
+	Name string `json:"name,omitempty"`
 	Lang string `json:"lang,omitempty"`
 	Body string `json:"body,omitempty"`
 	// Attrs are the block's attributes other than its id, as written,
@@ -553,6 +556,15 @@ func copyDir(from, to string) error {
 }
 
 func (n *Notebook) write(file string) error {
+	renames, err := run.NameBlocks(n.d, n.results, run.Options{File: n.file})
+	if err != nil {
+		return err
+	}
+	if len(renames) > 0 {
+		if err := n.sync(); err != nil {
+			return err
+		}
+	}
 	if err := n.fold(); err != nil {
 		return err
 	}

@@ -282,6 +282,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 					status = "failed"
 				}
 				name := e.Block.ID
+				if l := d.Label(e.Block); l != name {
+					name = "block " + l
+				}
 				if e.Block.IsInclude() {
 					name = "include " + e.Block.Attrs["file"]
 				}
@@ -306,6 +309,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
 	} else if tty != nil {
 		p := newPrompter(tty, tty)
+		p.d = d
 		// The streamed document already shows the code, unless it is
 		// hidden.
 		p.quiet = live != nil && !*hideCode
@@ -329,7 +333,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	// Say why the run stopped early, before the rest of the document and
 	// again after it, so it is seen whether or not that scrolls by.
 	note := ""
-	if n := stopNote(results); n != "" && runErr == nil {
+	if n := stopNote(d, results); n != "" && runErr == nil {
 		note = "mdsh: " + n
 	}
 	if note != "" && (live != nil || (!*write && reportFile == "")) {
@@ -337,6 +341,13 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	if *write {
+		// Saving the file itself names its unnamed blocks; a copy
+		// saved with -o leaves them, and their files, as they are.
+		if *outFile == "" {
+			if _, err := run.NameBlocks(d, results, opts); err != nil {
+				return err
+			}
+		}
 		out := render.Markdown(d, results, render.Options{WriteBack: true, Env: reportOpts.Env})
 		mode := os.FileMode(0o644)
 		if info, err := os.Stat(file); err == nil {
@@ -371,18 +382,18 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 
 // stopNote says why a run stopped before its last block, or returns ""
 // if it didn't.
-func stopNote(results []*run.Result) string {
+func stopNote(d *doc.Document, results []*run.Result) string {
 	for i, r := range results {
 		switch {
 		case r.Declined:
-			return fmt.Sprintf("stopped before block %s", r.Block.ID)
+			return fmt.Sprintf("stopped before block %s", d.Label(r.Block))
 		case !r.Ran || !unreached(results[i+1:]):
 		case r.Exited && r.Err != nil:
-			return fmt.Sprintf("block %s %v, which ended its shell, so the run stopped there", r.Block.ID, r.Err)
+			return fmt.Sprintf("block %s %v, which ended its shell, so the run stopped there", d.Label(r.Block), r.Err)
 		case r.Exited:
-			return fmt.Sprintf("block %s ended its shell (exit status %d, from exit or set -e), so the run stopped there", r.Block.ID, r.Status)
+			return fmt.Sprintf("block %s ended its shell (exit status %d, from exit or set -e), so the run stopped there", d.Label(r.Block), r.Status)
 		case r.Failed():
-			return fmt.Sprintf("block %s failed (exit status %d) and the run stops on errors (on_error: stop or --stop-on-error)", r.Block.ID, r.ExitStatus())
+			return fmt.Sprintf("block %s failed (exit status %d) and the run stops on errors (on_error: stop or --stop-on-error)", d.Label(r.Block), r.ExitStatus())
 		}
 	}
 	return ""
@@ -537,6 +548,16 @@ type prompter struct {
 	// quiet leaves the block's code out of the question, for when it
 	// has just been printed.
 	quiet bool
+	// d, if set, names blocks in messages; see doc.Document.Label.
+	d *doc.Document
+}
+
+// label names b in a message.
+func (p *prompter) label(b *doc.Block) string {
+	if p.d == nil {
+		return b.ID
+	}
+	return p.d.Label(b)
 }
 
 func newPrompter(in io.Reader, out io.Writer) *prompter {
@@ -547,7 +568,7 @@ func newPrompter(in io.Reader, out io.Writer) *prompter {
 // Pressing enter stops, so it is the safe choice.
 func (p *prompter) confirm(b *doc.Block) run.Answer {
 	if p.skipSaved && b.HasOutput() {
-		fmt.Fprintf(p.out, "--- block %s: skipped, keeping its saved output ---\n", b.ID)
+		fmt.Fprintf(p.out, "--- block %s: skipped, keeping its saved output ---\n", p.label(b))
 		return run.Skip
 	}
 	q := b.Attrs["confirm"]
@@ -559,9 +580,9 @@ func (p *prompter) confirm(b *doc.Block) run.Answer {
 		saved = " (has saved output)"
 	}
 	if p.quiet {
-		fmt.Fprintf(p.out, "\n--- block %s%s ---\n", b.ID, saved)
+		fmt.Fprintf(p.out, "\n--- block %s%s ---\n", p.label(b), saved)
 	} else {
-		fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", b.ID, saved, b.Body)
+		fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", p.label(b), saved, b.Body)
 	}
 	for {
 		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", q)
