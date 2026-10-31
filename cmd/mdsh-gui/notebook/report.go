@@ -54,9 +54,11 @@ func (n *Notebook) MakeReport(r Report) ([]byte, error) {
 		Format:     r.Format,
 		HideCode:   r.HideCode,
 		HideOutput: r.HideOutput,
-		Env:        os.Environ(),
-		Title:      report.Title(n.File()),
-		Dir:        filepath.Dir(n.File()),
+		// The report's conditions see $MDSH_MODE report, so
+		// show={{$MDSH_MODE}}!=report leaves a block out of it.
+		Env:   run.WithMode(os.Environ(), run.ModeReport),
+		Title: report.Title(n.File()),
+		Dir:   filepath.Dir(n.File()),
 	}
 	if r.Saved {
 		src, err := os.ReadFile(n.File())

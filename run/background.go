@@ -60,7 +60,7 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 			return
 		}
 	}
-	job, err := e.Shell.Background(ctx, prelude(b, s.opts)+b.Body, PIDVar(b.ID))
+	job, err := e.Shell.Background(ctx, prelude(s.d, b, s.opts)+b.Body, PIDVar(b.ID))
 	if err != nil {
 		done(err)
 		return

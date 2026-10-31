@@ -107,9 +107,7 @@ function drawDoc() {
   closeTerminal();
   main.replaceChildren();
   for (const c of cells) {
-    const e = c.block < 0 ? drawProse(c) : drawBlock(c);
-    e.dataset.line = String(c.line);
-    main.append(e);
+    main.append(drawCell(c));
   }
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
@@ -177,6 +175,12 @@ function stopFollowing() {
   following = null;
 }
 
+function drawCell(c: Cell): HTMLElement {
+  const e = c.textbox ? drawTextbox(c) : c.choice ? drawChoice(c) : c.block < 0 ? drawProse(c) : drawBlock(c);
+  e.dataset.line = String(c.line);
+  return e;
+}
+
 // drawProse draws one top-level block of prose. Clicking it shows its
 // markdown in the source pane, except on a link, which followLinks
 // follows.
@@ -184,11 +188,152 @@ function drawProse(c: Cell): HTMLElement {
   // goldmark's HTML, with raw HTML in the markdown left out.
   const s = el("section", { className: "prose", innerHTML: c.html ?? "", title: "Click to show it in the source" });
   highlightProse(s);
-  s.onclick = () => {
-    if (window.getSelection()?.toString()) return;
+  s.onclick = (e) => {
+    if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
     void showInSource(s, c.line, true);
   };
+  enableTasks(s, c.tasks);
   return s;
+}
+
+// enableTasks makes the task list checkboxes in e check and uncheck
+// their item in the file; tasks are their numbers. If they don't match
+// the tasks Go found, they stay as drawn.
+function enableTasks(e: HTMLElement, tasks: number[] | null | undefined) {
+  const boxes = e.querySelectorAll<HTMLInputElement>("input[type=checkbox]");
+  if (!tasks || boxes.length !== tasks.length) return;
+  boxes.forEach((box, i) => {
+    box.disabled = false;
+    box.title = "Check or uncheck it in the file";
+    box.onchange = () => void edit(() => App.SetTask(tasks[i], box.checked)).then((ok) => ok || (box.checked = !box.checked));
+  });
+}
+
+// drawTextbox draws a textbox block as a box to type in. What is typed
+// goes into the block's body after a pause, as typing in the source pane
+// does. Its lines= is the most lines it takes.
+function drawTextbox(c: Cell): HTMLElement {
+  const t = c.textbox!;
+  const box = el("textarea", { className: "textbox", rows: t.lines, value: t.text, placeholder: t.placeholder ?? "", spellcheck: t.lines > 1 });
+  box.setAttribute("aria-label", t.id);
+  box.dataset.input = String(t.block);
+  let timer = 0;
+  const save = async () => {
+    clearTimeout(timer);
+    if (running) {
+      timer = window.setTimeout(() => void save(), 1000);
+      return;
+    }
+    if (await edit(() => App.SetTextbox(t.block, box.value))) t.text = box.value;
+  };
+  box.onkeydown = (e) => {
+    if (e.key === "Enter" && !e.isComposing && box.value.split("\n").length >= t.lines) e.preventDefault();
+  };
+  box.oninput = () => {
+    const lines = box.value.split("\n");
+    if (lines.length > t.lines) {
+      // A paste with too many lines keeps the first ones.
+      const at = box.selectionStart;
+      box.value = lines.slice(0, t.lines - 1).join("\n") + (t.lines > 1 ? "\n" : "") + lines.slice(t.lines - 1).join(" ");
+      box.selectionStart = box.selectionEnd = Math.min(at, box.value.length);
+    }
+    clearTimeout(timer);
+    timer = window.setTimeout(() => void save(), 500);
+  };
+  box.onblur = () => {
+    if (box.value !== t.text) void save();
+  };
+  return inputCell("textbox-cell", t.id, t.problem, box);
+}
+
+// drawChoice draws a choice block as a dropdown, radio buttons or
+// checkboxes. Picking writes the checked options back into its body.
+function drawChoice(c: Cell): HTMLElement {
+  const ch = c.choice!;
+  const set = (checked: boolean[]) => edit(() => App.SetChoice(ch.block, checked));
+  const options = ch.options ?? [];
+  let control: HTMLElement;
+  if (ch.mode === "dropdown") {
+    const select = el("select", { className: "choice-select" }, el("option", { value: "-1" }, ch.placeholder || "Choose…"));
+    options.forEach((o, i) => select.append(el("option", { value: String(i), selected: o.checked }, o.label)));
+    if (!options.some((o) => o.checked)) select.value = "-1";
+    select.onchange = () => {
+      const pick = Number(select.value);
+      void set(options.map((_, i) => i === pick));
+    };
+    control = select;
+  } else {
+    const radio = ch.mode === "radio";
+    control = el("div", { className: "choice-options", role: radio ? "radiogroup" : "group" });
+    const inputs = options.map((o, i) => {
+      const input = el("input", { type: radio ? "radio" : "checkbox", name: "choice-" + ch.block, checked: o.checked });
+      input.onchange = () => {
+        const checked = inputs.map((x) => x.checked);
+        void set(checked).then((ok) => ok || inputs.forEach((x, j) => (x.checked = options[j].checked)));
+      };
+      control.append(el("label", {}, input, " " + o.label));
+      return input;
+    });
+  }
+  control.dataset.input = String(ch.block);
+  control.setAttribute("aria-label", ch.id);
+  return inputCell("choice-cell", ch.id, ch.problem, control);
+}
+
+// inputCell is the card around a textbox's or choice's control, with
+// its name over it and, when its var= binds nothing, why.
+function inputCell(className: string, id: string, problem: string | undefined, control: HTMLElement): HTMLElement {
+  const cell = el("section", { className: "input-cell " + className + (problem ? " taken" : ""), title: problem || id }, el("span", { className: "name" }, id), control);
+  if (problem) cell.append(el("p", { className: "problem" }, problem));
+  return cell;
+}
+
+// edit makes an edit in Go from the rendered view, such as checking a
+// task, once what was typed in the source pane is applied. The cells are
+// read again, without drawing them again, so the view keeps its focus.
+// It reports whether the edit was made.
+async function edit(call: () => Promise<void>): Promise<boolean> {
+  if (running) {
+    status("can't change the file while a block runs");
+    return false;
+  }
+  await applySource();
+  try {
+    await call();
+    status("");
+  } catch (err) {
+    fail(err);
+    return false;
+  }
+  $("dirty").hidden = false;
+  // A var= input can change what prose and sections show, so cells
+  // whose prose changed are drawn again, and all of them when sections
+  // came or went, keeping the focus in the input being typed in.
+  const fresh = (await App.Cells()) ?? [];
+  const focused = document.activeElement as HTMLTextAreaElement | null;
+  const input = focused?.closest<HTMLElement>("[data-input]")?.dataset.input;
+  const [from, to] = [focused?.selectionStart, focused?.selectionEnd];
+  if (fresh.length !== cells.length) {
+    cells = fresh;
+    drawDoc();
+    const again = input ? document.querySelector<HTMLElement>(`#doc [data-input="${input}"]`) : null;
+    if (again) {
+      again.focus();
+      if (again instanceof HTMLTextAreaElement && from != null) again.setSelectionRange(from, to ?? from);
+    }
+  } else {
+    // Each card's handlers hold its cell, so update them in place.
+    fresh.forEach((c, i) => {
+      const changed = c.block < 0 && !c.textbox && !c.choice && c.html !== cells[i].html;
+      Object.assign(cells[i], c);
+      const card = $("doc").children[i] as HTMLElement | undefined;
+      if (card && changed) card.replaceWith(drawCell(cells[i]));
+      else if (card) card.dataset.line = String(c.line);
+    });
+  }
+  await loadSource();
+  markRunLines();
+  return true;
 }
 
 function drawBlock(c: Cell): HTMLElement {
@@ -212,6 +357,9 @@ function drawBlock(c: Cell): HTMLElement {
     el("div", { className: "output", innerHTML: c.output ?? "" }),
   );
   colorOutput(block.querySelector(".output")!);
+  // Checkboxes in output, such as out=markdown's, are edited in place
+  // too, until the block runs again.
+  enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
   block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
     const img = (e.target as HTMLElement).closest("img");
     if (img) viewImage(img);
@@ -219,7 +367,7 @@ function drawBlock(c: Cell): HTMLElement {
   block.dataset.block = String(c.block);
   block.onclick = (e) => {
     select(blocks().indexOf(block), false);
-    if (!(e.target as HTMLElement).closest("button")) void showInSource(block, c.line, false);
+    if (!(e.target as HTMLElement).closest("button, input")) void showInSource(block, c.line, false);
   };
   return block;
 }
@@ -583,6 +731,13 @@ function drawOutline() {
   const items: HTMLElement[] = [];
   let level = 0;
   for (const e of document.querySelectorAll<HTMLElement>("#doc > section")) {
+    if (e.classList.contains("input-cell")) {
+      // An input whose var= binds nothing is marked !.
+      const taken = e.classList.contains("taken");
+      const name = e.querySelector(".name")?.textContent ?? "";
+      items.push(outlineItem(name, level + 1, e, "step input" + (taken ? " bad" : ""), taken ? "!" : ""));
+      continue;
+    }
     if (e.classList.contains("block")) {
       const ask = e.querySelector<HTMLElement>(".ask");
       const mark = blockMark(e);

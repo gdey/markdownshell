@@ -73,7 +73,11 @@ unless `on_error=stop`, `on_error: stop` in front matter, or
 ## What blocks can use
 
 Every block sees `$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, and the script's
-arguments as `$1`, `$2` and so on. The helpers `md_h1`, `md_h2`, `md_h3`,
+arguments as `$1`, `$2` and so on. `$MDSH_MODE` is `running` for a run from
+the command line, `interactive` in `mdsh -i` and mdsh-gui, and `report` for
+`--pdf` and `--html`, and conditions read it as `{{$MDSH_MODE}}`. A
+`textbox` or `choice` block with `var=name` binds `$MDSH_VAR_name` to its
+text or checked options, for blocks and conditions. The helpers `md_h1`, `md_h2`, `md_h3`,
 `md_table` (TSV on stdin) and `md_code` print markdown. `md_table -F SEP`
 splits fields on SEP as `awk -F` does (`-F ' '` is runs of blanks), and
 `md_table -s N` skips the first N lines.

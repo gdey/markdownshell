@@ -2,6 +2,7 @@ package doc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -64,8 +65,13 @@ type Lookup func(Ref) (value string, ok bool)
 //	{{#build/err?}}               the same; true when build failed
 //	{{$ran?}}, {{#build/ran?}}    whether the block ran
 //	true, false                   constants
+//	once                          in run= only: the block has no output yet
 type Cond struct {
-	Ref   *Ref // nil for a constant
+	Ref *Ref // nil for a constant
+	// Once is run=once: run the block only if it has no output, saved
+	// after it or from running earlier. The runner checks that; Eval
+	// reports true.
+	Once  bool
 	Not   bool
 	Op    string // "", "==" or "!="
 	Value string // compared against, or the constant
@@ -89,10 +95,13 @@ func ParseCond(s string) (Cond, error) {
 	case "false", "no", "0":
 		c.Value = "false"
 		return c, nil
+	case "once":
+		c.Value, c.Once = "true", true
+		return c, nil
 	}
 	m := condRE.FindStringSubmatch(s)
 	if m == nil {
-		return c, fmt.Errorf("bad condition %q: want {{$VAR}}, {{#block/env(VAR)}}, {{$?}}, {{$ran?}} or a block's {{#block/?}} or {{#block/ran?}}, optionally with ==value or !=value", s)
+		return c, fmt.Errorf("bad condition %q: want {{$VAR}}, {{#block/env(VAR)}}, {{$?}}, {{$ran?}} or a block's {{#block/?}} or {{#block/ran?}}, optionally with ==value or !=value, or true, false or once", s)
 	}
 	c.Not = m[1] == "!"
 	ref := newRef(m[2], m[3], m[4])
@@ -194,3 +203,6 @@ func (d *Document) Refs() []Ref {
 	}
 	return refs
 }
+
+// errOnce is the error for once anywhere but run=.
+var errOnce = errors.New("once only means something in run=")

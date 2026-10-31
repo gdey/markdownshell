@@ -84,6 +84,7 @@ func CheckInfo(info string) []Problem {
 			include = true
 		}
 	}
+	input := (in.Lang == doc.TextboxLang || in.Lang == doc.ChoiceLang) && !include
 	var problems []Problem
 	at := len(in.Lang)
 	for _, tok := range in.Tokens {
@@ -117,6 +118,12 @@ func CheckInfo(info string) []Problem {
 			continue
 		case !include && spec.Include:
 			add("warning", "%s only means something with <include", key)
+			continue
+		case len(spec.Inputs) > 0 && (include || !slices.Contains(spec.Inputs, in.Lang)):
+			add("warning", "%s only means something on a %s", key, strings.Join(spec.Inputs, " or "))
+			continue
+		case input && len(spec.Inputs) == 0 && key != "#" && key != "show":
+			add("warning", "a %s never runs, so %s means nothing on it", in.Lang, key)
 			continue
 		}
 		if err := spec.Check(unquote(value), set); err != nil {
