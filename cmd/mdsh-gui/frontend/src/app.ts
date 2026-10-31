@@ -66,12 +66,9 @@ async function refresh() {
     $("changed").hidden = true;
     return drawStart();
   }
-  const name = doc.file.split(/[\\/]/).pop() ?? "";
-  $("file").textContent = name;
-  $("file").title = doc.file;
+  const name = showFile(doc.file);
   $("dirty").hidden = !doc.dirty;
   $("changed").hidden = !doc.changed || $("changed").dataset.kept === doc.file;
-  $("changed-text").textContent = name + " changed on disk.";
   drawOptions();
   cells = (await App.Cells()) ?? [];
   drawDoc();
@@ -699,6 +696,16 @@ function applyView() {
   void App.SetView(view).catch(() => {});
 }
 
+// showFile names the file in the header, which Save As can change
+// without the document being read again. It returns the file's name.
+function showFile(file: string): string {
+  const name = file.split(/[\\/]/).pop() ?? "";
+  $("file").textContent = name;
+  $("file").title = file;
+  $("changed-text").textContent = name + " changed on disk.";
+  return name;
+}
+
 // openView shows the view the settings open files in, if they name one.
 function openView() {
   const v = settings.view;
@@ -1004,7 +1011,10 @@ Events.On(
 Events.On("opened", mine(() => ((selected = -1), void refresh())));
 Events.On(
   "saved",
-  mine(() => {
+  mine<string>((file) => {
+    // Save As saves to a new file, so name it.
+    doc = { ...doc, file, dirty: false, changed: false };
+    showFile(file);
     $("changed").hidden = true;
     $("dirty").hidden = true;
     void loadSource();
