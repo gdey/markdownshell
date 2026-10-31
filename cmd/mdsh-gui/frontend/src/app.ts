@@ -6,13 +6,14 @@ import { App, type AttrSpec, type Cell, type Doc, type Names, type Settings, typ
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
+import { fitHistory, historyBusy, historyEnd, historyTerminal, historyWrite, initHistory, showHistory } from "./history.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "" };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false };
 let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
@@ -30,8 +31,9 @@ interface View {
   outline: boolean;
   code: boolean;
   output: boolean;
+  history: boolean;
 }
-let view: View = { split: false, rendered: true, outline: false, code: true, output: true, ...loadView() };
+let view: View = { split: false, rendered: true, outline: false, code: true, output: true, history: false, ...loadView() };
 
 function loadView(): Partial<View> {
   try {
@@ -62,6 +64,7 @@ async function refresh() {
   $("toolbar").hidden = !open;
   $("workspace").hidden = !open;
   $("start").hidden = open;
+  syncHistory();
   if (!open) {
     $("changed").hidden = true;
     return drawStart();
@@ -329,11 +332,14 @@ function busy(on: boolean) {
   running = on;
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   runAllButton();
+  historyBusy(on);
   for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run")) x.disabled = on;
 }
 
 async function start(method: "RunBlock" | "RunFrom", block: number) {
   if (running) return;
+  // The History pane may have set the terminal's size to its own.
+  sizeTerminal();
   busy(true);
   ranHere = true;
   status("running");
@@ -685,6 +691,7 @@ function applyView() {
   $("outline-toggle").classList.toggle("on", view.outline);
   $("view-split").classList.toggle("on", view.split);
   $("view-rendered").classList.toggle("on", view.rendered);
+  syncHistory();
   if (view.split) openSource();
   else closeSource();
   drawOutline();
@@ -704,6 +711,19 @@ function showFile(file: string): string {
   $("file").title = file;
   $("changed-text").textContent = name + " changed on disk.";
   return name;
+}
+
+// syncHistory shows the History pane if the view has it, and tells Go
+// when that changes, as when the file opens or is read again.
+function syncHistory() {
+  if (!doc.file) {
+    $("history").hidden = true;
+    return;
+  }
+  if (view.history === doc.history && $("history").hidden === !view.history) return;
+  const had = doc.history;
+  doc.history = view.history;
+  void showHistory(view.history, had);
 }
 
 // openView shows the view the settings open files in, if they name one.
@@ -769,6 +789,7 @@ const actions: Record<string, () => Promise<void> | void> = {
   outline: () => toggle("outline"),
   code: () => toggle("code"),
   output: () => toggle("output"),
+  history: () => toggle("history"),
 };
 
 // Run options
@@ -911,6 +932,11 @@ interface Question {
 const liveColors = new WeakMap<HTMLElement, Record<string, Ansi>>();
 
 function onBlock(e: BlockEvent) {
+  // A command typed in the History pane runs there, before its card is
+  // drawn.
+  if (e.kind === "terminal" && historyTerminal(e.block, e.data)) return;
+  if (e.kind === "tty" && historyWrite(e.block, e.bytes)) return;
+  if (e.kind === "terminal-end" && historyEnd(e.block)) return;
   const block = document.getElementById("block-" + e.block);
   if (!block) return;
   const out = block.querySelector(".output")!;
@@ -1046,7 +1072,28 @@ $("run-all").onclick = () => void actions.runall();
 let resizeTimer = 0;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(() => doc.file && sizeTerminal(), 200);
+  resizeTimer = window.setTimeout(() => {
+    if (!doc.file) return;
+    sizeTerminal();
+    fitHistory();
+  }, 200);
+});
+initHistory({
+  canRun: () => !running,
+  async enter(call) {
+    busy(true);
+    ranHere = true;
+    status("running");
+    await call();
+    status("");
+    ranHere = false;
+    busy(false);
+    await refresh();
+    // What was added is at the end.
+    const scroll = $("doc-scroll");
+    scroll.scrollTop = scroll.scrollHeight;
+  },
+  status: (i) => cells.find((c) => c.block === i)?.status,
 });
 initReport({
   dirty: () => !$("dirty").hidden,

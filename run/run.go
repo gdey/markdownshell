@@ -71,6 +71,10 @@ type Options struct {
 	// end that draws on the terminal can step aside. The block runs once
 	// it returns, and calls the function it returned when done with TTY.
 	TakeTTY func(*doc.Block) (giveBack func())
+	// PTY starts every shell with a terminal of its own, as a document
+	// with a tty block does, so Session.RunTyped can run any block on
+	// Terminal.
+	PTY bool
 }
 
 // Answer is a reply to Confirm.

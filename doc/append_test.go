@@ -25,6 +25,11 @@ func TestAppendBlock(t *testing.T) {
 		t.Errorf("body %q, err %v", b.Body, err)
 	}
 
+	// Attributes go in the info string.
+	if b, err = d.AppendBlock("zsh {#typed}", "pwd"); err != nil || b.ID != "typed" || b.Lang != "zsh" {
+		t.Errorf("block %+v, err %v", b, err)
+	}
+
 	open, _ := Parse([]byte("```sh\necho open\n"))
 	if _, err := open.AppendBlock("sh", "echo x"); err == nil {
 		t.Error("appended inside an unclosed fence")

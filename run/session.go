@@ -10,6 +10,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/termrec"
 )
 
 // Session runs a document's blocks, keeping each env's shell alive from
@@ -60,10 +61,10 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
 			Dir:  opts.Dir,
 			Args: opts.Args,
-			TTY:  hasTTY(d),
+			TTY:  hasTTY(d) || opts.PTY,
 			Init: init,
 		}),
-		tty: hasTTY(d),
+		tty: hasTTY(d) || opts.PTY,
 	}
 	// Includes are part of the document, not steps of the run, so they
 	// are read whatever runs.
@@ -168,6 +169,10 @@ func (s *Session) Sync() error {
 	return nil
 }
 
+// PTY reports whether the session's shells have terminals of their own,
+// which RunTyped needs.
+func (s *Session) PTY() bool { return s.tty }
+
 // Close ends the session's shells, and any background block still
 // running, which it reports as killed.
 func (s *Session) Close() {
@@ -268,6 +273,55 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 	s.results[i] = r
 	s.run(ctx, b, r)
 	return r, ctx.Err()
+}
+
+// RunTyped runs block i on Terminal, as if it had been typed there: what
+// is typed in the terminal goes to it, and it shows what it writes. A
+// block that switched to the terminal's alternate screen, as vim or top
+// do, gets its session as a recording, the way a tty block does, and
+// RunTyped reports it as full screen. Any other block gets the text it
+// showed as its stdout. The session needs Options.PTY, or a tty block,
+// and Options.Terminal.
+func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bool, err error) {
+	if i < 0 || i >= len(s.d.Blocks) {
+		return nil, false, fmt.Errorf("no block %d", i)
+	}
+	b := s.d.Blocks[i]
+	if !Runnable(b) {
+		return s.results[i], false, fmt.Errorf("mdsh can't run %s blocks", b.Lang)
+	}
+	if s.opts.Terminal == nil {
+		return s.results[i], false, ErrNoTTY
+	}
+	s.Reap()
+	r = &Result{Block: b, Ran: true}
+	s.results[i] = r
+	s.emit(Event{Kind: Started, Block: b})
+	defer func() { s.emit(Event{Kind: Done, Block: b, Result: r}) }()
+	e, err := envFor(ctx, s.stack, s.d, b)
+	if err != nil {
+		r.Err = err
+		return r, false, nil
+	}
+	t := *s.opts.Terminal
+	rec := termrec.NewRecorder(t.Dims())
+	giveBack := takeTTY(b, s.opts)
+	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(b, s.opts)+b.Body, t, rec)
+	giveBack()
+	if err != nil && !errors.Is(err, env.ErrExited) {
+		r.Err = err
+	}
+	shown := rec.Recording()
+	if !shown.FullScreen() {
+		r.Stdout = []byte(shown.Text())
+		return r, false, ctx.Err()
+	}
+	img, err := saveRecording(b, shown, s.opts)
+	r.Image = img
+	if r.Err == nil {
+		r.Err = err
+	}
+	return r, true, ctx.Err()
 }
 
 func (s *Session) confirm(b *doc.Block) (Answer, error) {

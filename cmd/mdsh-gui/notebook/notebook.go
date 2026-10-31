@@ -115,6 +115,11 @@ type Notebook struct {
 	// it does, and idle tells those waiting for it that it is done.
 	bg      map[*doc.Block]bool
 	reaping bool
+	// history is set while the History pane is on, and noteEnd is the
+	// length of the source when the last note added there ended it, or
+	// -1.
+	history bool
+	noteEnd int
 	idle    *sync.Cond
 	quit    chan struct{}
 }
@@ -153,13 +158,14 @@ func Open(file string, opts Options) (*Notebook, error) {
 		return nil, fmt.Errorf("%s: %w", file, err)
 	}
 	n := &Notebook{
-		file:  abs,
-		opts:  opts,
-		d:     d,
-		index: map[*doc.Block]int{},
-		term:  newTerminal(),
-		bg:    map[*doc.Block]bool{},
-		quit:  make(chan struct{}),
+		file:    abs,
+		opts:    opts,
+		d:       d,
+		index:   map[*doc.Block]int{},
+		term:    newTerminal(),
+		bg:      map[*doc.Block]bool{},
+		quit:    make(chan struct{}),
+		noteEnd: -1,
 	}
 	n.idle = sync.NewCond(&n.mu)
 	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer()))
@@ -187,11 +193,12 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		StopOnError: ro.StopOnError,
 		Shell:       ro.Shell,
 		Source:      ro.Source,
-		Environ:     os.Environ(),
+		Environ:     n.environ(),
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
 		Terminal:    n.term.env(n.emit),
 		TakeTTY:     n.takeTTY,
+		PTY:         n.history,
 	})
 }
 

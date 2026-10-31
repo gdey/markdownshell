@@ -55,6 +55,21 @@ Each file opens in a tab of its own, with its own shells.
   card has a dashed edge and says it is running in the background, the
   status line counts them, and its output shows when it ends. Closing
   the window kills those still running.
+- **History** (View › History, cmd/ctrl+shift+H): a terminal along the
+  bottom that works like a paper tape. Type a command and press enter:
+  it runs in the file's shell, sharing variables and the working
+  directory with the blocks, and is added to the end of the file as a
+  block, `#history-1`, `#history-2`…, with its output and exit status,
+  failures included. It runs on a real terminal, so you can type at a
+  prompt it shows, and a full-screen program such as `vi` or `top` is
+  kept as a `tty` block with its recording. A line starting with `#` is
+  added as prose, without the `#`; notes typed one after another make
+  one paragraph. Shift+enter starts another line, and so does enter on
+  an unfinished command, such as one ending in `\` or inside quotes.
+  Up and down recall what you typed. The blocks are added as `zsh` when
+  the file runs in zsh, else `sh`. Turning History on starts the shells
+  again, on a terminal, with `TERM=xterm-256color`, unless a `tty` block
+  already did.
 - **Editing** happens in the source view. The pencil (or `e`) on a block
   opens it with the cursor on the block's code, and clicking prose opens
   it on that text. New blocks are typed there too. Inside
@@ -136,6 +151,12 @@ Image, screenshot and recording output shows in the block.
 A `tty` block runs in a terminal in its card.
 
 ![A tty block asking "Your name?" in a terminal in its card](../../site/static/images/gui/tty.png)
+
+View › History opens a terminal along the bottom. Each command typed
+there is added to the end of the file with its output, and each `#`
+line as prose.
+
+![The History pane under a document: notes and commands typed in the pane, and the same notes as prose and commands as blocks with their output in the file](../../site/static/images/gui/history.png)
 
 If the file changes on disk, a banner offers to reload it.
 

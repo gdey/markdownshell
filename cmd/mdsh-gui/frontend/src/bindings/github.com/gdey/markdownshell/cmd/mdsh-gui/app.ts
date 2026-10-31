@@ -138,6 +138,22 @@ export function EndDrag(id: number, outside: boolean, x: number, y: number): $Ca
 }
 
 /**
+ * HistoryComplete reports whether input is a whole command, so enter
+ * runs it, rather than starting another line.
+ */
+export function HistoryComplete(input: string): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.HistoryComplete", input);
+}
+
+/**
+ * HistoryEnter takes what was typed in the History pane: a note is added
+ * to the file as prose, and a command is added as a block and run.
+ */
+export function HistoryEnter(input: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.HistoryEnter", input);
+}
+
+/**
  * Live is what the run going on in the tab has sent so far, for a page
  * that starts partway through it.
  */
@@ -253,6 +269,15 @@ export function SaveAs(): $CancellablePromise<boolean> {
  */
 export function SelectTab(id: number): $CancellablePromise<void> {
     return $Call.ByName("main.App.SelectTab", id);
+}
+
+/**
+ * SetHistory turns the History pane on or off for the file. Turning it
+ * on may start the shells again, so commands can run on a terminal; it
+ * reports whether it did.
+ */
+export function SetHistory(on: boolean): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.SetHistory", on);
 }
 
 /**
