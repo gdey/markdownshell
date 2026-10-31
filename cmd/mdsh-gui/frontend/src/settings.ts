@@ -3,6 +3,7 @@ import { $ } from "./dom.js";
 import { applyTheme } from "./theme.js";
 
 let s: Settings = await App.Settings();
+let zsh = await App.ZshWrapperState().catch(() => null);
 
 const input = (id: string) => $<HTMLInputElement>(id);
 
@@ -16,6 +17,19 @@ function draw() {
   $<HTMLSelectElement>("start-mode").value = s.startFolder ? "fixed" : "last";
   input("start-folder").value = s.startFolder;
   $("fixed").hidden = !s.startFolder && $<HTMLSelectElement>("start-mode").value !== "fixed";
+  input("zsh-wrapper").checked = !!zsh?.on;
+  input("zsh-wrapper").disabled = !zsh;
+  if (zsh) $("zshrc").textContent = tilde(zsh.path, zsh.home);
+}
+
+// tilde shows a path under home as ~/….
+function tilde(path: string, home: string): string {
+  return home && path.startsWith(home + "/") ? "~" + path.slice(home.length) : path;
+}
+
+function showError(err: unknown) {
+  $("error").textContent = message(err);
+  $("error").hidden = false;
 }
 
 // Changes save as they are made, like a settings window should.
@@ -24,8 +38,7 @@ async function save() {
     await App.SetSettings(s);
     $("error").hidden = true;
   } catch (err) {
-    $("error").textContent = message(err);
-    $("error").hidden = false;
+    showError(err);
   }
 }
 
@@ -58,5 +71,14 @@ $<HTMLSelectElement>("start-mode").onchange = async () => {
   }
 };
 $("choose").onclick = choose;
+input("zsh-wrapper").onchange = async () => {
+  try {
+    zsh = await App.SetZshWrapper(input("zsh-wrapper").checked);
+    $("error").hidden = true;
+  } catch (err) {
+    showError(err);
+  }
+  draw();
+};
 
 draw();

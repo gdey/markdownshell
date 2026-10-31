@@ -53,6 +53,9 @@ included, before their first block:
   mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
   ```
 
+  The desktop app's Settings window can add it for you: check **Give
+  blocks your zsh aliases and functions**. It goes between marker
+  comments at the end of `~/.zshrc`, and unchecking it takes it out.
   In bash, use `<(alias -p; declare -f)`. Bash only expands aliases in a
   script after `shopt -s expand_aliases`.
 

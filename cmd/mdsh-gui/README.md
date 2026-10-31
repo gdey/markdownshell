@@ -77,7 +77,12 @@ Each file opens in a tab of its own, with its own shells.
   Linux): autosave after each run, Vim mode, a shell for every file,
   the view files open in (rendered, source or both; by default the
   view the last tab had), the start folder and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
-  config folder.
+  config folder. One more, **Give blocks your zsh aliases and
+  functions**, adds an `mdsh` function to `~/.zshrc` (or
+  `$ZDOTDIR/.zshrc`) between marker comments, and unchecking it takes
+  it out. The function runs the CLI with
+  `--source <(alias -L; typeset -f)`; the app itself isn't started from
+  a shell, so it can't see them.
 
 If the file changes on disk, a banner offers to reload it.
 

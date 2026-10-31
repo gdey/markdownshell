@@ -26,6 +26,8 @@ follow [Semantic Versioning](https://semver.org/).
   use aliases and functions. `--source` reads its file once, so
   `mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }` in
   `~/.zshrc` gives blocks the ones defined in the calling shell.
+- `mdsh-gui` setting **Give blocks your zsh aliases and functions** adds
+  that function to `~/.zshrc`, or takes it out.
 
 ## [1.2.1] - 2026-10-29
 

@@ -117,6 +117,23 @@ export interface View {
 }
 
 /**
+ * ZshWrapper is whether the user's .zshrc has the mdsh function that
+ * gives blocks the calling shell's aliases and functions.
+ */
+export interface ZshWrapper {
+    /**
+     * the .zshrc
+     */
+    "path": string;
+
+    /**
+     * for showing Path as ~/…
+     */
+    "home": string;
+    "on": boolean;
+}
+
+/**
  * liveEvent is an event sent while a run is going, kept so a tab drawn
  * again partway through, as after moving to another window, can catch
  * up.
