@@ -29,6 +29,14 @@ type Cell struct {
 	Block int `json:"block"`
 	// HTML is the prose, rendered. Empty for a block.
 	HTML string `json:"html,omitempty"`
+	// Tasks number the task list checkboxes in HTML, in order, for
+	// SetTask.
+	Tasks []int `json:"tasks,omitempty"`
+	// Textbox is set for a textbox, which is drawn as one to type in.
+	Textbox *TextboxCell `json:"textbox,omitempty"`
+	// Choice is set for a choice, which is drawn as a dropdown, radio
+	// buttons or checkboxes.
+	Choice *ChoiceCell `json:"choice,omitempty"`
 	// ID, Lang and Body describe a block.
 	ID   string `json:"id,omitempty"`
 	Lang string `json:"lang,omitempty"`
@@ -38,6 +46,9 @@ type Cell struct {
 	Attrs string `json:"attrs,omitempty"`
 	// Output is the block's output, saved or from this session, rendered.
 	Output string `json:"output,omitempty"`
+	// OutputTasks number the task list checkboxes in Output, as Tasks
+	// does for HTML.
+	OutputTasks []int `json:"outputTasks,omitempty"`
 	// Ran is true when the block ran this session; Status and Failed say
 	// how it went.
 	Ran    bool `json:"ran"`
@@ -162,7 +173,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		quit:  make(chan struct{}),
 	}
 	n.idle = sync.NewCond(&n.mu)
-	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer()))
+	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer()))
 	for i, b := range d.Blocks {
 		n.index[b] = i
 	}
@@ -187,13 +198,18 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		StopOnError: ro.StopOnError,
 		Shell:       ro.Shell,
 		Source:      ro.Source,
-		Environ:     os.Environ(),
+		Environ:     environ(),
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
 		Terminal:    n.term.env(n.emit),
 		TakeTTY:     n.takeTTY,
+		Mode:        run.ModeInteractive,
 	})
 }
+
+// environ is the environment blocks run in, and conditions and
+// placeholders read: the app's, with $MDSH_MODE interactive.
+func environ() []string { return run.WithMode(os.Environ(), run.ModeInteractive) }
 
 // File is the document's absolute path.
 func (n *Notebook) File() string {
@@ -541,7 +557,7 @@ func (n *Notebook) write(file string) error {
 // the source pane shows the output as soon as a run ends. No block
 // changes, so every result stays.
 func (n *Notebook) fold() error {
-	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: os.Environ()})
+	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: environ()})
 	if bytes.Equal(out, n.d.Src) {
 		return nil
 	}

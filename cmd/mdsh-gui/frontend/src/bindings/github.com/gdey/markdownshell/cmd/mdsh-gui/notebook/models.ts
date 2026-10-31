@@ -3,6 +3,9 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as doc$0 from "../../../doc/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as report$0 from "../../../report/models.js";
 
 /**
@@ -21,6 +24,23 @@ export interface Cell {
     "html"?: string;
 
     /**
+     * Tasks number the task list checkboxes in HTML, in order, for
+     * SetTask.
+     */
+    "tasks"?: number[] | null;
+
+    /**
+     * Textbox is set for a textbox, which is drawn as one to type in.
+     */
+    "textbox"?: TextboxCell | null;
+
+    /**
+     * Choice is set for a choice, which is drawn as a dropdown, radio
+     * buttons or checkboxes.
+     */
+    "choice"?: ChoiceCell | null;
+
+    /**
      * ID, Lang and Body describe a block.
      */
     "id"?: string;
@@ -37,6 +57,12 @@ export interface Cell {
      * Output is the block's output, saved or from this session, rendered.
      */
     "output"?: string;
+
+    /**
+     * OutputTasks number the task list checkboxes in Output, as Tasks
+     * does for HTML.
+     */
+    "outputTasks"?: number[] | null;
 
     /**
      * Ran is true when the block ran this session; Status and Failed say
@@ -62,6 +88,29 @@ export interface Cell {
      * Line is the line From is on, counting from 1.
      */
     "line": number;
+}
+
+/**
+ * ChoiceCell is a choice, as the frontend draws it.
+ */
+export interface ChoiceCell {
+    /**
+     * Block is the choice's index in the document, for SetChoice.
+     */
+    "block": number;
+    "id": string;
+
+    /**
+     * dropdown, radio or multi
+     */
+    "mode": string;
+    "options": doc$0.Option[] | null;
+    "placeholder"?: string;
+
+    /**
+     * Problem is why its var= binds nothing, if it doesn't.
+     */
+    "problem"?: string;
 }
 
 /**
@@ -144,4 +193,23 @@ export interface RunOptions {
      * Shell overrides the front matter's shell, like --shell.
      */
     "shell": string;
+}
+
+/**
+ * TextboxCell is a textbox, as the frontend draws it.
+ */
+export interface TextboxCell {
+    /**
+     * Block is the textbox's index in the document, for SetTextbox.
+     */
+    "block": number;
+    "id": string;
+    "text": string;
+    "lines": number;
+    "placeholder"?: string;
+
+    /**
+     * Problem is why its var= binds nothing, if it doesn't.
+     */
+    "problem"?: string;
 }

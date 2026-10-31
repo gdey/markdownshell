@@ -2,7 +2,6 @@ package notebook
 
 import (
 	"bytes"
-	"os"
 	"regexp"
 	"slices"
 
@@ -25,11 +24,12 @@ func (n *Notebook) Cells() []Cell {
 	d := n.d
 	l := layout{
 		n:      n,
-		lookup: run.NewLookup(d, n.results, os.Environ()),
+		lookup: run.NewLookup(d, n.results, environ()),
 		refs:   linkRefs(d.Src),
+		tasks:  n.taskMarks(),
 	}
 	l.cuts = cuts(d, n.results, l.lookup)
-	pieces := render.Pieces(d, n.results, render.Options{Env: os.Environ()})
+	pieces := render.Pieces(d, n.results, render.Options{Env: environ()})
 	pos := max(d.FrontMatter.End, len(d.Shebang))
 	for i, b := range d.Blocks {
 		l.prose(pos, b.Span.Start)
@@ -39,24 +39,35 @@ func (n *Notebook) Cells() []Cell {
 			continue
 		}
 		span := doc.Span{Start: b.Span.Start, End: b.Output.End}
+		if b.IsTextbox() {
+			t := b.Textbox()
+			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Placeholder: t.Placeholder, Problem: b.VarTaken}, From: span.Start, To: span.End})
+			continue
+		}
+		if b.IsChoice() {
+			c := b.Choice()
+			l.cells = append(l.cells, Cell{Block: -1, Choice: &ChoiceCell{Block: i, ID: b.ID, Mode: c.Mode, Options: c.Options, Placeholder: c.Placeholder, Problem: b.VarTaken}, From: span.Start, To: span.End})
+			continue
+		}
 		if !run.Runnable(b) {
 			l.cells = append(l.cells, Cell{Block: -1, HTML: n.html(append(append([]byte(nil), code...), out...)), From: span.Start, To: span.End})
 			continue
 		}
 		r := n.results[i]
 		l.cells = append(l.cells, Cell{
-			Block:   i,
-			ID:      b.ID,
-			Lang:    b.Lang,
-			Body:    b.Body,
-			Attrs:   attrsText(b.Info),
-			Output:  n.html(out),
-			Ran:     r.Ran,
-			Status:  r.Status,
-			Failed:  r.Failed(),
-			Running: n.bg[b],
-			From:    span.Start,
-			To:      span.End,
+			Block:       i,
+			ID:          b.ID,
+			Lang:        b.Lang,
+			Body:        b.Body,
+			Attrs:       attrsText(b.Info),
+			Output:      n.html(out),
+			OutputTasks: tasksIn(l.tasks, b.Output),
+			Ran:         r.Ran,
+			Status:      r.Status,
+			Failed:      r.Failed(),
+			Running:     n.bg[b],
+			From:        span.Start,
+			To:          span.End,
 		})
 	}
 	l.prose(pos, len(d.Src))
@@ -76,6 +87,7 @@ type layout struct {
 	lookup doc.Lookup
 	cuts   []doc.Span
 	refs   []byte
+	tasks  []int // taskMarks
 	cells  []Cell
 }
 
@@ -114,8 +126,10 @@ func (l *layout) prose(from, to int) {
 func (l *layout) part(span doc.Span) {
 	d := l.n.d
 	var md bytes.Buffer
+	var tasks []int
 	kept := keep(span, l.cuts)
 	for _, k := range kept {
+		tasks = append(tasks, tasksIn(l.tasks, k)...)
 		from := k.Start
 		for _, p := range d.Placeholders {
 			if p.Span.Start < from || p.Span.End > k.End {
@@ -138,7 +152,7 @@ func (l *layout) part(span doc.Span) {
 		md.WriteString("\n\n")
 		md.Write(l.refs)
 	}
-	l.cells = append(l.cells, Cell{Block: -1, HTML: l.n.html(md.Bytes()), From: span.Start, To: span.End})
+	l.cells = append(l.cells, Cell{Block: -1, HTML: l.n.html(md.Bytes()), Tasks: tasks, From: span.Start, To: span.End})
 }
 
 // firstLine is where the first line of source under node starts, as an
@@ -279,4 +293,15 @@ func (n *Notebook) setSource(src []byte) error {
 	}
 	n.dirty = true
 	return n.sync()
+}
+
+// tasksIn are the numbers of the tasks whose marks are in span.
+func tasksIn(marks []int, span doc.Span) []int {
+	var tasks []int
+	for t, p := range marks {
+		if p >= span.Start && p < span.End {
+			tasks = append(tasks, t)
+		}
+	}
+	return tasks
 }

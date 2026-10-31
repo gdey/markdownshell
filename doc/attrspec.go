@@ -41,6 +41,9 @@ type AttrSpec struct {
 	// Include is true for the attributes of include blocks. Include
 	// blocks take none of the others.
 	Include bool `json:"include,omitempty"`
+	// Inputs are the input block languages, textbox and choice, that
+	// the attribute is for. Empty for the attributes of other blocks.
+	Inputs []string `json:"inputs,omitempty"`
 }
 
 // BlockAttrs are the block attributes mdsh reads, in the order the spec
@@ -48,7 +51,7 @@ type AttrSpec struct {
 var BlockAttrs = []AttrSpec{
 	{Name: "#", Kind: AttrText, Default: "block-N", Help: "The block's name, for output, placeholders and --only"},
 	{Name: "skip", Kind: AttrFlag, Default: "off", Help: "Don't run the block"},
-	{Name: "run", Kind: AttrCond, Default: "run", Help: "Run only if the condition holds"},
+	{Name: "run", Kind: AttrCond, Default: "run", Help: "Run only if the condition holds; once runs it only while it has no output"},
 	{Name: "show", Kind: AttrCond, Default: "shown", Help: "Print the code only if the condition holds"},
 	{Name: "show-output", Kind: AttrCond, Default: "shown", Help: "Print the output only if the condition holds"},
 	{Name: "show-stderr", Kind: AttrCond, Bare: true, Default: "front matter show_stderr, else only when the block fails", Help: "Show stderr, or only if the condition holds"},
@@ -67,6 +70,10 @@ var BlockAttrs = []AttrSpec{
 	{Name: "from", Kind: AttrNumber, Include: true, Default: "the first line", Help: "The first line to include, counting from 1"},
 	{Name: "to", Kind: AttrNumber, Include: true, Default: "the last line", Help: "The last line to include"},
 	{Name: "number_on", Kind: AttrFlag, Include: true, Default: "off", Help: "Show each included line's number in the file"},
+	{Name: "lines", Kind: AttrNumber, Inputs: []string{TextboxLang}, Default: "1", Help: "The most lines a textbox holds; 1 or less is one line"},
+	{Name: "mode", Kind: AttrChoice, Values: []string{ChoiceDropdown, ChoiceRadio, ChoiceMulti}, Inputs: []string{ChoiceLang}, Default: ChoiceDropdown, Help: "Pick one from a dropdown or radio buttons, or check any number of boxes"},
+	{Name: "placeholder", Kind: AttrText, Inputs: []string{TextboxLang, ChoiceLang}, Default: "none", Help: "What an empty textbox, or a dropdown with nothing chosen, shows in an interactive view"},
+	{Name: "var", Kind: AttrText, Inputs: []string{TextboxLang, ChoiceLang}, Default: "none", Help: "Bind the text, or the checked options one per line, to $MDSH_VAR_<name> for blocks and conditions"},
 }
 
 // LookupAttr finds the spec for an attribute name.
@@ -94,7 +101,10 @@ func (s AttrSpec) Check(value string, set bool) error {
 		}
 		return fmt.Errorf("%s takes no value", s.Name)
 	case AttrCond:
-		_, err := ParseCond(value)
+		c, err := ParseCond(value)
+		if err == nil && c.Once && s.Name != "run" {
+			return errOnce
+		}
 		return err
 	case AttrChoice:
 		for _, v := range s.Values {
@@ -114,12 +124,15 @@ func (s AttrSpec) Check(value string, set bool) error {
 			return fmt.Errorf("%s= is a duration such as 30s or 5m", s.Name)
 		}
 	case AttrNumber:
-		if n, err := strconv.Atoi(value); err != nil || n < 0 {
+		if n, err := strconv.Atoi(value); err != nil || n < 0 && s.Name != "lines" {
 			return fmt.Errorf("%s= is a whole number", s.Name)
 		}
 	case AttrText:
 		if s.Name == "#" && value == "" {
 			return fmt.Errorf("an id can't be empty")
+		}
+		if s.Name == "var" && !ValidVar(value) {
+			return fmt.Errorf("var= is a name of letters, digits and _")
 		}
 	}
 	return nil
