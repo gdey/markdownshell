@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -29,6 +30,7 @@ type docTab struct {
 	view    View               // what the tab shows, for the View menu
 	running bool               // a run started from the tab hasn't returned
 	live    []liveEvent        // what the running run has sent so far
+	nvim    *nvim.Editor       // the source pane's Neovim, if running
 }
 
 // liveEvent is an event sent while a run is going, kept so a tab drawn
@@ -255,6 +257,7 @@ func (t *docTab) shutdown() {
 		close(t.done)
 	}
 	t.mu.Unlock()
+	t.stopNvim()
 	if n != nil {
 		n.Close()
 	}

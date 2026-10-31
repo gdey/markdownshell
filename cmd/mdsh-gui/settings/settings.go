@@ -21,6 +21,13 @@ type Settings struct {
 	Autosave bool `json:"autosave"`
 	// Vim turns on Vim key bindings in the code editors.
 	Vim bool `json:"vim"`
+	// Neovim makes the source pane an embedded Neovim, when Vim is on
+	// and a new enough nvim is found. Experimental.
+	Neovim bool `json:"neovim"`
+	// NeovimPath is the nvim to run; empty finds one.
+	NeovimPath string `json:"neovimPath"`
+	// NeovimClean starts Neovim without the user's config.
+	NeovimClean bool `json:"neovimClean"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
 	// Shell, if set, overrides the front matter's shell for every file.

@@ -10,6 +10,10 @@ const input = (id: string) => $<HTMLInputElement>(id);
 function draw() {
   input("autosave").checked = s.autosave;
   input("vim").checked = s.vim;
+  input("neovim").checked = s.neovim;
+  input("neovim").disabled = !s.vim;
+  input("neovim-clean").checked = s.neovimClean;
+  input("neovim-path").value = s.neovimPath;
   $<HTMLSelectElement>("theme").value = s.theme;
   applyTheme(s.theme);
   $<HTMLSelectElement>("view").value = s.view;
@@ -52,7 +56,21 @@ async function choose() {
 }
 
 input("autosave").onchange = () => ((s.autosave = input("autosave").checked), save());
-input("vim").onchange = () => ((s.vim = input("vim").checked), save());
+input("vim").onchange = () => ((s.vim = input("vim").checked), save().then(draw));
+input("neovim").onchange = () => ((s.neovim = input("neovim").checked), save());
+input("neovim-clean").onchange = () => ((s.neovimClean = input("neovim-clean").checked), save());
+input("neovim-path").onchange = async () => {
+  s.neovimPath = input("neovim-path").value.trim();
+  await save();
+  await drawNeovim();
+};
+
+// drawNeovim says which Neovim the source pane would run, or why none.
+async function drawNeovim() {
+  const n = await App.Neovim();
+  $("neovim-info").textContent = n.error ? n.error : `Neovim ${n.version} at ${n.path}. Needs Vim key bindings on.`;
+}
+
 $<HTMLSelectElement>("theme").onchange = async () => {
   s.theme = $<HTMLSelectElement>("theme").value;
   applyTheme(s.theme);
@@ -82,3 +100,4 @@ input("zsh-wrapper").onchange = async () => {
 };
 
 draw();
+void drawNeovim();

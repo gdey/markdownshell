@@ -6,6 +6,7 @@ import { App, type AttrSpec, type Cell, type Doc, type Names, type Settings, typ
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
+import { NvimPane } from "./nvim.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal } from "./terminal.js";
@@ -403,6 +404,7 @@ let sourceTimer = 0;
 let sourcePending = false; // typed but not yet applied
 
 function openSource() {
+  if (useNvim()) return void startNvim();
   if (source) return;
   source = markdownEditor($("source-editor"), {
     text: "",
@@ -430,6 +432,7 @@ function openSource() {
 }
 
 function closeSource() {
+  stopNvim();
   if (!source) return;
   void applySource();
   source.destroy();
@@ -439,14 +442,14 @@ function closeSource() {
 
 async function applySource() {
   clearTimeout(sourceTimer);
-  if (!source || !sourcePending) return;
+  if ((!source && !nvim) || !sourcePending) return;
   if (running) {
     sourceTimer = window.setTimeout(() => void applySource(), 1000);
     return;
   }
   sourcePending = false;
   try {
-    await App.SetText(source.view.state.doc.toString());
+    await App.SetText(nvim ? nvimText : source!.view.state.doc.toString());
     status("");
   } catch (err) {
     fail(err);
@@ -456,10 +459,15 @@ async function applySource() {
   cells = (await App.Cells()) ?? [];
   drawDoc();
   markRunLines();
-  markCurrent(source.view.state.doc.lineAt(source.view.state.selection.main.head).number);
+  if (source) markCurrent(source.view.state.doc.lineAt(source.view.state.selection.main.head).number);
 }
 
 async function loadSource() {
+  if (useNvim() && view.split) {
+    if (!nvim) return startNvim();
+    if (sourcePending) return; // typed but not yet applied
+    return void App.NvimLoad().catch(fail);
+  }
   if (!source || sourcePending || doc.file === "") return;
   try {
     source.setText(await App.Text());
@@ -468,6 +476,74 @@ async function loadSource() {
   }
   markRunLines();
 }
+
+// With Vim on and the Neovim setting, the source pane is an embedded
+// Neovim instead (nvim.ts). If it can't start, the pane falls back to
+// CodeMirror until the settings change.
+
+let nvim: NvimPane | null = null;
+let nvimText = ""; // the text Neovim sent last
+let nvimFailed = false;
+
+function useNvim() {
+  return settings.vim && settings.neovim && !nvimFailed;
+}
+
+async function startNvim() {
+  if (nvim || doc.file === "") return;
+  const pane = new NvimPane($("source-editor"));
+  nvim = pane;
+  $("source-editor").classList.add("nvim");
+  try {
+    await pane.start();
+  } catch (err) {
+    stopNvim();
+    nvimFailed = true;
+    status("Neovim: " + message(err) + "; using the built-in Vim");
+    if (view.split) openSource();
+  }
+}
+
+function stopNvim() {
+  if (!nvim) return;
+  void applySource();
+  nvim.destroy();
+  nvim = null;
+  $("source-editor").classList.remove("nvim");
+  void App.NvimStop();
+}
+
+Events.On("nvim-redraw", mine<unknown[][]>((ev) => nvim?.redraw(ev)));
+Events.On(
+  "nvim-text",
+  mine<string>((text) => {
+    nvimText = text;
+    sourcePending = true;
+    void applySource();
+  }),
+);
+// :w in Neovim.
+Events.On(
+  "nvim-write",
+  mine<string>(async (text) => {
+    nvimText = text;
+    sourcePending = true;
+    await applySource();
+    await actions.save();
+    await App.NvimSaved().catch(fail);
+  }),
+);
+Events.On(
+  "nvim-exit",
+  mine<string>((err) => {
+    if (!nvim) return;
+    nvim.destroy();
+    nvim = null;
+    $("source-editor").classList.remove("nvim");
+    status(err ? "Neovim quit: " + err : "Neovim quit");
+    if (view.split) toggle("split", false);
+  }),
+);
 
 // markRunLines puts a run button on each runnable block's first line.
 function markRunLines() {
@@ -1040,6 +1116,7 @@ Events.On("settings", (ev: { data: Settings }) => {
   settings = ev.data;
   applyTheme(settings.theme);
   source?.setVim(settings.vim);
+  nvimFailed = false;
 });
 
 $("run-all").onclick = () => void actions.runall();

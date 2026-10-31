@@ -15,6 +15,13 @@
     <label class="check"><input id="vim" type="checkbox"> Vim key bindings in the code editor</label>
     <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
 
+    <label class="check"><input id="neovim" type="checkbox"> Use Neovim for the source pane (experimental)</label>
+    <p id="neovim-info" class="muted"></p>
+    <label class="check"><input id="neovim-clean" type="checkbox"> Start Neovim without my config</label>
+    <label>Neovim to run
+      <input id="neovim-path" type="text" spellcheck="false" placeholder="Found on the PATH or in the usual places">
+    </label>
+
     <label>Theme
       <select id="theme">
         <option value="">Match the system</option>
