@@ -39,6 +39,11 @@ jobs:
       - name: Install GTK and WebKitGTK
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - name: Install the oldest Neovim the source pane supports
+        if: runner.os == 'Linux'
+        run: |
+          curl -sSL https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-linux64.tar.gz | tar xz -C "$RUNNER_TEMP"
+          echo "MDSH_TEST_NVIM=$RUNNER_TEMP/nvim-linux64/bin/nvim" >> "$GITHUB_ENV"
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build .

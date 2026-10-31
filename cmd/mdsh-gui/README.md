@@ -113,7 +113,10 @@ Each file opens in a tab of its own, with its own shells.
   assets folder; for `out=image:`, the assets folder's),
   explains an attribute on hover and underlines mistakes. Vim key bindings are a
   setting; with them, `:w` saves and `:RunBlock` runs the block at the
-  cursor, as cmd/ctrl+enter does.
+  cursor, as cmd/ctrl+enter does. With them on, an experimental setting
+  makes the source pane a real Neovim (0.10 or newer, with your own
+  config unless you turn it off); `:w` saves the file. It doesn't yet
+  have `:RunBlock`, the run buttons, attribute help or scroll sync.
 - **Checkboxes, textboxes and choices:** task list items (`- [ ] label`)
   in the rendered view check and uncheck in the file when clicked, and
   so do table cells that start with `[ ]` or `- [ ]` (GitHub shows
@@ -403,6 +406,12 @@ frontend calls, regenerate the bindings and the bundle (no npm needed):
 ```sh
 go generate
 ```
+
+The Neovim source pane is `nvim --embed` with the `ext_linegrid` UI:
+`nvim/` runs it and keeps its buffer in step with the notebook, and
+`frontend/src/nvim.ts` draws the grid on a canvas. Its tests run a real
+Neovim, from `$MDSH_TEST_NVIM` or found as the app would, and skip
+without one.
 
 The code editor is CodeMirror 6 with Vim bindings, vendored as one
 bundle in `frontend/vendor/codemirror.js`. `go run ./internal/vendorjs`
