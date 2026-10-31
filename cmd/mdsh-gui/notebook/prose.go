@@ -316,14 +316,22 @@ func (n *Notebook) Text() string {
 }
 
 // SetText replaces the whole file with text, as typed in the split
-// view. Blocks whose code didn't change keep their output.
-func (n *Notebook) SetText(text string) error {
+// view, if the file is still base, the text the typing started from,
+// and reports whether it did. When something else changed the file
+// since, such as a run's output or an include filling its fence, it is
+// left alone, so the editor can fold the change into what was typed and
+// try again instead of throwing the change away. Blocks whose code
+// didn't change keep their output.
+func (n *Notebook) SetText(base, text string) (bool, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.running {
-		return ErrBusy
+		return false, ErrBusy
 	}
-	return n.setSource([]byte(text))
+	if string(n.d.Src) != base {
+		return false, nil
+	}
+	return true, n.setSource([]byte(text))
 }
 
 func (n *Notebook) setSource(src []byte) error {

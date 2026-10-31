@@ -309,10 +309,12 @@ export function SetTerminalSize(cols: number, rows: number): $CancellablePromise
 }
 
 /**
- * SetText replaces the whole file, as typed in the source pane.
+ * SetText replaces the whole file, as typed in the source pane, if it
+ * is still base, and reports whether it did. When it isn't, the pane
+ * reads the file again, keeps what was typed and tries again.
  */
-export function SetText(text: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.SetText", text);
+export function SetText(base: string, text: string): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.SetText", base, text);
 }
 
 /**

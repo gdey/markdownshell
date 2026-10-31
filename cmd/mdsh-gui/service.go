@@ -409,15 +409,19 @@ func (a *App) Text(ctx context.Context) (string, error) {
 	return n.Text(), nil
 }
 
-// SetText replaces the whole file, as typed in the source pane.
-func (a *App) SetText(ctx context.Context, text string) error {
+// SetText replaces the whole file, as typed in the source pane, if it
+// is still base, and reports whether it did. When it isn't, the pane
+// reads the file again, keeps what was typed and tries again.
+func (a *App) SetText(ctx context.Context, base, text string) (bool, error) {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
-	err = n.SetText(text)
-	t.changed()
-	return err
+	ok, err := n.SetText(base, text)
+	if ok {
+		t.changed()
+	}
+	return ok, err
 }
 
 // SetTask checks or unchecks task list item task, as numbered by the
