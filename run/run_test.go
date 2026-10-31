@@ -223,6 +223,23 @@ func TestImageOutput(t *testing.T) {
 	}
 }
 
+// out=image:res://name saves the image in the assets folder.
+func TestImageOutputRes(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "doc.md")
+	src := "```sh {#pic out=screenshot:res://shots/p.png on_error=continue}\necho hi\n```\n\n```sh {#bad out=image:res://../p.svg}\nprintf '<svg/>'\n```\n"
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: file})
+	if r := results[0]; r.Err != nil || r.Image != "doc.md.assets/shots/p.png" {
+		t.Fatalf("result = %+v", r)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "doc.md.assets", "shots", "p.png")); err != nil {
+		t.Error(err)
+	}
+	if r := results[1]; r.Err == nil || !strings.Contains(r.Err.Error(), "must name a file in doc.md.assets") {
+		t.Errorf("res://../p.svg: err = %v", r.Err)
+	}
+}
+
 func TestWriteBackIsStable(t *testing.T) {
 	src := "#!/usr/bin/env mdsh\n# T\n\n```sh {#a}\necho '```'\necho err >&2\n```\n\n```sh {#m out=markdown}\necho '*hi*'\n```\n\ntext\n"
 	d, results := runDoc(t, src, run.Options{})

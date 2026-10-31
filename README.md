@@ -325,7 +325,9 @@ real code without a copy that goes stale:
 ````
 
 Each run writes the file's lines into the block, so it reads well on
-GitHub too. `file=` is relative to the document. `from=` and `to=` are line
+GitHub too. `file=` is relative to the document, and `file=res://notes.md`
+reads `notes.md` from the document's assets folder, `<doc>.assets/`.
+`out=image:res://plot.png` saves an image there the same way. `from=` and `to=` are line
 numbers counted from 1 and inclusive; `from` defaults to the start of the
 file and `to` to the end. The fence's language is the language, and
 `number_on` shows line numbers when the document is printed. An include

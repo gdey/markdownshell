@@ -141,11 +141,19 @@ export interface ChoiceCell {
 
 /**
  * Names are what attribute completion offers: block ids, for conditions,
- * and env names.
+ * env names, and files for paths: those in the document's assets folder,
+ * for res:// paths, and those beside the document.
  */
 export interface Names {
     "ids": string[] | null;
     "envs": string[] | null;
+    "assets": string[] | null;
+    "files": string[] | null;
+
+    /**
+     * AssetsDir is the assets folder's name, <doc>.assets.
+     */
+    "assetsDir": string;
 }
 
 /**

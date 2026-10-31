@@ -14,7 +14,8 @@ import (
 // Includes reads the files d's include blocks name. It returns one result
 // per block, like Run, with only the include blocks filled in: Stdout
 // holds the selected lines. A relative path is relative to opts.Dir, or
-// opts.File's directory.
+// opts.File's directory; res://name is name in the document's assets
+// folder, <doc>.assets.
 func Includes(d *doc.Document, opts Options) []*Result {
 	if opts.Dir == "" && opts.File != "" {
 		opts.Dir = filepath.Dir(opts.File)
@@ -29,21 +30,25 @@ func Includes(d *doc.Document, opts Options) []*Result {
 			results[i].Skipped = true
 			continue
 		}
-		includeBlock(b, results[i], opts.Dir)
+		includeBlock(b, results[i], opts)
 	}
 	return results
 }
 
-func includeBlock(b *doc.Block, r *Result, dir string) {
+func includeBlock(b *doc.Block, r *Result, opts Options) {
 	r.Ran = true
 	inc, err := b.Include()
 	if err != nil {
 		r.Err = err
 		return
 	}
-	path := inc.File
+	path, err := resolveRes(inc.File, opts)
+	if err != nil {
+		r.Err = fmt.Errorf("include: %w", err)
+		return
+	}
 	if !filepath.IsAbs(path) {
-		path = filepath.Join(dir, path)
+		path = filepath.Join(opts.Dir, filepath.FromSlash(path))
 	}
 	data, err := os.ReadFile(path)
 	if pe := (*fs.PathError)(nil); errors.As(err, &pe) {

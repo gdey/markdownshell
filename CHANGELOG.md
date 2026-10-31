@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `res://name` paths name a file in the document's assets folder,
+  `<doc>.assets/name`: `<include file=res://notes.md` reads one (tapes
+  too), and `out=image:res://plot.png` (or `screenshot:`, `recording:`)
+  saves there. A `res://` path can't leave the folder. In `mdsh-gui`'s
+  source pane, completing `file=` offers the files beside the document
+  and those in the assets folder as `res://` paths, and `out=image:`
+  the assets folder's. A path with spaces is put in quotes.
 - `mdsh-gui`: the active block (the selected card, or the block the
   source pane's cursor is in) has a play button by its name in the
   outline, which runs it as the card's play button does. Moving the
@@ -103,6 +110,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- An include block reads its file again when the run reaches it, so it
+  shows what a block above it wrote in the same run. `mdsh-gui` also
+  reads includes again after every run, and reads one as soon as it is
+  typed, rather than when the file is next opened.
 - A block's errors name it `block` instead of the runner's temp file,
   so `/var/folders/…/mdsh-123/block.sh:2: no such file or directory`
   reads `block:2: no such file or directory`.

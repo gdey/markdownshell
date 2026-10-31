@@ -507,3 +507,63 @@ func TestSaveAsAssets(t *testing.T) {
 		t.Errorf("SaveAs changed the original file:\n%s", orig)
 	}
 }
+
+// Names lists the files in the assets folder, for res:// completion.
+func TestNamesAssets(t *testing.T) {
+	file := write(t, src)
+	os.WriteFile(filepath.Join(filepath.Dir(file), "notes.txt"), nil, 0o644)
+	os.WriteFile(filepath.Join(filepath.Dir(file), ".env"), nil, 0o644)
+	for _, f := range []string{"a.png", "sub/b.md", ".hidden", ".git/x"} {
+		p := filepath.Join(file+".assets", filepath.FromSlash(f))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	names := n.Names()
+	if got := fmt.Sprint(names.Assets); got != "[a.png sub/b.md]" {
+		t.Errorf("assets = %s", got)
+	}
+	if names.AssetsDir != "doc.md.assets" {
+		t.Errorf("assets dir = %s", names.AssetsDir)
+	}
+	// Files beside the document leave out the document, hidden files and
+	// the assets folder.
+	if got := fmt.Sprint(names.Files); got != "[notes.txt]" {
+		t.Errorf("files = %s", got)
+	}
+}
+
+// An include of a file a block writes shows it after the block runs, and
+// a typed include shows its file's lines without a run.
+func TestIncludeFresh(t *testing.T) {
+	file := write(t, "```sh {#shot out=screenshot}\necho hi\n```\n\n```svg {<include file=res://shot.svg}\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(n.Text(), "```svg {<include file=res://shot.svg}\n<svg") {
+		t.Errorf("include not read after the run:\n%s", n.Text())
+	}
+
+	os.WriteFile(filepath.Join(filepath.Dir(file), "n.txt"), []byte("typed in\n"), 0o644)
+	if err := n.SetText(n.Text() + "\n```text {<include file=n.txt}\n```\n"); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, c := range n.Cells() {
+		found = found || strings.Contains(c.HTML, "typed in")
+	}
+	if !found {
+		t.Errorf("typed include not shown: %+v", n.Cells())
+	}
+}
