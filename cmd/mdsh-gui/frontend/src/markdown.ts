@@ -107,10 +107,17 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
       view.dispatch({ effects: [vimMode.reconfigure(on ? vim() : []), escape.reconfigure(escapeKey(on))] });
     },
     setText(text) {
-      if (text === view.state.doc.toString()) return;
+      const old = view.state.doc.toString();
+      if (text === old) return;
+      // Change only the part that differs, so the cursor and the scroll
+      // position move with the text around them instead of jumping, as
+      // when a save writes output in above them.
+      let from = 0;
+      while (from < old.length && from < text.length && old[from] === text[from]) from++;
+      let end = 0;
+      while (end < old.length - from && end < text.length - from && old[old.length - 1 - end] === text[text.length - 1 - end]) end++;
       quiet = true;
-      const head = Math.min(view.state.selection.main.head, text.length);
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, selection: { anchor: head } });
+      view.dispatch({ changes: { from, to: old.length - end, insert: text.slice(from, text.length - end) } });
       quiet = false;
     },
     destroy() {
