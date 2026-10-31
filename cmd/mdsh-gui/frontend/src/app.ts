@@ -193,7 +193,7 @@ function drawProse(c: Cell): HTMLElement {
 
 function drawBlock(c: Cell): HTMLElement {
   // The outline names a block by the .name's first child.
-  const name = el("span", { className: "name" }, el("span", { className: "id" }, c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
+  const name = el("span", { className: "name" }, el("span", { className: "id" }, c.name ?? c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
   const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
   const block = el(
     "section",
@@ -778,7 +778,7 @@ function openRunOptions() {
   $<HTMLInputElement>("opt-args").value = doc.args;
   const only = $<HTMLSelectElement>("opt-only");
   only.replaceChildren(el("option", { value: "" }, "All blocks"));
-  for (const c of cells) if (c.block >= 0 && c.id) only.append(el("option", { value: c.id }, c.id));
+  for (const c of cells) if (c.block >= 0 && c.id) only.append(el("option", { value: c.id }, c.name ?? c.id));
   only.value = doc.run.only;
   $<HTMLInputElement>("opt-step").checked = doc.run.step;
   $<HTMLInputElement>("opt-stop").checked = doc.run.stopOnError;

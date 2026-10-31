@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -82,6 +83,34 @@ func TestRunAndSave(t *testing.T) {
 	}
 	saved, _ := os.ReadFile(file)
 	if !strings.Contains(string(saved), "```output {for=hello exit=0}\nhello\n```") {
+		t.Errorf("saved file:\n%s", saved)
+	}
+}
+
+// TestSaveNamesBlocks checks that saving writes an id into each unnamed
+// block, keeping its result, and that cells show it by line.
+func TestSaveNamesBlocks(t *testing.T) {
+	file := write(t, "# T\n\n```sh\necho hi\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunFrom(0); err != nil {
+		t.Fatal(err)
+	}
+	if c := n.Cells()[1]; c.ID != "block-1" || c.Name != "line 3" {
+		t.Errorf("cell before saving: id %q, name %q", c.ID, c.Name)
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	c := n.Cells()[1]
+	if !doc.GeneratedID(c.ID) || c.Name != "line 3" || !c.Ran || !strings.Contains(c.Output, "hi") {
+		t.Errorf("cell after saving = %+v", c)
+	}
+	saved, _ := os.ReadFile(file)
+	if want := "```sh {#" + c.ID + "}\necho hi\n```\n\n```output {for=" + c.ID + " exit=0}\nhi\n```\n"; !strings.HasSuffix(string(saved), want) {
 		t.Errorf("saved file:\n%s", saved)
 	}
 }

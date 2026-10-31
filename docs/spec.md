@@ -53,7 +53,7 @@ hello from a sub-env
 
 **Rules**
 
-- **Label:** `#name` gives a block an id. Unlabeled blocks get `block-N` by position. Ids must be unique.
+- **Label:** `#name` gives a block an id. Ids must be unique. Saving the file (`-w`, or a save in the TUI or GUI, but not `-o`) writes `#block-<uuidv7>` into each runnable block that has none, and moves what named its old id along: its saved output, output copies, tapes, placeholders and conditions, and its files in `<doc>.assets/`. Until then an unlabeled block is `block-N` by position. Messages name a block whose id mdsh made up by its line.
 - **What runs:** every block whose language mdsh knows (`sh` in v1). Other languages are left alone. `skip` turns a block off.
 - **Front matter:** standard YAML front matter at the top of the file. mdsh reads only the `mdsh:` key, so `title`, tags and other tools' keys live alongside it. A shebang line may come before the opening `---`. Block attributes override it.
 - **Output block:** language `output`, carrying `for=<id>` and the exit code. A block in a list item or block quote gets its output inside the same container. stderr gets its own `output {for=<id> stream=stderr}` fence when shown (see Stderr). On a re-run mdsh replaces the old output, so the file stays stable. If output contains backticks, mdsh uses a longer fence. An `output` fence that isn't right after its block is a copy that mdsh refills (see Output copies).
@@ -63,7 +63,7 @@ Block attributes in v1:
 
 | Attribute | Meaning | Default |
 | --- | --- | --- |
-| `#id` | Block name | `block-N` |
+| `#id` | Block name | `block-<uuidv7>`, written on save |
 | `skip` | Don't run | off |
 | `run=COND` | Run only if COND holds | run |
 | `show=COND` | Print the code only if COND holds | shown |

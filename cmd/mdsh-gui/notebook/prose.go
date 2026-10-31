@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
@@ -47,6 +48,7 @@ func (n *Notebook) Cells() []Cell {
 		l.cells = append(l.cells, Cell{
 			Block:   i,
 			ID:      b.ID,
+			Name:    strings.TrimPrefix(d.Label(b), "at "),
 			Lang:    b.Lang,
 			Body:    b.Body,
 			Attrs:   attrsText(b.Info),

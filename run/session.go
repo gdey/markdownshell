@@ -272,7 +272,7 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 
 func (s *Session) confirm(b *doc.Block) (Answer, error) {
 	if s.opts.Confirm == nil {
-		return Stop, fmt.Errorf("%w: %s", ErrNoConfirm, b.ID)
+		return Stop, fmt.Errorf("%w: %s", ErrNoConfirm, s.d.Label(b))
 	}
 	return s.opts.Confirm(b), nil
 }
