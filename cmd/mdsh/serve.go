@@ -14,7 +14,9 @@ import (
 )
 
 // serveFlag is --serve, with an optional address: --serve alone listens
-// on serve.DefaultAddr, --serve=host:port where it says.
+// on serve.DefaultAddr, --serve=host:port where it says, and
+// --serve=stdio serves one client on stdin and stdout. It is a bool-style
+// flag, so the address needs the =.
 type serveFlag struct {
 	on   bool
 	addr string
@@ -64,11 +66,18 @@ func serveCmd(addr, file string, args []string, stderr io.Writer) error {
 			opts.Dir, opts.File = dir, ""
 		}
 	}
+	stdio := addr == serve.Stdio
+	if stdio {
+		opts.Addr = ""
+	}
 	s, err := serve.New(opts)
 	if err != nil {
 		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if stdio {
+		return s.ServeStdio(ctx, os.Stdin, os.Stdout)
+	}
 	return s.ListenAndServe(ctx)
 }
