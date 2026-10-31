@@ -106,6 +106,7 @@ function drawOptions() {
 
 function drawDoc() {
   const main = $("doc");
+  const restore = anchor();
   closeTerminal();
   main.replaceChildren();
   for (const c of cells) {
@@ -117,6 +118,66 @@ function drawDoc() {
   select(Math.min(selected, blocks().length - 1), false);
   drawOutline();
   sizeTerminal();
+  restore();
+}
+
+// anchor notes where the block being followed is in the rendered view,
+// or else the card at its top, and returns a function that puts the
+// card drawn in its place back there. Drawing the document anew replaces
+// every card, and the view would otherwise jump, as far as the top.
+function anchor(): () => void {
+  const pane = $("doc-scroll");
+  const cards = [...$("doc").children];
+  const top = pane.getBoundingClientRect().top;
+  const i = following ? cards.indexOf(following) : cards.findIndex((e) => e.getBoundingClientRect().bottom > top);
+  if (i < 0) return () => {};
+  const offset = cards[i].getBoundingClientRect().top - top;
+  return () => {
+    const e = $("doc").children[i] as HTMLElement | undefined;
+    if (following) following = e?.classList.contains("block") ? e : null;
+    if (e) pane.scrollTop += e.getBoundingClientRect().top - top - offset;
+  };
+}
+
+// Following a run: as a block's output grows, the rendered view scrolls
+// it up, smoothly, so the end of the output stays in sight, until the
+// block's top reaches the top of the view. Scrolling by hand stops it.
+let following: HTMLElement | null = null;
+let followFrame = 0;
+const followMargin = 8;
+
+// follow starts following block, scrolling up to it first if its top is
+// above the view.
+function follow(block: HTMLElement) {
+  following = block;
+  showEnd(block, true);
+}
+
+// followOutput keeps the end of the followed block's output in sight,
+// once a frame however often it grows.
+function followOutput() {
+  if (followFrame || !following) return;
+  followFrame = requestAnimationFrame(() => {
+    followFrame = 0;
+    if (following?.isConnected) showEnd(following, false);
+  });
+}
+
+// showEnd scrolls the rendered view down until block's end is in sight
+// or its top is at the top of the view; with up, a block whose top is
+// above the view is scrolled down to.
+function showEnd(block: HTMLElement, up: boolean) {
+  const pane = $("doc-scroll");
+  if (pane.hidden) return;
+  const p = pane.getBoundingClientRect();
+  const r = block.getBoundingClientRect();
+  const toTop = r.top - p.top - followMargin;
+  const d = up && toTop < 0 ? toTop : Math.max(0, Math.min(r.bottom - p.bottom + followMargin, toTop));
+  if (Math.abs(d) > 1) pane.scrollTo({ top: pane.scrollTop + d, behavior: "smooth" });
+}
+
+function stopFollowing() {
+  following = null;
 }
 
 // drawProse draws one top-level block of prose. Clicking it shows its
@@ -288,6 +349,9 @@ async function start(method: "RunBlock" | "RunFrom", block: number) {
   ranHere = false;
   busy(false);
   await refresh();
+  // The output is drawn in full now, and may be longer than it was.
+  if (following) showEnd(following, false);
+  following = null;
   backgroundStatus();
 }
 
@@ -856,7 +920,7 @@ function onBlock(e: BlockEvent) {
       block.classList.add("now");
       block.querySelector<HTMLElement>(".ask")!.hidden = true;
       out.replaceChildren(el("pre", { className: "live" }));
-      block.scrollIntoView({ block: "nearest" });
+      follow(block);
       break;
     case "stdout":
     case "stderr": {
@@ -866,6 +930,7 @@ function onBlock(e: BlockEvent) {
       const streams = (liveColors.get(live) ?? liveColors.set(live, {}).get(live))!;
       const ansi = (streams[e.kind] ??= new Ansi());
       live.append(el("span", { className: e.kind }, ...ansi.write(e.data ?? "")));
+      if (block === following) followOutput();
       break;
     }
     case "done":
@@ -886,6 +951,7 @@ function onBlock(e: BlockEvent) {
       // The block runs in its card, so show it, as a confirm does.
       if (!view.rendered) toggle("rendered", true);
       openTerminal(e.block);
+      follow(block);
       break;
     case "tty":
       return writeTerminal(e.block, e.bytes);
@@ -930,7 +996,7 @@ Events.On(
     if (ranHere || !running) return;
     busy(false);
     status("");
-    void refresh();
+    void refresh().then(() => (following = null));
   }),
 );
 
@@ -980,6 +1046,11 @@ $("outline-toggle").onclick = () => toggle("outline");
 $("view-split").onclick = () => toggle("split");
 $("view-rendered").onclick = () => toggle("rendered");
 $("doc-scroll").addEventListener("scroll", () => syncScroll("doc"));
+// Scrolling by hand, with the wheel, a touch or the scroll bar, stops
+// following a run.
+$("doc-scroll").addEventListener("wheel", stopFollowing, { passive: true });
+$("doc-scroll").addEventListener("touchstart", stopFollowing, { passive: true });
+$("doc-scroll").addEventListener("pointerdown", (e) => e.target === e.currentTarget && stopFollowing());
 $("reload").onclick = () => void actions.reload();
 $("keep").onclick = () => {
   $("changed").dataset.kept = doc.file;
