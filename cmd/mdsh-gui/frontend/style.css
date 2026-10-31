@@ -415,6 +415,27 @@ pre.numbered .line::before { counter-increment: line; content: counter(line); di
 .start-bar { display: flex; gap: 8px; }
 .start-bar input { flex: 1; font: inherit; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
 #start-dir { font-size: 13px; margin: 8px 0 0; }
+/* Tags and collections (folders with a .mdsh.yaml) on the start screen. */
+.tag-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 0; font-size: 12px; }
+button.tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); }
+button.tag .n { color: var(--muted); margin-left: 4px; }
+button.tag.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.tag.on .n { color: inherit; opacity: 0.8; }
+.coll { --c: var(--accent); margin: 20px 0 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.coll ul.files { border: 0; border-top: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 0; }
+.coll ul.files li button.file { border-radius: 0; }
+.chead { display: flex; gap: 12px; align-items: flex-start; padding: 14px 14px 12px 16px; border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 8%, var(--bg)); }
+.chead.bg { min-height: 64px; background: linear-gradient(90deg, var(--bg) 30%, color-mix(in srgb, var(--bg) 55%, transparent) 75%, transparent), var(--img) right / cover no-repeat; }
+.cicon { flex: none; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font-size: 22px; font-weight: 600; color: var(--c); background: color-mix(in srgb, var(--c) 16%, var(--bg)); overflow: hidden; }
+.cicon img { width: 24px; height: 24px; object-fit: contain; }
+.ctext { min-width: 0; }
+.ctitle { font-size: 15px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.ctitle .muted { font-size: 12px; font-weight: 400; }
+.cdesc { font-size: 13px; margin: 2px 0 0; }
+.ctags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.ctags button.tag { border-color: color-mix(in srgb, var(--c) 40%, var(--border)); background: color-mix(in srgb, var(--c) 10%, var(--bg)); }
+.ctags button.tag.on { background: var(--c); border-color: var(--c); color: #fff; }
+.ftag { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 6px; }
 ul.files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; }
 ul.files li + li { border-top: 1px solid var(--border); }
 button.file { display: flex; width: 100%; gap: 12px; justify-content: space-between; border: 0; border-radius: 0; background: none; padding: 7px 12px; font-size: 14px; text-align: left; }

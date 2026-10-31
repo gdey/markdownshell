@@ -2059,51 +2059,159 @@ $("options").onclick = openRunOptions;
 
 // Start screen
 
-let startScreen: Start = { dir: "", home: "", files: [], full: false, recent: [] };
+let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [] };
 
 async function drawStart() {
   try {
     startScreen = await App.StartScreen();
     $("start-dir").textContent = tilde(startScreen.dir) + (startScreen.full ? " (showing the first " + (startScreen.files ?? []).length + " files)" : "");
   } catch (err) {
-    startScreen = { dir: "", home: "", files: [], full: false, recent: [] };
+    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [] };
     $("start-dir").textContent = message(err);
   }
   filterStart();
   $("filter").focus();
 }
 
-function fileRow(path: string, label: string, detail: string, desc = ""): HTMLElement {
+type StartFile = NonNullable<Start["files"]>[number];
+type Collection = NonNullable<Start["collections"]>[number];
+
+function fileRow(path: string, label: string, detail: string, desc = "", tags: string[] = []): HTMLElement {
   const name = el("span", { className: "fname" }, label);
+  if (tags.length) name.append(el("span", { className: "ftag" }, tags.map((t) => "#" + t).join(" ")));
   const left = desc ? el("span", { className: "fleft" }, name, el("span", { className: "fdesc muted", title: desc }, desc)) : name;
   const b = el("button", { className: "file", title: path }, left, el("span", { className: "muted" }, detail));
   b.onclick = () => openPath(path);
   return el("li", {}, b);
 }
 
+// startFilter splits the filter box into #tags, which a file must all
+// have, and the rest, which must appear in its name, description, tags
+// or its collection's title or description.
+function startFilter(): { tags: string[]; text: string } {
+  const words = $<HTMLInputElement>("filter").value.trim().toLowerCase().split(/\s+/).filter((w) => w !== "");
+  const isTag = (w: string) => w.length > 1 && w.startsWith("#");
+  return { tags: words.filter(isTag).map((w) => w.slice(1)), text: words.filter((w) => !isTag(w)).join(" ") };
+}
+
+// toggleTag adds #tag to the filter box, or takes it out.
+function toggleTag(tag: string) {
+  const box = $<HTMLInputElement>("filter");
+  const words = box.value.trim().split(/\s+/).filter((w) => w !== "");
+  const i = words.findIndex((w) => w.toLowerCase() === "#" + tag);
+  if (i < 0) words.push("#" + tag);
+  else words.splice(i, 1);
+  box.value = words.join(" ");
+  filterStart();
+}
+
+function tagButton(tag: string, on: boolean, count?: number): HTMLElement {
+  const b = el("button", { className: "tag" + (on ? " on" : ""), title: (on ? "Stop filtering on #" : "Show files tagged #") + tag }, "#" + tag);
+  if (count !== undefined) b.append(el("span", { className: "n" }, String(count)));
+  b.onclick = () => toggleTag(tag);
+  return b;
+}
+
+function dirOf(rel: string): string {
+  const i = rel.lastIndexOf("/");
+  return i < 0 ? "" : rel.slice(0, i);
+}
+
+// collectionHeader shows a collection's icon, title, description and
+// tags, in its color and over its background image.
+function collectionHeader(c: Collection, dir: string, active: string[]): HTMLElement {
+  const folder = dir === "" ? startScreen.dir.split(/[\\/]/).pop() || startScreen.dir : dir.slice(dir.lastIndexOf("/") + 1);
+  const title = c.title || folder;
+  const icon = el("div", { className: "cicon" });
+  if (c.iconURL) icon.append(el("img", { src: c.iconURL, alt: "" }));
+  else icon.textContent = c.icon || [...title][0]?.toUpperCase() || "";
+  const text = el("div", { className: "ctext" }, el("div", { className: "ctitle" }, el("span", {}, title), el("span", { className: "muted" }, dir === "" ? "this folder" : dir + "/")));
+  if (c.description) text.append(el("div", { className: "cdesc muted" }, c.description));
+  if (c.tags?.length) text.append(el("div", { className: "ctags" }, ...c.tags.map((t) => tagButton(t, active.includes(t)))));
+  const head = el("div", { className: "chead" }, icon, text);
+  if (c.backgroundURL) {
+    head.classList.add("bg");
+    head.style.setProperty("--img", `url("${c.backgroundURL}")`);
+  }
+  if (c.problems?.length) head.title = ".mdsh.yaml: " + c.problems.join("\n");
+  return head;
+}
+
 function filterStart() {
-  const q = $<HTMLInputElement>("filter").value.trim().toLowerCase();
-  const match = (s: string) => s.toLowerCase().includes(q);
-  const recent = (startScreen.recent ?? []).filter(match);
+  const { tags, text } = startFilter();
+  const has = (s: string | undefined) => text === "" || (s ?? "").toLowerCase().includes(text);
+  const collections = new Map<string, Collection>();
+  const broken = new Map<string, string>();
+  for (const c of startScreen.collections ?? []) {
+    if (c.error) broken.set(c.rel, c.error);
+    else collections.set(c.rel, c);
+  }
+  const files = startScreen.files ?? [];
+  const byPath = new Map(files.map((f) => [f.path, f]));
+  const matches = (f: StartFile) => {
+    const ft = f.tags ?? [];
+    if (!tags.every((t) => ft.includes(t))) return false;
+    const c = collections.get(dirOf(f.rel));
+    return has(f.rel) || has(f.description) || ft.some(has) || has(c?.title) || has(c?.description);
+  };
+
+  // Recent files match on their path; with #tags, only listed files that have them.
+  const recent = (startScreen.recent ?? []).filter((p) => {
+    if (tags.length === 0) return has(p);
+    const f = byPath.get(p);
+    return f !== undefined && matches(f);
+  });
   $("recent-list").hidden = recent.length === 0;
   $("recent-list")
     .querySelector("ul")!
     .replaceChildren(...recent.map((p) => fileRow(p, p.split(/[\\/]/).pop() ?? p, tilde(p.replace(/[\\/][^\\/]*$/, "")))));
-  const groups = new Map<string, NonNullable<Start["files"]>>();
-  for (const f of startScreen.files ?? []) {
-    if (!match(f.rel) && !match(f.description ?? "")) continue;
-    const i = f.rel.lastIndexOf("/");
-    const dir = i < 0 ? "" : f.rel.slice(0, i);
+
+  // Every tag in the listing, with how many files have it.
+  const counts = new Map<string, number>();
+  for (const f of files) for (const t of f.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+  const bar = $("tag-bar");
+  bar.hidden = counts.size === 0;
+  bar.replaceChildren(el("span", { className: "muted" }, "Tags"), ...[...counts.keys()].sort().map((t) => tagButton(t, tags.includes(t), counts.get(t))));
+
+  // Group the matching files by folder. A collection whose files are
+  // all in subfolders still gets its header.
+  const groups = new Map<string, StartFile[]>();
+  for (const f of files) {
+    if (!matches(f)) continue;
+    const dir = dirOf(f.rel);
     if (!groups.has(dir)) groups.set(dir, []);
     groups.get(dir)!.push(f);
+    for (let up = dir; up !== ""; ) {
+      up = dirOf(up);
+      if (collections.has(up) && !groups.has(up)) groups.set(up, []);
+    }
   }
+  // Folders in path order, each just before its subfolders.
+  const key = (dir: string) => dir.replaceAll("/", "\0");
+  const dirs = [...groups.keys()].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
   const list = $("file-list");
   list.replaceChildren();
-  for (const [dir, files] of groups) {
-    list.append(
-      el("h2", {}, dir === "" ? "This folder" : dir + "/"),
-      el("ul", { className: "files" }, ...files.map((f) => fileRow(f.path, f.rel.slice(dir === "" ? 0 : dir.length + 1), blocksLabel(f.blocks) + " · " + ago(f.mod), f.description))),
-    );
+  for (const dir of dirs) {
+    const c = collections.get(dir);
+    const rows = groups.get(dir)!.map((f) => {
+      const own = (f.tags ?? []).filter((t) => !c?.tags?.includes(t));
+      return fileRow(f.path, f.rel.slice(dir === "" ? 0 : dir.length + 1), blocksLabel(f.blocks) + " · " + ago(f.mod), f.description, own);
+    });
+    const ul = el("ul", { className: "files" }, ...rows);
+    if (c) {
+      const section = el("section", { className: "coll" }, collectionHeader(c, dir, tags));
+      if (c.color) section.style.setProperty("--c", c.color);
+      if (rows.length) section.append(ul);
+      list.append(section);
+      continue;
+    }
+    const h = el("h2", {}, dir === "" ? "This folder" : dir + "/");
+    const err = broken.get(dir);
+    if (err) {
+      h.title = err;
+      h.append(" ⚠");
+    }
+    list.append(h, ul);
   }
   $("start-empty").hidden = groups.size > 0 || recent.length > 0;
 }

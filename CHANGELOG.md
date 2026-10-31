@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a `.mdsh.yaml` file makes a folder of runbooks a
+  collection on the start screen. Its header shows the folder's
+  `title`, `description`, `icon` (an image in the folder or an emoji)
+  and `tags`, in its `color` and over its `background` image. Files get
+  the tags of the collections above them plus their own front matter
+  `tags:`, a tag bar under the filter lists every tag with a count, and
+  clicking one or typing `#tag` shows only the files that have it.
 - `mdsh-gui`: Clear All Outputs has a shortcut, cmd/ctrl+alt+K, and an
   eraser button in the toolbar beside Run all. It now asks before it
   clears, from the menu, the key or the button.

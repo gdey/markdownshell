@@ -149,6 +149,7 @@ export interface Start {
      */
     "home": string;
     "files": library$0.File[] | null;
+    "collections": library$0.Collection[] | null;
 
     /**
      * more files than listed
