@@ -452,6 +452,35 @@ Sections nest, and their comment lines never appear in printed output.
 `show=`, `show-output=` and sections only change what is printed: `-w`
 keeps everything in the file. Use `run=` to keep a block from running.
 
+### Optional prechecks
+
+Checks that only apply to some setups are ordinary blocks gated with
+`run=`. Turn a check on with an environment variable, or let an earlier
+block detect what is there:
+
+````markdown
+```sh {#detect}
+command -v docker >/dev/null && HAS_DOCKER=1
+```
+
+```sh {#docker run={{#detect/env(HAS_DOCKER)}} show={{$ran?}}}
+docker info >/dev/null && echo "docker is up"
+```
+
+```sh {#vpn run={{$CHECK_VPN}} show={{$ran?}}}
+ping -c1 -W2 intranet.example.com
+```
+````
+
+`mdsh doc.md` checks Docker only where it is installed, and the VPN
+only with `CHECK_VPN=1`. `show={{$ran?}}` leaves a skipped check out of
+the printed output. An `mdsh:if` section around a block hides it but
+does not stop it running, so gate checks with `run=`.
+
+mdsh doesn't run blocks that a block prints: fences in `out=markdown`
+output are plain code. See
+[Not pursued](docs/spec.md#not-pursued) for why.
+
 ## Placeholders
 
 `{{#setup/env(NAME)}}` in the prose stands for the value `NAME` had right
