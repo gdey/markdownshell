@@ -23,6 +23,9 @@ follow [Semantic Versioning](https://semver.org/).
   at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
   address can run commands as you, so it listens on loopback by default;
   see Serving to a browser in the README.
+- `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
+  the program that started them, such as an editor plugin, as JSON lines
+  on stdin and stdout.
 
 ## [1.4.1] - 2026-11-07
 

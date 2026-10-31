@@ -19,6 +19,7 @@ func TestServeFlag(t *testing.T) {
 		{[]string{"--serve", "doc.md"}, true, "", 1},
 		{[]string{"--serve=:9000", "doc.md", "a"}, true, ":9000", 2},
 		{[]string{"--serve=localhost:9000"}, true, "localhost:9000", 0},
+		{[]string{"--serve=stdio", "doc.md"}, true, "stdio", 1},
 	} {
 		fs := flag.NewFlagSet("", flag.ContinueOnError)
 		var f serveFlag
