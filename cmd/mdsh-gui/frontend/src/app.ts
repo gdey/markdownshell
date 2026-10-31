@@ -407,6 +407,7 @@ function openSource() {
   source = markdownEditor($("source-editor"), {
     text: "",
     vim: settings.vim,
+    spellCheck: !settings.noSpellCheck,
     attrs,
     names: () => known,
     lineNumbers: true,
@@ -1040,6 +1041,7 @@ Events.On("settings", (ev: { data: Settings }) => {
   settings = ev.data;
   applyTheme(settings.theme);
   source?.setVim(settings.vim);
+  source?.setSpellCheck(!settings.noSpellCheck);
 });
 
 $("run-all").onclick = () => void actions.runall();
