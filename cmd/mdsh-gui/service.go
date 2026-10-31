@@ -287,11 +287,12 @@ func (a *App) StartScreen() (Start, error) {
 func (a *App) Settings() settings.Settings { return a.settings.Get() }
 
 // SetSettings saves the settings the Settings window edits: autosave,
-// Vim mode, theme, shell, the view files open in and the start folder. Open windows hear of it with a
+// Vim mode, Neovim, theme, shell, the view files open in and the start folder. Open windows hear of it with a
 // "settings" event.
 func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) {
 		cur.Autosave, cur.Vim, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.Shell, s.StartFolder
+		cur.Neovim, cur.NeovimPath, cur.NeovimClean = s.Neovim, strings.TrimSpace(s.NeovimPath), s.NeovimClean
 		cur.Theme = ""
 		if s.Theme == "light" || s.Theme == "dark" {
 			cur.Theme = s.Theme

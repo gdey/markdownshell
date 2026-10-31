@@ -16,6 +16,22 @@ export interface Settings {
     "vim": boolean;
 
     /**
+     * Neovim makes the source pane an embedded Neovim, when Vim is on
+     * and a new enough nvim is found. Experimental.
+     */
+    "neovim": boolean;
+
+    /**
+     * NeovimPath is the nvim to run; empty finds one.
+     */
+    "neovimPath": string;
+
+    /**
+     * NeovimClean starts Neovim without the user's config.
+     */
+    "neovimClean": boolean;
+
+    /**
      * Theme is "light" or "dark"; empty follows the system.
      */
     "theme": string;

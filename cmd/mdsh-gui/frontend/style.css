@@ -193,6 +193,9 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px; }
 #source-editor { flex: 1; min-height: 0; --custom-contextmenu: source; }
 #doc a[href] { --custom-contextmenu: link; }
 #source-editor .cm-editor { height: 100%; }
+#source-editor.nvim { position: relative; overflow: hidden; }
+#source-editor .nvim-grid { display: block; cursor: text; }
+#source-editor .nvim-input { position: absolute; width: 1px; height: 1em; padding: 0; border: 0; opacity: 0; resize: none; overflow: hidden; pointer-events: none; }
 #source-editor .cm-editor.cm-focused { outline: none; }
 #source-editor .cm-gutters { background: var(--bg); border-right-color: var(--border); color: var(--muted); }
 #source .md-bar { border-bottom: 1px solid var(--border); }
