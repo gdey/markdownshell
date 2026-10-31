@@ -55,6 +55,8 @@ var BlockAttrs = []AttrSpec{
 	{Name: "show", Kind: AttrCond, Default: "shown", Help: "Print the code only if the condition holds"},
 	{Name: "show-output", Kind: AttrCond, Default: "shown", Help: "Print the output only if the condition holds"},
 	{Name: "show-stderr", Kind: AttrCond, Bare: true, Default: "front matter show_stderr, else only when the block fails", Help: "Show stderr, or only if the condition holds"},
+	{Name: "collapse", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the code folded to one line, or only if the condition holds"},
+	{Name: "collapse-output", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the output folded to one line, or only if the condition holds"},
 	{Name: "env", Kind: AttrText, Default: "top-level env", Help: "Run in a named sub-env; a/b stacks b on a"},
 	{Name: "share", Kind: AttrList, Default: "front matter env.share, else all", Help: "Exported variables a new sub-env gets from its parent; empty for none"},
 	{Name: "on_error", Kind: AttrChoice, Values: []string{"stop", "continue"}, Default: "front matter on_error", Help: "Stop the run if this block fails, or go on"},

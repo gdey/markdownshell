@@ -48,6 +48,20 @@ func TestHideFlags(t *testing.T) {
 	}
 }
 
+func TestFoldLines(t *testing.T) {
+	src := "# A\n<!-- mdsh:collapse -->\ntext\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(Markdown(d, nil, Options{})); got != "# A\ntext\n" {
+		t.Errorf("printed %q", got)
+	}
+	if got := string(Markdown(d, nil, Options{WriteBack: true})); got != src {
+		t.Errorf("wrote back %q", got)
+	}
+}
+
 func TestNested(t *testing.T) {
 	src := "1. Run:\n\n   ```sh {#a}\n   echo a\n   ```\n\n> ```sh {#b}\n> echo b\n> ```\n\n- ```sh {#c}\n  echo c\n  ```\n"
 	d, err := doc.Parse([]byte(src))
