@@ -34,7 +34,8 @@ follow [Semantic Versioning](https://semver.org/).
   that function to `~/.zshrc`, or takes it out.
 - `mdsh-gui` Run › Run Current Block (cmd/ctrl+enter) runs the block
   the source view's cursor is in: on its fence, in its body or in its
-  output. Without the source view it runs the selected card.
+  output. Without the source view it runs the selected card. With Vim
+  mode on, `:RunBlock` does the same.
 
 ### Fixed
 

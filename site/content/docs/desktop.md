@@ -59,7 +59,8 @@ mdsh-gui notes.md staging # open a file; $1 is staging
 - **Editing.** The source view shows the whole file in a markdown editor
   beside the rendered view. It completes block attributes, explains them
   on hover and underlines mistakes, and has Vim key bindings as a
-  setting.
+  setting. Cmd/ctrl+enter, or `:RunBlock` in Vim mode, runs the block
+  the cursor is in.
 - **Output.** Images, screenshots and recordings show in the block.
   Save writes the output into the file, and File › Create Report… makes
   a PDF, HTML or markdown report, and shows the `mdsh` command that makes

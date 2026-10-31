@@ -60,7 +60,8 @@ Each file opens in a tab of its own, with its own shells.
   it on that text. New blocks are typed there too. Inside
   `{…}` the editor completes attribute names and values, explains an
   attribute on hover and underlines mistakes. Vim key bindings are a
-  setting.
+  setting; with them, `:w` saves and `:RunBlock` runs the block at the
+  cursor, as cmd/ctrl+enter does.
 - **Links** in the rendered view open when clicked: web links in the
   browser, a markdown file in a new tab (or the tab it's already open
   in), any other file as the system would open it, and `#heading`

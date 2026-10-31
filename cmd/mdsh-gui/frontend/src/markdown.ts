@@ -32,6 +32,9 @@ export interface MarkdownEditorOptions {
   // close is :q, and esc when Vim is off. Mod-Enter is done.
   close(): void;
   done?(): void;
+  // run runs the block at the cursor, for Mod-Enter, in place of done,
+  // and Vim's :RunBlock. Without it Mod-Enter is CodeMirror's own.
+  run?(): void;
 }
 
 export interface MarkdownEditor {
@@ -66,12 +69,23 @@ const attrMarks = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
+// modEnter runs the block at the cursor, or is done. It takes the key
+// either way, so the default keymap doesn't put in a blank line and the
+// menu doesn't run the block a second time.
+function modEnter(opts: MarkdownEditorOptions): () => boolean {
+  return () => {
+    const fn = opts.run ?? opts.done;
+    fn?.();
+    return !!fn;
+  };
+}
+
 export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions): MarkdownEditor {
   const vimMode = new Compartment();
   const escape = new Compartment();
   const escapeKey = (on: boolean): Extension => (on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]));
   let quiet = false; // setText is changing the text
-  const target: ExTarget = { view: null as unknown as EditorView, write: opts.write, close: opts.close };
+  const target: ExTarget = { view: null as unknown as EditorView, write: opts.write, close: opts.close, run: opts.run };
   const view = new EditorView({
     parent,
     state: EditorState.create({
@@ -86,7 +100,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         markdown({ codeLanguages }),
         editorLook,
         attrMarks,
-        Prec.high(keymap.of([{ key: "Mod-Enter", run: () => (opts.done?.(), !!opts.done) }, ...barKeys, { key: "Tab", run: tableTab(1) }, { key: "Shift-Tab", run: tableTab(-1) }])),
+        Prec.high(keymap.of([{ key: "Mod-Enter", run: modEnter(opts) }, ...barKeys, { key: "Tab", run: tableTab(1) }, { key: "Shift-Tab", run: tableTab(-1) }])),
         escape.of(escapeKey(opts.vim)),
         keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap]),
         attrHelp(opts.attrs, opts.names),

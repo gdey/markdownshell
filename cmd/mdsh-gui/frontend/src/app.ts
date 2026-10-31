@@ -357,6 +357,7 @@ function openSource() {
       await actions.save();
     },
     close() {},
+    run: () => void runCurrent(),
   });
   $("source-bar").replaceChildren(markdownBar(() => source?.view ?? null));
   source.view.scrollDOM.addEventListener("scroll", () => syncScroll("source"));
