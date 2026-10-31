@@ -129,6 +129,11 @@ func (s *Session) refs() {
 	s.lookup = NewLookup(s.d, s.results, s.opts.Environ)
 }
 
+// SetFile renames the document the session runs: blocks run from now on
+// see file as MDSH_FILE and save their assets in <file>.assets. The
+// shells and their working directory stay as they are.
+func (s *Session) SetFile(file string) { s.opts.File = file }
+
 // Results returns one result per block, in order. A block run again gets
 // a new result, so hold on to the slice only while nothing runs.
 func (s *Session) Results() []*Result { return s.results }
