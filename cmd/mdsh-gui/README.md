@@ -9,8 +9,16 @@ See [the design](../../docs/gui/design.md) for how it works and what
 comes next.
 
 ```sh
-mdsh-gui [file.md [args...] | folder]
+mdsh-gui [flags] [file.md [args...] | folder]
 ```
+
+Flags come before the file, as with `mdsh`; `mdsh-gui --help` lists them.
+`--source FILE` (repeatable) sources a file into every shell of every
+file opened, before its first block. It's read once at startup, so
+`mdsh-gui --source <(alias -L; typeset -f) notes.md` gives blocks the
+calling shell's aliases and functions. `--only`, `--step` and
+`--stop-on-error` set the Run Options of the file named on the command
+line.
 
 With no file, the start screen lists the markdown files under the current
 folder, or under `folder` when one is given (or the start folder from Settings, when started from Finder or

@@ -29,6 +29,7 @@ type App struct {
 	settings *settings.Store
 	cwd      string // the folder mdsh-gui started in
 	dir      string // the folder given on the command line, if any
+	source   string // the files given to --source, read at startup
 
 	menu       *application.Menu
 	viewItems  struct{ split, rendered, outline, code, output *application.MenuItem }
@@ -45,6 +46,12 @@ type App struct {
 	quitting  bool
 
 	started atomic.Bool // the app is running, so menus change on its main thread
+}
+
+// runOptions are the options a file opens with: the shell from Settings
+// and what --source read.
+func (a *App) runOptions() notebook.RunOptions {
+	return notebook.RunOptions{Shell: a.settings.Get().Shell, Source: a.source}
 }
 
 // errNoFile is returned by calls that need a file before one is open.
@@ -339,7 +346,7 @@ func (a *App) openIn(w *docWindow, file string) error {
 		a.focusTab(t)
 		return nil
 	}
-	ro := notebook.RunOptions{Shell: a.settings.Get().Shell}
+	ro := a.runOptions()
 	if w != nil {
 		if t := w.activeTab(); t != nil && t.file() == "" {
 			return t.open(abs, ro)

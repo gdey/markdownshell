@@ -186,7 +186,7 @@ func (a *App) OpenPath(ctx context.Context, file string) error {
 		a.focusTab(open)
 		return nil
 	}
-	return t.open(file, notebook.RunOptions{Shell: a.settings.Get().Shell})
+	return t.open(file, a.runOptions())
 }
 
 // Save writes the output into the file.
