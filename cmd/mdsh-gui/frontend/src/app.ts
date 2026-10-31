@@ -2,7 +2,7 @@ import "./tab.js";
 import { EditorView } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Doc, type Names, type Settings, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
@@ -724,6 +724,7 @@ function toggle(key: keyof View, on = !view[key]) {
 // Actions run from menus, buttons and keys.
 
 const actions: Record<string, () => Promise<void> | void> = {
+  newfile: () => openNewFile(),
   async save() {
     try {
       await App.Save();
@@ -890,6 +891,37 @@ $("filter").oninput = filterStart;
 $("filter").onkeydown = (e) => {
   if (e.key === "Enter") document.querySelector<HTMLElement>("#start .file")?.click();
 };
+$("new-file").onclick = () => openNewFile();
+
+// New file
+
+// openNewFile asks which template to start from, when the templates
+// folder in Settings has any, and then where to save the file.
+async function openNewFile() {
+  let templates: Template[] = [];
+  try {
+    templates = (await App.Templates()) ?? [];
+  } catch (err) {
+    $("new-file-error").textContent = "Templates folder: " + message(err);
+    $("new-file-error").hidden = false;
+  }
+  if (templates.length === 0 && $("new-file-error").hidden) return void App.NewFile("").catch(fail);
+  const pick = (path: string, label: string, detail: string, desc = "") => {
+    const row = fileRow(path, label, detail, desc);
+    row.querySelector("button")!.onclick = (e) => {
+      e.preventDefault();
+      $<HTMLDialogElement>("new-file-dialog").close();
+      App.NewFile(path).catch(fail);
+    };
+    return row;
+  };
+  $("templates").replaceChildren(
+    pick("", "Blank", "a heading named for the file"),
+    ...templates.map((f) => pick(f.path, f.rel.replace(/\.(md|markdown)$/, ""), blocksLabel(f.blocks), f.description)),
+  );
+  $<HTMLDialogElement>("new-file-dialog").showModal();
+}
+$<HTMLDialogElement>("new-file-dialog").onclose = () => ($("new-file-error").hidden = true);
 $("open-other").onclick = () => App.Open().catch(fail);
 
 // Events from Go

@@ -31,6 +31,9 @@ type Settings struct {
 	// StartFolder is the folder the start screen lists when the app
 	// isn't started from a terminal. Empty means the last folder used.
 	StartFolder string `json:"startFolder"`
+	// TemplateFolder holds the markdown files New File… offers to start
+	// from. Empty offers only a blank file.
+	TemplateFolder string `json:"templateFolder"`
 	// LastFolder is the folder of the file opened last.
 	LastFolder string `json:"lastFolder"`
 	// Recent are the files opened last, newest first.

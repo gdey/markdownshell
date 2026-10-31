@@ -16,6 +16,8 @@ function draw() {
   input("shell").value = s.shell;
   $<HTMLSelectElement>("start-mode").value = s.startFolder ? "fixed" : "last";
   input("start-folder").value = s.startFolder;
+  input("template-folder").value = s.templateFolder;
+  $("clear-templates").hidden = !s.templateFolder;
   $("fixed").hidden = !s.startFolder && $<HTMLSelectElement>("start-mode").value !== "fixed";
   input("zsh-wrapper").checked = !!zsh?.on;
   input("zsh-wrapper").disabled = !zsh;
@@ -43,7 +45,7 @@ async function save() {
 }
 
 async function choose() {
-  const dir = await App.ChooseFolder();
+  const dir = await App.ChooseFolder("Choose the start folder", s.startFolder);
   if (dir) {
     s.startFolder = dir;
     await save();
@@ -71,6 +73,19 @@ $<HTMLSelectElement>("start-mode").onchange = async () => {
   }
 };
 $("choose").onclick = choose;
+$("choose-templates").onclick = async () => {
+  const dir = await App.ChooseFolder("Choose the templates folder", s.templateFolder);
+  if (dir) {
+    s.templateFolder = dir;
+    await save();
+  }
+  draw();
+};
+$("clear-templates").onclick = async () => {
+  s.templateFolder = "";
+  await save();
+  draw();
+};
 input("zsh-wrapper").onchange = async () => {
   try {
     zsh = await App.SetZshWrapper(input("zsh-wrapper").checked);

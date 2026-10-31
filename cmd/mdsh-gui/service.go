@@ -176,6 +176,28 @@ func (a *App) Open(ctx context.Context) error {
 	return nil
 }
 
+// NewFile asks where to make a new markdown file and opens it: in this
+// tab if it shows the start screen, else in a new tab. The file is a
+// copy of template, or a heading if template is "".
+func (a *App) NewFile(ctx context.Context, template string) error {
+	w, err := a.window(ctx)
+	if err != nil {
+		return err
+	}
+	return a.newFile(w, template)
+}
+
+// Templates lists the markdown files in the templates folder, for New
+// File… to start from. With no templates folder set it lists none.
+func (a *App) Templates() ([]library.File, error) {
+	dir := a.settings.Get().TemplateFolder
+	if dir == "" {
+		return nil, nil
+	}
+	files, _, err := library.List(dir)
+	return files, err
+}
+
 // OpenPath opens file, from the start screen.
 func (a *App) OpenPath(ctx context.Context, file string) error {
 	t, err := a.tab(ctx)
@@ -287,11 +309,13 @@ func (a *App) StartScreen() (Start, error) {
 func (a *App) Settings() settings.Settings { return a.settings.Get() }
 
 // SetSettings saves the settings the Settings window edits: autosave,
-// Vim mode, theme, shell, the view files open in and the start folder. Open windows hear of it with a
+// Vim mode, theme, shell, the view files open in, the start folder and
+// the templates folder. Open windows hear of it with a
 // "settings" event.
 func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) {
 		cur.Autosave, cur.Vim, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.Shell, s.StartFolder
+		cur.TemplateFolder = s.TemplateFolder
 		cur.Theme = ""
 		if s.Theme == "light" || s.Theme == "dark" {
 			cur.Theme = s.Theme
@@ -339,15 +363,18 @@ func (a *App) SetZshWrapper(on bool) (ZshWrapper, error) {
 	return a.ZshWrapperState()
 }
 
-// ChooseFolder asks for a folder and returns it, or "" if none was
-// picked.
-func (a *App) ChooseFolder(ctx context.Context) (string, error) {
+// ChooseFolder asks for a folder, with title, starting in dir or the
+// start folder, and returns it, or "" if none was picked.
+func (a *App) ChooseFolder(ctx context.Context, title, dir string) (string, error) {
+	if dir == "" {
+		dir = a.startDir()
+	}
 	d := a.app.Dialog.OpenFile().
 		CanChooseDirectories(true).
 		CanChooseFiles(false).
 		CanCreateDirectories(true).
-		SetTitle("Choose the start folder").
-		SetDirectory(a.startDir())
+		SetTitle(title).
+		SetDirectory(dir)
 	if w, ok := ctx.Value(application.WindowKey).(application.Window); ok {
 		d.AttachToWindow(w)
 	}
