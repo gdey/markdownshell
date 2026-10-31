@@ -43,6 +43,13 @@ type Settings struct {
 	// NoSpellCheck turns off spell checking of the prose in the code
 	// editor, which is on by default.
 	NoSpellCheck bool `json:"noSpellCheck"`
+	// Neovim makes the source pane an embedded Neovim, when Vim is on
+	// and a new enough nvim is found. Experimental.
+	Neovim bool `json:"neovim"`
+	// NeovimPath is the nvim to run; empty finds one.
+	NeovimPath string `json:"neovimPath"`
+	// NeovimClean starts Neovim without the user's config.
+	NeovimClean bool `json:"neovimClean"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
 	// Shell, if set, overrides the front matter's shell for every file.

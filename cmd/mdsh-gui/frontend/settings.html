@@ -73,6 +73,28 @@
       </div>
       <div class="setting">
         <div class="text">
+          <label for="neovim">Use Neovim for the source pane</label>
+          <p class="muted">Experimental. Needs Vim key bindings on. <span id="neovim-info"></span></p>
+        </div>
+        <input id="neovim" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="neovim-clean">Start Neovim without my config</label>
+          <p class="muted">Runs it with <code>--clean</code>, skipping your init.lua or init.vim and plugins.</p>
+        </div>
+        <input id="neovim-clean" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="neovim-path">Neovim to run</label>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="neovim-path" type="text" spellcheck="false" placeholder="Found on the PATH or in the usual places">
+      </div>
+      <div class="setting">
+        <div class="text">
           <label for="spellcheck">Check spelling in the code editor</label>
           <p class="muted">Underlines misspelled words in the prose, not in code, links or HTML.</p>
         </div>
