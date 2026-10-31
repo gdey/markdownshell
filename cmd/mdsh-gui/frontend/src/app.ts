@@ -635,6 +635,19 @@ const actions: Record<string, () => Promise<void> | void> = {
     }
   },
   runall: () => (running ? actions.stop() : start("RunFrom", 0)),
+  // clearoutputs takes all output out of the document. In the source
+  // pane it is one edit, so undo brings the output back.
+  async clearoutputs() {
+    if (!doc.file || running) return;
+    await applySource();
+    try {
+      await App.ClearOutputs();
+      status("outputs cleared");
+    } catch (err) {
+      fail(err);
+    }
+    await refresh();
+  },
   report: () => (doc.file && !running ? openReport() : undefined),
   stop: () => App.Stop(),
   runoptions: () => openRunOptions(),

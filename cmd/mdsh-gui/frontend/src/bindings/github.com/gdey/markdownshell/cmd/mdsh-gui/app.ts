@@ -75,6 +75,14 @@ export function ChooseReport(format: report$0.Format, dest: string): $Cancellabl
 }
 
 /**
+ * ClearOutputs takes every block's output out of the document and
+ * starts its shells again.
+ */
+export function ClearOutputs(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ClearOutputs");
+}
+
+/**
  * CloseTab closes tab id, asking first if it has unsaved output.
  */
 export function CloseTab(id: number): $CancellablePromise<void> {

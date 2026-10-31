@@ -380,6 +380,30 @@ func (n *Notebook) Stop() {
 	}
 }
 
+// ClearOutputs takes every run's output out of the document, as
+// render.Clear does, and starts the shells again, so the notebook is as
+// if nothing had run: no output, no statuses, no variables. Like an
+// edit, it isn't saved until Save.
+func (n *Notebook) ClearOutputs() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return ErrBusy
+	}
+	n.waitReap()
+	if err := n.setSource(render.Clear(n.d)); err != nil {
+		return err
+	}
+	sess, err := n.newSession(n.opts.Run)
+	if err != nil {
+		return err
+	}
+	n.closeSession()
+	n.sess = sess
+	n.results = append([]*run.Result(nil), sess.Results()...)
+	return nil
+}
+
 // Save writes the output of every block that ran into the file.
 func (n *Notebook) Save() error {
 	n.mu.Lock()

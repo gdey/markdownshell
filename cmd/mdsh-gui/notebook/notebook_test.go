@@ -355,3 +355,39 @@ func blockCell(t *testing.T, cells []Cell, id string) Cell {
 	t.Fatalf("no cell %s", id)
 	return Cell{}
 }
+
+func TestClearOutputs(t *testing.T) {
+	file := write(t, src)
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunFrom(0); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.ClearOutputs(); err != nil {
+		t.Fatal(err)
+	}
+	if got := n.Text(); got != src {
+		t.Errorf("text after ClearOutputs:\n%s\nwant:\n%s", got, src)
+	}
+	for _, c := range n.Cells() {
+		if c.Block >= 0 && (c.Ran || c.Failed || c.Output != "") {
+			t.Errorf("cell after ClearOutputs = %+v", c)
+		}
+	}
+	if !n.Dirty() {
+		t.Errorf("ClearOutputs should leave the notebook to be saved")
+	}
+	// The shells started again: a block runs, and its output comes back.
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if c := n.Cells()[2]; !c.Ran || !strings.Contains(c.Output, "hello") {
+		t.Errorf("hello cell after running again = %+v", c)
+	}
+}
