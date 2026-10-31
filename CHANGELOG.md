@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
+  the program that started them, such as an editor plugin, as JSON lines
+  on stdin and stdout.
+
 ## [1.2.0] - 2026-10-29
 
 The desktop app: `mdsh-gui` opens documents in a window, with packages for

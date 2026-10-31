@@ -283,6 +283,27 @@ a shell login:
   dialogs and the commands it runs, and it shows the images and files
   beside open documents.
 
+### Serving to another program
+
+`mdsh --serve=stdio` serves the notebook to the program that started
+mdsh, such as an editor plugin, instead of to a browser: the same calls,
+events and questions, as one JSON object per line on stdin and stdout.
+`mdsh-gui --serve=stdio` does the same and opens no window, so a plugin
+can use whichever is installed.
+
+```
+{"id":1,"name":"ui.App.RunBlock","args":[0],"window":1,"tab":1}   → stdin
+{"window":1,"name":"block","data":{"mdshTab":1,"data":{...}},"sender":"w1"}
+{"id":1,"result":null}                                             ← stdout
+```
+
+A call names a method of `ui.App`, and its reply carries the same `id`
+with a `result` or an `error`. Every other line is an event for a window.
+A question (`mdsh:ask`, `mdsh:prompt`) is answered with
+`{"answer":ID,"value":"..."}`. There is no token, as only the parent
+holds the pipes. Logs go to stderr, and mdsh stops, closing every shell,
+when stdin ends. The full format is in [serve/stdio.go](serve/stdio.go).
+
 ## PDF output
 
 `--pdf FILE` lays out what mdsh would print as a PDF, so a run can be

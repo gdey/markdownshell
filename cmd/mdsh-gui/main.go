@@ -3,9 +3,13 @@
 //
 //	mdsh-gui [file.md [args...] | folder]
 //	mdsh-gui --version
+//	mdsh-gui --serve=stdio [file.md [args...] | folder]
 //
 // With no file, the window lists the markdown files under the current
 // folder to pick from, or under folder when one is given.
+//
+// With --serve=stdio it opens no window and serves the notebook on stdin
+// and stdout instead, as mdsh --serve=stdio does.
 package main
 
 import (
@@ -36,6 +40,12 @@ var version = "dev"
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
 		fmt.Println("mdsh-gui", version)
+		return
+	}
+	if len(os.Args) >= 2 && os.Args[1] == stdioFlag {
+		if err := serveStdio(os.Args[2:]); err != nil {
+			log.Fatal("mdsh-gui: ", err)
+		}
 		return
 	}
 	if err := mdshGUI(os.Args[1:]); err != nil {
