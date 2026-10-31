@@ -35,6 +35,8 @@ type Doc struct {
 	Run   notebook.RunOptions `json:"run"`
 	// Args is Run.Args as one line, quoted as a shell would need.
 	Args string `json:"args"`
+	// History is set while the History pane is on for the file.
+	History bool `json:"history"`
 }
 
 // Doc describes the open file. File is "" while the start screen shows.
@@ -52,7 +54,7 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	t.fresh = false
 	t.mu.Unlock()
 	ro := n.RunOptions()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args), History: n.History()}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -256,6 +258,39 @@ func (a *App) SetRunOptions(ctx context.Context, args, only string, step, stopOn
 	return n.SetRunOptions(ro)
 }
 
+// SetHistory turns the History pane on or off for the file. Turning it
+// on may start the shells again, so commands can run on a terminal; it
+// reports whether it did.
+func (a *App) SetHistory(ctx context.Context, on bool) (bool, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return false, err
+	}
+	return n.SetHistory(on)
+}
+
+// HistoryEnter takes what was typed in the History pane: a note is added
+// to the file as prose, and a command is added as a block and run.
+func (a *App) HistoryEnter(ctx context.Context, input string) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = t.run(func() error { return n.Enter(input) })
+	a.afterRun(t, n)
+	return err
+}
+
+// HistoryComplete reports whether input is a whole command, so enter
+// runs it, rather than starting another line.
+func (a *App) HistoryComplete(ctx context.Context, input string) bool {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return true
+	}
+	return n.Complete(input)
+}
+
 // Start is what the start screen lists.
 type Start struct {
 	Dir    string         `json:"dir"`
@@ -400,6 +435,7 @@ type View struct {
 	Outline  bool `json:"outline"`
 	Code     bool `json:"code"`
 	Output   bool `json:"output"`
+	History  bool `json:"history"` // the History pane
 }
 
 // defaultView is what a new tab shows until its page says.

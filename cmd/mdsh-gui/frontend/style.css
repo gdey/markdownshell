@@ -349,6 +349,18 @@ dialog#report { width: min(560px, 92vw); }
 .block .output .terminal :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
 .block .output:has(.terminal) { padding: 0 12px; }
 
+/* The History pane: a terminal along the bottom whose commands are
+   added to the file. */
+#history { flex: none; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--term-bg); }
+#history[hidden] { display: none; }
+#history-term { padding: 4px 8px 0; overflow: hidden; }
+#history-term :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
+#history .history-line { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px 6px; border-top: 1px solid rgb(255 255 255 / 0.08); font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#history .prompt { color: #4ec94e; font-weight: 700; line-height: 18px; }
+#history-input { flex: 1; resize: none; border: 0; outline: none; padding: 0; background: transparent; color: var(--term-fg); font: inherit; line-height: 18px; }
+#history-input::placeholder { color: rgb(212 212 212 / 0.45); }
+#history-input:disabled { opacity: 0.5; }
+
 /* A window: the tab bar, and the tab in front under it. */
 body.shell { overflow: hidden; }
 #tabbar {

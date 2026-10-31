@@ -140,6 +140,7 @@ func (a *App) buildMenu() *application.Menu {
 	a.viewItems.split = view.AddCheckbox("Source View", false).SetAccelerator("CmdOrCtrl+\\").OnClick(send("split"))
 	a.viewItems.rendered = view.AddCheckbox("Rendered View", true).SetAccelerator("CmdOrCtrl+Shift+\\").OnClick(send("rendered"))
 	a.viewItems.outline = view.AddCheckbox("Outline", false).SetAccelerator("CmdOrCtrl+Shift+O").OnClick(send("outline"))
+	a.viewItems.history = view.AddCheckbox("History", false).SetAccelerator("CmdOrCtrl+Shift+H").OnClick(send("history"))
 	view.AddSeparator()
 	a.viewItems.code = view.AddCheckbox("Show Code", true).OnClick(send("code"))
 	a.viewItems.output = view.AddCheckbox("Show Output", true).OnClick(send("output"))
@@ -192,6 +193,7 @@ func (a *App) checkView(v View) {
 	items.split.SetChecked(v.Split)
 	items.rendered.SetChecked(v.Rendered || !v.Split)
 	items.outline.SetChecked(v.Outline)
+	items.history.SetChecked(v.History)
 	items.code.SetChecked(v.Code)
 	items.output.SetChecked(v.Output)
 	if a.menu != nil {

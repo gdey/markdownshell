@@ -32,7 +32,7 @@ type App struct {
 	source   string // the files given to --source, read at startup
 
 	menu       *application.Menu
-	viewItems  struct{ split, rendered, outline, code, output *application.MenuItem }
+	viewItems  struct{ split, rendered, outline, history, code, output *application.MenuItem }
 	recentMenu *application.Menu
 
 	mu        sync.Mutex

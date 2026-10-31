@@ -44,6 +44,12 @@ follow [Semantic Versioning](https://semver.org/).
   block's language and exit status as badges and label their output.
 - `mdsh-gui` shows the ANSI colors and bold, italic and underline in a
   block's output, saved or live, instead of the escape codes.
+- `mdsh-gui` **History** pane (View › History, cmd/ctrl+shift+H): a
+  terminal along the bottom of the window. A command typed there runs
+  in the file's shell, on a terminal, and is added to the end of the
+  file as a `#history-N` block with its output; a full-screen one, such
+  as `vi`, is kept as a `tty` block with its recording. A line starting
+  with `#` is added as prose.
 
 ### Fixed
 

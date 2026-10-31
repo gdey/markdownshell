@@ -33,6 +33,11 @@ export interface Doc {
      * Args is Run.Args as one line, quoted as a shell would need.
      */
     "args": string;
+
+    /**
+     * History is set while the History pane is on for the file.
+     */
+    "history": boolean;
 }
 
 /**
@@ -114,6 +119,11 @@ export interface View {
     "outline": boolean;
     "code": boolean;
     "output": boolean;
+
+    /**
+     * the History pane
+     */
+    "history": boolean;
 }
 
 /**
