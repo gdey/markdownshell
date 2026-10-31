@@ -97,6 +97,7 @@ github.com/gdey/markdownshell/pdf
 github.com/gdey/markdownshell/render
 github.com/gdey/markdownshell/report
 github.com/gdey/markdownshell/run
+github.com/gdey/markdownshell/serve
 github.com/gdey/markdownshell/session
 github.com/gdey/markdownshell/settings
 github.com/gdey/markdownshell/shellrc

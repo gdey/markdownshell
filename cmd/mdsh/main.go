@@ -141,7 +141,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mdsh [run] [flags] file.md [args...]")
-		fmt.Fprintln(stderr, "       mdsh --serve[=host:port] [file.md [args...] | folder]")
+		fmt.Fprintln(stderr, "       mdsh --serve[=host:port|=stdio] [file.md [args...] | folder]")
 		fmt.Fprintln(stderr, "       mdsh completion bash|zsh")
 		fmt.Fprintln(stderr, "       mdsh lsp")
 		fmt.Fprintln(stderr, "       mdsh ctl COMMAND ...  (from inside a block; mdsh ctl help lists them)")
@@ -167,7 +167,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	var serveOn serveFlag
-	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"); anyone who can reach it with its token can run commands as you")
+	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"), or with =stdio to the program that started mdsh, as JSON lines on stdin and stdout; anyone who can reach it with its token can run commands as you")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	allowOutside := fs.Bool("allow-outside", false, "let include blocks, out= files and report images reach outside the document's git repository (or its folder, outside a repository); only for documents you trust")
 	auditFile := fs.String("audit", "", "write an audit log of the run to this file, one JSON object per line")
