@@ -72,6 +72,15 @@ func TestParseFlags(t *testing.T) {
 	if o, err := parseFlags([]string{"--version"}, io.Discard); err != nil || !o.version {
 		t.Errorf("--version: %+v, %v", o, err)
 	}
+	if o, err := parseFlags([]string{"--serve=stdio", "doc.md", "a"}, io.Discard); err != nil || !o.stdio || !slices.Equal(o.args, []string{"doc.md", "a"}) {
+		t.Errorf("--serve=stdio: %+v, %v", o, err)
+	}
+	if _, err := parseFlags([]string{"--serve=localhost:9000"}, io.Discard); err == nil {
+		t.Error("--serve with an address: no error")
+	}
+	if _, err := parseFlags([]string{"--serve=stdio", "--step", "doc.md"}, io.Discard); err == nil {
+		t.Error("--serve=stdio --step: no error")
+	}
 	if _, err := parseFlags([]string{"--source", filepath.Join(dir, "missing")}, io.Discard); err == nil {
 		t.Error("missing --source file: no error")
 	}
