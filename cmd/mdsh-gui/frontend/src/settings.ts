@@ -25,6 +25,10 @@ function draw() {
   input("autosave").checked = s.autosave;
   input("vim").checked = s.vim;
   input("spellcheck").checked = !s.noSpellCheck;
+  input("neovim").checked = s.neovim;
+  input("neovim").disabled = !s.vim;
+  input("neovim-clean").checked = s.neovimClean;
+  input("neovim-path").value = s.neovimPath;
   select("theme").value = s.theme;
   select("look").value = s.look;
   drawLook();
@@ -72,8 +76,22 @@ async function choose() {
 }
 
 input("autosave").onchange = () => ((s.autosave = input("autosave").checked), save());
-input("vim").onchange = () => ((s.vim = input("vim").checked), save());
+input("vim").onchange = () => ((s.vim = input("vim").checked), save().then(draw));
 input("spellcheck").onchange = () => ((s.noSpellCheck = !input("spellcheck").checked), save());
+input("neovim").onchange = () => ((s.neovim = input("neovim").checked), save());
+input("neovim-clean").onchange = () => ((s.neovimClean = input("neovim-clean").checked), save());
+input("neovim-path").onchange = async () => {
+  s.neovimPath = input("neovim-path").value.trim();
+  await save();
+  await drawNeovim();
+};
+
+// drawNeovim says which Neovim the source pane would run, or why none.
+async function drawNeovim() {
+  const n = await App.Neovim();
+  $("neovim-info").textContent = n.error ? n.error : `Found Neovim ${n.version} at ${n.path}.`;
+}
+
 select("theme").onchange = () => lookChange(() => (s.theme = select("theme").value));
 select("look").onchange = () => lookChange(() => (s.look = select("look").value));
 
@@ -295,3 +313,4 @@ $("copy").onclick = async () => {
 };
 
 draw();
+void drawNeovim();
