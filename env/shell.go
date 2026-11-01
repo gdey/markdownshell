@@ -243,6 +243,7 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited
+		s.drainTTY(onTTY)
 		return s.exit, true, ErrExited
 	}
 
@@ -253,12 +254,14 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		case v, ok := <-s.out.done:
 			if !ok {
 				<-s.waited
+				s.drainTTY(onTTY)
 				return s.exit, true, ErrExited
 			}
 			outRC, gotOut = v, true
 		case _, ok := <-s.errs.done:
 			if !ok {
 				<-s.waited
+				s.drainTTY(onTTY)
 				return s.exit, true, ErrExited
 			}
 			gotErr = true
@@ -276,6 +279,17 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		return 0, false, fmt.Errorf("bad status %q", outRC)
 	}
 	return rc, false, nil
+}
+
+// drainTTY, after a block on the terminal ended the shell, waits until
+// everything it wrote there has been read. The shell can't write the
+// marker that says so, so mdsh writes it to the terminal's shell end,
+// which it keeps open, behind what the block left.
+func (s *Shell) drainTTY(onTTY bool) {
+	if !onTTY || s.pty == nil {
+		return
+	}
+	s.pty.drain(s.mark, s.ttyRun)
 }
 
 // jobControl reports whether the shell might turn job control on with

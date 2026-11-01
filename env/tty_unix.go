@@ -5,6 +5,7 @@ package env
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -272,6 +273,17 @@ func (p *ptyConn) wait(n int) {
 			return
 		}
 	}
+}
+
+// drain writes the marker of block n to the shell's end of the
+// pseudo-terminal, as the shell would have after the block, and waits
+// for it, so what the block wrote before it ended the shell has gone to
+// the attached writer.
+func (p *ptyConn) drain(mark string, n int) {
+	if _, err := fmt.Fprintf(p.pts, "%s%d\n", mark, n); err != nil {
+		return
+	}
+	p.wait(n)
 }
 
 func (p *ptyConn) close() {
