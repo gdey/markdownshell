@@ -3,7 +3,7 @@ import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { initDeps, litDeps, setDeps } from "./deps.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
@@ -447,11 +447,13 @@ function drawBlock(c: Cell): HTMLElement {
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
       iconButton("play", "Run this block (enter)", () => start("RunBlock", c.block)),
       iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
+      ...(c.movable ? [trashButton(c)] : []),
     ),
     foldPart("code", el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))), () => foldBlock(block, "code")),
     el("div", { className: "ask", hidden: true }),
     foldPart("output", el("div", { className: "output", innerHTML: c.output ?? "" }), () => foldBlock(block, "output")),
   );
+  if (c.movable) block.querySelector(".output-part")!.append(clearOutputButton(c));
   colorOutput(block.querySelector(".output")!);
   block.dataset.foldCode = c.collapsed ? "1" : "";
   block.dataset.foldOutput = c.collapsedOutput ? "1" : "";
@@ -1614,6 +1616,83 @@ function showMoved(m: Move, undoIt: () => unknown) {
 }
 $("moved-close").onclick = () => ($("moved").hidden = true);
 
+// Deleting blocks
+//
+// The selected card has a trash button, as delete or backspace does: it
+// asks first, then takes the block out of the file with its output and
+// tape, as a rendered-view edit that Undo puts back. The bar says so,
+// with an Undo button of its own. Its output has a trash button too,
+// which clears just the output.
+
+function trashButton(c: Cell): HTMLButtonElement {
+  const b = iconButton("trash", "Delete this block (delete)", () => void deleteBlock(c.block));
+  b.classList.add("trash");
+  return b;
+}
+
+// clearOutputButton clears the output on the selected card, without
+// asking, since the bar's Undo puts it back.
+function clearOutputButton(c: Cell): HTMLButtonElement {
+  const b = iconButton("trash", "Clear this block's output", () => void clearOutput(c.block));
+  b.classList.add("trash", "clear-output");
+  return b;
+}
+
+async function clearOutput(i: number) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  try {
+    await App.ClearOutput(i);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  $("moved-text").textContent = "Cleared the output.";
+  $("moved-undo").onclick = () => {
+    $("moved").hidden = true;
+    void undoEdit(false);
+  };
+  $("moved").hidden = false;
+  status("cleared output");
+}
+
+// deleteBlock asks whether to delete block i, and does.
+async function deleteBlock(i: number) {
+  if (running) return status("can't change the file while a block runs");
+  const c = cells.find((c) => c.block === i);
+  if (!c?.movable) return status("only top-level blocks can be deleted");
+  const id = c.name ?? c.id ?? "";
+  if (!(await confirmDelete(id ? "#" + id : `the block at line ${c.line}`))) return;
+  await applySource();
+  const k = blocks().findIndex((b) => Number(b.dataset.block) === i);
+  let d: Deleted;
+  try {
+    d = await App.DeleteBlock(i);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  const all = blocks();
+  if (all.length) select(Math.min(Math.max(k, 0), all.length - 1));
+  $("moved-text").textContent = [`Deleted ${d.name}.`, ...(d.warnings ?? [])].join(" ");
+  $("moved-undo").onclick = () => {
+    $("moved").hidden = true;
+    void undoEdit(false);
+  };
+  $("moved").hidden = false;
+  status("deleted " + d.name);
+}
+
+// confirmDelete asks whether to delete the block named name.
+function confirmDelete(name: string): Promise<boolean> {
+  const dialog = $<HTMLDialogElement>("delete-dialog");
+  $("delete-name").textContent = name;
+  dialog.returnValue = "";
+  dialog.showModal();
+  $("delete-ok").focus();
+  return new Promise((resolve) => (dialog.onclose = () => resolve(dialog.returnValue === "delete")));
+}
+
 // undoEdit is Edit › Undo, or Redo. Where the focus is decides what it
 // takes back: the source view keeps its own history, a text field its
 // own, and everything else is the rendered view's, whose edits (tasks,
@@ -2045,6 +2124,10 @@ document.addEventListener("keydown", (e) => {
       break;
     case "s":
       void runSection(sectionCell());
+      break;
+    case "Delete":
+    case "Backspace":
+      if (selected >= 0) void deleteBlock(current());
       break;
     case "e":
       if (selected >= 0) {

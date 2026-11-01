@@ -99,6 +99,14 @@ export function ClearConsole(): $CancellablePromise<void> {
 }
 
 /**
+ * ClearOutput takes block i's output out of the file and forgets its
+ * run. Undo puts it back.
+ */
+export function ClearOutput(i: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ClearOutput", i);
+}
+
+/**
  * ClearOutputs takes every block's output out of the document and
  * starts its shells again.
  */
@@ -126,6 +134,14 @@ export function Console(): $CancellablePromise<$models.ConsoleEntry[] | null> {
  */
 export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
     return $Call.ByName("main.App.CreateReport", r);
+}
+
+/**
+ * DeleteBlock takes top-level block i, with its output and tape, out of
+ * the file. Undo puts it back.
+ */
+export function DeleteBlock(i: number): $CancellablePromise<notebook$0.Deleted> {
+    return $Call.ByName("main.App.DeleteBlock", i);
 }
 
 /**

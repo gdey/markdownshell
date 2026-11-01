@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -20,6 +21,14 @@ type change struct {
 	what, key     string
 	before, after []byte
 	outs          []outChange
+	res           []resChange
+}
+
+// resChange is a block's result swapped for another, as clearing its
+// output swaps it for one that never ran.
+type resChange struct {
+	b             *doc.Block
+	before, after *run.Result
 }
 
 // outChange is a block's stdout before and after a change.
@@ -106,6 +115,15 @@ func (n *Notebook) step(from, to *[]change, redo bool) (string, error) {
 			if o := c.outs[i]; bytes.Equal(o.r.Stdout, o.after) {
 				o.r.Stdout = o.before
 			}
+		}
+	}
+	for _, rc := range c.res {
+		was, now := rc.after, rc.before
+		if redo {
+			was, now = now, was
+		}
+		if i, ok := n.index[rc.b]; ok && n.results[i] == was {
+			n.results[i] = now
 		}
 	}
 	*from = (*from)[:len(*from)-1]
