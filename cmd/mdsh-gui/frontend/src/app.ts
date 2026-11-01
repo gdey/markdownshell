@@ -209,6 +209,8 @@ function drawCell(c: Cell): HTMLElement {
   e.dataset.line = String(c.line);
   e.dataset.from = String(c.from);
   if (c.drop) e.dataset.drop = "1";
+  if (c.dropAfter >= 0) e.dataset.dropAfter = String(c.dropAfter);
+  if (c.dropBefore >= 0) e.dataset.dropBefore = String(c.dropBefore);
   if (c.movable) {
     // The grip goes first in a block's head, or before an input's name.
     const g = grip("Drag to move this block (alt+↑/↓)", (ev, handle) => startDrag(ev, handle, e, c.from, 0, "doc"));
@@ -1324,6 +1326,8 @@ function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLEl
   const row = el("div", { className: "row" }, item);
   row.dataset.from = cell.dataset.from ?? "";
   if (cell.dataset.drop) row.dataset.drop = "1";
+  if (cell.dataset.dropAfter) row.dataset.dropAfter = cell.dataset.dropAfter;
+  if (cell.dataset.dropBefore) row.dataset.dropBefore = cell.dataset.dropBefore;
   if (level) row.dataset.level = String(level);
   const movable = level ? cell.dataset.drop === "1" : !!cell.querySelector(".grip");
   if (movable) {
@@ -1759,8 +1763,10 @@ function confirmDelete(name: string): Promise<boolean> {
 // A card's grip drags its block, with its output, to a spot between
 // top-level cells; the outline's grips drag a block, or a heading's whole
 // section, between its entries. A section goes only before a heading of
-// its level or higher, or to the end. A line shows the spot; near the
-// top or bottom edge the pane scrolls; Esc cancels.
+// its level or higher, or to the end. Neither goes where a block would
+// land above one its depends= names: the line stops at the last spot
+// that keeps them in order, and the status line says why. A line shows
+// the spot; near the top or bottom edge the pane scrolls; Esc cancels.
 
 function grip(title: string, start: (ev: PointerEvent, handle: HTMLElement) => void): HTMLElement {
   const g = el("button", { className: "grip", title, tabIndex: -1 }, "⋮⋮");
@@ -1774,22 +1780,30 @@ function grip(title: string, start: (ev: PointerEvent, handle: HTMLElement) => v
 interface Spot {
   at: number; // a cell's From, or -1 for the end
   y: () => number; // where the line goes, in the viewport
+  blocked?: "above" | "below"; // a depends= keeps the move from here
 }
 
 // spots are where a drag in pane can drop: before each row or card
 // marked drop, and at the end. For a section (level > 0), only before
-// headings of its level or higher.
-function spots(pane: "doc" | "outline", level: number): Spot[] {
+// headings of its level or higher. Each says whether a block would land
+// above one it depends on there, against item's drop limits (see
+// Cell.dropAfter): "above" if the moved blocks would go above one they
+// depend on, "below" if below one that depends on them.
+function spots(pane: "doc" | "outline", level: number, item: HTMLElement): Spot[] {
+  const after = Number(item.dataset.dropAfter ?? -1);
+  const before = Number(item.dataset.dropBefore ?? -1);
+  const blocked = (at: number): Spot["blocked"] => (at >= 0 && at <= after ? "above" : before >= 0 && (at < 0 || at > before) ? "below" : undefined);
   const rows = pane === "doc" ? [...$("doc").children] : [...$("outline").querySelectorAll<HTMLElement>(":scope > .row")];
   const shown = (rows as HTMLElement[]).filter((e) => e.offsetParent !== null);
   const out: Spot[] = [];
   for (const e of shown) {
     if (e.dataset.drop !== "1") continue;
     if (level && !(Number(e.dataset.level ?? 0) > 0 && Number(e.dataset.level) <= level)) continue;
-    out.push({ at: Number(e.dataset.from), y: () => e.getBoundingClientRect().top });
+    const at = Number(e.dataset.from);
+    out.push({ at, y: () => e.getBoundingClientRect().top, blocked: blocked(at) });
   }
   const last = shown[shown.length - 1];
-  if (last) out.push({ at: -1, y: () => last.getBoundingClientRect().bottom });
+  if (last) out.push({ at: -1, y: () => last.getBoundingClientRect().bottom, blocked: blocked(-1) });
   return out;
 }
 
@@ -1797,8 +1811,9 @@ function startDrag(ev: PointerEvent, handle: HTMLElement, item: HTMLElement, fro
   if (running) return void status("can't change the file while a block runs");
   ev.preventDefault();
   const scroller = pane === "doc" ? $("doc-scroll") : $("outline");
-  const all = spots(pane, level);
-  if (!all.length) return;
+  const all = spots(pane, level, item);
+  const open = all.filter((s) => !s.blocked);
+  if (!open.length) return;
   handle.setPointerCapture(ev.pointerId);
   const line = el("div", { className: "drop-line", hidden: true });
   document.body.append(line);
@@ -1806,15 +1821,29 @@ function startDrag(ev: PointerEvent, handle: HTMLElement, item: HTMLElement, fro
   let y = ev.clientY;
   let dragging = false;
   let spot: Spot | null = null;
+  let warned: Spot["blocked"]; // the limit the status line says, if any
   let frame = 0;
   const place = () => {
     const box = scroller.getBoundingClientRect();
-    spot = null;
-    let best = Infinity;
-    for (const s of all) {
-      const d = Math.abs(s.y() - y);
-      if (d < best) [best, spot] = [d, s];
+    const nearest = (list: Spot[]) => {
+      let near: Spot | null = null;
+      let best = Infinity;
+      for (const s of list) {
+        const d = Math.abs(s.y() - y);
+        if (d < best) [best, near] = [d, s];
+      }
+      return near as Spot | null;
+    };
+    // Past a depends= limit the line stays at the last spot short of
+    // it, and the status line says why.
+    const want = nearest(all);
+    spot = nearest(open);
+    const why = want?.blocked;
+    if (why !== warned) {
+      status(why === "below" ? "can't go below a block that depends on it" : why === "above" ? "can't go above a block it depends on" : "");
+      warned = why;
     }
+    line.classList.toggle("held", !!why);
     if (!spot) return;
     const top = Math.max(box.top, Math.min(box.bottom, spot.y()));
     Object.assign(line.style, { top: top - 1 + "px", left: box.left + 8 + "px", width: box.width - 16 + "px" });
@@ -1841,6 +1870,7 @@ function startDrag(ev: PointerEvent, handle: HTMLElement, item: HTMLElement, fro
     cancelAnimationFrame(frame);
     line.remove();
     item.classList.remove("dragging");
+    if (warned) status("");
     if (drop && dragging && spot) void moveTo(from, spot.at);
   };
   const move = (e: PointerEvent) => {

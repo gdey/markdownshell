@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/gdey/markdownshell/doc"
 )
 
 func TestMoveBlock(t *testing.T) {
@@ -209,5 +211,53 @@ func TestMoveFence(t *testing.T) {
 	}
 	if want := "```go\nfunc main() {}\n```\n\nA.\n"; n.Text() != want {
 		t.Errorf("text %q, want %q", n.Text(), want)
+	}
+}
+
+func TestMoveDependsOrder(t *testing.T) {
+	src := "```sh\ntrue\n```\n\n```sh {#a}\ntrue\n```\n\nX.\n\n```sh {#b depends=a}\ntrue\n```\n\nY.\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	cell := func(text string) Cell {
+		t.Helper()
+		for _, c := range n.Cells() {
+			if strings.HasPrefix(n.Text()[c.From:], text) {
+				return c
+			}
+		}
+		t.Fatalf("no cell %q", text)
+		return Cell{}
+	}
+	// a can go as far down as just above b; b as far up as just below a.
+	a, b := cell("```sh {#a"), cell("```sh {#b")
+	if a.DropAfter != -1 || a.DropBefore != b.From {
+		t.Errorf("a's limits %d, %d; b is at %d", a.DropAfter, a.DropBefore, b.From)
+	}
+	if b.DropAfter != a.From || b.DropBefore != -1 {
+		t.Errorf("b's limits %d, %d; a is at %d", b.DropAfter, b.DropBefore, a.From)
+	}
+	if c := cell("X."); c.DropAfter != -1 || c.DropBefore != -1 {
+		t.Errorf("prose has limits %d, %d", c.DropAfter, c.DropBefore)
+	}
+	// Past them a drag or a step fails, and changes nothing, not even
+	// the unnamed block's id.
+	if _, err := n.MoveTo(a.From, -1); !errors.Is(err, doc.ErrDependsOrder) {
+		t.Errorf("a to the end: %v", err)
+	}
+	if _, err := n.MoveTo(b.From, a.From); !errors.Is(err, doc.ErrDependsOrder) {
+		t.Errorf("b above a: %v", err)
+	}
+	if _, err := n.MoveBlock(1, 1, true); !errors.Is(err, doc.ErrDependsOrder) {
+		t.Errorf("a down past b: %v", err)
+	}
+	if n.Text() != src {
+		t.Errorf("text changed:\n%s", n.Text())
+	}
+	// Up to the limit is fine.
+	if _, err := n.MoveTo(a.From, b.From); err != nil || !strings.Contains(n.Text(), "X.\n\n```sh {#a}") {
+		t.Errorf("a to just above b: %v\n%s", err, n.Text())
 	}
 }

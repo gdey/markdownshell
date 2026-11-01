@@ -155,7 +155,7 @@ func (n *Notebook) plan(fn moveFn, block int) (Move, error) {
 		return Move{}, ErrBusy
 	}
 	m, order, err := n.tryMove(fn, block)
-	if err != nil && !errors.Is(err, ErrNoMove) && n.unnamed() {
+	if err != nil && !errors.Is(err, ErrNoMove) && !errors.Is(err, doc.ErrDependsOrder) && n.unnamed() {
 		// Give blocks ids, as saving would, and try again.
 		if _, nerr := run.NameBlocks(n.d, n.results, run.Options{File: n.file}); nerr != nil {
 			return Move{}, nerr
