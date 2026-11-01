@@ -14,6 +14,7 @@
   --warn-border: #d4a72c;
   --selection: rgb(84 174 255 / 0.35);
   --active-line: rgb(208 215 222 / 0.35);
+  --dep-1: #8250df; --dep-2: #bf3989; --dep-3: #1b7c83; --dep-4: #bc4c00; --dep-more: #8c959f;
   /* Syntax colors for the editors. */
   --syn-keyword: #cf222e;
   --syn-string: #0a3069;
@@ -53,6 +54,7 @@
     --warn-border: #9e6a03;
     --selection: rgb(56 139 253 / 0.4);
     --active-line: rgb(110 118 129 / 0.14);
+    --dep-1: #a475f9; --dep-2: #f778ba; --dep-3: #39c5cf; --dep-4: #f0883e; --dep-more: #6e7781;
     --syn-keyword: #ff7b72;
     --syn-string: #a5d6ff;
     --syn-number: #79c0ff;
@@ -202,7 +204,23 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 .cm-run { display: inline-flex; color: var(--accent); cursor: pointer; border-radius: 3px; }
 .cm-run:hover { background: var(--hover); }
 .cm-run svg { width: 11px; height: 11px; fill: currentColor; }
-#doc-scroll { flex: 1; overflow: auto; min-width: 0; }
+#doc-scroll { flex: 1; overflow: auto; min-width: 0; position: relative; isolation: isolate; }
+/* Dependency lines: an SVG layer behind the cards, over the page, in
+   the margin. A block's first dependency is dep-1, its fifth and later
+   dep-more. Selecting a block lights its lines (lit) and outlines the
+   blocks they lead to (dep-of) in the line's color. */
+#deps { position: absolute; top: 0; left: 0; z-index: -1; overflow: visible; pointer-events: none; }
+#deps .dep { color: var(--dep-more); }
+#deps .dep-1 { color: var(--dep-1); }
+#deps .dep-2 { color: var(--dep-2); }
+#deps .dep-3 { color: var(--dep-3); }
+#deps .dep-4 { color: var(--dep-4); }
+#deps path { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.3; pointer-events: stroke; cursor: pointer; }
+#deps circle { fill: currentColor; opacity: 0.45; pointer-events: all; }
+#deps .dep:hover path, #deps .dep:hover circle { opacity: 0.7; }
+#deps .lit path { opacity: 1; stroke-width: 3.5; }
+#deps .lit circle { opacity: 1; }
+#doc > .dep-of { outline: 2px solid var(--dep-of); outline-offset: 1px; border-radius: 8px; }
 #workspace.split #doc-scroll { flex: 1; }
 /* The grip over the source view's right edge, to drag. */
 #split-grip { flex: none; position: relative; z-index: 3; width: 7px; margin: 0 -4px 0 -3px; cursor: col-resize; }

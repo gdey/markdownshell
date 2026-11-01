@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a block's `depends=` is drawn as lines in the margin of
+  the rendered view, from the block up to each block it names, faint
+  behind the cards: the first dependency in purple, then pink, teal and
+  orange, and any past four in gray. Selecting a block lights its lines
+  and outlines the blocks they lead to in the same colors. Hovering a
+  line says what it joins, and double-clicking one goes to its far end.
 - `mdsh-gui`: folding a block's code or output, or a section, by hand
   now saves the fold in the file, so it opens folded next time: a bare
   `collapse` or `collapse-output` on the block, or a

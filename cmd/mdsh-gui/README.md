@@ -232,6 +232,14 @@ run yet.
 
 ![A background block still running, and a confirm block asking "Ship the site to production?" with Run, Skip and Stop](../../site/static/images/gui/confirm.png)
 
+A block's `depends=` is drawn as lines in the page margin, from the block
+up to each block it names, painted faintly behind the cards: its first
+dependency in purple, then pink, teal and orange, and any past four in
+gray. Each line keeps a lane of its own, in the left margin when the
+lanes fit there, else the right. Selecting a block lights its lines and
+outlines the blocks they lead to in the same colors; hover a line to
+read what it joins, and double-click one to go to its far end.
+
 The outline lists the headings and blocks, with a mark for each block's
 state. The selected block, or the one the source pane's cursor is in,
 has a play button in the outline that runs it.

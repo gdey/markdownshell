@@ -75,6 +75,7 @@ func (n *Notebook) cells() []Cell {
 			Lang:            b.Lang,
 			Body:            b.Body,
 			Attrs:           attrsText(b.Info),
+			Depends:         b.Depends(),
 			Output:          n.html(out),
 			OutputTasks:     tasksIn(l.tasks, b.Output),
 			Ran:             r.Ran,

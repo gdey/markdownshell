@@ -60,6 +60,12 @@ export interface Cell {
     "attrs"?: string;
 
     /**
+     * Depends are the ids of the blocks the block's depends= names, in
+     * order, for the lines the rendered view draws between them.
+     */
+    "depends"?: string[] | null;
+
+    /**
      * Output is the block's output, saved or from this session, rendered.
      */
     "output"?: string;
