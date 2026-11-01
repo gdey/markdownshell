@@ -8,6 +8,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: dragging a dependency line over a folded section's heading
+  opens the section for the moment, so a block in it can be dropped on.
+  It folds again when the line leaves it; dropping on a block in it
+  leaves it open for the tab, without writing the fold to the file.
+- `mdsh-gui`: selecting a block outlines what it depends on in the
+  outline too, in its lines' colors. A dependency in a folded section
+  marks the section's heading instead, with a ring per dependency
+  stacked in their order, in the outline and the rendered view.
+- `mdsh-gui`: a button at the top of the dependency lines' margin hides
+  the lines and shows them again.
 - `mdsh-gui`: a `.mdsh.yaml` file makes a folder of runbooks a
   collection on the start screen. Its header shows the folder's
   `title`, `description`, `icon` (an image in the folder or an emoji)

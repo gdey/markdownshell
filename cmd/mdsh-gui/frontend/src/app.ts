@@ -4,7 +4,7 @@ import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
-import { initDeps, litDeps, setDeps } from "./deps.js";
+import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
@@ -524,6 +524,82 @@ function sectionFolded(cell: HTMLElement): boolean {
   return folds.get(cell.dataset.fold ?? "") ?? !!cell.dataset.foldDefault;
 }
 
+// peeks are the folded sections a dependency line being dragged has
+// opened for the moment, by heading key, so the blocks in them can be
+// dropped on. They change neither folds nor the file.
+const peeks = new Set<string>();
+let peekTimer = 0;
+let peekCell: HTMLElement | null = null;
+// How long the line is held over a folded heading before it opens.
+const peekDelay = 400;
+
+// shownFolded is whether a section is drawn folded: folded, and not
+// opened by a drag.
+function shownFolded(cell: HTMLElement): boolean {
+  return !peeks.has(cell.dataset.fold ?? "") && sectionFolded(cell);
+}
+
+// holds is whether cell is in the section under heading, at any depth.
+function holds(heading: HTMLElement, cell: HTMLElement): boolean {
+  const level = Number(heading.dataset.level ?? 0);
+  for (let e = heading.nextElementSibling as HTMLElement | null; e; e = e.nextElementSibling as HTMLElement | null) {
+    const l = Number(e.dataset.level ?? 0);
+    if (l && l <= level) return false;
+    if (e === cell) return true;
+  }
+  return false;
+}
+
+const headingFor = (key: string) => [...($("doc").children as HTMLCollectionOf<HTMLElement>)].find((e) => e.dataset.fold === key);
+
+// peek follows a dependency drag over cell, the top-level cell under
+// the pointer (null between cells changes nothing). The sections it
+// opened close once the pointer is out of them, and a folded heading
+// held under the pointer opens.
+function peek(cell: HTMLElement | null) {
+  if (!cell) return;
+  let closed = false;
+  for (const key of [...peeks]) {
+    const h = headingFor(key);
+    if (h && (h === cell || holds(h, cell))) continue;
+    peeks.delete(key);
+    closed = true;
+  }
+  if (closed) {
+    applyFolds();
+    drawOutline();
+  }
+  if (cell === peekCell) return;
+  clearTimeout(peekTimer);
+  peekCell = null;
+  const key = cell.dataset.fold;
+  if (!key || !shownFolded(cell)) return;
+  peekCell = cell;
+  peekTimer = window.setTimeout(() => {
+    peekCell = null;
+    peeks.add(key);
+    applyFolds();
+    drawOutline();
+  }, peekDelay);
+}
+
+// endPeek closes what a dependency drag opened, when it ends. Sections
+// holding the block it was dropped on stay open while the tab is, as
+// reveal leaves them, so the new line is seen arriving there; the file
+// keeps them folded.
+function endPeek(dropped: HTMLElement | null) {
+  clearTimeout(peekTimer);
+  peekCell = null;
+  if (!peeks.size) return;
+  for (const key of peeks) {
+    const h = headingFor(key);
+    if (dropped && h && holds(h, dropped)) folds.set(key, false);
+  }
+  peeks.clear();
+  applyFolds();
+  drawOutline();
+}
+
 function foldButton(title: string, onclick: () => void): HTMLButtonElement {
   const b = el("button", { className: "fold", title }, svg(icons.chevron));
   b.setAttribute("aria-label", title);
@@ -623,7 +699,7 @@ function applyFolds() {
     e.classList.toggle("in-fold", !!owner);
     if (owner) owner.hidden++;
     if (level) {
-      const h = { level, folded: sectionFolded(e), cell: e, hidden: 0 };
+      const h = { level, folded: shownFolded(e), cell: e, hidden: 0 };
       e.classList.toggle("folded", h.folded);
       open.push(h);
       headings.push(h);
@@ -1329,7 +1405,7 @@ function drawOutline() {
         const mark = item.querySelector<HTMLElement>(".mark")!;
         mark.replaceChildren(svg(icons.chevron));
         mark.classList.add("fold");
-        mark.classList.toggle("closed", sectionFolded(e));
+        mark.classList.toggle("closed", shownFolded(e));
         mark.title = "Fold or unfold this section";
         mark.onclick = (ev) => {
           ev.stopPropagation();
@@ -1359,6 +1435,7 @@ function markOutline() {
   for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) {
     row.classList.toggle("active", row.dataset.section !== undefined ? !!selectedSection && row.dataset.section === selectedSection : row.dataset.block === b);
   }
+  markDeps();
 }
 
 // blockMark is the mark for a block card's state: ? waiting for an
@@ -1389,6 +1466,8 @@ function blockTitle(name: string): string {
 function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLElement {
   const row = el("div", { className: "row" }, item);
   row.dataset.from = cell.dataset.from ?? "";
+  // The cell's line, so the dependency rings find its row.
+  row.dataset.line = cell.dataset.line ?? "";
   if (cell.dataset.drop) row.dataset.drop = "1";
   if (cell.dataset.dropAfter) row.dataset.dropAfter = cell.dataset.dropAfter;
   if (cell.dataset.dropBefore) row.dataset.dropBefore = cell.dataset.dropBefore;
@@ -2459,7 +2538,7 @@ window.addEventListener("resize", () => {
   }, 200);
 });
 initSplitGrip();
-initDeps($("doc-scroll"), { jump: jumpTo, setDepends });
+initDeps($("doc-scroll"), { jump: jumpTo, setDepends, peek, endPeek });
 initHistory({
   canRun: () => !running,
   async enter(call) {

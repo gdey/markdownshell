@@ -241,7 +241,19 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 #deps-ui .drag { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 5; opacity: 0.8; }
 #deps-ui .drag.tear { color: var(--bad); stroke-dasharray: 2 5; opacity: 0.6; }
 body.dragging-dep, body.dragging-dep * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
-#doc > .dep-of { outline: 2px solid var(--dep-of); outline-offset: 1px; border-radius: 8px; }
+/* A ring per dependency the card or row stands for, the first nearest
+   it; deps.ts sets --dep-rings. */
+#doc > .dep-of { box-shadow: var(--dep-rings); border-radius: 8px; }
+#doc > .heading-cell.dep-of { border-radius: 4px; }
+#outline .row.dep-of { box-shadow: var(--dep-rings); border-radius: 4px; }
+#doc > .dep-of.current { box-shadow: -3px 0 0 var(--accent), var(--dep-rings); }
+#deps-bar { position: sticky; top: 0; z-index: 2; height: 0; }
+#deps-toggle { position: absolute; top: 6px; width: 18px; height: 18px; padding: 2px; border: 0; border-radius: 4px; background: var(--bg); color: var(--muted); opacity: 0.45; }
+#deps-toggle.on { color: var(--dep-1); }
+#deps-toggle:hover { opacity: 1; background: var(--hover); }
+#deps-toggle[hidden] { display: none; }
+#deps-toggle svg { width: 14px; height: 14px; fill: currentColor; display: block; }
+#doc-scroll.deps-hidden #deps, #doc-scroll.deps-hidden #deps-ui { display: none; }
 #doc > .block.dep-target { outline: 2px dashed var(--accent); outline-offset: 1px; }
 body.dragging-dep #deps-ui .port { opacity: 0.8; }
 #workspace.split #doc-scroll { flex: 1; }

@@ -41,6 +41,7 @@ export const icons = {
   choice: '<circle cx="3.5" cy="4.5" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="3.5" cy="11.5" r="2"/><rect x="7" y="3.8" width="7.5" height="1.4"/><rect x="7" y="10.8" width="7.5" height="1.4"/>',
   sidebar: '<path d="M1.5 2.5h13v11h-13zm1.4 1.4v8.2h3.2V3.9zm4.6 0v8.2h5.6V3.9z"/>',
   // A fold: open points down, and CSS turns it right when closed.
+  lines: '<path d="M12.5 3H6.8a2.3 2.3 0 0 0-2.3 2.3v5.4A2.3 2.3 0 0 0 6.8 13h5.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12.5" cy="13" r="1.9"/>',
   chevron: '<path d="M3.7 5.6 8 9.9l4.3-4.3 1 1L8 11.9 2.7 6.6z"/>',
   rendered: '<path d="M3.5 1.5h6l3.5 3.5v9.5h-9.5zm1.4 1.4v10.2h6.7V6H8.5V2.9z"/>',
 };
