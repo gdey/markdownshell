@@ -201,3 +201,12 @@ func fenceRun(c byte, s string) int {
 	}
 	return n
 }
+
+// InfoSpan is where b's info string, the part of its opening fence line
+// after the backticks, is in d's source.
+func (d *Document) InfoSpan(b *Block) Span {
+	line := string(d.Src[b.Span.Start:lineEnd(d.Src, b.Span.Start)])
+	at := strings.Index(line, b.Fence) + len(b.Fence)
+	at += strings.Index(line[at:], b.Info)
+	return Span{b.Span.Start + at, b.Span.Start + at + len(b.Info)}
+}

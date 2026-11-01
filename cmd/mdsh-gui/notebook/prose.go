@@ -22,6 +22,11 @@ import (
 func (n *Notebook) Cells() []Cell {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	return n.cells()
+}
+
+// cells is Cells for a caller that holds n.mu.
+func (n *Notebook) cells() []Cell {
 	d := n.d
 	l := layout{
 		n:      n,

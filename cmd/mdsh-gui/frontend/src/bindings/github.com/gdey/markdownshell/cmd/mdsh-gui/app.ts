@@ -313,6 +313,14 @@ export function SetChoice(i: number, checked: boolean[] | null): $CancellablePro
 }
 
 /**
+ * SetFolds writes folds made by hand in the rendered view to the file,
+ * as collapse attributes and mdsh:collapse lines, so it opens with them.
+ */
+export function SetFolds(folds: notebook$0.Fold[] | null): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetFolds", folds);
+}
+
+/**
  * SetRunOptions sets the arguments (one line, split as a shell would),
  * --only, --step and --stop-on-error for this file.
  */

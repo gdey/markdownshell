@@ -99,3 +99,96 @@ func unquote(v string) string {
 	}
 	return v
 }
+
+// SetFlag returns info, a fence info string, with the bare attribute
+// key added (on) or taken out, keeping the rest of it as it is:
+//
+//	SetFlag("sh {#a}", "collapse", true)     // sh {#a collapse}
+//	SetFlag("sh {#a collapse}", "collapse", false) // sh {#a}
+//
+// It returns info unchanged when key is already as asked, when key holds
+// a value, such as a condition, which it leaves alone, or when info has
+// text after the language that isn't attributes, as in sh foo.
+func SetFlag(info, key string, on bool) string {
+	info = strings.TrimSpace(info)
+	open := 0 // where the { is
+	if !strings.HasPrefix(info, "{") {
+		i := strings.IndexFunc(info, func(r rune) bool { return unicode.IsSpace(r) || r == '{' })
+		if i < 0 {
+			if on {
+				return strings.TrimSpace(info + " {" + key + "}")
+			}
+			return info
+		}
+		rest := strings.TrimLeftFunc(info[i:], unicode.IsSpace)
+		if !strings.HasPrefix(rest, "{") {
+			return info
+		}
+		open = len(info) - len(rest)
+	}
+	close := len(info)
+	if strings.HasSuffix(info, "}") {
+		close--
+	}
+	inner := info[open+1 : close]
+	for _, t := range attrTokens(inner) {
+		k, v, hasValue := strings.Cut(inner[t.Start:t.End], "=")
+		if k != key {
+			continue
+		}
+		if on || hasValue && v != "" {
+			return info
+		}
+		// Take out the token and the space before it, or after it when
+		// it comes first.
+		from, to := t.Start, t.End
+		for from > 0 && unicode.IsSpace(rune(inner[from-1])) {
+			from--
+		}
+		if from == 0 {
+			for to < len(inner) && unicode.IsSpace(rune(inner[to])) {
+				to++
+			}
+		}
+		inner = inner[:from] + inner[to:]
+		if strings.TrimSpace(inner) == "" {
+			return strings.TrimSpace(info[:open])
+		}
+		return info[:open] + "{" + inner + "}"
+	}
+	if !on {
+		return info
+	}
+	inner = strings.TrimRightFunc(inner, unicode.IsSpace)
+	if strings.TrimSpace(inner) != "" {
+		inner += " "
+	}
+	return info[:open] + "{" + inner + key + "}"
+}
+
+// attrTokens are where the tokens of s are, split as splitAttrs splits
+// them.
+func attrTokens(s string) []Span {
+	var out []Span
+	start, quoted := -1, false
+	for i, r := range s {
+		switch {
+		case unicode.IsSpace(r) && !quoted:
+			if start >= 0 {
+				out = append(out, Span{start, i})
+				start = -1
+			}
+		default:
+			if r == '"' {
+				quoted = !quoted
+			}
+			if start < 0 {
+				start = i
+			}
+		}
+	}
+	if start >= 0 {
+		out = append(out, Span{start, len(s)})
+	}
+	return out
+}

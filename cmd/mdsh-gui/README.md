@@ -134,8 +134,12 @@ Each file opens in a tab of its own, with its own shells.
   sections too. `collapse`, `collapse-output` and a
   `<!-- mdsh:collapse -->` line in a section say what starts folded; they
   take conditions, so `{{$MDSH_VAR_name}}` can fold or unfold a part as an
-  input changes. Folding by hand lasts while the tab is open and never
-  changes the file. The source view folds headings and fences in its
+  input changes. Folding by hand writes the fold to the file, so it
+  opens that way next time: a bare `collapse` or `collapse-output` on
+  the block, or a `<!-- mdsh:collapse -->` line under the heading, and
+  unfolding takes it out. Undo takes a fold back. Where the file folds
+  by a condition, or while a block runs, a fold by hand lasts only while
+  the tab is open. The source view folds headings and fences in its
   gutter, apart from the rendered view. View › Folding collapses all
   blocks or sections, expands all, and copies the folds from one view to
   the other.
