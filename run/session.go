@@ -29,9 +29,12 @@ type Session struct {
 	selected map[*doc.Block]bool
 	results  []*Result
 	lookup   doc.Lookup
-	wanted   map[string][]string
-	tty      bool // whether the shells have terminals of their own
-	jobs     []*bgJob
+	// baseLookup is lookup without the variables mdsh ctl set made.
+	baseLookup doc.Lookup
+	ctl        *ctlState
+	wanted     map[string][]string
+	tty        bool // whether the shells have terminals of their own
+	jobs       []*bgJob
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -73,6 +76,7 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 	// Includes are part of the document, not steps of the run, so they
 	// are read whatever runs.
 	s.results = Includes(d, opts)
+	s.startCtl()
 	s.refs()
 	return s, nil
 }
@@ -131,7 +135,8 @@ func (s *Session) refs() {
 			s.wanted[ref.BlockID] = append(s.wanted[ref.BlockID], ref.Var)
 		}
 	}
-	s.lookup = NewLookup(s.d, s.results, s.opts.Environ)
+	s.baseLookup = NewLookup(s.d, s.results, s.opts.Environ)
+	s.lookup = s.ctlLookup(s.baseLookup)
 }
 
 // SetFile renames the document the session runs: blocks run from now on
@@ -225,13 +230,14 @@ func (s *Session) Ask(ctx context.Context, script string) (string, error) {
 func (s *Session) PTY() bool { return s.tty }
 
 // Close ends the session's shells, and any background block still
-// running, which it reports as killed.
+// running, which it reports as killed, and removes the control socket.
 func (s *Session) Close() {
 	for _, j := range s.jobs {
 		j.job.Kill()
 	}
 	s.Reap()
 	s.stack.Close()
+	s.closeCtl()
 }
 
 func (s *Session) emit(e Event) {
@@ -488,9 +494,11 @@ func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bo
 	// it, and jobs, fg and bg in a later block see it.
 	t.JobControl = true
 	rec := termrec.NewRecorder(t.Dims())
+	pre, revoke := s.issue(b)
 	giveBack := takeTTY(b, s.opts)
-	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(s.d, b, s.opts)+b.Body, t, rec)
+	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, pre+b.Body, t, rec)
 	giveBack()
+	revoke()
 	if err != nil && !errors.Is(err, env.ErrExited) {
 		r.Err = err
 	}
@@ -520,6 +528,8 @@ func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 		s.background(ctx, b, r)
 		return
 	}
-	runBlock(ctx, s.stack, s.d, b, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
+	pre, revoke := s.issue(b)
+	runBlock(ctx, s.stack, s.d, b, pre, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
+	revoke()
 	s.emit(Event{Kind: Done, Block: b, Result: r})
 }

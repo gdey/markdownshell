@@ -126,14 +126,21 @@ const (
 	Stdout
 	Stderr
 	Done
+	// Status is a block reporting progress with mdsh ctl status. It
+	// replaces the block's last status, and the block's Done ends it.
+	// It comes from the control socket's goroutine, while the block
+	// runs, so OnEvent must be safe to call from more than one.
+	Status
 )
 
-// Event reports progress. Data is set for Stdout and Stderr, Result for Done.
+// Event reports progress. Data is set for Stdout and Stderr, Result for
+// Done, and Progress for Status.
 type Event struct {
-	Kind   EventKind
-	Block  *doc.Block
-	Data   []byte
-	Result *Result
+	Kind     EventKind
+	Block    *doc.Block
+	Data     []byte
+	Result   *Result
+	Progress *Progress
 }
 
 // Result is what one block did.
@@ -308,9 +315,9 @@ func tapeFor(d *doc.Document, results []*Result, b *doc.Block) *Result {
 	return &Result{Block: t, Stdout: []byte(t.Body)}
 }
 
-// runBlock runs b. taped is its tape, if it has one, and lookup fills in
-// the tape's placeholders.
-func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, r *Result, opts Options, emit func(Event), vars []string, taped *Result, lookup doc.Lookup) {
+// runBlock runs b after pre, its prelude. taped is its tape, if it has
+// one, and lookup fills in the tape's placeholders.
+func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block, pre string, r *Result, opts Options, emit func(Event), vars []string, taped *Result, lookup doc.Lookup) {
 	r.Ran = true
 	e, err := envFor(ctx, stack, d, b)
 	if err != nil {
@@ -337,23 +344,23 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	switch {
 	case !b.Attrs.Has("tty"):
 		if kind, _ := outKind(b); kind == "image" {
-			r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(d, b, opts)+b.Body, out, errw)
+			r.Status, r.Exited, err = e.Shell.Run(ctx, pre+b.Body, out, errw)
 			break
 		}
 		// Text output is shown as text, so backspace overstrikes, as
 		// man prints bold and underline, are applied.
 		o, ew := &overstrikeWriter{w: out}, &overstrikeWriter{w: errw}
-		r.Status, r.Exited, err = e.Shell.Run(ctx, prelude(d, b, opts)+b.Body, o, ew)
+		r.Status, r.Exited, err = e.Shell.Run(ctx, pre+b.Body, o, ew)
 		o.Flush()
 		ew.Flush()
 	case taped != nil:
 		// The tape types for the block, so it needs no terminal. It
 		// runs on a fixed size, so it records the same anywhere.
-		rec, err = runTaped(ctx, e.Shell, prelude(d, b, opts)+b.Body, taped, lookup, r, opts)
+		rec, err = runTaped(ctx, e.Shell, pre+b.Body, taped, lookup, r, opts)
 	case opts.TTY == nil && opts.Terminal != nil:
 		rec = termrec.NewRecorder(opts.Terminal.Dims())
 		giveBack := takeTTY(b, opts)
-		r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, prelude(d, b, opts)+b.Body, *opts.Terminal, rec)
+		r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, pre+b.Body, *opts.Terminal, rec)
 		giveBack()
 	case opts.TTY == nil:
 		err = ErrNoTTY
@@ -366,7 +373,7 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 		}
 		rec = termrec.NewRecorder(cols, rows)
 		giveBack := takeTTY(b, opts)
-		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, prelude(d, b, opts)+b.Body, opts.TTY, rec)
+		r.Status, r.Exited, err = e.Shell.RunTTY(ctx, pre+b.Body, opts.TTY, rec)
 		giveBack()
 	}
 	r.Stdout, r.Stderr = stdout.Bytes(), stderr.Bytes()
