@@ -199,6 +199,20 @@ mdsh completion zsh > "${fpath[1]}/_mdsh"      # zsh, then restart the shell
 source <(mdsh completion zsh)                  # or zsh, after compinit in ~/.zshrc
 ```
 
+`mdsh lsp` is a language server for editors: on stdin and stdout, it
+completes the attributes in a fence's `{…}` and the block names in
+`depends=`, explains an attribute on hover and flags mistakes as
+diagnostics. In Neovim, for markdown files:
+
+```lua
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "markdown",
+  callback = function(ev)
+    vim.lsp.start({ name = "mdsh", cmd = { "mdsh", "lsp" } }, { bufnr = ev.buf })
+  end,
+})
+```
+
 Printed markdown is styled when stdout is a terminal; `--color=never`,
 `--no-color` or `NO_COLOR` turn that off.
 

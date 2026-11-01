@@ -2,16 +2,14 @@ package notebook
 
 import (
 	"errors"
-	"fmt"
-	"io/fs"
 	"log/slog"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/lsp"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -89,49 +87,10 @@ func (n *Notebook) Names() Names {
 	return names
 }
 
-// Limits on what listFiles lists, so a document in a big folder, such as
-// a home folder, doesn't stall completion.
-const (
-	maxListDepth = 3
-	maxListFiles = 500
-)
-
-// listFiles lists the regular files under dir, as sorted slash paths
-// relative to it. It leaves out hidden files and folders, node_modules,
-// vendor and .assets folders (res:// paths name what is in those), goes
-// at most maxListDepth folders down and stops at maxListFiles. It is
-// empty if dir doesn't exist.
-func listFiles(dir string) []string {
-	var files []string
-	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if len(files) >= maxListFiles {
-			return filepath.SkipAll
-		}
-		if err != nil {
-			return filepath.SkipDir
-		}
-		if path == dir {
-			return nil
-		}
-		name := d.Name()
-		if d.IsDir() {
-			rel, _ := filepath.Rel(dir, path)
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || strings.HasSuffix(name, ".assets") || strings.Count(rel, string(filepath.Separator)) >= maxListDepth {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.HasPrefix(name, ".") || !d.Type().IsRegular() {
-			return nil
-		}
-		if rel, err := filepath.Rel(dir, path); err == nil {
-			files = append(files, filepath.ToSlash(rel))
-		}
-		return nil
-	})
-	slices.Sort(files)
-	return files
-}
+// listFiles lists the files under dir as lsp.ListFiles does: sorted
+// slash paths relative to it, leaving out hidden files, node_modules,
+// vendor and .assets folders, and a big folder's depths.
+func listFiles(dir string) []string { return lsp.ListFiles(dir) }
 
 // Problem is something wrong in a fence's info string, for the block
 // editor to underline. From and To are byte offsets in the info string.
@@ -143,62 +102,14 @@ type Problem struct {
 }
 
 // CheckInfo checks the attributes in a fence's info string, such as
-// sh {#build timeout=5m}, against doc.BlockAttrs.
+// sh {#build timeout=5m}, against doc.BlockAttrs, as the language
+// server does.
 func CheckInfo(info string) []Problem {
-	in := doc.SplitInfo(info)
-	include := false
-	for _, t := range in.Tokens {
-		if t == doc.IncludeAttr {
-			include = true
-		}
+	var out []Problem
+	for _, p := range lsp.CheckInfo(info) {
+		out = append(out, Problem{From: p.From, To: p.To, Severity: p.Severity, Message: p.Message})
 	}
-	input := (in.Lang == doc.TextboxLang || in.Lang == doc.ChoiceLang) && !include
-	var problems []Problem
-	at := len(in.Lang)
-	for _, tok := range in.Tokens {
-		from := strings.Index(info[at:], tok)
-		if from < 0 {
-			continue
-		}
-		from += at
-		at = from + len(tok)
-		add := func(severity, format string, args ...any) {
-			problems = append(problems, Problem{From: from, To: at, Severity: severity, Message: fmt.Sprintf(format, args...)})
-		}
-		if strings.HasPrefix(tok, ".") {
-			continue
-		}
-		key, value, set := strings.Cut(tok, "=")
-		if strings.HasPrefix(tok, "#") {
-			key, value, set = "#", tok[1:], true
-		}
-		spec, ok := doc.LookupAttr(key)
-		switch {
-		case !ok:
-			add("warning", "mdsh doesn't know %s and leaves it as it is", key)
-			continue
-		case include && !spec.Include:
-			if key == "#" {
-				add("error", "an include block has no name")
-			} else {
-				add("error", "an include block never runs, so it can't have %s", key)
-			}
-			continue
-		case !include && spec.Include:
-			add("warning", "%s only means something with <include", key)
-			continue
-		case len(spec.Inputs) > 0 && (include || !slices.Contains(spec.Inputs, in.Lang)):
-			add("warning", "%s only means something on a %s", key, strings.Join(spec.Inputs, " or "))
-			continue
-		case input && len(spec.Inputs) == 0 && key != "#" && key != "show":
-			add("warning", "a %s never runs, so %s means nothing on it", in.Lang, key)
-			continue
-		}
-		if err := spec.Check(unquote(value), set); err != nil {
-			add("error", "%s", err)
-		}
-	}
-	return problems
+	return out
 }
 
 // SourceBlock is a block in the source pane's text, for completing and
@@ -215,27 +126,11 @@ type SourceBlock struct {
 // leaving out includes and tapes, which have no name. It is nil if text
 // doesn't parse.
 func SourceBlocks(text string) []SourceBlock {
-	d, err := doc.Parse([]byte(text))
-	if err != nil {
-		return nil
-	}
 	var out []SourceBlock
-	for _, b := range d.Blocks {
-		if b.IsInclude() || b.IsTape() {
-			continue
-		}
-		line := strings.Count(text[:b.Span.Start], "\n") + 1
-		out = append(out, SourceBlock{Line: line, ID: b.ID, Runs: !b.IsInput()})
+	for _, b := range lsp.SourceBlocks(text) {
+		out = append(out, SourceBlock{Line: b.Line, ID: b.ID, Runs: b.Runs})
 	}
 	return out
-}
-
-// unquote matches doc's reading of "quoted" values.
-func unquote(v string) string {
-	if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
-		return strings.ReplaceAll(v[1:len(v)-1], `\"`, `"`)
-	}
-	return v
 }
 
 // lineRe is the line number a document warning starts with.

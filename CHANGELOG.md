@@ -33,6 +33,13 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui`: Clear All Outputs has a shortcut, cmd/ctrl+alt+K, and an
   eraser button in the toolbar beside Run all. It now asks before it
   clears, from the menu, the key or the button.
+- `mdsh lsp`: a language server for editors, on stdin and stdout. It
+  completes the attributes in a fence's `{…}`, their values and the
+  block names in `depends=`, explains an attribute on hover and reports
+  mistakes in them (unknown or misused attributes, `depends=` naming no
+  block that runs, a `var=` bound twice) as diagnostics.
+- `mdsh-gui`: the Neovim source pane attaches that language server, so
+  completion plugins such as nvim-cmp see mdsh's completions too.
 - `mdsh-gui`: a Console (View › Console, cmd/ctrl+shift+Y, or the
   toolbar's console button) along the bottom of the window shows what
   the app logs, with the time and level: errors from what you did, such

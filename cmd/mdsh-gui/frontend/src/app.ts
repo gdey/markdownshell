@@ -1,5 +1,4 @@
 import "./tab.js";
-import { CompletionContext } from "@codemirror/autocomplete";
 import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
 import { type StateCommand, Text } from "@codemirror/state";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
@@ -8,14 +7,13 @@ import { Events, Window } from "/wails/runtime.js";
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
-import { attrCompletions, attrHelpAt, checkInfo } from "./editor.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { consoleFile, initConsole, showConsole } from "./console.js";
 import { fitHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
-import { charCol, lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
+import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
@@ -1248,7 +1246,6 @@ async function loadSourceNow() {
       fail(err);
     }
     markRunLines();
-    lintNvim();
     return;
   }
   if (!source || doc.file === "") return;
@@ -1348,7 +1345,6 @@ async function applyNvim(d: NvimDoc) {
   cells = (await App.Cells()) ?? [];
   drawDoc();
   markRunLines();
-  lintNvim();
 }
 
 // sendNvim hands Go Neovim's text, merging Go's changes into it first
@@ -1417,11 +1413,10 @@ async function nvimLine(): Promise<number> {
 }
 
 // nvimReady gives a Neovim that just started the settings and the
-// file's folds, run buttons and lint.
+// file's folds and run buttons. Its language server does the rest.
 async function nvimReady() {
   await nvimSettings();
   markRunLines();
-  lintNvim();
   if (sourceFoldsFor !== doc.file) {
     sourceFoldsFor = doc.file;
     await nvimCall("set_folds", renderedFoldLines(true)).catch(fail);
@@ -1437,53 +1432,6 @@ async function nvimSettings() {
 // A system theme change changes the page's colors when the Theme setting
 // follows the system.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => void nvimSettings());
-
-// lintNvim checks the fences' attributes, as the built-in editor's lint
-// does, and gives Neovim what it finds as diagnostics. Only the last
-// check's answer counts.
-let lintSeq = 0;
-function lintNvim() {
-  const d = nvimDoc;
-  if (!d) return;
-  const seq = ++lintSeq;
-  const state = stateOf(d.text);
-  void checkInfo(state)
-    .then((found) => {
-      if (seq !== lintSeq || nvimDoc !== d) return;
-      const list = found.map((f) => {
-        const from = posOf(state.doc, f.from);
-        const to = posOf(state.doc, f.to);
-        return { line: from.line, col: from.col, end_line: to.line, end_col: to.col, error: f.severity === "error", message: f.message };
-      });
-      return nvimCall("diagnostics", list);
-    })
-    .catch(() => {});
-}
-
-// completeNvim answers Neovim asking for completions as a fence's
-// attributes are typed, with those the built-in editor offers.
-async function completeNvim(ask: { text: string; line: number; col: number; tick: number }) {
-  const state = stateOf(ask.text);
-  const pos = offsetOf(state.doc, ask.line, ask.col);
-  const res = await attrCompletions(attrs, () => known)(new CompletionContext(state, pos, false));
-  if (!res) return;
-  const typed = state.sliceDoc(res.from, pos).toLowerCase();
-  const items = res.options
-    .filter((o) => o.label.toLowerCase().startsWith(typed))
-    .map((o) => ({ word: typeof o.apply === "string" ? o.apply : o.label, abbr: o.label, menu: o.detail ?? "", info: typeof o.info === "string" ? o.info : "", icase: 1, dup: 0 }));
-  if (!items.length) return;
-  await nvimCall("complete", ask.tick, posOf(state.doc, res.from).col, items);
-}
-
-// hoverNvim shows help for the attribute under Neovim's cursor, for K.
-async function hoverNvim(ask: { text: string; line: number; col: number }) {
-  const state = stateOf(ask.text);
-  const h = attrHelpAt(attrs, state, charCol(ask.text, ask.col));
-  if (!h) return void nvimCall("hover", ["No help here: K gives help for a fence's attributes."]);
-  const lines = [`**${h.key === "#" ? "#id" : h.key}** ${h.spec.help}`];
-  if (h.spec.default) lines.push("", "Default: " + h.spec.default);
-  await nvimCall("hover", lines);
-}
 
 // insertNvim runs a markdown command, such as the Insert menu's, on
 // Neovim's text at its cursor or selection, and gives Neovim the result
@@ -1543,10 +1491,6 @@ async function nvimEvent(name: string, data: any) {
       if (data.what === "section") return runCurrentSection();
       await nvimState();
       return runLine(data.line);
-    case "complete":
-      return completeNvim(data);
-    case "hover":
-      return hoverNvim(data);
   }
 }
 

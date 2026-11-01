@@ -153,6 +153,10 @@ type Options struct {
 	// Dark sets 'background' to dark, else light, before the config
 	// runs, which may set it again.
 	Dark bool
+	// LSP is the command that starts mdsh's language server, which the
+	// buffer attaches to for completion, hover help and diagnostics.
+	// Empty starts none.
+	LSP []string
 
 	// Redraw gets the redraw events up to each flush, as Neovim sent
 	// them: each is the event's name and then one argument list for
@@ -256,7 +260,11 @@ func Start(o Options) (*Editor, error) {
 			setup <- fmt.Errorf("attaching to Neovim: %w", err)
 			return
 		}
-		if err := v.ExecLua(mdshLua, nil, v.ChannelID(), o.Name, lines(o.Text)); err != nil {
+		lspCmd := o.LSP
+		if lspCmd == nil {
+			lspCmd = []string{}
+		}
+		if err := v.ExecLua(mdshLua, nil, v.ChannelID(), o.Name, lines(o.Text), lspCmd); err != nil {
 			setup <- fmt.Errorf("setting up Neovim: %w", err)
 			return
 		}

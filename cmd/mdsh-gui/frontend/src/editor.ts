@@ -124,9 +124,9 @@ function checkDepends(blocks: SourceBlock[], from: number, info: string, out: Di
   }
 }
 
-// checkInfo checks the attributes of every fence with some. The Neovim
-// source pane uses it too, on a state made of its text.
-export async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
+// checkInfo checks the attributes of every fence with some, as mdsh's
+// language server (the lsp package) does for the Neovim source pane.
+async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
   const out: Diagnostic[] = [];
   const doc = state.doc;
   // The blocks are only needed, and parsed, if a depends= is there.
@@ -175,9 +175,9 @@ function tokenAt(state: EditorState, pos: number): { start: number; text: string
 // on a textbox or a choice.
 const inputAttrs = new Set(["#", "show"]);
 
-// attrCompletions completes a fence's attributes and their values. The
-// Neovim source pane uses it too, on a state made of its text.
-export function attrCompletions(attrs: AttrSpec[], names: () => Names) {
+// attrCompletions completes a fence's attributes and their values, as
+// mdsh's language server does for the Neovim source pane.
+function attrCompletions(attrs: AttrSpec[], names: () => Names) {
   return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
     const tok = tokenAt(ctx.state, ctx.pos);
     if (!tok) return null;
@@ -278,7 +278,7 @@ async function dependsCompletions(ctx: CompletionContext, from: number, value: s
 
 // attrHelpAt is the attribute at pos in a fence's info string, with its
 // spec and where it is, or null.
-export function attrHelpAt(attrs: AttrSpec[], state: EditorState, pos: number): { key: string; spec: AttrSpec; from: number; to: number } | null {
+function attrHelpAt(attrs: AttrSpec[], state: EditorState, pos: number): { key: string; spec: AttrSpec; from: number; to: number } | null {
   const r = infoRange(state, pos);
   if (!r || pos < r.from || pos > r.from + r.text.length) return null;
   const re = /[#<\w-]+(=("[^"]*"|\S*))?/g;
