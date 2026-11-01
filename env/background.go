@@ -137,6 +137,12 @@ func (j *Job) Kill() {
 	killTree(j.PID)
 }
 
+// closeBraceHint follows zsh's error for a lone } anywhere on a line,
+// such as echo }: unlike sh, zsh takes it as the end of a { } group even
+// as an argument. setopt ignore_close_braces can't help, since check
+// parses the block without running it.
+const closeBraceHint = "mdsh: zsh reads a lone } as the end of a { } group, even as an argument; quote it, as in echo '}'\n"
+
 // check checks the syntax of the script in file f in a separate
 // process, since a syntax error in a dot script ends a non-interactive
 // POSIX shell. It writes the error, if any, to w, naming the file
@@ -148,7 +154,11 @@ func (s *Shell) check(ctx context.Context, f string, w io.Writer) (ok bool, err 
 	if err := chk.Run(); err != nil {
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {
-			w.Write(bytes.ReplaceAll(syn.Bytes(), []byte(f), []byte("block")))
+			msg := bytes.ReplaceAll(syn.Bytes(), []byte(f), []byte("block"))
+			w.Write(msg)
+			if filepath.Base(s.path) == "zsh" && bytes.Contains(msg, []byte("parse error near `}'")) {
+				io.WriteString(w, closeBraceHint)
+			}
 			return false, nil
 		}
 		return false, err
