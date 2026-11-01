@@ -12,8 +12,10 @@ import (
 // and in order, or takes the attribute out when deps is empty. It is a
 // rendered-view edit, so Undo takes it back. Blocks without ids get
 // them first, as saving would give them, since depends= names blocks by
-// id. What mdsh refuses, such as a cycle or a dependency on a textbox,
-// comes back as its parse error and changes nothing.
+// id. Names already there that aren't a block that runs, which mdsh
+// ignores, are kept, after the blocks deps names, so a typo isn't lost.
+// A cycle comes back as its parse error and changes nothing, and a
+// textbox or a choice, which never runs, is refused.
 func (n *Notebook) SetDepends(i int, deps []int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -30,6 +32,9 @@ func (n *Notebook) SetDepends(i int, deps []int) error {
 		if j == i {
 			return fmt.Errorf("block %s can't depend on itself", n.d.Label(n.d.Blocks[i]))
 		}
+		if d := n.d.Blocks[j]; d.IsInput() {
+			return fmt.Errorf("block %s is a %s, which never runs", n.d.Label(d), d.Lang)
+		}
 	}
 	if n.unnamed() {
 		if _, err := run.NameBlocks(n.d, n.results, run.Options{File: n.file}); err != nil {
@@ -44,6 +49,11 @@ func (n *Notebook) SetDepends(i int, deps []int) error {
 	ids := make([]string, len(deps))
 	for k, j := range deps {
 		ids[k] = n.d.Blocks[j].ID
+	}
+	for _, id := range b.Depends() {
+		if n.d.Dep(id) == nil {
+			ids = append(ids, id)
+		}
 	}
 	info := doc.SplitInfo(b.Info)
 	if len(ids) == 0 {

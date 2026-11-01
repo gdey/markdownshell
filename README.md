@@ -394,9 +394,11 @@ If a dependency fails, `deploy` doesn't run. In a whole run, the run then
 goes on or stops as the dependency's `on_error` says, and a block already
 run as a dependency isn't run again when the run reaches it. With no
 terminal the run stops with an error, unless you pass `--yes`, which runs
-dependencies without asking. An id that names no block, a block that
-depends on itself and a cycle are errors when the file is read. mdsh-gui
-and `mdsh -i` ask the same question in their own way.
+dependencies without asking. An id that names no block is a warning
+and is ignored, so a typo doesn't stop the file opening; mdsh-gui
+underlines it in the source and notes it in the Console. A block that depends on itself and a cycle
+are errors when the file is read. mdsh-gui and `mdsh -i` ask the same
+question in their own way.
 
 ## Terminal blocks
 

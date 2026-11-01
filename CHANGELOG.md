@@ -84,8 +84,11 @@ follow [Semantic Versioning](https://semver.org/).
   asked about first (run it, skip it or stop), on the terminal in `mdsh`,
   in the TUI's prompt line and in mdsh-gui's card. `--yes` runs them
   without asking, and with no terminal the run stops with an error. A
-  failed dependency keeps the block from running. Unknown ids, a block
-  depending on itself and cycles are parse errors.
+  failed dependency keeps the block from running. An unknown id is a
+  warning and is ignored, so a typo doesn't stop the file opening;
+  mdsh-gui's source pane underlines it and the Console notes it, and
+  completing `depends=` offers the blocks above. A block depending on
+  itself and cycles are parse errors.
 - `mdsh-gui`: the active block (the selected card, or the block the
   source pane's cursor is in) has a play button by its name in the
   outline, which runs it as the card's play button does. Moving the

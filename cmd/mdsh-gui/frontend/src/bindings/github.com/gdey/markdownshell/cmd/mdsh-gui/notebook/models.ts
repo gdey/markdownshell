@@ -347,6 +347,23 @@ export interface RunOptions {
 }
 
 /**
+ * SourceBlock is a block in the source pane's text, for completing and
+ * checking depends= there.
+ */
+export interface SourceBlock {
+    /**
+     * Line is the line its opening fence is on, from 1.
+     */
+    "line": number;
+    "id": string;
+
+    /**
+     * Runs says whether depends= can name it: an input never runs.
+     */
+    "runs": boolean;
+}
+
+/**
  * TextboxCell is a textbox, as the frontend draws it.
  */
 export interface TextboxCell {

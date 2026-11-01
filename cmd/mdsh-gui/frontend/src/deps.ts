@@ -80,7 +80,9 @@ export function initDeps(scrollView: HTMLElement, h: Host) {
 // index, then draws them.
 export function setDeps(cells: Cell[]) {
   const index = new Map<string, number>();
-  for (const c of cells) if (c.block >= 0 && c.id) index.set(c.id, c.block);
+  // A textbox or a choice never runs, so depends= naming one is ignored
+  // and gets no line.
+  for (const c of cells) if (c.block >= 0 && c.id && !c.textbox && !c.choice) index.set(c.id, c.block);
   edges = [];
   for (const c of cells) {
     if (c.block < 0 || !c.depends) continue;

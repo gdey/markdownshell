@@ -487,6 +487,10 @@ func (a *App) Names(ctx context.Context) (notebook.Names, error) {
 // CheckInfo checks the attributes in a fence's info string.
 func (a *App) CheckInfo(info string) []notebook.Problem { return notebook.CheckInfo(info) }
 
+// SourceBlocks lists the blocks in the source pane's text, for
+// completing and checking depends=.
+func (a *App) SourceBlocks(text string) []notebook.SourceBlock { return notebook.SourceBlocks(text) }
+
 // Text is the whole file, for the split view's source pane.
 func (a *App) Text(ctx context.Context) (string, error) {
 	_, n, err := a.notebook(ctx)

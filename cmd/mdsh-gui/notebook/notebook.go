@@ -149,8 +149,11 @@ type Notebook struct {
 	md   goldmark.Markdown
 	term *terminal
 
-	mu      sync.Mutex // guards the fields below
-	d       *doc.Document
+	mu sync.Mutex // guards the fields below
+	d  *doc.Document
+	// warned are the document's warnings already logged, without their
+	// line numbers, so a warning is logged once, not on every edit.
+	warned  map[string]bool
 	sess    *run.Session
 	results []*run.Result
 	index   map[*doc.Block]int
@@ -224,6 +227,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		n.index[b] = i
 	}
 	n.stamp = stampOf(abs)
+	n.logWarnings()
 	sess, err := n.newSession(opts.Run)
 	if err != nil {
 		return nil, err

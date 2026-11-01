@@ -504,6 +504,14 @@ export function Settings(): $CancellablePromise<settings$0.Settings> {
 }
 
 /**
+ * SourceBlocks lists the blocks in the source pane's text, for
+ * completing and checking depends=.
+ */
+export function SourceBlocks(text: string): $CancellablePromise<notebook$0.SourceBlock[] | null> {
+    return $Call.ByName("main.App.SourceBlocks", text);
+}
+
+/**
  * StartScreen lists the markdown files under the start folder, and the
  * recent files that still exist.
  */

@@ -69,7 +69,10 @@ them first, as moving a block does.
   walk a chain by double-clicking again.
 
 The document's own checks still apply: a drop that would make a cycle is
-refused with mdsh's message.
+refused with mdsh's message. A name in `depends=` that isn't a block
+that runs (a typo, or a textbox) gets no line, since mdsh ignores it;
+the source pane underlines it, and editing the lines keeps it, at the
+end of `depends=`.
 
 ## How it is built
 
