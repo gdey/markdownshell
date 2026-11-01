@@ -77,6 +77,9 @@ func Open(path string) (*Store, error) {
 	return st, nil
 }
 
+// Path is the file the settings live in.
+func (st *Store) Path() string { return st.path }
+
 // Get returns a copy of the settings.
 func (st *Store) Get() Settings {
 	st.mu.Lock()

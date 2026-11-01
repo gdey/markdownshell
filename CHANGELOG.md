@@ -14,6 +14,16 @@ follow [Semantic Versioning](https://semver.org/).
   `<!-- mdsh:collapse -->` line under the heading, which other markdown
   renderers hide. Unfolding takes them out, and Undo takes a fold back.
   Folds the file sets by a condition are left alone.
+- `mdsh-gui`: Settings has tabs (General, Editing, Shell, Files, About)
+  and scrolls, so every setting fits. About shows the version and build
+  (commit, time, whether the tree was modified), the Go version and
+  platform, where the settings file, `.zshrc`, start folder and
+  templates folder are with Show buttons, whether `zsh`, `sh`, `mdsh`
+  and the shell from Settings are on the app's PATH with their
+  versions, and links to the docs, source, releases, changelog and new
+  issues; Copy puts it on the clipboard for a bug report.
+  `mdsh-gui --version` now falls back to the module version or the
+  commit it was built from, as `mdsh --version` does.
 - Run a section: in `mdsh-gui`, each heading with a block under it has a
   play button that runs the blocks of its section and its
   subsections, following Run All's rules (confirm, `skip`, `run=once`,

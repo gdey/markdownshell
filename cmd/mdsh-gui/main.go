@@ -4,6 +4,9 @@
 //	mdsh-gui [flags] [file.md [args...] | folder]
 //	mdsh-gui --version
 //
+// --version prints the release version, or for a go install or go build
+// build the module version or the commit it was built from.
+//
 // With no file, the window lists the markdown files under the current
 // folder to pick from, or under folder when one is given.
 package main
@@ -34,11 +37,11 @@ import (
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
 //go:generate go run ./internal/build
 
-//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css
+// build/appicon.svg is the app's icon, for the Settings window's About
+// tab.
+//
+//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
 var frontend embed.FS
-
-// version is set by release builds.
-var version = "dev"
 
 func main() {
 	o, err := parseFlags(os.Args[1:], os.Stderr)
@@ -49,7 +52,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "mdsh-gui:", err)
 		os.Exit(2)
 	case o.version:
-		fmt.Println("mdsh-gui", version)
+		fmt.Println("mdsh-gui", thisBuild())
 		return
 	}
 	if err := mdshGUI(o); err != nil {

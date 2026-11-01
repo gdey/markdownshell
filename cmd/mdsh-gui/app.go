@@ -472,11 +472,13 @@ func (a *App) openSettings() {
 		return
 	}
 	opts := application.WebviewWindowOptions{
-		Name:   "settings",
-		Title:  "Settings",
-		Width:  520,
-		Height: 420,
-		URL:    "/settings.html",
+		Name:      "settings",
+		Title:     "Settings",
+		Width:     600,
+		Height:    520,
+		MinWidth:  480,
+		MinHeight: 360,
+		URL:       "/settings.html",
 	}
 	a.prefs = a.app.Window.NewWithOptions(opts)
 	a.prefs.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {

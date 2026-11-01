@@ -192,15 +192,25 @@ Each file opens in a tab of its own, with its own shells.
 - **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
   `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
-  Linux): autosave after each run, Vim mode, a shell for every file,
-  the view files open in (rendered, source or both; by default the
-  view the last tab had), the start folder, the templates folder for New File… and the theme (System, Light or Dark). They are kept in `mdsh/gui.json` in the user's
-  config folder. One more, **Give blocks your zsh aliases and
-  functions**, adds an `mdsh` function to `~/.zshrc` (or
-  `$ZDOTDIR/.zshrc`) between marker comments, and unchecking it takes
-  it out. The function runs the CLI with
-  `--source <(alias -L; typeset -f)`; the app itself isn't started from
-  a shell, so it can't see them.
+  Linux) has tabs: General for the theme (System, Light or Dark), the
+  view files open in (rendered, source or both; by default the view
+  the last tab had) and the start folder; Editing for autosave after
+  each run and Vim mode; Shell for a shell for every file and the file
+  the History pane's shell reads; and Files for the templates folder
+  for New File…. They are kept in
+  `mdsh/gui.json` in the user's config folder. Shell has one more,
+  **Give blocks your zsh aliases and functions**, which adds an `mdsh`
+  function to `~/.zshrc` (or `$ZDOTDIR/.zshrc`) between marker
+  comments, and unchecking it takes it out. The function runs the CLI
+  with `--source <(alias -L; typeset -f)`; the app itself isn't started
+  from a shell, so it can't see them. About shows the version and
+  build, the Go version and platform, where the settings file, `.zshrc`
+  and the folders from Settings are, whether `zsh`, `sh`, `mdsh` and the
+  shell from Settings are on the app's PATH and their versions, and
+  links to the docs, source, releases and changelog; Copy puts it on
+  the clipboard for a bug report. `mdsh-gui --version` prints the same
+  version: the release's, or for a `go install` or `go build` build the
+  module version or the commit it was built from.
 
 If the file changes on disk, a banner offers to reload it.
 
@@ -271,8 +281,9 @@ Tabs drag between windows, or out into a window of their own.
 
 ![Two windows: deploy.md and disk.md in one, and onboarding.md, dragged out, in another](../../site/static/images/gui/windows.png)
 
-Settings has autosave, Vim mode, a shell for every file, the view files
-open in, the start folder and the theme.
+Settings has tabs for the theme, the view files open in and the start
+folder; autosave and Vim mode; the shell; the templates folder; and an
+About tab with the version, build, paths and tools.
 
 ![The settings window](../../site/static/images/gui/settings.png)
 

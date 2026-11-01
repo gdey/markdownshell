@@ -9,15 +9,19 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 )
 
-// assets serves the frontend, and at notebook.DocPrefix the files beside
-// the open documents, such as the images their blocks write.
-func (a *App) assets(frontend http.Handler) http.Handler {
+// assets serves the frontend, the app icon, and at notebook.DocPrefix the
+// files beside the open documents, such as the images their blocks write.
+func (a *App) assets(pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/appicon.svg" {
+			http.ServeFileFS(w, r, frontend, "build/appicon.svg")
+			return
+		}
 		if path, ok := strings.CutPrefix(r.URL.Path, notebook.DocPrefix+"/"); ok {
 			a.serveDocFile(w, r, filepath.FromSlash("/"+path))
 			return
 		}
-		frontend.ServeHTTP(w, r)
+		pages.ServeHTTP(w, r)
 	})
 }
 
