@@ -138,6 +138,13 @@ export interface Cell {
     "lastLine"?: number;
 
     /**
+     * Undeletable says why a top-level block can't be deleted: what else
+     * in the document uses it, such as another block's depends=. Empty
+     * when it can.
+     */
+    "undeletable"?: string;
+
+    /**
      * Drop is set when a block or section can be moved to just before
      * the cell, with MoveTo at From.
      */

@@ -121,3 +121,13 @@ func TestDeleteBlockCopies(t *testing.T) {
 		t.Errorf("warnings %q", w)
 	}
 }
+
+func TestDeleteBlockers(t *testing.T) {
+	d := mustParse(t, "```sh {#a}\necho a\n```\n\n```sh {#b depends=a}\necho b\n```\n")
+	if got := d.DeleteBlockers(d.Block("a")); len(got) != 1 || got[0] != "#b's depends=" {
+		t.Errorf("a: %q", got)
+	}
+	if got := d.DeleteBlockers(d.Block("b")); got != nil {
+		t.Errorf("b: %q", got)
+	}
+}

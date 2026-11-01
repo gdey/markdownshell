@@ -91,6 +91,17 @@ func (d *Document) DeleteBlock(b *Block) (warnings []string, err error) {
 	return warnings, nil
 }
 
+// DeleteBlockers names what stops DeleteBlock deleting b: what else in
+// the document uses its id, such as a depends= or a placeholder. It is
+// nil when b can go, or when b isn't a top-level block.
+func (d *Document) DeleteBlockers(b *Block) []string {
+	u, err := d.Unit(b)
+	if err != nil {
+		return nil
+	}
+	return d.users(b.ID, u)
+}
+
 // users names what outside span uses block id: blocks that depend on it
 // or read it in a condition, tapes for it, placeholders, and sections or
 // folds whose condition reads it.
