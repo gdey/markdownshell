@@ -149,6 +149,17 @@ export interface Cell {
      * the cell, with MoveTo at From.
      */
     "drop"?: boolean;
+
+    /**
+     * DropAfter and DropBefore limit where a movable block, or a
+     * heading's section, can be dragged, so no block goes above one its
+     * depends= names: only to a cell whose From is above DropAfter and
+     * at or above DropBefore. DropAfter is -1 when nothing holds the
+     * move up, and DropBefore -1 when nothing holds it down, so the end
+     * is fine.
+     */
+    "dropAfter": number;
+    "dropBefore": number;
 }
 
 /**

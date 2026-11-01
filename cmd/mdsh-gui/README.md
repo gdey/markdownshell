@@ -135,8 +135,12 @@ Each file opens in a tab of its own, with its own shells.
   heading has a grip too: a heading's drags its whole section (prose,
   blocks, output and subsections), which goes only before a heading of
   its level or higher, or to the end. A section that only partly holds
-  an `mdsh:if` section doesn't move. Drags are edits like the keys below,
-  with the same warnings and Undo.
+  an `mdsh:if` section doesn't move. Nor does a block, or a section, go
+  below a block whose `depends=` names it, or above one its own
+  `depends=` names: the line stops at the last spot short of that, turns
+  gray, and the status line says why. The keys below keep to the same
+  limit. Drags are edits like the keys below, with the same warnings
+  and Undo.
 - **Moving blocks:** alt+↑ and alt+↓ (Edit › Move Block Up and Move
   Block Down) move the selected block, or the textbox or choice being
   used, past the cell above or below it; with shift they move it past

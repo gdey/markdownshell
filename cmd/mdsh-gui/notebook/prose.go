@@ -108,6 +108,12 @@ func (n *Notebook) cells() []Cell {
 		pos = c.From
 		c.Line = line
 		c.Drop = slices.Contains(bounds, c.From)
+		c.DropAfter, c.DropBefore = -1, -1
+		if c.Heading > 0 && c.Drop {
+			if span, _, err := d.Section(c.From); err == nil {
+				c.dropLimits(d, span)
+			}
+		}
 		bi := c.Block
 		if c.Textbox != nil {
 			bi = c.Textbox.Block
@@ -126,6 +132,7 @@ func (n *Notebook) cells() []Cell {
 		if bi >= 0 {
 			if end, ok := unitEnd(d, bi, bounds); ok {
 				c.Movable, c.LastLine = true, lineNo(d.Src, max(end-1, c.From))
+				c.dropLimits(d, doc.Span{Start: d.Blocks[bi].Span.Start, End: end})
 				if users := d.DeleteBlockers(d.Blocks[bi]); len(users) > 0 {
 					c.Undeletable = "Can't delete: " + strings.Join(users, ", ") + " still use it. Take those out first."
 				}
@@ -133,6 +140,16 @@ func (n *Notebook) cells() []Cell {
 		}
 	}
 	return l.cells
+}
+
+// dropLimits sets c's DropAfter and DropBefore from span's
+// doc.Document.DependsLimits.
+func (c *Cell) dropLimits(d *doc.Document, span doc.Span) {
+	l := d.DependsLimits(span)
+	c.DropAfter = l.After
+	if l.BeforeDep != nil {
+		c.DropBefore = l.Before
+	}
 }
 
 // sections sets the heading cells' SectionFrom and SectionTo. A section

@@ -639,4 +639,6 @@ body.shell { overflow: hidden; }
 .prose.fence > .grip { position: absolute; left: -18px; top: 6px; }
 .dragging { opacity: 0.5; }
 .drop-line { position: fixed; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; z-index: 100; }
+/* The drag is past a depends= limit, so the line holds at the last spot short of it. */
+.drop-line.held { background: var(--muted); }
 #outline .row .grip { padding: 0 2px; margin-left: 2px; }

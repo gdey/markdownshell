@@ -135,7 +135,8 @@ func (d *Document) MoveBlock(b *Block, at int) ([]int, error) {
 // results indexed by block can follow. Ids don't change, so name the
 // blocks first (see NameBlocks): a move fails, leaving d as it was, if
 // it would renumber a block that is referred to or that has output. It
-// also fails if it would split an mdsh:if section.
+// also fails if it would split an mdsh:if section, or take a block above
+// one it depends on (see CheckDependsMove).
 func (d *Document) MoveSpan(span Span, at int) (order []int, err error) {
 	bounds := d.Boundaries()
 	src := d.Src
@@ -165,6 +166,9 @@ func (d *Document) MoveSpan(span Span, at int) (order []int, err error) {
 		if (sec.If.Start >= s && sec.If.Start < e) != (sec.End.Start >= s && sec.End.Start < e) {
 			return nil, fmt.Errorf("the move would split the mdsh:if section at line %d", lineNo(src, sec.If.Start))
 		}
+	}
+	if err := d.CheckDependsMove(Span{s, e}, at); err != nil {
+		return nil, err
 	}
 
 	piece := append([]byte(nil), src[s:s+trimBlankLen(src[s:e])]...)

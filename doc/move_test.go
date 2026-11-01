@@ -1,6 +1,7 @@
 package doc
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -209,7 +210,7 @@ func TestMoveUnnamedWithoutRefs(t *testing.T) {
 
 	// One that depends= names may not.
 	d = mustParse(t, "```sh\ntrue\n```\n\n```sh\nfalse\n```\n\n```sh {#x depends=block-1}\ntrue\n```\n")
-	if _, err := d.MoveBlock(d.Blocks[0], len(d.Src)); err == nil || !strings.Contains(err.Error(), "name the document's blocks") {
+	if _, err := d.MoveBlock(d.Blocks[1], 0); err == nil || !strings.Contains(err.Error(), "name the document's blocks") {
 		t.Errorf("unnamed block that depends= names: err = %v", err)
 	}
 }
@@ -341,5 +342,54 @@ func TestMoveSection(t *testing.T) {
 	want = "Intro.\n\n# Two\n\nB.\n\nSetext\n------\n\nC.\n\n## One.a\n\n```sh {#a}\necho a\n```\n\n# One\n\nA.\n"
 	if string(d.Src) != want {
 		t.Errorf("src =\n%s\nwant\n%s", d.Src, want)
+	}
+}
+
+func TestMoveDependsOrder(t *testing.T) {
+	src := "# One\n\n```sh {#a}\ntrue\n```\n\nX.\n\n```sh {#b depends=a}\ntrue\n```\n\nY.\n\n" +
+		"# Two\n\n```sh {#c depends=a}\ntrue\n```\n\nZ.\n"
+	cases := []struct {
+		block, to string
+		ok        bool
+	}{
+		{"a", "X.", true},
+		{"a", "```sh {#b", true}, // just above b
+		{"a", "Y.", false},       // below b
+		{"a", "", false},         // the end
+		{"b", "X.", true},
+		{"b", "```sh {#a", false}, // above a
+		{"b", "# One", false},
+		{"c", "Y.", true},
+		{"c", "X.", true},
+		{"c", "```sh {#a", false},
+	}
+	for _, tt := range cases {
+		d := mustParse(t, src)
+		at := len(d.Src)
+		if tt.to != "" {
+			at = spot(t, d, tt.to)
+		}
+		_, err := d.MoveBlock(d.Block(tt.block), at)
+		if tt.ok && err != nil || !tt.ok && !errors.Is(err, ErrDependsOrder) {
+			t.Errorf("move %s to %q: err = %v", tt.block, tt.to, err)
+		}
+	}
+	// A section moves under the same limits: One holds a, which b and
+	// c depend on, so it can't go below Two, and Two can't go above it.
+	d := mustParse(t, src)
+	if _, err := d.MoveSection(spot(t, d, "# One"), len(d.Src)); !errors.Is(err, ErrDependsOrder) {
+		t.Errorf("section One to the end: err = %v", err)
+	}
+	if _, err := d.MoveSection(spot(t, d, "# Two"), spot(t, d, "# One")); err == nil || err.Error() != "#c depends on #a, so #c can't go above it" {
+		t.Errorf("section Two first: err = %v", err)
+	}
+	// One already out of order doesn't hold a move up.
+	d = mustParse(t, "```sh {#b depends=a}\ntrue\n```\n\nX.\n\n```sh {#a}\ntrue\n```\n")
+	if _, err := d.MoveBlock(d.Block("a"), 0); err != nil {
+		t.Errorf("a out of order: %v", err)
+	}
+	l := mustParse(t, src).DependsLimits(Span{})
+	if l.After != -1 || l.Before != len(src) {
+		t.Errorf("limits of nothing: %+v", l)
 	}
 }
