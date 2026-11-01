@@ -89,6 +89,14 @@ follow [Semantic Versioning](https://semver.org/).
   block that runs, a `var=` bound twice) as diagnostics.
 - `mdsh-gui`: the Neovim source pane attaches that language server, so
   completion plugins such as nvim-cmp see mdsh's completions too.
+- `mdsh ctl`: a block can talk back to the run that started it. `mdsh
+  ctl set NAME VALUE` sets `$MDSH_VAR_NAME` for the blocks that start
+  after it, and for their `run=` conditions; `unset` removes it, `get`
+  reads it as it is now, and `status [--step N --of M] TEXT` shows
+  progress on stderr. Every block gets `$MDSH_SOCK` and `$MDSH_TOKEN`;
+  the socket is in a directory only you can open, and a token stops
+  working when its block ends. Exit codes: 0 done, 2 refused, 3 not
+  running under mdsh. macOS and Linux only for now.
 - `mdsh-gui`: a Console (View › Console, cmd/ctrl+shift+Y, or the
   toolbar's console button) along the bottom of the window shows what
   the app logs, with the time and level: errors from what you did, such

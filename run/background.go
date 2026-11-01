@@ -22,6 +22,7 @@ type bgJob struct {
 	job     *env.Job
 	timeout string // the block's timeout=, or ""
 	timer   *time.Timer
+	revoke  func() // stops the block's $MDSH_TOKEN working
 	// timedOut is set when timeout= killed the job, and overdue when
 	// the run's end did.
 	timedOut, overdue atomic.Bool
@@ -60,13 +61,15 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 			return
 		}
 	}
-	job, err := e.Shell.Background(ctx, prelude(s.d, b, s.opts)+b.Body, PIDVar(b.ID))
+	pre, revoke := s.issue(b)
+	job, err := e.Shell.Background(ctx, pre+b.Body, PIDVar(b.ID))
 	if err != nil {
+		revoke()
 		done(err)
 		return
 	}
 	r.Running = true
-	j := &bgJob{r: r, job: job, timeout: t}
+	j := &bgJob{r: r, job: job, timeout: t, revoke: revoke}
 	if hasTimeout {
 		j.timer = time.AfterFunc(dur, func() {
 			j.timedOut.Store(true)
@@ -129,6 +132,7 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 	if j.timer != nil {
 		j.timer.Stop()
 	}
+	j.revoke()
 	r, b := j.r, j.r.Block
 	r.Running = false
 	r.Stdout, r.Stderr = j.job.Output()
