@@ -15,13 +15,20 @@
 // drag it onto a block above to depend on it, and the line attaches at
 // that block's bottom anchor. Click a line's dot to take that dependency out, or drag the dot to
 // another block above to depend on that one instead, or out past the
-// lanes, away from the cards, to tear it off.
+// lanes, away from the cards, to tear it off. While a line is dragged,
+// holding it over a folded section's heading opens the section for the
+// moment, so the blocks in it can be dropped on (Host.peek).
+//
+// A button at the top of the margin hides the lines and what edits them,
+// and shows them again; the tab remembers which. Selecting a block still
+// outlines what it depends on while they are hidden.
 //
 // There are two layers: the paint, behind the cards, and over
 // everything a clear one holding what is clicked or dragged, since the
 // paint can't be reached where the page is over it.
 
 import { type Cell } from "./api.js";
+import { el, icons, svg as icon } from "./dom.js";
 
 // An Edge is one dependency: block from depends on block to, as the
 // k-th (from 0) in its depends=.
@@ -31,12 +38,17 @@ interface Edge {
   k: number;
 }
 
-// Host is what the layer asks of the page: to go to a card, and to
-// write a block's depends= as the blocks it names, by index, with a
-// word for the status line.
+// Host is what the layer asks of the page: to go to a card, to write a
+// block's depends= as the blocks it names, by index, with a word for
+// the status line, and, while a line is dragged, to open folded
+// sections for the moment: peek is told the top-level cell under the
+// pointer, or null between cells, and endPeek the block the line was
+// dropped on, or null.
 export interface Host {
   jump(block: HTMLElement): void;
   setDepends(block: number, deps: number[], what: string): Promise<void>;
+  peek(cell: HTMLElement | null): void;
+  endPeek(dropped: HTMLElement | null): void;
 }
 
 // The number of colors; dependencies past them share the gray of
@@ -53,8 +65,23 @@ let lit = -1; // the selected block, whose lines are lit
 let svg: SVGSVGElement | null = null; // the paint
 let ui: SVGSVGElement | null = null; // dots, rings and the drag
 let scroll: HTMLElement;
-let host: Host = { jump() {}, setDepends: async () => {} };
+let host: Host = { jump() {}, setDepends: async () => {}, peek() {}, endPeek() {} };
 let pending = 0;
+// The line being dragged, kept over a redraw, and how to draw it again
+// when the page under it moves, as when a section opens.
+let ghost: SVGPathElement | null = null;
+let redrawGhost: (() => void) | null = null;
+// Whether the lines are shown, and the button that says.
+let showLines = loadShown();
+let toggle: HTMLButtonElement | null = null;
+
+function loadShown(): boolean {
+  try {
+    return localStorage.getItem("mdsh-dep-lines") !== "0";
+  } catch {
+    return true;
+  }
+}
 
 // The layout of the last draw, for a drag: the content coordinates'
 // origin, the cards' edge on the line side, which way the lines go
@@ -69,7 +96,20 @@ export function initDeps(scrollView: HTMLElement, h: Host) {
   host = h;
   svg = make("svg", { id: "deps", "aria-hidden": "true" });
   ui = make("svg", { id: "deps-ui", "aria-hidden": "true" });
-  scroll.prepend(svg, ui);
+  // The button stays at the top of the margin as the view scrolls.
+  toggle = el("button", { id: "deps-toggle", className: "icon" }, icon(icons.lines));
+  toggle.onclick = (e) => {
+    e.stopPropagation();
+    showLines = !showLines;
+    try {
+      localStorage.setItem("mdsh-dep-lines", showLines ? "1" : "0");
+    } catch {
+      // Only a convenience: the next tab shows them.
+    }
+    drawDeps();
+  };
+  const bar = el("div", { id: "deps-bar" }, toggle);
+  scroll.prepend(bar, svg, ui);
   const ro = new ResizeObserver(() => drawDeps());
   ro.observe(scroll);
   const main = scroll.querySelector("main");
@@ -124,17 +164,52 @@ interface Anchor {
 }
 
 function anchorOf(block: number, top: number, end: "top" | "bottom"): Anchor | null {
-  let card = document.getElementById("block-" + block);
+  const card = shown(block);
   if (!card) return null;
-  if (card.classList.contains("in-fold")) {
-    // The nearest cell above that isn't hidden is the heading, or a
-    // cell in the section, that folds it away.
-    let e: Element | null = card;
-    while (e && e.classList.contains("in-fold")) e = e.previousElementSibling;
-    if (!(e instanceof HTMLElement)) return null;
-    card = e;
-  }
   return { card, y: end === "top" ? headY(card, top) : footY(card, top) };
+}
+
+// shown is block's card, or the heading of the folded section hiding it.
+function shown(block: number): HTMLElement | null {
+  const card = document.getElementById("block-" + block);
+  if (!card || !card.classList.contains("in-fold")) return card;
+  // The nearest cell above that isn't hidden is the heading that folds
+  // it away.
+  let e: Element | null = card;
+  while (e && e.classList.contains("in-fold")) e = e.previousElementSibling;
+  return e instanceof HTMLElement ? e : null;
+}
+
+// markDeps outlines what the lit block depends on, in the colors of its
+// lines: each block's card in the rendered view and its row in the
+// outline, or, for a block in a folded section, the section's heading
+// and its row. A card or row standing for more than one gets a ring for
+// each, the first dependency's nearest it.
+export function markDeps() {
+  for (const e of document.querySelectorAll<HTMLElement>(".dep-of")) {
+    e.classList.remove("dep-of");
+    e.style.removeProperty("--dep-rings");
+  }
+  const by = new Map<HTMLElement, string[]>();
+  for (const e of edges) {
+    if (e.from !== lit) continue;
+    const card = shown(e.to);
+    if (!card) continue;
+    const list = by.get(card) ?? [];
+    by.set(card, list);
+    list.push(`var(--dep-${e.k < colors ? e.k + 1 : "more"})`);
+  }
+  for (const [card, list] of by) {
+    // Outward from the card, past a hairline of the page.
+    card.classList.add("dep-of");
+    card.style.setProperty("--dep-rings", ["0 0 0 1px var(--bg)", ...list.map((c, i) => `0 0 0 ${3 + 2 * i}px ${c}`)].join(", "));
+    const row = document.querySelector<HTMLElement>(`#outline .row[data-line="${card.dataset.line}"]`);
+    if (!row) continue;
+    // Inward from the row's edge, which its neighbors touch: the last
+    // at the edge, on top, and each before it 2px wider, under it.
+    row.classList.add("dep-of");
+    row.style.setProperty("--dep-rings", list.map((c, i) => `inset 0 0 0 ${2 * (list.length - i)}px ${c}`).reverse().join(", "));
+  }
 }
 
 // A card has two anchors on its edge: the top one, on its head row,
@@ -172,11 +247,16 @@ function make<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string
 function draw() {
   if (!svg || !ui) return;
   const main = scroll.querySelector<HTMLElement>("main");
-  for (const e of scroll.querySelectorAll<HTMLElement>(".dep-of")) {
-    e.classList.remove("dep-of");
-    e.style.removeProperty("--dep-of");
-  }
+  markDeps();
   const cards = [...scroll.querySelectorAll<HTMLElement>("#doc > .block:not(.in-fold)")];
+  const title = showLines ? "Hide the dependency lines" : "Show the dependency lines";
+  if (toggle) {
+    toggle.title = title;
+    toggle.setAttribute("aria-label", title);
+    toggle.classList.toggle("on", showLines);
+    toggle.hidden = !cards.length;
+  }
+  scroll.classList.toggle("deps-hidden", !showLines);
   if (!main || scroll.hidden || !cards.length) {
     svg.replaceChildren();
     ui.replaceChildren();
@@ -229,6 +309,8 @@ function draw() {
   const dir = onLeft ? -1 : 1;
   const edge = onLeft ? cardLeft : cardRight;
   geo = { edge, dir, reach: laneGap + laneStep * Math.min(Math.max(lanes.length - 1, 0), fit) };
+  // The button sits over the lanes nearest the cards, 18px wide.
+  if (toggle) toggle.style.left = edge + dir * laneGap - 9 + "px";
 
   const out: SVGGElement[] = [];
   const hits: SVGElement[] = [];
@@ -262,10 +344,6 @@ function draw() {
     dot.onpointerdown = (ev) => startDrag(ev, l.from, l.k, l.a.card);
     hits.push(hit);
     dots.push(dot);
-    if (l.from === lit) {
-      l.b.card.classList.add("dep-of");
-      l.b.card.style.setProperty("--dep-of", `var(--dep-${l.k < colors ? l.k + 1 : "more"})`);
-    }
   }
   // Lit lines go last, over the rest.
   out.sort((p, q) => Number(p.classList.contains("lit")) - Number(q.classList.contains("lit")));
@@ -291,7 +369,8 @@ function draw() {
     }
   });
   svg.replaceChildren(...out);
-  ui.replaceChildren(...hits, ...dots, ...rings);
+  ui.replaceChildren(...hits, ...dots, ...rings, ...(ghost ? [ghost] : []));
+  redrawGhost?.();
 }
 
 // elbow is a line's path: out from the cards' edge at y1 to lane x, along
@@ -311,59 +390,73 @@ function name(card: HTMLElement): string {
 // A drag makes block from depend on the block it ends on, as its k-th
 // dependency: a new one from a ring, or in place of the one whose dot
 // was dragged. A dot let go where it was taken, or out past the lanes,
-// takes that dependency out.
+// takes that dependency out. The pointer is captured by the page's
+// body, not the ring or dot, since a section opening under the drag
+// draws the layer again.
 function startDrag(ev: PointerEvent, from: number, k: number, card: HTMLElement) {
   if (ev.button !== 0 || !ui) return;
   ev.preventDefault();
   ev.stopPropagation();
   const deps = dependencies(from);
   const moving = k < deps.length; // a dot, else a ring
-  const handle = ev.currentTarget as SVGElement;
+  const body = document.body;
   const startY = ev.clientY;
   const startX = ev.clientX;
   const { edge, dir, reach } = geo;
-  const y1 = headY(card, origin().top);
   const x = edge + dir * (reach + laneStep);
-  const ghost = make("path", { class: "dep drag dep-" + (k < colors ? k + 1 : "more"), d: "" });
+  // Where the line leaves from, which moves down when a section above
+  // opens.
+  const y1 = () => headY(card, origin().top);
+  const line = make("path", { class: "dep drag dep-" + (k < colors ? k + 1 : "more"), d: "" });
   let target: HTMLElement | null = null;
   let moved = false;
   let torn = false; // a dot dragged out past the line's lane, to let go of
-  ui.append(ghost);
-  handle.setPointerCapture(ev.pointerId);
-  document.body.classList.add("dragging-dep");
+  let last: { clientX: number; clientY: number } | null = null;
+  ghost = line;
+  ui.append(line);
+  body.setPointerCapture(ev.pointerId);
+  body.classList.add("dragging-dep");
   const clear = () => {
     target?.classList.remove("dep-target");
     target = null;
   };
-  const finish = () => {
-    ghost.remove();
+  const finish = (dropped: HTMLElement | null) => {
+    line.remove();
+    ghost = null;
+    redrawGhost = null;
     clear();
-    document.body.classList.remove("dragging-dep");
-    handle.onpointermove = handle.onpointerup = handle.onpointercancel = null;
+    body.classList.remove("dragging-dep");
+    body.onpointermove = body.onpointerup = body.onpointercancel = null;
+    if (body.hasPointerCapture(ev.pointerId)) body.releasePointerCapture(ev.pointerId);
     document.removeEventListener("keydown", onKey, true);
+    host.endPeek(dropped);
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== "Escape") return;
     e.stopPropagation();
-    finish();
+    finish(null);
   };
   document.addEventListener("keydown", onKey, true);
-  handle.onpointermove = (e) => {
-    if (!moved && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
-    moved = true;
+  const follow = (e: { clientX: number; clientY: number }, peek: boolean) => {
+    last = e;
     // The line only goes up: below its block's row it stays there, and
     // nothing there is a target.
     const { top, left } = origin();
-    let y = Math.min(e.clientY - top, y1);
+    const from1 = y1();
+    let y = Math.min(e.clientY - top, from1);
     // A dot pulled out past the lane, where the line could no longer
     // turn back to the cards, is being torn off: letting go there takes
     // the dependency out.
     torn = moving && dir * (e.clientX - left - x) > 0;
-    ghost.classList.toggle("tear", torn);
+    line.classList.toggle("tear", torn);
+    const below = e.clientY - top > from1;
+    const cell = below || torn ? null : (document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.closest("#doc > *"))?.closest<HTMLElement>("#doc > *") ?? null);
+    // A folded section's heading opens when the line is held over it,
+    // and closes again when the line leaves the section.
+    if (peek && !below && !torn) host.peek(cell);
     // The card under the pointer, when it is a block above from and not
     // one from depends on already (other than the one being moved).
-    const below = e.clientY - top > y1;
-    const under = below || torn ? null : (document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.closest("#doc > .block"))?.closest<HTMLElement>("#doc > .block") ?? null);
+    const under = cell?.classList.contains("block") ? cell : null;
     const to = under ? Number(under.dataset.block) : -1;
     const ok = under && to < from && !deps.some((d, i) => d === to && i !== k);
     if (under !== target) {
@@ -375,12 +468,21 @@ function startDrag(ev: PointerEvent, from: number, k: number, card: HTMLElement)
     }
     // Over a target, the line arrives at its bottom anchor.
     if (target) y = footY(target, top);
-    ghost.setAttribute("d", elbow(x, y1, y));
+    line.setAttribute("d", elbow(x, from1, y));
   };
-  handle.onpointercancel = finish;
-  handle.onpointerup = () => {
+  // Drawn again after the page moves, without opening or closing more.
+  redrawGhost = () => {
+    if (moved && last) follow(last, false);
+  };
+  body.onpointermove = (e) => {
+    if (!moved && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+    moved = true;
+    follow(e, true);
+  };
+  body.onpointercancel = () => finish(null);
+  body.onpointerup = () => {
     const dropped = target;
-    finish();
+    finish(dropped);
     if (dropped) {
       const to = Number(dropped.dataset.block);
       const next = [...deps];
