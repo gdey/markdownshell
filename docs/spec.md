@@ -164,6 +164,90 @@ v1 ships on `sh` plus a few markdown helpers.
 - `out=markdown` puts a block's output into the document as raw markdown, so a script can print a table or a list that renders.
 - Each shell starts with helper functions: `md_h1`, `md_h2`, `md_h3` (headings), `md_table [-F SEP] [-s N]` (tab-separated lines on stdin, or split on SEP as `awk -F` does; the first line after skipping N is the header) and `md_code LANG` (stdin as a fenced block). They are plain shell functions, so blocks stay valid `sh`.
 
+## Control socket and audit log (planned)
+
+Not built yet. This section sets the rules before any code is written.
+
+A block can talk back to the run that started it with `mdsh ctl`: set variables for later blocks, tick tasks, ask the user a question, and report progress. Every run also writes an audit log of what happened, socket calls included, so a run that `ctl` changed can be reviewed afterwards.
+
+**What ctl can't do.** It can't add, remove, edit or run blocks, and it can't change prose apart from task markers. This keeps the line drawn in [Runnable blocks in generated output](#runnable-blocks-in-generated-output-2026-10-31): you can still read the file and know what can run. A `ctl` call can change *whether* a written block runs, through a variable that a `run=` condition reads, and the audit log records that.
+
+**The socket.** At the start of a run (`mdsh doc.md`, `-w`, `-o`, reports), or of a session (`mdsh -i`, mdsh-gui), mdsh creates a Unix socket in a new temp directory with mode 0700, and removes both at the end. On Windows it is a named pipe, `\\.\pipe\mdsh-<random>`, that only the current user can open. mdsh exports two variables in every block's prelude, whatever its env and whatever `env.share` or `share=` say:
+
+- `$MDSH_SOCK` is the socket's path.
+- `$MDSH_TOKEN` is a random token for this run of this block. mdsh uses it to tell which block made a call, including a call from a process the block started in the background. A token stops working when its block ends, or for a `background` block, when that block ends.
+
+**Protocol.** Each call opens a connection, sends one line of JSON, reads one line of JSON back, and closes. `mdsh ctl` is the client that blocks are expected to use. The protocol is versioned so other clients can be written later.
+
+```json
+{"v":1,"token":"…","cmd":"set","args":{"name":"env","value":"prod"}}
+{"v":1,"ok":true}
+{"v":1,"ok":false,"error":"no task matches \"deploy\"","code":2}
+```
+
+mdsh handles calls one at a time, in the order they arrive, so calls from background blocks never interleave.
+
+**Commands.**
+
+| Command | Does | Prints |
+| --- | --- | --- |
+| `mdsh ctl set NAME VALUE` | Sets `$MDSH_VAR_NAME` for later blocks, conditions and placeholders. `-` as the value reads stdin. `--secret` marks it secret | Nothing |
+| `mdsh ctl unset NAME` | Removes a variable that `set` made | Nothing |
+| `mdsh ctl get NAME` | Reads `$MDSH_VAR_NAME` as it is now, including values set after this block started | The value |
+| `mdsh ctl check TASK` / `uncheck TASK` | Ticks or unticks a task in prose or a table cell. `TASK` is a number (as `SetTask` counts them) or a label that must match exactly one task | Nothing |
+| `mdsh ctl ask QUESTION` | Asks for text. `--choice a,b,c` limits the answers, `--default V` is used when nobody can answer, `--secret` hides the typing | The answer |
+| `mdsh ctl confirm QUESTION` | Asks yes or no. `--default yes\|no` | Nothing; the exit code is the answer |
+| `mdsh ctl status TEXT` | Shows progress. `--step N --of M` adds a count | Nothing |
+
+**Exit codes.** These are the same for every command, so a block can check them with `if` or `||`.
+
+| Code | Means |
+| --- | --- |
+| 0 | Done, or `confirm` was answered yes |
+| 1 | `confirm` was answered no |
+| 2 | Refused: bad arguments, an unknown task, a token that has stopped working, or a name that an input binds |
+| 3 | Not running under mdsh: `$MDSH_SOCK` is unset or nothing is listening on it |
+| 4 | No answer: `ask` or `confirm` with nobody to answer and no `--default` |
+
+`status` is the one exception to code 3. Outside mdsh it does nothing and exits 0, so a script that reports progress still runs on its own.
+
+**Rules for variables.**
+
+- `set` changes the variable for blocks that *start* afterwards, in every env. A block that is already running keeps the environment it started with. It can read the new value with `get`.
+- `run=` and other conditions are checked just before their block runs, so they see every `set` made before that point.
+- A name that a `textbox` or `choice` binds with `var=` belongs to that input. `set` on it is refused with code 2, since the input's text in the file would otherwise disagree with the variable.
+- A `--secret` variable reaches blocks and conditions as usual. Placeholders print it as `***`, and write-back stores `***` in the file, never the value.
+
+**Rules for tasks.** `check` follows the same write-back rules as a click in mdsh-gui. Under `-w`, `-i` and the GUI, the change is saved to the file. Under plain `mdsh doc.md`, it shows in what mdsh prints, and the file is not changed. In the GUI, edits you make by hand are still refused while a block runs; `ctl` edits are the exception, because they go through the session.
+
+**Rules for questions.**
+
+- **With someone to answer:** the GUI shows a dialog, the TUI a prompt, and the CLI asks on `/dev/tty`, as it does for `confirm` blocks.
+- **Without:** this means `$MDSH_MODE` is `report`, or a CLI run with no terminal. `ask` and `confirm` take `--default`, and the log records that the default answered. With no default, the call exits 4, and mdsh shows "no answer: QUESTION" under the block as an mdsh error.
+- `--yes` answers yes to `confirm` calls that have no default, the same way it does for `confirm` blocks.
+- Time spent waiting for an answer counts toward the block's `timeout=`.
+
+**Status.** In the CLI, the status line goes to stderr; in the TUI and GUI, it shows on the block's card. It replaces the previous status from the same block, and it goes away when the block ends. It is never written to the file.
+
+**Audit log.** `--audit FILE` writes one JSON object per line, in order, for the whole run. mdsh-gui and `mdsh -i` keep a log for each run in the session, and the GUI can save one. Every event has `v`, `seq` (counting from 1), `t` (RFC 3339 with milliseconds) and `event`, plus `block` and `env` when they apply. Events:
+
+- `run.start`: the file, a SHA-256 of its bytes, `$MDSH_MODE`, the flags and arguments, the mdsh version. `run.end`: the exit code and whether the run stopped early.
+- `env.start`: an env's shell starting, with its parent and the names `share` let through (names only, no values).
+- `block.start`, `block.end` (with the exit code and the time taken), `block.skip` (with the reason: `skip`, `run=` and the value it saw, `once`, `--only`, a stop or a confirm answer).
+- `ctl`: every call, with the calling block, the command, its arguments, the result and the exit code. Refused calls are logged too.
+- `var`: a variable changing, with the old and new values and what changed it (`ctl`, an input, a placeholder read).
+- `task`: a task ticked or unticked, with its number, its label and what changed it.
+- `ask`: the question, the answer, and who answered it (`user`, `default`, `yes-flag`, or `none` for code 4).
+- `write`: mdsh changing the file: an output region, a task, an input, a placeholder value, or a History entry.
+
+`--secret` values never appear in the log. Where a value would go, the log stores `{"secret":true,"hmac":"…"}`, an HMAC-SHA-256 keyed with a random key for each run. So you can tell whether two secret values in one run were the same, but a short secret can't be guessed from the log. Answers to `ask --secret` are treated the same way.
+
+**Open questions.**
+
+- Should `check` also reach tasks in a block's `out=markdown` output, as clicks in mdsh-gui can?
+- Should `set` on a name an input binds update the input, instead of being refused?
+- Does the audit log need its own viewer in mdsh-gui, or is a file enough for now?
+
 ## Go architecture
 
 The runner reports events (started, stdout, stderr, done), and every front end (CLI, TUI, GUI) is a consumer of those events. The parser keeps the original bytes, so writing output back never reformats prose.
@@ -198,6 +282,7 @@ Settled on 2026-10-27.
 - **Placeholders:** `{{#block/env(VAR)}}` in prose, on by default, `interpolate: false` to turn off.
 - **Output copies:** an `output {for=id}` fence or region that isn't right after block `id` is refilled from it on every run, like a placeholder. Settled on 2026-10-29.
 - **Includes:** a block marked `<include` with `file=`, `from=`, `to=` (1-based, inclusive) and `number_on`; mdsh writes the lines into the block's body, and the fence's language is the language. Include blocks never run and have no name.
+- **Control socket:** blocks talk back to the run with `mdsh ctl` over a socket in `$MDSH_SOCK`, limited to vars, tasks, questions and status; every run can write a JSON Lines audit log. Settled on 2026-10-31; not built yet.
 
 ## Not pursued
 
