@@ -10,6 +10,7 @@ says what gets built in which order and what is still open.
 | v1: library and CLI | Parse, run and render `sh` blocks; `mdsh run` | Released as v1.0.0 |
 | v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | Released in v1.1.0 |
 | GUI | Desktop or web front end on the same library | Desktop app `mdsh-gui` released in v1.2.0 |
+| v1.3: polish | Settings with the changelog, a Welcome template, icons and motion, the site led by the app; see [release/v1.3.md](release/v1.3.md) | Planned |
 
 ## v1: library and CLI
 
