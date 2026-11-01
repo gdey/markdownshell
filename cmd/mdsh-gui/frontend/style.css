@@ -289,6 +289,21 @@ th { background: var(--code-bg); }
 .block .output pre { background: none; padding: 4px 0 10px; }
 .block .output img, .prose img { max-width: 100%; height: auto; }
 .block .output img { display: block; margin: 12px 0; cursor: zoom-in; }
+/* d2 and svg fences drawn as pictures, with a button to switch to their
+   code. A d2 diagram comes in a light and a dark theme. */
+figure.diagram { position: relative; margin: 12px 0; }
+figure.diagram .diagram-image { padding: 8px 0; }
+figure.diagram .diagram-image img { display: block; margin: 0; }
+figure.diagram[data-show="image"] > pre, figure.diagram[data-show="code"] > .diagram-image { display: none; }
+figure.diagram .diagram-toggle { position: absolute; top: 4px; right: 4px; z-index: 1; background: var(--bg); border-color: var(--border); }
+figure.diagram img.dark { display: none; }
+:root[data-theme="dark"] figure.diagram img.light { display: none; }
+:root[data-theme="dark"] figure.diagram img.dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) figure.diagram img.light { display: none; }
+  :root:not([data-theme="light"]) figure.diagram img.dark { display: block; }
+}
+.diagram-note { margin: 4px 0 0; color: var(--muted); font-size: 0.9em; white-space: pre-wrap; }
 /* Task list items, textboxes and choices are edited in place. */
 .prose input[type="checkbox"]:not(:disabled) { cursor: pointer; }
 .textbox-cell { margin: 16px 0; }

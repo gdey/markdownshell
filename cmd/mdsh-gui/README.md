@@ -146,6 +146,13 @@ Each file opens in a tab of its own, with its own shells.
 - **Images:** image, screenshot and recording output shows in the
   block, and so do images in the prose, from the document's folder.
   Click an output image to see it full size.
+- **Diagrams:** a fenced `d2` block shows as the diagram it draws, and
+  a fenced `svg` block as its picture, with a button to switch to the
+  code and back. d2 diagrams are drawn by the built-in
+  [d2](https://d2lang.com) library, with its dagre layout, in a light
+  and a dark theme to match the window. When a diagram has a mistake,
+  the code shows with d2's message under it. Pictures are shown as
+  images, so an SVG's scripts don't run and it loads nothing.
 - **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
   `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
