@@ -531,21 +531,25 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, tea.Quit
-	case "q":
+	case "q", "ctrl+w":
+		// q goes back to the start screen, if the file came from it;
+		// ctrl+w closes the tab. Closing the last tab quits.
+		key := k.String()
 		switch {
 		case m.running:
 			m.status = "a block is running; ctrl+c stops it"
 		case m.dirty && !quitArmed:
-			m.status = "output is not saved; q again quits anyway, w saves"
-			if m.back {
-				m.status = "output is not saved; q again closes it anyway, w saves"
-			}
+			m.status = "output is not saved; " + key + " again " + m.quitWord(key) + "s anyway, w saves"
 			m.quitArmed = true
-		case m.back:
+		case m.back && key == "q":
 			return m, func() tea.Msg { return backMsg{} }
 		default:
-			return m, tea.Quit
+			return m, func() tea.Msg { return closeTabMsg{} }
 		}
+	case "]":
+		return m, func() tea.Msg { return nextTabMsg{1} }
+	case "[":
+		return m, func() tea.Msg { return nextTabMsg{-1} }
 	case "j", "down", "tab":
 		m.moveTo(m.navAt(m.cursor + 1))
 	case "k", "up", "shift+tab":
@@ -1208,16 +1212,16 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · q " + m.quitWord())
+		help = helpStyle.Render("j/k move · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }
 
 const footerLines = 2
 
-// quitWord is what q does.
-func (m *Model) quitWord() string {
-	if m.back {
+// quitWord is what key, q or ctrl+w, does.
+func (m *Model) quitWord(key string) string {
+	if m.back || key == "ctrl+w" {
 		return "close"
 	}
 	return "quit"

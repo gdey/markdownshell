@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -581,9 +582,11 @@ func do(a *app, msg tea.Msg) {
 		_, cmd := a.Update(msg)
 		msg = nil
 		if cmd != nil {
-			switch next := cmd().(type) {
-			case openMsg, backMsg, savedAsMsg, viewMsg, runOptsMsg:
-				msg = next
+			if next, ok := cmd().(tabMsg); ok {
+				switch next.msg.(type) {
+				case openMsg, backMsg, savedAsMsg, viewMsg, runOptsMsg, closeTabMsg, nextTabMsg, quitAllMsg:
+					msg = next
+				}
 			}
 		}
 	}
@@ -612,14 +615,14 @@ func TestStartScreen(t *testing.T) {
 	}
 
 	do(a, tea.KeyMsg{Type: tea.KeyEnter})
-	if a.doc == nil || a.doc.opts.Run.File != filepath.Join(dir, "a.md") {
+	if a.tab().doc == nil || a.tab().doc.opts.Run.File != filepath.Join(dir, "a.md") {
 		t.Fatal("enter didn't open a.md")
 	}
-	if !a.doc.back {
+	if !a.tab().doc.back {
 		t.Error("q should go back to the start screen")
 	}
 	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	if a.doc != nil {
+	if a.tab().doc != nil {
 		t.Fatal("q didn't go back to the start screen")
 	}
 	v := a.View()
@@ -634,13 +637,13 @@ func TestStartScreen(t *testing.T) {
 func TestSaveAsAnotherFolderReopens(t *testing.T) {
 	a, dir := newTestApp(t)
 	do(a, tea.KeyMsg{Type: tea.KeyEnter})
-	m := a.doc
+	m := a.tab().doc
 	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	pump(t, m)
 	press(m, "W")
 	m.saveAs.SetValue(filepath.Join(dir, "sub", "c.md"))
 	do(a, tea.KeyMsg{Type: tea.KeyEnter})
-	if a.doc == m || a.doc.opts.Run.File != filepath.Join(dir, "sub", "c.md") {
+	if a.tab().doc == m || a.tab().doc.opts.Run.File != filepath.Join(dir, "sub", "c.md") {
 		t.Fatal("save as into another folder didn't open the new file")
 	}
 	if !strings.Contains(a.View(), "hi") {
@@ -716,7 +719,7 @@ func TestViewKept(t *testing.T) {
 	}
 	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	do(a, tea.KeyMsg{Type: tea.KeyEnter})
-	if !a.doc.shown.HideCode {
+	if !a.tab().doc.shown.HideCode {
 		t.Error("the next file didn't open in the view kept")
 	}
 }
@@ -893,7 +896,7 @@ func TestRunOptionsKept(t *testing.T) {
 	}
 	do(a, tea.KeyMsg{Type: tea.KeyEnter})
 	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
-	if got := a.doc.opts.Run.Args; len(got) != 1 || got[0] != "xy" {
+	if got := a.tab().doc.opts.Run.Args; len(got) != 1 || got[0] != "xy" {
 		t.Errorf("args after reload = %q", got)
 	}
 }
@@ -973,5 +976,119 @@ func TestKeyBytes(t *testing.T) {
 		if got := string(keyBytes(c.k)); got != c.want {
 			t.Errorf("%v: %q, want %q", c.k, got, c.want)
 		}
+	}
+}
+
+// typeKeys sends each key to a, as do does.
+func typeKeys(a *app, ks ...string) {
+	for _, k := range ks {
+		var msg tea.KeyMsg
+		switch k {
+		case "enter":
+			msg = tea.KeyMsg{Type: tea.KeyEnter}
+		case "esc":
+			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "ctrl+t":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlT}
+		case "ctrl+w":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlW}
+		case "ctrl+c":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlC}
+		default:
+			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+		}
+		do(a, msg)
+	}
+}
+
+func TestTabs(t *testing.T) {
+	a, dir := newTestApp(t)
+	typeKeys(a, "enter")
+	first := a.tab()
+	if strings.Contains(a.View(), "Start") {
+		t.Error("a tab bar shows with one tab")
+	}
+	typeKeys(a, "ctrl+t")
+	if len(a.tabs) != 2 || a.at != 1 || a.tab().start == nil {
+		t.Fatal("ctrl+t didn't open the start screen in a new tab")
+	}
+	if v := a.View(); !strings.HasPrefix(v, a.bar()) || !strings.Contains(a.bar(), "a.md") || !strings.Contains(a.bar(), "Start") {
+		t.Errorf("tab bar:\n%s", v)
+	}
+	typeKeys(a, "sub/b", "enter")
+	second := a.tab()
+	if second.doc == nil || second.doc.opts.Run.File != filepath.Join(dir, "sub", "b.md") {
+		t.Fatal("the new tab didn't open b.md")
+	}
+	if first.doc.opts.Run.File != filepath.Join(dir, "a.md") {
+		t.Fatal("opening b.md changed the first tab")
+	}
+	typeKeys(a, "[")
+	if a.at != 0 {
+		t.Fatal("[ didn't go to the tab before")
+	}
+	typeKeys(a, "]")
+	if a.at != 1 {
+		t.Fatal("] didn't go to the next tab")
+	}
+
+	// A run in a tab behind goes on, and its output reaches that tab.
+	m := first.doc
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	for done := false; !done; {
+		select {
+		case msg := <-m.events:
+			_, done = msg.(runDoneMsg)
+			a.Update(tabMsg{first, msg})
+		case <-time.After(10 * time.Second):
+			t.Fatal("timed out waiting for the run")
+		}
+	}
+	if !m.results[0].Ran || second.doc.results[0].Ran {
+		t.Fatal("the run's output went to the wrong tab")
+	}
+	if !strings.Contains(a.bar(), "a.md •") {
+		t.Errorf("the tab bar doesn't mark output not saved: %s", a.bar())
+	}
+
+	// A file open in another tab is shown there.
+	typeKeys(a, "ctrl+t", "a.md", "enter")
+	if a.tab() != first || len(a.tabs) != 3 {
+		t.Fatalf("opening a.md again didn't go to its tab: at %d of %d", a.at, len(a.tabs))
+	}
+
+	// ctrl+w closes a tab; esc on the start screen closes its tab.
+	typeKeys(a, "]", "ctrl+w")
+	if len(a.tabs) != 2 || slices.Contains(a.tabs, second) {
+		t.Fatal("ctrl+w didn't close b.md's tab")
+	}
+	// The start screen still has "a.md" typed: esc clears it first.
+	typeKeys(a, "]", "esc", "esc")
+	if len(a.tabs) != 1 || a.tab() != first {
+		t.Fatal("esc didn't close the start screen's tab")
+	}
+
+	// Quitting from another tab stops first at output not saved.
+	typeKeys(a, "ctrl+t")
+	a.Update(tabMsg{a.tab(), quitAllMsg{}})
+	if a.tab() != first || !a.quitArmed || !strings.Contains(first.doc.status, "not saved") {
+		t.Fatalf("quit didn't stop at output not saved: %q", first.doc.status)
+	}
+	if _, cmd := a.Update(tabMsg{first, quitAllMsg{}}); cmd == nil {
+		t.Error("quitting again didn't quit")
+	}
+}
+
+func TestWrapKeepsTeaMessages(t *testing.T) {
+	a, _ := newTestApp(t)
+	tb := a.tab()
+	if got := a.wrap(tb, func() tea.Msg { return runDoneMsg{} })(); got.(tabMsg).t != tb {
+		t.Errorf("a tab's message isn't marked: %#v", got)
+	}
+	if got := a.wrap(tb, tea.Quit)(); got.(tabMsg).msg != (quitAllMsg{}) {
+		t.Errorf("quit isn't checked by the app: %#v", got)
+	}
+	if _, ok := a.wrap(tb, tea.ClearScreen)().(tabMsg); ok {
+		t.Error("a Bubble Tea message was marked")
 	}
 }

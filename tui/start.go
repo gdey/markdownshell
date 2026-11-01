@@ -157,7 +157,8 @@ func (s *start) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return s, tea.Quit
 		case "esc":
 			if s.filter.Value() == "" {
-				return s, tea.Quit
+				// It closes the tab; the last one quits.
+				return s, func() tea.Msg { return closeTabMsg{} }
 			}
 			s.filter.SetValue("")
 			s.match()
@@ -262,6 +263,6 @@ func (s *start) View() string {
 	if s.status != "" {
 		b.WriteString(stderrStyle.Render(s.status))
 	}
-	b.WriteString("\n" + helpStyle.Render("type to filter · ↑/↓ pick · enter open · esc clear, or quit"))
+	b.WriteString("\n" + helpStyle.Render("type to filter · ↑/↓ pick · enter open · ctrl+t new tab · esc clear, or close"))
 	return b.String()
 }

@@ -179,6 +179,11 @@ follow [Semantic Versioning](https://semver.org/).
   `mdsh-gui`, instead of taking over the screen: up to 24 rows, as wide
   as the card, and following it when the window resizes. Keys go to the
   block while it runs, and ctrl+] stops it.
+- `mdsh -i` has tabs, as `mdsh-gui` does: ctrl+t opens one on the list
+  of files, `]` and `[` move between them, and ctrl+w closes one. Each
+  tab has its own shells, and runs go on in the tabs behind. The tab bar
+  marks output not saved, running blocks and questions waiting, and
+  quitting stops at a tab with output not saved first.
 
 ### Changed
 
