@@ -57,7 +57,8 @@ func Run(d *doc.Document, opts Options) error {
 		return err
 	}
 	defer m.Close()
-	_, err = tea.NewProgram(m, tea.WithAltScreen()).Run()
+	var replies replyFilter
+	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithFilter(replies.filter)).Run()
 	return err
 }
 

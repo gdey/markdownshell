@@ -12,6 +12,18 @@ const fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 let term: Terminal | null = null;
 let block = -1;
 
+// typing is the last key send. Keys go to Go one call at a time, in
+// order, since Wails runs calls at once: a program's query, such as
+// OSC 11 for the background colour, gets two replies, and if the cursor
+// report got there first the colour would reach the program as typing.
+let typing: Promise<unknown> = Promise.resolve();
+
+// typeKeys sends keys to the block running on a terminal, after the
+// keys sent before them.
+export function typeKeys(keys: string) {
+  typing = typing.then(() => App.Type(keys)).catch(() => {});
+}
+
 // wanted is the size the file's front matter asks for, under
 // mdsh: terminal:, with 0 where it leaves it to the window.
 export const wanted = { cols: 0, rows: 0 };
@@ -63,7 +75,7 @@ export function openTerminal(i: number) {
   block = i;
   term = new Terminal({ cols: cols(), rows: rows(), fontSize, fontFamily, cursorBlink: true, theme: colors(), scrollback: 1000 });
   term.open(host);
-  term.onData((keys) => App.Type(keys).catch(() => {}));
+  term.onData(typeKeys);
   term.focus();
 }
 

@@ -8,7 +8,7 @@ import { Terminal } from "@xterm/xterm";
 import { App, message } from "./api.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
-import { wanted } from "./terminal.js";
+import { typeKeys, wanted } from "./terminal.js";
 
 // rows is how many lines the transcript shows, which dragging the pane's
 // top edge changes, from one to most of the window. Commands run at this
@@ -76,7 +76,7 @@ function ensureTerm(): Terminal {
   term = new Terminal({ cols: cols(), rows, fontSize, fontFamily, theme: colors(), scrollback: 5000, disableStdin: true, convertEol: true, cursorInactiveStyle: "none" });
   term.open($("history-term"));
   term.onData((keys) => {
-    if (block >= 0) App.Type(keys).catch(() => {});
+    if (block >= 0) typeKeys(keys);
   });
   return term;
 }
@@ -425,7 +425,7 @@ export function initHistory(h: HistoryHooks) {
   // A command typed here gets ctrl+c, as in a terminal, so the shell
   // and what blocks set in it live on; anything else stops as Run ›
   // Stop does.
-  $("history-stop").onclick = () => (block >= 0 ? void App.Type("\x03").catch(() => {}) : hooks.stop());
+  $("history-stop").onclick = () => (block >= 0 ? typeKeys("\x03") : hooks.stop());
   $("history-restart").onclick = async () => {
     await hooks.restart();
     if (term) say("\x1b[2m(The shells started again, so variables that blocks set are gone.)\x1b[0m");
