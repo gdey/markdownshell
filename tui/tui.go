@@ -115,6 +115,11 @@ type Model struct {
 	// shown is how the file is shown: the outline, code and output.
 	shown View
 
+	// pane is the terminal tty blocks run in, and termBlock the block
+	// it is drawn in while one runs, or -1.
+	pane      *pane
+	termBlock int
+
 	// form is the report or run options form, while one is up;
 	// formKind says which: "report" or "run".
 	form     *form
@@ -163,29 +168,6 @@ type reapMsg struct{ m *Model }
 // nothing else runs.
 const reapEvery = 250 * time.Millisecond
 
-// handOff gives the terminal to a tty block. As a tea.ExecCommand, Bubble
-// Tea runs it with the terminal released: it lets the block start, waits
-// for it to finish, and then for enter, so the block's last screen can be
-// read before the TUI draws over it.
-type handOff struct {
-	label      string // the block, as doc.Document.Label names it
-	tty        *os.File
-	start, end chan struct{}
-}
-
-func (h *handOff) Run() error {
-	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s runs on the terminal ---\r\n", h.label)
-	close(h.start)
-	<-h.end
-	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s is done; press enter to go back ---", h.label)
-	bufio.NewReader(h.tty).ReadString('\n')
-	return nil
-}
-
-func (h *handOff) SetStdin(io.Reader)  {}
-func (h *handOff) SetStdout(io.Writer) {}
-func (h *handOff) SetStderr(io.Writer) {}
-
 type ttyBackMsg struct{}
 
 // viewer shows an image full screen, with the terminal released, until
@@ -230,17 +212,19 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		opts.Style = "dark"
 	}
 	m := &Model{
-		d:      d,
-		opts:   opts,
-		index:  map[*doc.Block]int{},
-		events: make(chan tea.Msg, 64),
-		done:   make(chan struct{}),
-		shown:  opts.View,
-		active: -1,
-		live:   map[int][]chunk{},
-		bg:     map[int]bool{},
-		md:     map[string]string{},
-		images: map[string]string{},
+		d:         d,
+		opts:      opts,
+		index:     map[*doc.Block]int{},
+		events:    make(chan tea.Msg, 64),
+		done:      make(chan struct{}),
+		shown:     opts.View,
+		active:    -1,
+		pane:      newPane(),
+		termBlock: -1,
+		live:      map[int][]chunk{},
+		bg:        map[int]bool{},
+		md:        map[string]string{},
+		images:    map[string]string{},
 	}
 	if info, err := os.Stat(opts.Run.File); err == nil {
 		m.mtime = info.ModTime()
@@ -266,9 +250,8 @@ func (m *Model) newSession(ro run.Options) (*run.Session, error) {
 	ro.OnEvent = func(e run.Event) { m.send(eventMsg(e)) }
 	ro.Confirm = m.confirm
 	ro.Depend = m.depend
-	if ro.TTY != nil {
-		ro.TakeTTY = m.takeTTY
-	}
+	// tty blocks run in a terminal drawn in their card.
+	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
 	return run.NewSession(m.d, ro)
 }
 
@@ -338,17 +321,6 @@ func (m *Model) depend(dep, b *doc.Block) run.Answer {
 	return <-reply
 }
 
-// takeTTY hands the terminal to block b, from the run's goroutine, and
-// returns once the TUI has stepped aside.
-func (m *Model) takeTTY(b *doc.Block) func() {
-	h := &handOff{label: m.d.Label(b), tty: m.opts.Run.TTY, start: make(chan struct{}), end: make(chan struct{})}
-	if !m.send(h) {
-		return func() {}
-	}
-	<-h.start
-	return func() { close(h.end) }
-}
-
 func (m *Model) wait() tea.Msg {
 	select {
 	case msg := <-m.events:
@@ -386,7 +358,7 @@ func (m *Model) tick() tea.Cmd {
 }
 
 // Init starts listening for run events, and watching the file.
-func (m *Model) Init() tea.Cmd { return tea.Batch(m.wait, m.check()) }
+func (m *Model) Init() tea.Cmd { return tea.Batch(m.wait, m.check(), m.watchPane) }
 
 // Update handles a key, a window size or a run event.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -429,8 +401,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.refresh()
 		return m, m.wait
-	case *handOff:
-		return m, tea.Batch(m.wait, tea.Exec(msg, func(error) tea.Msg { return ttyBackMsg{} }))
+	case paneTurnMsg:
+		i := m.index[msg.block]
+		if msg.end {
+			m.termBlock = -1
+			m.refresh()
+			return m, m.wait
+		}
+		m.pane.take(i)
+		m.termBlock = i
+		close(msg.reply)
+		m.moveTo(i)
+		m.follow(i)
+		return m, m.wait
+	case paneMsg:
+		if msg.m != m {
+			return m, nil
+		}
+		if m.termBlock >= 0 {
+			m.refresh()
+			m.follow(m.termBlock)
+		}
+		return m, m.watchPane
 	case editedMsg:
 		m.edited(msg)
 		m.refresh()
@@ -498,6 +490,15 @@ func (m *Model) event(e run.Event) {
 }
 
 func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// While a tty block runs in its card, keys are for it.
+	if m.termBlock >= 0 {
+		if k.String() == "ctrl+]" {
+			m.cancel()
+		} else {
+			m.pane.typeKey(k)
+		}
+		return m, nil
+	}
 	// Keys typed quickly can arrive together; take them one at a time.
 	if k.Type == tea.KeyRunes && len(k.Runes) > 1 && !k.Paste {
 		var cmds []tea.Cmd
@@ -1122,6 +1123,7 @@ func (m *Model) resize(w, h int) {
 		m.md = map[string]string{}
 	}
 	m.width, m.height = w, h
+	m.fit()
 	if !m.ready {
 		m.vp = viewport.New(m.docWidth(), m.vpHeight())
 		m.ready = true
@@ -1189,6 +1191,8 @@ func (m *Model) footer() string {
 	line1 := titleStyle.Render(name) + rest
 	var help string
 	switch {
+	case m.termBlock >= 0:
+		help = promptStyle.Render(m.name(m.d.Blocks[m.termBlock])+" runs in its card:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.typing:
 		help = m.input.View()
 	case m.naming:

@@ -528,12 +528,6 @@ func interactiveCmd(file string, args []string, source string, stop, step, yes, 
 	if os.Getenv("NO_COLOR") != "" {
 		style = "notty"
 	}
-	// Blocks marked tty get the terminal while they run.
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
-	if err != nil {
-		return err
-	}
-	defer tty.Close()
 	protocol := termimg.Detect(os.Getenv)
 	c.Open = func(file string) (*doc.Document, tui.Options, error) {
 		abs, err := filepath.Abs(file)
@@ -550,7 +544,6 @@ func interactiveCmd(file string, args []string, source string, stop, step, yes, 
 		}
 		return d, tui.Options{
 			Run: run.Options{
-				TTY:         tty,
 				File:        abs,
 				LinkDir:     filepath.Dir(abs),
 				Args:        args,
