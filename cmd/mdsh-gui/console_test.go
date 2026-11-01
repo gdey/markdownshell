@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"testing"
@@ -42,10 +43,40 @@ func TestConsoleHandler(t *testing.T) {
 	}
 }
 
+// A "file" and a "line" say where an entry is about, rather than
+// being part of its text.
+func TestConsoleWhere(t *testing.T) {
+	c := newConsole()
+	log := slog.New(newConsoleHandler(slog.NewTextHandler(io.Discard, nil), c))
+
+	log.Warn("block a: depends= names unknown block", "file", "/x/a.md", "line", 3, "id", "a")
+	log.With("file", "/x/b.md").Warn("near", "line", uint(7))
+	log.Warn("no file", "line", 9)
+	log.WithGroup("g").Warn("grouped", "file", "/x/c.md", "line", 2)
+	log.Warn("odd types", "file", 4, "line", "5")
+
+	want := []ConsoleEntry{
+		{Message: "block a: depends= names unknown block id=a", File: "/x/a.md", Line: 3},
+		{Message: "near", File: "/x/b.md", Line: 7},
+		{Message: "no file line=9"},
+		{Message: "grouped g.file=/x/c.md g.line=2"},
+		{Message: "odd types file=4 line=5"},
+	}
+	got := c.list()
+	if len(got) != len(want) {
+		t.Fatalf("got %d entries, want %d: %+v", len(got), len(want), got)
+	}
+	for i, w := range want {
+		if g := got[i]; g.Message != w.Message || g.File != w.File || g.Line != w.Line {
+			t.Errorf("entry %d = %q %q:%d, want %q %q:%d", i, g.Message, g.File, g.Line, w.Message, w.File, w.Line)
+		}
+	}
+}
+
 func TestConsoleKeepsTheLast(t *testing.T) {
 	c := newConsole()
 	for i := range consoleMax + 5 {
-		c.add(time.Now(), slog.LevelInfo, fmt.Sprint(i))
+		c.add(ConsoleEntry{Time: time.Now(), Level: "info", Message: fmt.Sprint(i)})
 	}
 	got := c.list()
 	if len(got) != consoleMax || got[0].Message != "5" || got[len(got)-1].Seq != consoleMax+5 {
@@ -55,7 +86,7 @@ func TestConsoleKeepsTheLast(t *testing.T) {
 	if n := len(c.list()); n != 0 {
 		t.Errorf("after clear, %d entries", n)
 	}
-	if e := c.add(time.Now(), slog.LevelWarn, "after"); e.Seq != consoleMax+6 {
+	if e := c.add(ConsoleEntry{Time: time.Now(), Level: "warn", Message: "after"}); e.Seq != consoleMax+6 {
 		t.Errorf("seq after clear = %d", e.Seq)
 	}
 }

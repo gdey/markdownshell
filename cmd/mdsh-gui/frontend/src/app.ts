@@ -9,7 +9,7 @@ import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
-import { initConsole, showConsole } from "./console.js";
+import { consoleFile, initConsole, showConsole } from "./console.js";
 import { fitHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
@@ -74,6 +74,7 @@ async function refresh() {
   wantTerminalSize(doc.termCols, doc.termRows);
   fitHistory();
   const open = doc.file !== "";
+  consoleFile(doc.file);
   $("toolbar").hidden = !open;
   $("workspace").hidden = !open;
   $("start").hidden = open;
@@ -994,6 +995,15 @@ async function showInSource(card: HTMLElement, line: number, open: boolean) {
     effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: Math.max(0, offset) }),
   });
   if (open) cm.focus();
+}
+
+// goToLine puts the source pane's cursor on line, opening the pane if
+// need be, with the rendered view brought to the cell holding it.
+async function goToLine(line: number) {
+  if (!doc.file) return;
+  const card = cellAt(line);
+  if (card && view.rendered) card.scrollIntoView({ block: "nearest" });
+  await showInSource(card ?? $("doc"), line, true);
 }
 
 // editBlock puts the cursor on the first line of block c's code.
@@ -2357,7 +2367,7 @@ initHistory({
     await refresh();
   },
 });
-initConsole({ toggle: () => void actions.console() });
+initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line) });
 initReport({
   dirty: () => !$("dirty").hidden,
   before: applySource,

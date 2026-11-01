@@ -15,6 +15,9 @@ follow [Semantic Versioning](https://semver.org/).
   button counts warnings and errors that came while it was closed. Copy
   copies the selected lines, or all of them; Clear empties it in every
   window. It keeps the last 1000 lines.
+- `mdsh-gui`: a Console line about a place in a file, such as a
+  `depends=` naming no block, shows the file's name and line; in a tab
+  showing that file, a click on it opens the source pane at the line.
 - `mdsh-gui`: a block's `depends=` is drawn as lines in the margin of
   the rendered view, from the block up to each block it names, faint
   behind the cards: the first dependency in purple, then pink, teal and

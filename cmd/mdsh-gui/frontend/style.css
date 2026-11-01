@@ -561,6 +561,9 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #console-log .message { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 #console-log .warn .level { color: var(--warn-border); }
 #console-log .error .level, #console-log .error .message { color: var(--bad); }
+#console-log .where { color: var(--muted); }
+#console-log .jump { cursor: pointer; }
+#console-log .jump .where { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 #console-empty { position: absolute; top: 28px; left: 8px; margin: 0; font-size: 12px; pointer-events: none; }
 #console-toggle { position: relative; }
 #console-toggle .badge { position: absolute; top: -3px; right: -4px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; background: var(--bad); color: #fff; font-size: 10px; line-height: 14px; text-align: center; }

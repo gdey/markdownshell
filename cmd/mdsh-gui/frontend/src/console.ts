@@ -2,6 +2,10 @@
 // errors from calls to Go, such as a file that doesn't parse, and notes
 // at info and above. The log is the app's, so every tab shows the same
 // one; new lines come as "console" events.
+//
+// A line about a place in a file shows the file's name and the line.
+// When that file is the one this tab shows, a click on the line takes
+// the source pane (or Neovim, when it is the editor) to it.
 
 import { Clipboard, Events } from "/wails/runtime.js";
 import { App, type ConsoleEntry } from "./api.js";
@@ -21,26 +25,76 @@ const short: Record<string, string> = { debug: "DBG", info: "INF", warn: "WRN", 
 export interface ConsoleHooks {
   // toggle opens or closes the pane, as View › Console does.
   toggle: () => void;
+  // jump puts the source pane's cursor on line of the file this tab shows.
+  jump: (line: number) => void;
 }
 
 let hooks: ConsoleHooks;
+// here is the file this tab shows, for telling which lines are about it.
+let here = "";
 
 function time(t: unknown): string {
   const d = new Date(String(t));
   return isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
 }
 
+// base is the last element of a path.
+const base = (file: string) => file.slice(Math.max(file.lastIndexOf("/"), file.lastIndexOf("\\")) + 1);
+
+// where is the place an entry is about, as name:line, or "".
+const where = (e: ConsoleEntry) => (e.file ? base(e.file) + (e.line ? `:${e.line}` : "") : "");
+
 // line is an entry as text, for copying.
-const line = (e: ConsoleEntry) => `${time(e.time)} ${short[e.level] ?? e.level.toUpperCase()} ${e.message}`;
+const line = (e: ConsoleEntry) =>
+  `${time(e.time)} ${short[e.level] ?? e.level.toUpperCase()} ${where(e) ? where(e) + " " : ""}${e.message}`;
+
+// rows holds the entry each drawn row is for.
+const rows = new WeakMap<HTMLElement, ConsoleEntry>();
 
 function row(e: ConsoleEntry): HTMLElement {
-  return el(
+  const r = el(
     "div",
     { className: "entry " + e.level },
     el("time", {}, time(e.time)),
     el("span", { className: "level" }, short[e.level] ?? e.level),
-    el("span", { className: "message" }, e.message),
+    el("span", { className: "message" }, ...(e.file ? [el("span", { className: "where" }, where(e)), " "] : []), e.message),
   );
+  rows.set(r, e);
+  mark(r, e);
+  return r;
+}
+
+// canJump reports whether e is about a line of the file this tab shows.
+const canJump = (e: ConsoleEntry) => !!e.file && !!e.line && e.file === here;
+
+// mark styles r as a link when it is about this tab's file.
+function mark(r: HTMLElement, e: ConsoleEntry) {
+  const on = canJump(e);
+  r.classList.toggle("jump", on);
+  if (on) r.title = `Show line ${e.line} in the source`;
+  else if (e.file) r.title = e.file;
+  else r.removeAttribute("title");
+}
+
+// consoleFile tells the pane which file this tab shows, "" for none.
+export function consoleFile(file: string) {
+  if (file === here) return;
+  here = file;
+  for (const r of $("console-log").children) {
+    const e = rows.get(r as HTMLElement);
+    if (e) mark(r as HTMLElement, e);
+  }
+}
+
+// click takes the source pane to the line a clicked row is about,
+// unless the click ended a drag that selected text to copy.
+function click(ev: MouseEvent) {
+  const r = (ev.target as HTMLElement).closest<HTMLElement>(".entry");
+  const e = r && rows.get(r);
+  if (!e || !canJump(e)) return;
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && $("console-log").contains(sel.anchorNode)) return;
+  hooks.jump(e.line!);
 }
 
 function drawAll() {
@@ -152,6 +206,7 @@ export function initConsole(h: ConsoleHooks) {
     // No storage: the default it is.
   }
   $("console-grip").onpointerdown = dragGrip;
+  $("console-log").onclick = click;
   $("console-clear").onclick = () => void App.ClearConsole().catch(() => {});
   $("console-copy").onclick = () => void copy();
   $("console-close").onclick = () => hooks.toggle();
