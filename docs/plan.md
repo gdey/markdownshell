@@ -11,6 +11,7 @@ says what gets built in which order and what is still open.
 | v2: interactive mode | `mdsh -i`: a TUI that runs blocks as you go | Released in v1.1.0 |
 | GUI | Desktop or web front end on the same library | Desktop app `mdsh-gui` released in v1.2.0 |
 | v1.3: polish | Settings with the changelog, a Welcome template, icons and motion, the site led by the app; see [release/v1.3.md](release/v1.3.md) | Planned |
+| Diagnosis and MCP | Ask a model about a failed block; serve a document to an outside agent | Designed in [diagnose.md](diagnose.md), not built |
 
 ## v1: library and CLI
 
