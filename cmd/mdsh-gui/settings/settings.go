@@ -50,6 +50,9 @@ type Settings struct {
 	NeovimPath string `json:"neovimPath"`
 	// NeovimClean starts Neovim without the user's config.
 	NeovimClean bool `json:"neovimClean"`
+	// NeovimOwnColors keeps the colorscheme from the user's Neovim
+	// config, rather than the app's theme, which is the default.
+	NeovimOwnColors bool `json:"neovimOwnColors"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
 	// Look is "tty" for the Teletype look, paper in the light theme and

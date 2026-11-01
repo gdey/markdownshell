@@ -353,12 +353,18 @@ const mdshBlocks: { name: string; label: string; text: string }[] = [
   { name: "choice", label: "choice", text: "```choice {#id mode=dropdown}\n- [ ] one\n- [ ] two\n```" },
 ];
 
+// insertCommand is the markdown bar's action called name, as the source
+// view's Insert menu names them, or null.
+export function insertCommand(name: string): StateCommand | null {
+  const a = actions.find((a) => a.name === name);
+  const b = mdshBlocks.find((b) => b.name === name);
+  return a?.run ?? (b ? insertBlock(b.text, "id") : null);
+}
+
 // insertAction runs the markdown bar's action called name, as the source
 // view's Insert menu asks, and reports whether there is one.
 export function insertAction(view: EditorView, name: string): boolean {
-  const a = actions.find((a) => a.name === name);
-  const b = mdshBlocks.find((b) => b.name === name);
-  const run = a?.run ?? (b && insertBlock(b.text, "id"));
+  const run = insertCommand(name);
   if (!run) return false;
   run(view);
   view.focus();

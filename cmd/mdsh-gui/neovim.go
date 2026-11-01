@@ -11,7 +11,8 @@ import (
 // The source pane as an embedded Neovim, for the frontend's nvim.ts.
 // Each tab with the pane open has its own Neovim. Its redraws come to the
 // page as "nvim-redraw" events, its edits as "nvim-text" and :w as
-// "nvim-write"; "nvim-exit" says it quit.
+// "nvim-write", and what else the buffer reports (the cursor moving,
+// :RunBlock, …) as "nvim-event"; "nvim-exit" says it quit.
 
 // NeovimInfo is what the Settings window shows about Neovim.
 type NeovimInfo struct {
@@ -67,6 +68,7 @@ func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) 
 		Redraw:  func(ev [][]any) { t.emitNow("nvim-redraw", ev) },
 		Changed: func(text string) { t.emitNow("nvim-text", text) },
 		Write:   func(text string) { t.emitNow("nvim-write", text) },
+		Event:   func(name, data string) { t.emitNow("nvim-event", NvimEvent{name, data}) },
 		Exit: func(err error) {
 			t.mu.Lock()
 			if t.nvim == e {
@@ -157,6 +159,37 @@ func (a *App) NvimSetText(ctx context.Context, text string) error {
 		return err
 	}
 	return e.SetText(text)
+}
+
+// NvimApply gives Neovim text, Go's text merged with what was typed, as
+// edits to the text Neovim last had, so typing elsewhere in the moment
+// since isn't lost. If an edit's lines changed, the whole text is set.
+func (a *App) NvimApply(ctx context.Context, text string, edits []nvim.Edit) error {
+	e, err := a.editor(ctx)
+	if errors.Is(err, errNoNvim) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return e.ApplyEdits(text, edits)
+}
+
+// NvimEvent is something the Neovim buffer reports: its name, such as
+// "cursor" or "run", and its data as JSON.
+type NvimEvent struct {
+	Name string `json:"name"`
+	Data string `json:"data"`
+}
+
+// NvimCall calls fn in mdsh.lua with args, a JSON array, and returns its
+// result as JSON: the cursor, setting the run buttons or folds, and so on.
+func (a *App) NvimCall(ctx context.Context, fn, args string) (string, error) {
+	e, err := a.editor(ctx)
+	if err != nil {
+		return "", err
+	}
+	return e.Call(fn, args)
 }
 
 // NvimSaved marks Neovim's buffer unchanged after a save.
