@@ -9,7 +9,7 @@ import { vim } from "@replit/codemirror-vim";
 
 import type { AttrSpec, Names } from "./api.js";
 import { el, iconButton, type icons } from "./dom.js";
-import { type ExTarget, attrHelp, exTarget, forgetEx } from "./editor.js";
+import { type ExTarget, attrHelp, clickFocus, exTarget, forgetEx } from "./editor.js";
 import { codeLanguages } from "./highlight.js";
 import { Synced } from "./sync.js";
 import { editorLook } from "./theme.js";
@@ -112,6 +112,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap]),
         attrHelp(opts.attrs, opts.names),
         exTarget(() => target),
+        clickFocus(),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !quiet) {

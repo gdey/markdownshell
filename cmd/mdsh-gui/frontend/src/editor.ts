@@ -43,6 +43,30 @@ export function exTarget(t: () => ExTarget | null): Extension {
   return EditorView.domEventHandlers({ focus: () => void (active = t()) });
 }
 
+// clickFocus makes a click in an editor that doesn't have the focus put
+// the cursor where it lands without scrolling. The pane may have been
+// scrolled away from the cursor, as the split view's panes follow each
+// other, and WebKit scrolls an editable to its caret when it takes the
+// focus: in a file just opened, to the top. So the cursor moves to the
+// click first, the editor takes the focus, and the scroll is put back
+// before CodeMirror reads where the click is.
+export function clickFocus(): Extension {
+  return EditorView.domEventHandlers({
+    mousedown(e, view) {
+      if (view.hasFocus || e.button !== 0 || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
+      const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+      if (pos == null) return false;
+      const s = view.scrollDOM;
+      const [top, left] = [s.scrollTop, s.scrollLeft];
+      view.dispatch({ selection: { anchor: pos }, userEvent: "select.pointer" });
+      view.focus();
+      s.scrollTop = top;
+      s.scrollLeft = left;
+      return false;
+    },
+  });
+}
+
 // forgetEx stops ex commands acting on view once it is gone.
 export function forgetEx(view: EditorView) {
   if (active?.view === view) active = null;
