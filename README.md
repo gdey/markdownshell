@@ -234,6 +234,8 @@ its output.
 | `v` | show the block's image or recording full screen; enter goes back |
 | `o` | show or hide the outline: the headings and blocks down the left, with each block's state (✓ ran, ✗ failed, ? waiting for an answer, … running) |
 | `C` / `O` | hide or show the code / the output of blocks |
+| `p` | create a report, as `mdsh-gui`'s Create Report: PDF, HTML or markdown, with or without code and output, of this run, of a run of every block, or of the file as saved. It shows the `mdsh` command that makes the same report |
+| `,` | run options for this file: the arguments `$1` and on, `--only`, `--step` and `--stop-on-error`. Setting them starts new shells, and the file keeps them when opened again |
 | `w` or ctrl+s | save now |
 | `W` | save as: type a path (relative to the file's folder); mdsh follows the new file. In another folder it opens it again, with fresh shells |
 | `R` | reload the file from disk, dropping output not saved |

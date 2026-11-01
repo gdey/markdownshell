@@ -115,6 +115,16 @@ type Model struct {
 	// shown is how the file is shown: the outline, code and output.
 	shown View
 
+	// form is the report or run options form, while one is up;
+	// formKind says which: "report" or "run".
+	form     *form
+	formKind string
+	// report is the report to write when the run going on ends.
+	report *pendingReport
+	// optsChanged is set when the run options changed, until the app is
+	// told.
+	optsChanged bool
+
 	// back is set when the TUI came from the start screen: q goes back
 	// to it rather than quitting.
 	back bool
@@ -235,14 +245,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	if info, err := os.Stat(opts.Run.File); err == nil {
 		m.mtime = info.ModTime()
 	}
-	ro := opts.Run
-	ro.OnEvent = func(e run.Event) { m.send(eventMsg(e)) }
-	ro.Confirm = m.confirm
-	ro.Depend = m.depend
-	if ro.TTY != nil {
-		ro.TakeTTY = m.takeTTY
-	}
-	sess, err := run.NewSession(d, ro)
+	sess, err := m.newSession(opts.Run)
 	if err != nil {
 		return nil, err
 	}
@@ -256,6 +259,17 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	m.saveAs = textinput.New()
 	m.saveAs.Prompt = "save as: "
 	return m, nil
+}
+
+// newSession starts a session that runs d with ro, reporting to m.
+func (m *Model) newSession(ro run.Options) (*run.Session, error) {
+	ro.OnEvent = func(e run.Event) { m.send(eventMsg(e)) }
+	ro.Confirm = m.confirm
+	ro.Depend = m.depend
+	if ro.TTY != nil {
+		ro.TakeTTY = m.takeTTY
+	}
+	return run.NewSession(m.d, ro)
 }
 
 // layout splits the document into prose and the blocks the cursor
@@ -433,6 +447,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.err != nil:
 			m.status = msg.err.Error()
 		}
+		if r := m.report; r != nil {
+			m.report = nil
+			if errors.Is(msg.err, context.Canceled) {
+				m.status = "stopped; the report wasn't saved"
+			} else {
+				was := m.status
+				m.writeReport(*r)
+				if was != "" {
+					m.status = was + " · " + m.status
+				}
+			}
+		}
 		m.refresh()
 		return m, m.wait
 	}
@@ -486,6 +512,9 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.naming {
 		return m, m.named(k)
+	}
+	if m.form != nil {
+		return m, m.formed(k)
 	}
 	if m.prompt != nil {
 		m.answer(k.String())
@@ -574,6 +603,14 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "M":
 		if m.changed {
 			m.keepMine()
+		}
+	case "p":
+		if cmd := m.reportForm(); cmd != nil {
+			return m, cmd
+		}
+	case ",":
+		if cmd := m.runOptionsForm(); cmd != nil {
+			return m, cmd
 		}
 	case "o":
 		return m, m.toggle(&m.shown.Outline)
@@ -973,15 +1010,7 @@ func (m *Model) named(k tea.KeyMsg) tea.Cmd {
 		if name == "" {
 			return nil
 		}
-		if strings.HasPrefix(name, "~/") {
-			if home, err := os.UserHomeDir(); err == nil {
-				name = filepath.Join(home, name[2:])
-			}
-		}
-		if !filepath.IsAbs(name) {
-			name = filepath.Join(filepath.Dir(m.opts.Run.File), name)
-		}
-		name = filepath.Clean(name)
+		name = m.path(name)
 		if _, err := os.Stat(name); err == nil && name != m.opts.Run.File && name != m.overwrite {
 			m.overwrite = name
 			m.status = filepath.Base(name) + " exists; enter again overwrites it"
@@ -1089,6 +1118,9 @@ func (m *Model) View() string {
 		return "loading…"
 	}
 	view := m.vp.View()
+	if m.form != nil {
+		view = m.form.view(m.docWidth(), m.vp.Height)
+	}
 	if m.showOutline() {
 		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
 		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
@@ -1101,10 +1133,7 @@ func (m *Model) View() string {
 }
 
 func (m *Model) footer() string {
-	name := m.opts.Run.File
-	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(name, home+string(filepath.Separator)) {
-		name = "~" + name[len(home):]
-	}
+	name := m.tilde(m.opts.Run.File)
 	state := ""
 	if m.dirty {
 		state = " " + dirtyStyle.Render("• not saved")
@@ -1135,6 +1164,10 @@ func (m *Model) footer() string {
 		help = m.input.View()
 	case m.naming:
 		help = m.saveAs.View()
+	case m.form != nil && m.formKind == "report":
+		help = helpStyle.Render(formHelp + "save · esc cancel")
+	case m.form != nil:
+		help = helpStyle.Render(formHelp + "apply · esc cancel")
 	case m.prompt != nil && m.prompt.of != nil:
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", m.d.Label(m.prompt.of), m.d.Label(m.prompt.block)))
 	case m.prompt != nil:
@@ -1142,7 +1175,7 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a from here · i new · e edit · E edit file · v view · o outline · C code · O output · w save · W save as · q " + m.quitWord())
+		help = helpStyle.Render("j/k move · enter run · a from here · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · q " + m.quitWord())
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }

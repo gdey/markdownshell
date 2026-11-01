@@ -52,7 +52,7 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	t.fresh = false
 	t.mu.Unlock()
 	ro := n.RunOptions()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args)}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: run.JoinArgs(ro.Args)}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -269,7 +269,7 @@ func (a *App) SetRunOptions(ctx context.Context, args, only string, step, stopOn
 	if err != nil {
 		return err
 	}
-	list, err := notebook.SplitArgs(args)
+	list, err := run.SplitArgs(args)
 	if err != nil {
 		return fmt.Errorf("arguments: %w", err)
 	}
