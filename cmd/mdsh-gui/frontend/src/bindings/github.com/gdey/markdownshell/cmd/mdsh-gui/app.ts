@@ -204,6 +204,13 @@ export function OpenPath(file: string): $CancellablePromise<void> {
 }
 
 /**
+ * Redo does again what Undo took back, and says what it was.
+ */
+export function Redo(): $CancellablePromise<string> {
+    return $Call.ByName("main.App.Redo");
+}
+
+/**
  * Reload reads the file from disk again, dropping output not saved.
  */
 export function Reload(): $CancellablePromise<void> {
@@ -390,6 +397,14 @@ export function Text(): $CancellablePromise<string> {
  */
 export function Type(keys: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.Type", keys);
+}
+
+/**
+ * Undo takes back the rendered view's last edit, such as checking a task,
+ * and says what it was: "" when there is none.
+ */
+export function Undo(): $CancellablePromise<string> {
+    return $Call.ByName("main.App.Undo");
 }
 
 /**

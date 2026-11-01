@@ -109,16 +109,20 @@ func (n *Notebook) SetTask(task int, done bool) error {
 	if (n.d.Src[p] != ' ') == done {
 		return nil
 	}
-	n.setResultTask(marks, task, mark)
+	outs := n.setResultTask(marks, task, mark)
 	src := append([]byte(nil), n.d.Src...)
 	src[p] = mark
-	return n.setSource(src)
+	what := "uncheck task"
+	if done {
+		what = "check task"
+	}
+	return n.change(what, "", src, outs)
 }
 
 // setResultTask sets the mark of task in the output of a block that ran
 // this session, if the task is in its output, so that saving, which
-// writes that output, keeps it.
-func (n *Notebook) setResultTask(marks []int, task int, mark byte) {
+// writes that output, keeps it, and returns the change for Undo.
+func (n *Notebook) setResultTask(marks []int, task int, mark byte) []outChange {
 	for i, b := range n.d.Blocks {
 		r := n.results[i]
 		if r == nil || !r.Ran || marks[task] < b.Output.Start || marks[task] >= b.Output.End {
@@ -126,11 +130,14 @@ func (n *Notebook) setResultTask(marks []int, task int, mark byte) {
 		}
 		j := tasksIn(marks[:task], b.Output) // the task's place in the output
 		if out := n.marksIn(r.Stdout); len(j) < len(out) {
+			before := r.Stdout
 			r.Stdout = append([]byte(nil), r.Stdout...)
 			r.Stdout[out[len(j)]+1] = mark
+			return []outChange{{r, before, r.Stdout}}
 		}
-		return
+		return nil
 	}
+	return nil
 }
 
 // SetTextbox replaces the text of textbox i.
@@ -143,7 +150,8 @@ func (n *Notebook) SetTextbox(i int, text string) error {
 	if i < 0 || i >= len(n.d.Blocks) || !n.d.Blocks[i].IsTextbox() {
 		return fmt.Errorf("block %d isn't a textbox", i)
 	}
-	return n.setSource(n.d.SetBody(n.d.Blocks[i], text))
+	b := n.d.Blocks[i]
+	return n.change("edit textbox", "textbox:"+b.ID, n.d.SetBody(b, text), nil)
 }
 
 // SetChoice checks the options of choice i as checked says, one bool
@@ -157,7 +165,7 @@ func (n *Notebook) SetChoice(i int, checked []bool) error {
 	if i < 0 || i >= len(n.d.Blocks) || !n.d.Blocks[i].IsChoice() {
 		return fmt.Errorf("block %d isn't a choice", i)
 	}
-	return n.setSource(n.d.SetChoice(n.d.Blocks[i], checked))
+	return n.change("pick choice", "", n.d.SetChoice(n.d.Blocks[i], checked), nil)
 }
 
 // tableTaskAttr holds, on a checkbox tableTasks made, the offset of its

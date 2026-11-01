@@ -82,6 +82,14 @@ Each file opens in a tab of its own, with its own shells.
   picks as `$MDSH_VAR_name`; a later input reusing a name is marked, with
   `!` in the outline, and ignored. All are edits like typing in the source
   view: Save writes them.
+- **Undo in the rendered view:** Edit › Undo (cmd/ctrl+Z) takes back the
+  rendered view's last edit (checking a task, picking a choice, or what
+  was typed into a textbox since moving to it) and Redo
+  (cmd/ctrl+shift+Z) does it again, up to 100 edits back. It is its own
+  history: in the source view, and in a textbox while typing, undo is
+  that editor's own. Once the file changes some other way, such as
+  typing in the source view, a run writing output or Reload, the
+  rendered view's earlier edits can't be undone.
 - **Links** in the rendered view open when clicked: web links in the
   browser, a markdown file in a new tab (or the tab it's already open
   in), any other file as the system would open it, and `#heading`
