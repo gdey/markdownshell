@@ -4,6 +4,7 @@ import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
+import { initDeps, litDeps, setDeps } from "./deps.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
@@ -139,6 +140,7 @@ function drawDoc() {
   drawOutline();
   sizeTerminal();
   restore();
+  setDeps(cells);
 }
 
 // anchor notes where the block being followed is in the rendered view,
@@ -790,6 +792,7 @@ function select(i: number, scroll = true) {
     markSection();
   }
   markOutline();
+  litDeps(i >= 0 && i < all.length ? Number(all[i].dataset.block) : -1);
   if (i < 0 || i >= all.length) return;
   all[i].classList.add("selected");
   if (scroll) all[i].scrollIntoView({ block: "nearest" });
@@ -1181,10 +1184,12 @@ function syncScroll(from: "source" | "doc") {
   if (from === "source") {
     const line = cm.state.doc.lineAt(cm.lineBlockAtHeight(cm.scrollDOM.scrollTop).from).number;
     const cell = cellAt(line);
-    if (cell) pane.scrollTop = cell.offsetTop - pane.offsetTop - 8;
+    // The pane is positioned, for the dependency lines, so a cell's
+    // offsetTop is from the pane's top.
+    if (cell) pane.scrollTop = cell.offsetTop - 8;
     return;
   }
-  const top = pane.scrollTop + pane.offsetTop;
+  const top = pane.scrollTop;
   const cell = [...document.querySelectorAll<HTMLElement>("#doc > [data-line]")].find((e) => e.offsetTop + e.offsetHeight > top);
   if (!cell) return;
   const line = Math.min(Number(cell.dataset.line), cm.state.doc.lines);
@@ -1515,6 +1520,21 @@ document.addEventListener(
   },
   true,
 );
+
+// setDepends writes block i's depends= as the blocks deps names, from a
+// drag or a click on a dependency line. It is a rendered-view edit, so
+// Undo takes it back.
+async function setDepends(i: number, deps: number[], what: string) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  try {
+    await App.SetDepends(i, deps);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  status(what);
+}
 
 // moveRendered moves block i as a rendered-view edit, which Undo takes
 // back.
@@ -1947,6 +1967,7 @@ window.addEventListener("resize", () => {
   }, 200);
 });
 initSplitGrip();
+initDeps($("doc-scroll"), { jump: jumpTo, setDepends });
 initHistory({
   canRun: () => !running,
   async enter(call) {

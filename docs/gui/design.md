@@ -16,6 +16,8 @@ Not goals for v1: a plugin system, remote kernels, or languages beyond what `run
 
 Every feature of `mdsh` and `mdsh -i` gets a place in the GUI. New in the GUI: save as, create report, a start screen, and editing the whole document. M1 to M7 are the milestones below.
 
+Later additions have notes of their own beside this one: [dependency lines](depends.md) draws `depends=` in the rendered view's margin and lets you edit it there.
+
 | Feature | Today (CLI / TUI) | In the GUI | When |
 | --- | --- | --- | --- |
 | Run one block, run from here, run all | `enter`, `a` in `-i`; `mdsh file.md` | Buttons per block and in the toolbar | Done (#28) |

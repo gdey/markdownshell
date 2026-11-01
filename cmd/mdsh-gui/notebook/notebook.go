@@ -47,6 +47,9 @@ type Cell struct {
 	// Attrs are the block's attributes other than its id, as written,
 	// such as confirm timeout=5m.
 	Attrs string `json:"attrs,omitempty"`
+	// Depends are the ids of the blocks the block's depends= names, in
+	// order, for the lines the rendered view draws between them.
+	Depends []string `json:"depends,omitempty"`
 	// Output is the block's output, saved or from this session, rendered.
 	Output string `json:"output,omitempty"`
 	// OutputTasks number the task list checkboxes in Output, as Tasks

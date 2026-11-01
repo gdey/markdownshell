@@ -14,6 +14,7 @@
   --warn-border: #d4a72c;
   --selection: rgb(84 174 255 / 0.35);
   --active-line: rgb(208 215 222 / 0.35);
+  --dep-1: #8250df; --dep-2: #bf3989; --dep-3: #1b7c83; --dep-4: #bc4c00; --dep-more: #8c959f;
   /* Syntax colors for the editors. */
   --syn-keyword: #cf222e;
   --syn-string: #0a3069;
@@ -53,6 +54,7 @@
     --warn-border: #9e6a03;
     --selection: rgb(56 139 253 / 0.4);
     --active-line: rgb(110 118 129 / 0.14);
+    --dep-1: #a475f9; --dep-2: #f778ba; --dep-3: #39c5cf; --dep-4: #f0883e; --dep-more: #6e7781;
     --syn-keyword: #ff7b72;
     --syn-string: #a5d6ff;
     --syn-number: #79c0ff;
@@ -202,7 +204,37 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 .cm-run { display: inline-flex; color: var(--accent); cursor: pointer; border-radius: 3px; }
 .cm-run:hover { background: var(--hover); }
 .cm-run svg { width: 11px; height: 11px; fill: currentColor; }
-#doc-scroll { flex: 1; overflow: auto; min-width: 0; }
+#doc-scroll { flex: 1; overflow: auto; min-width: 0; position: relative; isolation: isolate; }
+/* Dependency lines: an SVG layer behind the cards, over the page, in
+   the margin, and a clear one over everything for what is clicked or
+   dragged: the dots where lines attach, the rings to drag new lines
+   from, and unseen wider copies of the lines. A block's first
+   dependency is dep-1, its fifth and later dep-more. Selecting a block
+   lights its lines (lit) and outlines the blocks they lead to (dep-of)
+   in the line's color. */
+#deps, #deps-ui { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+#deps { z-index: -1; }
+#deps-ui { z-index: 1; }
+.dep, .dot, .handle { color: var(--dep-more); }
+.dep-1 { color: var(--dep-1); }
+.dep-2 { color: var(--dep-2); }
+.dep-3 { color: var(--dep-3); }
+.dep-4 { color: var(--dep-4); }
+#deps path { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.3; }
+#deps .hover path { opacity: 0.7; }
+#deps .lit path { opacity: 1; stroke-width: 3.5; }
+#deps-ui .hit { fill: none; stroke: transparent; stroke-width: 9; pointer-events: stroke; cursor: pointer; }
+#deps-ui .dot { fill: currentColor; opacity: 0.6; pointer-events: all; cursor: grab; }
+#deps-ui .dot.lit, #deps-ui .dot:hover { opacity: 1; }
+#deps-ui .handle { fill: var(--bg); stroke: var(--muted); stroke-width: 1.5; opacity: 0.35; pointer-events: all; cursor: grab; }
+#deps-ui .handle:hover { opacity: 1; stroke: var(--accent); }
+#deps-ui .port { fill: var(--muted); opacity: 0.35; }
+#deps-ui .drag { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 5; opacity: 0.8; }
+#deps-ui .drag.tear { color: var(--bad); stroke-dasharray: 2 5; opacity: 0.6; }
+body.dragging-dep, body.dragging-dep * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+#doc > .dep-of { outline: 2px solid var(--dep-of); outline-offset: 1px; border-radius: 8px; }
+#doc > .block.dep-target { outline: 2px dashed var(--accent); outline-offset: 1px; }
+body.dragging-dep #deps-ui .port { opacity: 0.8; }
 #workspace.split #doc-scroll { flex: 1; }
 /* The grip over the source view's right edge, to drag. */
 #split-grip { flex: none; position: relative; z-index: 3; width: 7px; margin: 0 -4px 0 -3px; cursor: col-resize; }

@@ -232,6 +232,23 @@ run yet.
 
 ![A background block still running, and a confirm block asking "Ship the site to production?" with Run, Skip and Stop](../../site/static/images/gui/confirm.png)
 
+A block's `depends=` is drawn as lines in the page margin, from the block
+up to each block it names, painted faintly behind the cards: its first
+dependency in purple, then pink, teal and orange, and any past four in
+gray. Each line keeps a lane of its own, in the left margin when the
+lanes fit there, else the right. Selecting a block lights its lines and
+outlines the blocks they lead to in the same colors; hover a line to
+read what it joins, and double-click one to go to its far end. The
+lines are edited where they are drawn. Each card has two anchors on its
+edge: a ring at the top, where its lines leave, and a dot at the bottom,
+where lines from the blocks that depend on it arrive. Drag the ring
+onto a block above to depend on it, click the dot at a line's corner to
+take that dependency out, or drag the dot to another block above to
+depend on that one instead, or out past the lines, away from the cards,
+to tear it off. Each writes the block's `depends=`, so Undo
+takes it back, and a cycle or a block that can't be depended on is
+refused with mdsh's message.
+
 The outline lists the headings and blocks, with a mark for each block's
 state. The selected block, or the one the source pane's cursor is in,
 has a play button in the outline that runs it.

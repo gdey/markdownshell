@@ -51,6 +51,21 @@ func TestCells(t *testing.T) {
 	}
 }
 
+func TestCellsDepends(t *testing.T) {
+	n, err := Open(write(t, "```sh {#build}\necho built\n```\n\n```sh {#login}\necho in\n```\n\n```sh {#deploy depends=build,login}\necho deploy\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	cells := n.Cells()
+	if got := cells[0].Depends; got != nil {
+		t.Errorf("build depends = %q, want none", got)
+	}
+	if got, want := cells[2].Depends, []string{"build", "login"}; !slices.Equal(got, want) {
+		t.Errorf("deploy depends = %q, want %q", got, want)
+	}
+}
+
 func TestRunAndSave(t *testing.T) {
 	file := write(t, src)
 	var mu sync.Mutex
