@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: Edit › Undo and Redo work in the rendered view, taking
+  back and redoing checking tasks, typing in textboxes and picking
+  choices. Where the focus is decides what they undo: the source view
+  and a textbox being typed in keep their own history.
 - `res://name` paths name a file in the document's assets folder,
   `<doc>.assets/name`: `<include file=res://notes.md` reads one (tapes
   too), and `out=image:res://plot.png` (or `screenshot:`, `recording:`)

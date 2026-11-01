@@ -146,6 +146,8 @@ type Notebook struct {
 	reaping bool
 	idle    *sync.Cond
 	quit    chan struct{}
+	// undo and redo are the rendered view's edits, for Undo and Redo.
+	undo, redo []change
 }
 
 // reapEvery is how often a notebook checks on background blocks while

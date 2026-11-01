@@ -3,6 +3,7 @@ package main
 import (
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -14,6 +15,29 @@ import (
 func (a *App) send(action string) func(*application.Context) {
 	return func(*application.Context) {
 		if t := a.currentTab(); t != nil {
+			t.emit("menu", action)
+		}
+	}
+}
+
+// undo is Edit › Undo's action, or Redo's. A document window decides
+// what to undo by where its focus is: an editor's own history, a text
+// field's, or the rendered view's edits (see Notebook.Undo). Any other
+// window, such as Settings, gets the browser's undo.
+func (a *App) undo(action string) func(*application.Context) {
+	return func(*application.Context) {
+		win := a.app.Window.Current()
+		if win == nil {
+			return
+		}
+		a.mu.Lock()
+		w := a.windows[win.ID()]
+		a.mu.Unlock()
+		if w == nil {
+			win.ExecJS("document.execCommand(" + strconv.Quote(action) + ")")
+			return
+		}
+		if t := w.activeTab(); t != nil {
 			t.emit("menu", action)
 		}
 	}
@@ -117,8 +141,8 @@ func (a *App) buildMenu() *application.Menu {
 	}
 
 	edit := m.AddSubmenu("Edit")
-	edit.AddRole(application.Undo)
-	edit.AddRole(application.Redo)
+	edit.Add("Undo").SetAccelerator("CmdOrCtrl+Z").OnClick(a.undo("undo"))
+	edit.Add("Redo").SetAccelerator("CmdOrCtrl+Shift+Z").OnClick(a.undo("redo"))
 	edit.AddSeparator()
 	edit.AddRole(application.Cut)
 	edit.AddRole(application.Copy)

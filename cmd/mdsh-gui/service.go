@@ -447,6 +447,29 @@ func (a *App) SetTextbox(ctx context.Context, i int, text string) error {
 	return err
 }
 
+// Undo takes back the rendered view's last edit, such as checking a task,
+// and says what it was: "" when there is none.
+func (a *App) Undo(ctx context.Context) (string, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return "", err
+	}
+	what, err := n.Undo()
+	t.changed()
+	return what, err
+}
+
+// Redo does again what Undo took back, and says what it was.
+func (a *App) Redo(ctx context.Context) (string, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return "", err
+	}
+	what, err := n.Redo()
+	t.changed()
+	return what, err
+}
+
 // SetChoice checks the options of choice block i as picked in it.
 func (a *App) SetChoice(ctx context.Context, i int, checked []bool) error {
 	t, n, err := a.notebook(ctx)

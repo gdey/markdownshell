@@ -1,4 +1,5 @@
 import "./tab.js";
+import { redo, undo } from "@codemirror/commands";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
@@ -1232,7 +1233,40 @@ const actions: Record<string, () => Promise<void> | void> = {
   },
   foldstosource: () => foldsToSource(),
   foldstorendered: () => foldsToRendered(),
+  undo: () => undoEdit(false),
+  redo: () => undoEdit(true),
 };
+
+// undoEdit is Edit › Undo, or Redo. Where the focus is decides what it
+// takes back: the source view keeps its own history, a text field its
+// own, and everything else is the rendered view's, whose edits (tasks,
+// textboxes and choices) Go keeps.
+async function undoEdit(again: boolean) {
+  const at = document.activeElement as HTMLElement | null;
+  const cm = at?.closest<HTMLElement>(".cm-editor");
+  if (cm) {
+    const view = EditorView.findFromDOM(cm);
+    if (view) (again ? redo : undo)(view);
+    return;
+  }
+  if (at?.closest("textarea, input:not([type=checkbox]):not([type=radio]), [contenteditable]")) {
+    document.execCommand(again ? "redo" : "undo");
+    return;
+  }
+  if (!doc.file) return;
+  if (running) {
+    status("can't change the file while a block runs");
+    return;
+  }
+  await applySource();
+  try {
+    const what = await (again ? App.Redo() : App.Undo());
+    status(what ? `${again ? "redid" : "undid"}: ${what}` : `nothing to ${again ? "redo" : "undo"}`);
+  } catch (err) {
+    fail(err);
+  }
+  await refresh();
+}
 
 // Run options
 
