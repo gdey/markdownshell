@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/gdey/markdownshell/doc"
 )
@@ -44,38 +47,75 @@ func Run(c Config) error {
 // MaxRecent is how many recent files are kept.
 const MaxRecent = 10
 
-// app is the TUI: a file, or the start screen. It is a tea.Model.
+// app is the TUI: tabs, as in mdsh-gui, each showing a file or the start
+// screen. It is a tea.Model.
 type app struct {
-	c     Config
-	doc   *Model // nil while the start screen shows
-	start *start
-	st    state
-	size  tea.WindowSizeMsg
+	c    Config
+	tabs []*tab
+	at   int // the tab in front
+	st   state
+	size tea.WindowSizeMsg
 	// runOpts are the run options set for each file opened, which it
 	// keeps when opened again.
 	runOpts map[string]RunOptions
+	// quitArmed is set after a quit with output not saved in another
+	// tab: quitting again quits anyway.
+	quitArmed bool
 }
 
-// openMsg asks the app to open a file, or the same one again.
+// tab shows a file, or the start screen.
+type tab struct {
+	doc   *Model // nil while the start screen shows
+	start *start
+	// back is set when q in the file goes back to the start screen.
+	back bool
+}
+
+// tabMsg is a message from a tab's command, so it reaches that tab even
+// when another is in front.
+type tabMsg struct {
+	t   *tab
+	msg tea.Msg
+}
+
+// openMsg asks the app to open a file, or the same one again, in the
+// tab it came from.
 type openMsg struct{ file string }
 
-// backMsg asks the app to close the file and show the start screen.
+// backMsg asks the app to close the tab's file and show the start
+// screen.
 type backMsg struct{}
 
 // savedAsMsg says the file was saved under a new name.
 type savedAsMsg struct{ file string }
 
+// closeTabMsg asks the app to close the tab. The last tab quits.
+type closeTabMsg struct{}
+
+// nextTabMsg asks for the tab by, the next one (1) or the one before
+// (-1).
+type nextTabMsg struct{ by int }
+
+// quitAllMsg is a tab's quit, which the app checks against the other
+// tabs' unsaved output.
+type quitAllMsg struct{}
+
 func newApp(c Config) (*app, error) {
 	a := &app{c: c, st: loadState(c.State)}
+	t := &tab{back: c.File == ""}
+	a.tabs = []*tab{t}
 	if c.File != "" {
-		return a, a.open(c.File)
+		return a, a.open(t, c.File)
 	}
-	a.start = newStart(c.Dir, a.st.Recent)
+	t.start = newStart(c.Dir, a.st.Recent)
 	return a, nil
 }
 
-// open opens file in place of whatever shows.
-func (a *app) open(file string) error {
+// tab is the tab in front.
+func (a *app) tab() *tab { return a.tabs[a.at] }
+
+// open opens file in tab t in place of whatever it shows.
+func (a *app) open(t *tab, file string) error {
 	d, opts, err := a.c.Open(file)
 	if err != nil {
 		return err
@@ -88,17 +128,22 @@ func (a *app) open(file string) error {
 	if err != nil {
 		return err
 	}
-	m.back = a.c.File == ""
-	a.close()
-	a.doc, a.start = m, nil
+	m.back = t.back
+	if t.doc != nil {
+		t.doc.Close()
+	}
+	t.doc, t.start = m, nil
 	a.opened(m.opts.Run.File)
 	return nil
 }
 
+// close closes every tab's file.
 func (a *app) close() {
-	if a.doc != nil {
-		a.doc.Close()
-		a.doc = nil
+	for _, t := range a.tabs {
+		if t.doc != nil {
+			t.doc.Close()
+			t.doc = nil
+		}
 	}
 }
 
@@ -113,35 +158,116 @@ func (a *app) opened(file string) {
 }
 
 func (a *app) Init() tea.Cmd {
-	if a.doc != nil {
-		return a.doc.Init()
+	if t := a.tab(); t.doc != nil {
+		return a.wrap(t, t.doc.Init())
 	}
 	return nil
 }
 
+// wrap marks what cmd sends as coming from tab t. Bubble Tea's own
+// messages, such as the one that runs an editor, pass as they are.
+func (a *app) wrap(t *tab, cmd tea.Cmd) tea.Cmd {
+	if cmd == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg := cmd()
+		switch msg := msg.(type) {
+		case nil:
+			return nil
+		case tea.BatchMsg:
+			out := make(tea.BatchMsg, len(msg))
+			for i, c := range msg {
+				out[i] = a.wrap(t, c)
+			}
+			return out
+		case tea.QuitMsg:
+			return tabMsg{t, quitAllMsg{}}
+		}
+		if typ := reflect.TypeOf(msg); typ.PkgPath() == reflect.TypeOf(tea.QuitMsg{}).PkgPath() {
+			return msg
+		}
+		return tabMsg{t, msg}
+	}
+}
+
+// barHeight is the height of the tab bar: shown with more than one tab.
+func (a *app) barHeight() int {
+	if len(a.tabs) > 1 {
+		return 1
+	}
+	return 0
+}
+
+// resize tells every tab the size it has under the tab bar.
+func (a *app) resize() tea.Cmd {
+	size := a.size
+	size.Height = max(size.Height-a.barHeight(), 1)
+	var cmds []tea.Cmd
+	for _, t := range a.tabs {
+		if t.doc != nil {
+			_, cmd := t.doc.Update(size)
+			cmds = append(cmds, a.wrap(t, cmd))
+		} else {
+			t.start.Update(size)
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
 func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	t := a.tab()
+	if m, ok := msg.(tabMsg); ok {
+		t, msg = m.t, m.msg
+		if !slices.Contains(a.tabs, t) {
+			return a, nil // a tab closed since
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		a.size = msg
+		return a, a.resize()
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+t":
+			return a, a.newTab()
+		case "ctrl+c", "q", "ctrl+w", "esc":
+		default:
+			a.quitArmed = false
+		}
 	case openMsg:
-		if err := a.open(msg.file); err != nil {
-			if a.doc != nil {
-				a.doc.status = err.Error()
-				a.doc.refresh()
+		// A file open in another tab is shown there.
+		for i, u := range a.tabs {
+			if u != t && u.doc != nil && u.doc.opts.Run.File == msg.file {
+				a.at = i
+				return a, nil
+			}
+		}
+		if err := a.open(t, msg.file); err != nil {
+			if t.doc != nil {
+				t.doc.status = err.Error()
+				t.doc.refresh()
 			} else {
-				a.start.status = err.Error()
+				t.start.status = err.Error()
 			}
 			return a, nil
 		}
-		a.doc.Update(a.size)
-		return a, a.doc.Init()
+		size := a.size
+		size.Height = max(size.Height-a.barHeight(), 1)
+		t.doc.Update(size)
+		return a, a.wrap(t, t.doc.Init())
 	case backMsg:
-		a.close()
-		a.start = newStart(a.c.Dir, a.st.Recent)
-		a.start.Update(a.size)
-		return a, nil
+		if t.doc != nil {
+			t.doc.Close()
+		}
+		t.doc, t.start = nil, newStart(a.c.Dir, a.st.Recent)
+		return a, a.resize()
 	case savedAsMsg:
 		a.opened(msg.file)
+		return a, nil
+	case viewMsg:
+		a.st.View = View(msg)
+		saveState(a.c.State, a.st)
 		return a, nil
 	case runOptsMsg:
 		if a.runOpts == nil {
@@ -149,24 +275,112 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.runOpts[msg.file] = msg.ro
 		return a, nil
-	case viewMsg:
-		a.st.View = View(msg)
-		saveState(a.c.State, a.st)
+	case closeTabMsg:
+		return a, a.closeTab(t)
+	case nextTabMsg:
+		a.at = (a.at + msg.by + len(a.tabs)) % len(a.tabs)
 		return a, nil
+	case quitAllMsg:
+		return a, a.quit(t)
 	}
-	if a.doc != nil {
-		_, cmd := a.doc.Update(msg)
-		return a, cmd
+	if t.doc != nil {
+		_, cmd := t.doc.Update(msg)
+		return a, a.wrap(t, cmd)
 	}
-	_, cmd := a.start.Update(msg)
-	return a, cmd
+	_, cmd := t.start.Update(msg)
+	return a, a.wrap(t, cmd)
+}
+
+// newTab opens a tab with the start screen in front.
+func (a *app) newTab() tea.Cmd {
+	t := &tab{start: newStart(a.c.Dir, a.st.Recent), back: true}
+	a.tabs = slices.Insert(a.tabs, a.at+1, t)
+	a.at++
+	return a.resize()
+}
+
+// closeTab closes t. Closing the last tab quits.
+func (a *app) closeTab(t *tab) tea.Cmd {
+	i := slices.Index(a.tabs, t)
+	if i < 0 {
+		return nil
+	}
+	if len(a.tabs) == 1 {
+		return a.quit(t)
+	}
+	if t.doc != nil {
+		t.doc.Close()
+	}
+	a.tabs = slices.Delete(a.tabs, i, i+1)
+	if a.at >= i && a.at > 0 {
+		a.at--
+	}
+	return a.resize()
+}
+
+// quit quits, unless another tab than t has output not saved: then it
+// shows that tab, and quitting again quits anyway.
+func (a *app) quit(t *tab) tea.Cmd {
+	if !a.quitArmed {
+		for i, u := range a.tabs {
+			if u != t && u.doc != nil && (u.doc.dirty || u.doc.running) {
+				a.at, a.quitArmed = i, true
+				u.doc.status = "output is not saved here; quit again to quit anyway"
+				if u.doc.running {
+					u.doc.status = "a block is running here; quit again to stop it and quit"
+				}
+				u.doc.refresh()
+				return nil
+			}
+		}
+	}
+	return tea.Quit
+}
+
+var (
+	tabStyle   = lipgloss.NewStyle().Foreground(dimCol).Padding(0, 1)
+	frontStyle = lipgloss.NewStyle().Bold(true).Foreground(accent).Reverse(true).Padding(0, 1)
+)
+
+// bar draws the tab bar: each tab's file, with • when output isn't
+// saved, … while a block runs and ? while one waits for an answer.
+func (a *app) bar() string {
+	var parts []string
+	for i, t := range a.tabs {
+		name := "Start"
+		if m := t.doc; m != nil {
+			name = filepath.Base(m.opts.Run.File)
+			switch {
+			case m.prompt != nil:
+				name += " ?"
+			case m.running || len(m.bg) > 0:
+				name += " …"
+			}
+			if m.dirty {
+				name += " •"
+			}
+		}
+		style := tabStyle
+		if i == a.at {
+			style = frontStyle
+		}
+		parts = append(parts, style.Render(name))
+	}
+	return truncate(strings.Join(parts, ""), max(a.size.Width, 1))
 }
 
 func (a *app) View() string {
-	if a.doc != nil {
-		return a.doc.View()
+	t := a.tab()
+	view := ""
+	if t.doc != nil {
+		view = t.doc.View()
+	} else {
+		view = t.start.View()
 	}
-	return a.start.View()
+	if len(a.tabs) > 1 {
+		view = a.bar() + "\n" + view
+	}
+	return view
 }
 
 // state is what the TUI keeps between runs: the files opened most

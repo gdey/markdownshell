@@ -241,7 +241,10 @@ its output.
 | `R` | reload the file from disk, dropping output not saved |
 | `M` | when the file changed on disk, keep what is shown; the next save overwrites the file |
 | ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
-| `q` | quit, or go back to the list of files |
+| `q` | go back to the list of files, or close the tab; the last tab quits |
+| ctrl+t | open a new tab with the list of files; picking a file already open in a tab goes to that tab |
+| `]` / `[` | the next or previous tab. The tab bar marks a file with • when its output isn't saved, … while a block runs and ? while one waits for an answer. Blocks go on running in the tabs behind |
+| ctrl+w | close the tab (esc on the list of files closes its tab). Quitting stops at a tab with output not saved first |
 
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
