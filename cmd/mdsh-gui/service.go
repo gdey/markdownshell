@@ -594,6 +594,18 @@ func (a *App) ClearOutput(ctx context.Context, i int) error {
 	return err
 }
 
+// MoveTo moves the block or heading's section that starts at from to
+// at, a cell's From or -1 for the end, as dragging does.
+func (a *App) MoveTo(ctx context.Context, from, at int) (notebook.Move, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Move{}, err
+	}
+	m, err := n.MoveTo(from, at)
+	t.changed()
+	return m, err
+}
+
 // PlanMove works out MoveBlock's move without making it, for the source
 // view to make as its own edit.
 func (a *App) PlanMove(ctx context.Context, i, dir int, byBlock bool) (notebook.Move, error) {

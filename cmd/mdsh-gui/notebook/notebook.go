@@ -89,6 +89,9 @@ type Cell struct {
 	// block with its output and tape.
 	Movable  bool `json:"movable,omitempty"`
 	LastLine int  `json:"lastLine,omitempty"`
+	// Drop is set when a block or section can be moved to just before
+	// the cell, with MoveTo at From.
+	Drop bool `json:"drop,omitempty"`
 }
 
 // Event is what OnEvent reports while a block runs.

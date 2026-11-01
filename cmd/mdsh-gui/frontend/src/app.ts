@@ -207,6 +207,20 @@ function stopFollowing() {
 function drawCell(c: Cell): HTMLElement {
   const e = c.textbox ? drawTextbox(c) : c.choice ? drawChoice(c) : c.block < 0 ? drawProse(c) : drawBlock(c);
   e.dataset.line = String(c.line);
+  e.dataset.from = String(c.from);
+  if (c.drop) e.dataset.drop = "1";
+  if (c.movable) {
+    // The grip goes first in a block's head, or before an input's name.
+    const g = grip("Drag to move this block (alt+↑/↓)", (ev, handle) => startDrag(ev, handle, e, c.from, 0, "doc"));
+    const head = e.querySelector(".head");
+    if (head) head.prepend(g);
+    else {
+      // A fence that doesn't run has no head; its grip sits in the
+      // margin beside it.
+      e.classList.add("fence");
+      e.prepend(g);
+    }
+  }
   return e;
 }
 
@@ -868,6 +882,7 @@ function runAllButton() {
 
 function busy(on: boolean) {
   running = on;
+  document.body.classList.toggle("running", on);
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   runAllButton();
   historyBusy(on);
@@ -1216,7 +1231,8 @@ function drawOutline() {
       // An input whose var= binds nothing is marked !.
       const taken = e.classList.contains("taken");
       const name = e.querySelector(".name")?.textContent ?? "";
-      items.push(outlineItem(name, level + 1, e, "step input" + (taken ? " bad" : ""), taken ? "!" : ""));
+      const item = outlineItem(name, level + 1, e, "step input" + (taken ? " bad" : ""), taken ? "!" : "");
+      items.push(outlineRow(item, e, 0));
       continue;
     }
     if (e.classList.contains("block")) {
@@ -1230,7 +1246,8 @@ function drawOutline() {
       const play = iconButton("play", "Run this block (enter)", () => start("RunBlock", block));
       play.classList.add("run");
       play.disabled = running;
-      const row = el("div", { className: "row" }, item, play);
+      const row = outlineRow(item, e, 0);
+      row.append(play);
       row.dataset.block = String(block);
       items.push(row);
       continue;
@@ -1250,15 +1267,15 @@ function drawOutline() {
           foldSection(e);
         };
       }
-      if (!e.dataset.sectionTo) {
-        items.push(item);
-        continue;
+      const row = outlineRow(item, e, level);
+      row.dataset.section = "";
+      if (e.dataset.sectionTo) {
+        const play = iconButton("play", "Run this section (s)", () => void runSection(e));
+        play.classList.add("run");
+        play.disabled = running;
+        row.append(play);
+        row.dataset.section = e.dataset.fold ?? "";
       }
-      const play = iconButton("play", "Run this section (s)", () => void runSection(e));
-      play.classList.add("run");
-      play.disabled = running;
-      const row = el("div", { className: "row" }, item, play);
-      row.dataset.section = e.dataset.fold ?? "";
       items.push(row);
     }
   }
@@ -1289,6 +1306,21 @@ function blockMark(e: HTMLElement): string {
 
 function markClass(mark: string): string {
   return { "✗": " bad", "✓": " ok", "▶": " now", "◐": " bg", "?": " now" }[mark] ?? "";
+}
+
+// outlineRow holds an outline entry for cell, with a grip to drag the
+// block, or with level the heading's whole section, when it can move.
+function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLElement {
+  const row = el("div", { className: "row" }, item);
+  row.dataset.from = cell.dataset.from ?? "";
+  if (cell.dataset.drop) row.dataset.drop = "1";
+  if (level) row.dataset.level = String(level);
+  const movable = level ? cell.dataset.drop === "1" : !!cell.querySelector(".grip");
+  if (movable) {
+    const title = level ? "Drag to move this section, with all that is in it" : "Drag to move this block";
+    row.prepend(grip(title, (ev, handle) => startDrag(ev, handle, row, Number(row.dataset.from), level, "outline")));
+  }
+  return row;
 }
 
 function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string): HTMLElement {
@@ -1691,6 +1723,140 @@ function confirmDelete(name: string): Promise<boolean> {
   dialog.showModal();
   $("delete-ok").focus();
   return new Promise((resolve) => (dialog.onclose = () => resolve(dialog.returnValue === "delete")));
+}
+
+// Dragging
+//
+// A card's grip drags its block, with its output, to a spot between
+// top-level cells; the outline's grips drag a block, or a heading's whole
+// section, between its entries. A section goes only before a heading of
+// its level or higher, or to the end. A line shows the spot; near the
+// top or bottom edge the pane scrolls; Esc cancels.
+
+function grip(title: string, start: (ev: PointerEvent, handle: HTMLElement) => void): HTMLElement {
+  const g = el("button", { className: "grip", title, tabIndex: -1 }, "⋮⋮");
+  g.onpointerdown = (ev) => {
+    if (ev.button === 0) start(ev, g);
+  };
+  g.onclick = (ev) => ev.stopPropagation();
+  return g;
+}
+
+interface Spot {
+  at: number; // a cell's From, or -1 for the end
+  y: () => number; // where the line goes, in the viewport
+}
+
+// spots are where a drag in pane can drop: before each row or card
+// marked drop, and at the end. For a section (level > 0), only before
+// headings of its level or higher.
+function spots(pane: "doc" | "outline", level: number): Spot[] {
+  const rows = pane === "doc" ? [...$("doc").children] : [...$("outline").querySelectorAll<HTMLElement>(":scope > .row")];
+  const shown = (rows as HTMLElement[]).filter((e) => e.offsetParent !== null);
+  const out: Spot[] = [];
+  for (const e of shown) {
+    if (e.dataset.drop !== "1") continue;
+    if (level && !(Number(e.dataset.level ?? 0) > 0 && Number(e.dataset.level) <= level)) continue;
+    out.push({ at: Number(e.dataset.from), y: () => e.getBoundingClientRect().top });
+  }
+  const last = shown[shown.length - 1];
+  if (last) out.push({ at: -1, y: () => last.getBoundingClientRect().bottom });
+  return out;
+}
+
+function startDrag(ev: PointerEvent, handle: HTMLElement, item: HTMLElement, from: number, level: number, pane: "doc" | "outline") {
+  if (running) return void status("can't change the file while a block runs");
+  ev.preventDefault();
+  const scroller = pane === "doc" ? $("doc-scroll") : $("outline");
+  const all = spots(pane, level);
+  if (!all.length) return;
+  handle.setPointerCapture(ev.pointerId);
+  const line = el("div", { className: "drop-line", hidden: true });
+  document.body.append(line);
+  const startY = ev.clientY;
+  let y = ev.clientY;
+  let dragging = false;
+  let spot: Spot | null = null;
+  let frame = 0;
+  const place = () => {
+    const box = scroller.getBoundingClientRect();
+    spot = null;
+    let best = Infinity;
+    for (const s of all) {
+      const d = Math.abs(s.y() - y);
+      if (d < best) [best, spot] = [d, s];
+    }
+    if (!spot) return;
+    const top = Math.max(box.top, Math.min(box.bottom, spot.y()));
+    Object.assign(line.style, { top: top - 1 + "px", left: box.left + 8 + "px", width: box.width - 16 + "px" });
+    line.hidden = false;
+  };
+  // Near an edge the pane scrolls, faster nearer it.
+  const scroll = () => {
+    frame = 0;
+    if (!dragging) return;
+    const box = scroller.getBoundingClientRect();
+    const edge = 40;
+    const by = y < box.top + edge ? -(box.top + edge - y) / 2 : y > box.bottom - edge ? (y - box.bottom + edge) / 2 : 0;
+    if (by) {
+      scroller.scrollTop += by;
+      place();
+      frame = requestAnimationFrame(scroll);
+    }
+  };
+  const end = (drop: boolean) => {
+    handle.removeEventListener("pointermove", move);
+    handle.removeEventListener("pointerup", up);
+    handle.removeEventListener("pointercancel", cancel);
+    document.removeEventListener("keydown", esc, true);
+    cancelAnimationFrame(frame);
+    line.remove();
+    item.classList.remove("dragging");
+    if (drop && dragging && spot) void moveTo(from, spot.at);
+  };
+  const move = (e: PointerEvent) => {
+    y = e.clientY;
+    if (!dragging && Math.abs(y - startY) < 4) return;
+    if (!dragging) {
+      dragging = true;
+      item.classList.add("dragging");
+    }
+    place();
+    if (!frame) frame = requestAnimationFrame(scroll);
+  };
+  const up = () => end(true);
+  const cancel = () => end(false);
+  const esc = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    end(false);
+  };
+  handle.addEventListener("pointermove", move);
+  handle.addEventListener("pointerup", up);
+  handle.addEventListener("pointercancel", cancel);
+  document.addEventListener("keydown", esc, true);
+}
+
+// moveTo moves the block or section at from to at, as a rendered-view
+// edit, which Undo takes back.
+async function moveTo(from: number, at: number) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  let m: Move;
+  try {
+    m = await App.MoveTo(from, at);
+  } catch (err) {
+    return fail(err);
+  }
+  if (m.text === m.base) return;
+  await refresh();
+  if (m.block >= 0) {
+    const k = blocks().findIndex((b) => Number(b.dataset.block) === m.block);
+    if (k >= 0) select(k);
+  }
+  [...$("doc").children].find((e) => Number((e as HTMLElement).dataset.line) === m.line)?.scrollIntoView({ block: "nearest" });
+  showMoved(m, () => undoEdit(false));
 }
 
 // undoEdit is Edit › Undo, or Redo. Where the focus is decides what it

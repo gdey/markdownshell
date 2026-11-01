@@ -328,3 +328,31 @@ func endsBlank(src []byte) bool {
 	start := bytes.LastIndexByte(s, '\n') + 1
 	return start == 0 && blank(s) || start > 0 && blank(s[start:])
 }
+
+// Section is the section of the heading that starts at start: from it
+// to the next heading of the same or a higher level, or the end of the
+// file. It also returns the heading's level.
+func (d *Document) Section(start int) (Span, int, error) {
+	for _, h := range d.Headings() {
+		if h.Span.Start == start {
+			return h.Span, h.Level, nil
+		}
+	}
+	return Span{}, 0, errors.New("no heading there")
+}
+
+// MoveSection moves the section of the heading at start (see Section),
+// with everything in it, to at: the start of a heading of the same or a
+// higher level, or the end of the file, so the section lands between
+// sections at its own depth. It returns the blocks' new order, as
+// MoveSpan does.
+func (d *Document) MoveSection(start, at int) ([]int, error) {
+	span, level, err := d.Section(start)
+	if err != nil {
+		return nil, err
+	}
+	if at != len(d.Src) && !slices.ContainsFunc(d.Headings(), func(h Heading) bool { return h.Span.Start == at && h.Level <= level }) {
+		return nil, fmt.Errorf("a level %d section can only go before a heading of level %d or higher, or at the end", level, level)
+	}
+	return d.MoveSpan(span, at)
+}

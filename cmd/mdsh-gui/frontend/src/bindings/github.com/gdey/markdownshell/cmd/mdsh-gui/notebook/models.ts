@@ -136,6 +136,12 @@ export interface Cell {
      */
     "movable"?: boolean;
     "lastLine"?: number;
+
+    /**
+     * Drop is set when a block or section can be moved to just before
+     * the cell, with MoveTo at From.
+     */
+    "drop"?: boolean;
 }
 
 /**
