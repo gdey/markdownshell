@@ -16,14 +16,21 @@ import (
 //
 // To report something to the console, log it with slog:
 //
-//	slog.Warn("block git-cleanup: depends= names unknown block", "line", 96)
+//	slog.Warn("block git-cleanup: depends= names unknown block", "file", path, "line", 96)
+//
+// A "file" attribute, the file's absolute path, and a "line" attribute
+// say where in a file the entry is about. They become the entry's File
+// and Line rather than part of its message, and a click on the entry in
+// a window showing that file takes its source pane to the line.
 
 // ConsoleEntry is one line of the console.
 type ConsoleEntry struct {
 	Seq     int       `json:"seq"` // counts up from 1, so a page can tell it missed one
 	Time    time.Time `json:"time"`
 	Level   string    `json:"level"`
-	Message string    `json:"message"` // the message, then its attributes as key=value
+	Message string    `json:"message"`        // the message, then its attributes as key=value
+	File    string    `json:"file,omitempty"` // the file the entry is about, from a "file" attribute
+	Line    int       `json:"line,omitempty"` // the line in File, from a "line" attribute; 0 if none
 }
 
 // consoleMax is how many entries the console keeps; older ones go.
@@ -44,10 +51,11 @@ func newConsole() *console {
 	return &console{out: make(chan ConsoleEntry, 256)}
 }
 
-func (c *console) add(t time.Time, level slog.Level, msg string) ConsoleEntry {
+// add adds e, numbering it.
+func (c *console) add(e ConsoleEntry) ConsoleEntry {
 	c.mu.Lock()
 	c.seq++
-	e := ConsoleEntry{Seq: c.seq, Time: t, Level: levelName(level), Message: msg}
+	e.Seq = c.seq
 	c.entries = append(c.entries, e)
 	if len(c.entries) > consoleMax {
 		c.entries = append(c.entries[:0:0], c.entries[len(c.entries)-consoleMax:]...)
@@ -106,6 +114,39 @@ type consoleHandler struct {
 	c      *console
 	prefix string // the attributes and groups from WithAttrs and WithGroup, formatted
 	group  string // the open group, as "a.b." for keys
+	where  where  // the file and line from WithAttrs
+}
+
+// where is the place in a file an entry is about.
+type where struct {
+	file string
+	line int
+}
+
+// take keeps a if it is a top-level "file" or "line" attribute, and
+// reports whether it did.
+func (w *where) take(group string, a slog.Attr) bool {
+	if group != "" {
+		return false
+	}
+	v := a.Value.Resolve()
+	switch a.Key {
+	case "file":
+		if v.Kind() == slog.KindString && v.String() != "" {
+			w.file = v.String()
+			return true
+		}
+	case "line":
+		switch v.Kind() {
+		case slog.KindInt64:
+			w.line = int(v.Int64())
+			return true
+		case slog.KindUint64:
+			w.line = int(v.Uint64())
+			return true
+		}
+	}
+	return false
 }
 
 func newConsoleHandler(next slog.Handler, c *console) *consoleHandler {
@@ -127,15 +168,23 @@ func (h *consoleHandler) Handle(ctx context.Context, r slog.Record) error {
 		var b strings.Builder
 		b.WriteString(r.Message)
 		b.WriteString(h.prefix)
+		w := h.where
 		r.Attrs(func(a slog.Attr) bool {
-			writeAttr(&b, h.group, a)
+			if !w.take(h.group, a) {
+				writeAttr(&b, h.group, a)
+			}
 			return true
 		})
+		if w.file == "" && w.line != 0 {
+			// A line in no file in particular is just text.
+			writeAttr(&b, "", slog.Int("line", w.line))
+			w.line = 0
+		}
 		t := r.Time
 		if t.IsZero() {
 			t = time.Now()
 		}
-		h.c.add(t, r.Level, b.String())
+		h.c.add(ConsoleEntry{Time: t, Level: levelName(r.Level), Message: b.String(), File: w.file, Line: w.line})
 	}
 	if h.next.Enabled(ctx, r.Level) {
 		return h.next.Handle(ctx, r)
@@ -146,17 +195,20 @@ func (h *consoleHandler) Handle(ctx context.Context, r slog.Record) error {
 func (h *consoleHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	var b strings.Builder
 	b.WriteString(h.prefix)
+	w := h.where
 	for _, a := range attrs {
-		writeAttr(&b, h.group, a)
+		if !w.take(h.group, a) {
+			writeAttr(&b, h.group, a)
+		}
 	}
-	return &consoleHandler{next: h.next.WithAttrs(attrs), c: h.c, prefix: b.String(), group: h.group}
+	return &consoleHandler{next: h.next.WithAttrs(attrs), c: h.c, prefix: b.String(), group: h.group, where: w}
 }
 
 func (h *consoleHandler) WithGroup(name string) slog.Handler {
 	if name == "" {
 		return h
 	}
-	return &consoleHandler{next: h.next.WithGroup(name), c: h.c, prefix: h.prefix, group: h.group + name + "."}
+	return &consoleHandler{next: h.next.WithGroup(name), c: h.c, prefix: h.prefix, group: h.group + name + ".", where: h.where}
 }
 
 // writeAttr writes a as " key=value", as slog's text handler would.

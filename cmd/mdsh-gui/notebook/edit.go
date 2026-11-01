@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
@@ -238,18 +239,28 @@ func unquote(v string) string {
 }
 
 // lineRe is the line number a document warning starts with.
-var lineRe = regexp.MustCompile(`^line \d+: `)
+var lineRe = regexp.MustCompile(`^line (\d+): `)
 
 // logWarnings logs, for the console, the document's warnings that are
 // new since it last did, such as a depends= naming no block. One that
-// only moved to another line isn't new.
+// only moved to another line isn't new. The file and the line go with
+// it as attributes, so the console can take the source pane there.
 func (n *Notebook) logWarnings() {
 	now := make(map[string]bool, len(n.d.Warnings))
 	for _, w := range n.d.Warnings {
-		key := lineRe.ReplaceAllString(w, "")
+		key, line := w, 0
+		if m := lineRe.FindStringSubmatch(w); m != nil {
+			key = w[len(m[0]):]
+			line, _ = strconv.Atoi(m[1])
+		}
 		now[key] = true
-		if !n.warned[key] {
-			slog.Warn(filepath.Base(n.file) + ": " + w)
+		if n.warned[key] {
+			continue
+		}
+		if line > 0 {
+			slog.Warn(key, "file", n.file, "line", line)
+		} else {
+			slog.Warn(key, "file", n.file)
 		}
 	}
 	n.warned = now

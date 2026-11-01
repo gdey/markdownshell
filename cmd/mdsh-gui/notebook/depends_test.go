@@ -111,6 +111,10 @@ func TestDependsWarningLogged(t *testing.T) {
 	if got := strings.Count(buf.String(), `depends= names unknown block \"nope\"`); got != 1 {
 		t.Fatalf("logged %d times after open:\n%s", got, buf.String())
 	}
+	// It says where, for the console to take the source pane there.
+	if want := "file=" + file + " line=1"; !strings.Contains(buf.String(), want) {
+		t.Errorf("no %q in:\n%s", want, buf.String())
+	}
 	// An edit that only moves it down a line doesn't log it again.
 	if _, err := n.SetText(string(n.d.Src), "# T\n\n"+string(n.d.Src)); err != nil {
 		t.Fatal(err)

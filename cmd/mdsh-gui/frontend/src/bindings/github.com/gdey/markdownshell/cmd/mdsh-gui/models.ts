@@ -53,6 +53,16 @@ export interface ConsoleEntry {
      * the message, then its attributes as key=value
      */
     "message": string;
+
+    /**
+     * the file the entry is about, from a "file" attribute
+     */
+    "file"?: string;
+
+    /**
+     * the line in File, from a "line" attribute; 0 if none
+     */
+    "line"?: number;
 }
 
 /**
