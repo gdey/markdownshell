@@ -540,6 +540,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd := m.edit(); cmd != nil {
 			return m, cmd
 		}
+	case "E":
+		if cmd := m.editAll(); cmd != nil {
+			return m, cmd
+		}
 	case "v":
 		if cmd := m.view(); cmd != nil {
 			return m, cmd
@@ -590,11 +594,14 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// editedMsg reports that the editor opened by edit has exited.
+// editedMsg reports that the editor opened by edit or editAll has
+// exited.
 type editedMsg struct {
-	block int
+	block int // -1 for the whole file
 	file  string
-	err   error
+	// text is what the editor was given, for the whole file.
+	text string
+	err  error
 }
 
 // edit opens the block under the cursor, fences and all, in $VISUAL,
@@ -650,7 +657,103 @@ func (m *Model) getenv(name string) string {
 	return ""
 }
 
-// edited puts the edited block into the document.
+// editAll opens the whole file in $VISUAL, $EDITOR or vi, as it would
+// be saved, so output not saved yet is in it, with the cursor on the
+// block under the TUI's cursor where the editor takes a +line argument.
+// This is the TUI's source view: mdsh-gui edits the whole file too.
+func (m *Model) editAll() tea.Cmd {
+	switch {
+	case m.running:
+		m.status = "a block is running; ctrl+c stops it"
+		return nil
+	case len(m.bg) > 0:
+		m.status = "a block is running in the background; wait for it to end"
+		return nil
+	}
+	text, line := m.fileText()
+	f, err := os.CreateTemp("", "mdsh-*.md")
+	if err == nil {
+		_, err = f.WriteString(text)
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		m.status = "edit: " + err.Error()
+		return nil
+	}
+	editor := strings.Fields(m.editor())
+	args := editor[1:]
+	if takesLine(editor[0]) {
+		args = append(args, fmt.Sprintf("+%d", line))
+	}
+	cmd := exec.Command(editor[0], append(args, f.Name())...)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg { return editedMsg{block: -1, file: f.Name(), text: text, err: err} })
+}
+
+// fileText is the file as it would be saved, and the line the block
+// under the cursor starts on in it.
+func (m *Model) fileText() (string, int) {
+	text := string(render.Markdown(m.d, m.results, render.Options{WriteBack: true, Env: m.opts.Run.Environ}))
+	line := 1
+	if d, err := doc.Parse([]byte(text)); err == nil && m.cur() >= 0 && len(d.Blocks) == len(m.d.Blocks) {
+		line = 1 + strings.Count(text[:d.Blocks[m.cur()].Span.Start], "\n")
+	}
+	return text, line
+}
+
+// takesLine reports whether editor opens a file at a line given as +N.
+func takesLine(editor string) bool {
+	switch filepath.Base(editor) {
+	case "vi", "vim", "nvim", "gvim", "view", "nano", "pico", "emacs", "emacsclient", "micro", "kak", "joe", "ne", "mg", "jed", "mcedit":
+		return true
+	}
+	return false
+}
+
+// editedAll puts the edited file into the document. Blocks whose code
+// didn't change keep their output, wherever they moved; edited and new
+// blocks start with none, as in mdsh-gui.
+func (m *Model) editedAll(text string, was string) {
+	if text == was {
+		return
+	}
+	var b *doc.Block // the block under the cursor
+	if i := m.cur(); i >= 0 {
+		b = m.d.Blocks[i]
+	}
+	if err := m.d.SetSource([]byte(text)); err != nil {
+		m.status = "edit: " + err.Error()
+		return
+	}
+	if err := m.sess.Sync(); err != nil {
+		m.status = "edited; " + err.Error()
+	} else {
+		m.status = "edited"
+	}
+	m.results = append([]*run.Result(nil), m.sess.Results()...)
+	m.index = map[*doc.Block]int{}
+	m.layout()
+	m.cursor = min(m.cursor, max(len(m.nav)-1, 0))
+	// The cursor stays on its block, or one with its id if it was edited.
+	if i, ok := m.index[b]; ok && b != nil {
+		m.moveTo(i)
+	} else if b != nil {
+		for _, i := range m.nav {
+			if m.d.Blocks[i].ID == b.ID {
+				m.moveTo(i)
+				break
+			}
+		}
+	}
+	m.md = map[string]string{}
+	m.dirty = true
+	if m.opts.AutoSave {
+		m.save(false)
+	}
+}
+
+// edited puts the edited block, or file, into the document.
 func (m *Model) edited(msg editedMsg) {
 	defer os.Remove(msg.file)
 	if msg.err != nil {
@@ -660,6 +763,10 @@ func (m *Model) edited(msg editedMsg) {
 	text, err := os.ReadFile(msg.file)
 	if err != nil {
 		m.status = "edit: " + err.Error()
+		return
+	}
+	if msg.block < 0 {
+		m.editedAll(string(text), msg.text)
 		return
 	}
 	b := m.d.Blocks[msg.block]
@@ -1035,7 +1142,7 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a from here · i new · e edit · v view · o outline · C code · O output · w save · W save as · q " + m.quitWord())
+		help = helpStyle.Render("j/k move · enter run · a from here · i new · e edit · E edit file · v view · o outline · C code · O output · w save · W save as · q " + m.quitWord())
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }
