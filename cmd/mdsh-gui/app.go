@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -86,17 +87,35 @@ func (a *App) newWindow(t *docTab) *docWindow {
 	a.named++
 	name := fmt.Sprintf("doc-%d", a.named)
 	a.mu.Unlock()
+	file := ""
+	if t != nil {
+		file = t.file()
+	}
+	areas := a.workAreas()
+	p, move := a.placeFor(file, areas)
 	opts := application.WebviewWindowOptions{
 		Name:           name,
 		Title:          "mdsh",
-		Width:          960,
-		Height:         820,
+		Width:          p.Width,
+		Height:         p.Height,
+		MinWidth:       480,
+		MinHeight:      360,
 		URL:            "/window.html",
 		EnableFileDrop: true,
+	}
+	if move && keepPlace && len(areas) > 0 {
+		opts.InitialPosition = application.WindowXY
+		opts.X, opts.Y = p.X, p.Y
 	}
 	opts.Linux.Menu = a.menu
 	w := &docWindow{app: a}
 	w.win = a.app.Window.NewWithOptions(opts)
+	switch {
+	case move:
+		a.settle(w.win, p)
+	case len(areas) == 0:
+		a.shrinkToFit(w.win)
+	}
 	a.mu.Lock()
 	a.windows[w.win.ID()] = w
 	a.mu.Unlock()
@@ -355,7 +374,19 @@ func (a *App) openIn(w *docWindow, file string) error {
 	ro := a.runOptions()
 	if w != nil {
 		if t := w.activeTab(); t != nil && t.file() == "" {
-			return t.open(abs, ro)
+			if err := t.open(abs, ro); err != nil {
+				return err
+			}
+			// A window holding only the start screen is as good as new:
+			// it takes the size the file's window had. One with other
+			// tabs keeps its size.
+			a.mu.Lock()
+			alone := len(w.tabs) == 1
+			a.mu.Unlock()
+			if alone {
+				a.resizeTo(w.win, abs)
+			}
+			return nil
 		}
 		t := a.newTab()
 		if err := t.open(abs, ro); err != nil {
@@ -477,19 +508,37 @@ func (a *App) openSettings() {
 		a.prefs.Focus()
 		return
 	}
+	width, height := a.settingsSize()
 	opts := application.WebviewWindowOptions{
 		Name:      "settings",
 		Title:     "Settings",
-		Width:     600,
-		Height:    520,
-		MinWidth:  480,
-		MinHeight: 360,
+		Width:     width,
+		Height:    height,
+		MinWidth:  560,
+		MinHeight: 440,
 		URL:       "/settings.html",
 	}
-	a.prefs = a.app.Window.NewWithOptions(opts)
-	a.prefs.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+	win := a.app.Window.NewWithOptions(opts)
+	a.prefs = win
+	if a.settings.Get().SettingsWindow != nil {
+		resize(win, width, height)
+	}
+	var timer *time.Timer
+	win.OnWindowEvent(events.Common.WindowDidResize, func(*application.WindowEvent) {
 		a.mu.Lock()
+		defer a.mu.Unlock()
+		if timer != nil {
+			timer.Stop()
+		}
+		timer = time.AfterFunc(placeDelay, func() { a.saveSettingsSize(win) })
+	})
+	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+		a.mu.Lock()
+		if timer != nil {
+			timer.Stop()
+		}
 		a.prefs = nil
 		a.mu.Unlock()
+		a.saveSettingsSize(win)
 	})
 }

@@ -15,6 +15,25 @@ import (
 // MaxRecent is how many files Open Recent remembers.
 const MaxRecent = 10
 
+// MaxPlaces is how many files' window places are remembered.
+const MaxPlaces = 100
+
+// Place is where a file's window was and how big, in the screen's
+// points. X and Y are its top left corner.
+type Place struct {
+	File   string `json:"file"`
+	X      int    `json:"x"`
+	Y      int    `json:"y"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+// Size is a window's width and height.
+type Size struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 // Settings are the app-wide settings. The zero value is the default.
 type Settings struct {
 	// Autosave saves the file after each run.
@@ -44,6 +63,12 @@ type Settings struct {
 	LastFolder string `json:"lastFolder"`
 	// Recent are the files opened last, newest first.
 	Recent []string `json:"recent"`
+	// Places are where the windows of the files last shown alone in a
+	// new window were, newest first.
+	Places []Place `json:"places,omitempty"`
+	// SettingsWindow is the size the Settings window was left at, or
+	// nil for its default.
+	SettingsWindow *Size `json:"settingsWindow,omitempty"`
 }
 
 // Store reads and writes Settings.
@@ -87,8 +112,17 @@ func (st *Store) Path() string { return st.path }
 func (st *Store) Get() Settings {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	s := st.s
+	return st.s.clone()
+}
+
+// clone copies s, so that changing the copy leaves s as it was.
+func (s Settings) clone() Settings {
 	s.Recent = slices.Clone(s.Recent)
+	s.Places = slices.Clone(s.Places)
+	if s.SettingsWindow != nil {
+		sz := *s.SettingsWindow
+		s.SettingsWindow = &sz
+	}
 	return s
 }
 
@@ -96,8 +130,7 @@ func (st *Store) Get() Settings {
 func (st *Store) Update(f func(*Settings)) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	s := st.s
-	s.Recent = slices.Clone(s.Recent)
+	s := st.s.clone()
 	f(&s)
 	out, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
@@ -122,6 +155,30 @@ func (s *Settings) Opened(file string) {
 		s.Recent = s.Recent[:MaxRecent]
 	}
 	s.LastFolder = filepath.Dir(file)
+}
+
+// Place is where file's window was last, if that is remembered.
+func (s Settings) Place(file string) (Place, bool) {
+	i := slices.IndexFunc(s.Places, func(p Place) bool { return p.File == file })
+	if i < 0 {
+		return Place{}, false
+	}
+	return s.Places[i], true
+}
+
+// Placed remembers where p.File's window is: p goes to the top of
+// Places, and the oldest are forgotten past MaxPlaces. It reports
+// whether that changed anything.
+func (s *Settings) Placed(p Place) bool {
+	if len(s.Places) > 0 && s.Places[0] == p {
+		return false
+	}
+	s.Places = slices.DeleteFunc(s.Places, func(q Place) bool { return q.File == p.File })
+	s.Places = slices.Insert(s.Places, 0, p)
+	if len(s.Places) > MaxPlaces {
+		s.Places = s.Places[:MaxPlaces]
+	}
+	return true
 }
 
 // StartDir is the folder the start screen lists. Started from a

@@ -73,3 +73,65 @@ func TestStartDir(t *testing.T) {
 		}
 	}
 }
+
+func TestPlaced(t *testing.T) {
+	var s Settings
+	for i := range MaxPlaces + 2 {
+		s.Placed(Place{File: fmt.Sprintf("/d/%d.md", i), Width: i})
+	}
+	if !s.Placed(Place{File: "/d/5.md", X: 10, Y: 20, Width: 800, Height: 600}) {
+		t.Error("moving /d/5.md changed nothing")
+	}
+	if s.Placed(Place{File: "/d/5.md", X: 10, Y: 20, Width: 800, Height: 600}) {
+		t.Error("placing /d/5.md where it was changed something")
+	}
+	if len(s.Places) != MaxPlaces {
+		t.Fatalf("len(Places) = %d", len(s.Places))
+	}
+	if s.Places[1].File != fmt.Sprintf("/d/%d.md", MaxPlaces+1) {
+		t.Errorf("Places[1] = %+v", s.Places[1])
+	}
+	p, ok := s.Place("/d/5.md")
+	if !ok || p != (Place{File: "/d/5.md", X: 10, Y: 20, Width: 800, Height: 600}) {
+		t.Errorf("Place(/d/5.md) = %+v, %v", p, ok)
+	}
+	if _, ok := s.Place("/d/0.md"); ok {
+		t.Error("/d/0.md is still remembered past MaxPlaces")
+	}
+	n := 0
+	for _, p := range s.Places {
+		if p.File == "/d/5.md" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("/d/5.md is in Places %d times", n)
+	}
+}
+
+func TestStorePlaces(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gui.json")
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = st.Update(func(s *Settings) {
+		s.Placed(Place{File: "/a.md", X: 1, Y: 2, Width: 3, Height: 4})
+		s.SettingsWindow = &Size{Width: 700, Height: 640}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := st.Get()
+	got.Places[0].Width = 99
+	got.SettingsWindow.Width = 99
+	st2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []Settings{st.Get(), st2.Get()} {
+		if p, _ := s.Place("/a.md"); p.Width != 3 || s.SettingsWindow == nil || s.SettingsWindow.Width != 700 {
+			t.Errorf("read back %+v, %+v", s.Places, s.SettingsWindow)
+		}
+	}
+}
