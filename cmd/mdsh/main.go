@@ -25,6 +25,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/lsp"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
@@ -61,6 +62,8 @@ func mdsh(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = completionCmd(args[1:], stdout)
 	case len(args) > 0 && args[0] == "__blocks":
 		err = blocksCmd(args[1:], stdout)
+	case len(args) > 0 && args[0] == "lsp":
+		err = lspCmd(args[1:], stdin, stdout, stderr)
 	case len(args) > 0 && args[0] == "run":
 		err = runCmd(args[1:], stdin, stdout, stderr)
 	default:
@@ -79,12 +82,28 @@ func mdsh(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
+// lspCmd serves the language server on stdin and stdout, for an editor
+// to start: it completes and checks the attributes of mdsh's blocks.
+func lspCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mdsh lsp", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: mdsh lsp")
+		fmt.Fprintln(stderr, "       serve the language server on stdin and stdout, for an editor to start")
+	}
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return lsp.Serve(stdin, stdout, "")
+}
+
 func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mdsh run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mdsh [run] [flags] file.md [args...]")
 		fmt.Fprintln(stderr, "       mdsh completion bash|zsh")
+		fmt.Fprintln(stderr, "       mdsh lsp")
 		fmt.Fprintln(stderr, "       use - as the file to read markdown from stdin")
 		fs.PrintDefaults()
 	}

@@ -29,6 +29,7 @@ import (
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/lsp"
 )
 
 // The frontend is TypeScript in frontend/src, bundled into frontend/bundle.
@@ -44,6 +45,20 @@ import (
 var frontend embed.FS
 
 func main() {
+	// --lsp serves the language server on stdin and stdout, for the
+	// Neovim source pane: mdsh-gui runs itself, so it needs no mdsh on
+	// the PATH. A file after it is the document, for completing paths.
+	if len(os.Args) > 1 && os.Args[1] == "--lsp" {
+		file := ""
+		if len(os.Args) > 2 {
+			file = os.Args[2]
+		}
+		if err := lsp.Serve(os.Stdin, os.Stdout, file); err != nil {
+			fmt.Fprintln(os.Stderr, "mdsh-gui --lsp:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	o, err := parseFlags(os.Args[1:], os.Stderr)
 	switch {
 	case errors.Is(err, flag.ErrHelp):
