@@ -247,9 +247,10 @@ A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
 under `--step` or `step: true` when running with `a`, ask in the
 block's card, under its code, with the same choices as on the command line. `--yes`, `--stop-on-error`
-and block arguments work as usual. A `tty` block gets the whole terminal
-while it runs, and the TUI comes back when you press enter after it ends;
-a taped block's run is shown the same way. Images and recordings
+and block arguments work as usual. A `tty` block runs in a terminal drawn
+in its card, as in `mdsh-gui`: up to 24 rows, as wide as the card. While
+it runs every key goes to it, ctrl+c included, and ctrl+] stops it. A
+taped block's run is shown the same way. Images and recordings
 show under their block as a preview in colored half blocks (any terminal
 with 24-bit color; off with `NO_COLOR`). `v` shows one full size, through
 the kitty, iTerm2 or sixel protocol when mdsh recognizes the terminal

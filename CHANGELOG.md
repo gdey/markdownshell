@@ -95,6 +95,10 @@ follow [Semantic Versioning](https://semver.org/).
   `--only`, `--step` and `--stop-on-error`. The command line both show
   now comes from `report.Command`, and `SplitArgs` and `JoinArgs` moved
   from `mdsh-gui` into `run`.
+- `mdsh -i`: a `tty` block runs in a terminal drawn in its card, as in
+  `mdsh-gui`, instead of taking over the screen: up to 24 rows, as wide
+  as the card, and following it when the window resizes. Keys go to the
+  block while it runs, and ctrl+] stops it.
 
 ### Changed
 

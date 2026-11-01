@@ -878,3 +878,81 @@ func TestRunOptionsKept(t *testing.T) {
 		t.Errorf("args after reload = %q", got)
 	}
 }
+
+// until feeds run events to m until ok holds.
+func until(t *testing.T, m *Model, what string, ok func() bool) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for !ok() {
+		select {
+		case msg := <-m.events:
+			m.Update(msg)
+		case <-m.pane.drawn:
+			m.Update(paneMsg{m})
+		case <-time.After(20 * time.Millisecond):
+		case <-deadline:
+			t.Fatalf("timed out waiting for %s:\n%s", what, m.View())
+		}
+	}
+}
+
+func TestTTYInCard(t *testing.T) {
+	src := "```sh {#ask tty}\nprintf '\\033[1mname?\\033[0m '; read n; echo \"hi $n\"\n```\n\nAfter.\n"
+	m, file := newModel(t, src, Options{})
+	press(m, "enter")
+	until(t, m, "the question", func() bool { return strings.Contains(m.pane.screen(), "name?") })
+	v := m.View()
+	q, after := strings.Index(v, "name?"), strings.Index(v, "After.")
+	if q < 0 || (after >= 0 && after < q) {
+		t.Errorf("the terminal isn't in the block's card:\n%s", v)
+	}
+	if !strings.Contains(v, "keys go to it") {
+		t.Errorf("the footer doesn't say keys go to the block:\n%s", v)
+	}
+	// Keys, q included, go to the block.
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("qbob")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pump(t, m)
+	if m.termBlock != -1 {
+		t.Error("the terminal is still shown after the block ended")
+	}
+	if r := m.results[0]; !r.Ran || r.Status != 0 {
+		t.Fatalf("result: %+v", r)
+	}
+	img := m.results[0].Image
+	cast := read(t, filepath.Join(filepath.Dir(file), strings.TrimSuffix(img, ".gif")+".cast"))
+	if !strings.Contains(cast, "hi qbob") {
+		t.Errorf("the recording doesn't have the answer:\n%s", cast)
+	}
+}
+
+func TestTTYStop(t *testing.T) {
+	src := "```sh {#wait tty}\necho waiting; sleep 30\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	until(t, m, "the block", func() bool { return strings.Contains(m.pane.screen(), "waiting") })
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlCloseBracket})
+	pump(t, m)
+	if m.status != "stopped" {
+		t.Errorf("status = %q", m.status)
+	}
+}
+
+func TestKeyBytes(t *testing.T) {
+	for _, c := range []struct {
+		k    tea.KeyMsg
+		want string
+	}{
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("é")}, "é"},
+		{tea.KeyMsg{Type: tea.KeyEnter}, "\r"},
+		{tea.KeyMsg{Type: tea.KeyCtrlC}, "\x03"},
+		{tea.KeyMsg{Type: tea.KeyBackspace}, "\x7f"},
+		{tea.KeyMsg{Type: tea.KeyUp}, "\x1b[A"},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b"), Alt: true}, "\x1bb"},
+		{tea.KeyMsg{Type: tea.KeyF2}, "\x1bOQ"},
+	} {
+		if got := string(keyBytes(c.k)); got != c.want {
+			t.Errorf("%v: %q, want %q", c.k, got, c.want)
+		}
+	}
+}
