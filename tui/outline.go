@@ -188,6 +188,7 @@ func (m *Model) toggle(f *bool) func() tea.Msg {
 	*f = !*f
 	m.md = map[string]string{}
 	m.vp.Width = m.docWidth()
+	m.fit()
 	m.refresh()
 	if i := m.cur(); i >= 0 {
 		m.moveTo(i)
