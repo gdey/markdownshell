@@ -284,6 +284,7 @@ says otherwise; a document with any `zsh` block runs in `zsh` by default.
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent (default all; empty for none) |
 | `on_error=stop` | Stop the run if this block fails |
+| `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run) |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an animated GIF |
@@ -362,6 +363,39 @@ block's output, stderr included if it failed, as soon as it finishes.
 This happens with `-w` too, so you can follow a run as it is written
 back. Without asking, `-w` prints only a status line per block, followed
 by the output and stderr of a block that failed.
+
+## Dependencies
+
+`depends=` lists blocks, by id, that a block needs to have run first:
+
+````markdown
+```sh {#build}
+make
+```
+
+```sh {#deploy depends=build,login}
+./deploy.sh
+```
+````
+
+When `deploy` is about to run, mdsh checks `build` and then `login`, in
+that order. A block that has already run in this session (in `mdsh -i`
+or mdsh-gui; in a plain `mdsh` run, earlier in the run) and didn't fail
+is passed over. For any other, mdsh asks
+`Run build first? [r]un / s[k]ip / [s]top`:
+
+- `r` checks that block's own `depends=` the same way, then runs it. Its
+  `skip`, `run=` and `confirm` don't apply, since you just said to run it.
+- `k` goes on without it.
+- `s`, or just enter, runs neither it nor `deploy`.
+
+If a dependency fails, `deploy` doesn't run. In a whole run, the run then
+goes on or stops as the dependency's `on_error` says, and a block already
+run as a dependency isn't run again when the run reaches it. With no
+terminal the run stops with an error, unless you pass `--yes`, which runs
+dependencies without asking. An id that names no block, a block that
+depends on itself and a cycle are errors when the file is read. mdsh-gui
+and `mdsh -i` ask the same question in their own way.
 
 ## Terminal blocks
 

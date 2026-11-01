@@ -31,6 +31,33 @@ func TestConfirmPrompt(t *testing.T) {
 	}
 }
 
+func TestDependPrompt(t *testing.T) {
+	dep := &doc.Block{ID: "build", Body: "make\n"}
+	b := &doc.Block{ID: "deploy", Body: "./deploy\n", Attrs: doc.Attrs{"depends": "build"}}
+	for in, want := range map[string]run.Answer{
+		"r\n": run.Go, "y\n": run.Go, "k\n": run.Skip, "\n": run.Stop, "s\n": run.Stop, "o\nk\n": run.Skip, "": run.Stop,
+	} {
+		var out bytes.Buffer
+		if got := newPrompter(strings.NewReader(in), &out).depend(dep, b); got != want {
+			t.Errorf("input %q: got %v, want %v", in, got, want)
+		}
+		if !strings.Contains(out.String(), "deploy depends on build") || !strings.Contains(out.String(), "make") || !strings.Contains(out.String(), "Run build first?") {
+			t.Errorf("prompt = %q", out.String())
+		}
+	}
+}
+
+// TestDependsYes checks that --yes runs a later dependency first,
+// without asking, and only once.
+func TestDependsYes(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	os.WriteFile(f, []byte("```sh {#deploy depends=build}\necho deploy\n```\n\n```sh {#build}\necho built\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"--yes", "--no-color", f}, nil, &out, &errb); rc != 0 || strings.Count(out.String(), "```output {for=build exit=0}\nbuilt\n") != 1 || !strings.Contains(out.String(), "```output {for=deploy exit=0}\ndeploy\n") {
+		t.Errorf("--yes: rc = %d, stdout %s, stderr %s", rc, out.String(), errb.String())
+	}
+}
+
 func TestConfirmSkipSaved(t *testing.T) {
 	d, err := doc.Parse([]byte("```sh {#a}\necho a\n```\n\n```output {for=a exit=0}\na\n```\n\n```sh {#b}\necho b\n```\n\n```sh {#c}\necho c\n```\n\n```output {for=c exit=0}\nc\n```\n"))
 	if err != nil {

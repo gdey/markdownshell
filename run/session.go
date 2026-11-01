@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
@@ -216,14 +217,20 @@ func (s *Session) emit(e Event) {
 }
 
 // RunFrom runs the blocks from index from to the end, the way Run does:
-// it honors skip, run= (once included), Only, confirm and step mode, and stops when a
+// it honors skip, run= (once included), Only, confirm, depends= and step mode, and stops when a
 // block ends its shell or fails with on_error stop. Blocks it runs again
 // get new results.
 func (s *Session) RunFrom(ctx context.Context, from int) error {
 	d, opts := s.d, s.opts
+	// ran holds the blocks already run as dependencies on the way, so
+	// they don't run twice.
+	ran := map[*doc.Block]bool{}
 	for i := from; i < len(d.Blocks); i++ {
 		s.Reap()
 		b := d.Blocks[i]
+		if ran[b] {
+			continue
+		}
 		if b.IsInclude() {
 			// Read it again: a block above may have just written it.
 			r := s.readInclude(b)
@@ -256,6 +263,28 @@ func (s *Session) RunFrom(ctx context.Context, from int) error {
 				continue
 			}
 		}
+		if err := s.runDepends(ctx, b, ran); err != nil {
+			var de *depError
+			switch {
+			case errors.Is(err, errStopped):
+				s.results[i].Declined = true
+				return s.Wait(ctx)
+			case errors.As(err, &de):
+				// As if the dependency had failed in place: the
+				// block doesn't run, and on_error says whether the
+				// run goes on.
+				r.Skipped = true
+				s.results[i] = r
+				if stopOnError(d, de.dep, opts) {
+					return s.Wait(ctx)
+				}
+				continue
+			}
+			if ctx.Err() == nil {
+				s.results[i].Declined = true
+			}
+			return err
+		}
 		s.results[i] = r
 		s.run(ctx, b, r)
 		if ctx.Err() != nil {
@@ -279,7 +308,10 @@ func (s *Session) hasOutput(i int) bool {
 // block even if it is marked skip, its run= condition is false or Only
 // leaves it out, since running it is what was asked for. A confirm block
 // is still confirmed first; if the answer is not Go, the old result
-// stays and RunBlock returns it. An include block reads its file again.
+// stays and RunBlock returns it. Then the blocks its depends= names are
+// asked about and run, as Options.Depend says; a Stop there keeps the old
+// result too, and a failed dependency returns ErrDependency. An include
+// block reads its file again.
 // It returns an error if the block can't run at all.
 func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 	if i < 0 || i >= len(s.d.Blocks) {
@@ -306,9 +338,85 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 			return s.results[i], nil
 		}
 	}
+	if err := s.runDepends(ctx, b, nil); err != nil {
+		if errors.Is(err, errStopped) {
+			err = nil
+		}
+		return s.results[i], err
+	}
 	s.results[i] = r
 	s.run(ctx, b, r)
 	return r, ctx.Err()
+}
+
+// errStopped is runDepends' error when the answer for a dependency was
+// Stop.
+var errStopped = errors.New("stopped")
+
+// depError is runDepends' error when a dependency failed.
+type depError struct {
+	dep   *doc.Block
+	label string // the block that didn't run
+}
+
+func (e *depError) Error() string { return fmt.Sprintf("%s didn't run: %s", e.label, ErrDependency) }
+func (e *depError) Unwrap() error { return ErrDependency }
+
+// runDepends readies b to run: in the order b's depends= lists them,
+// each block that hasn't run in this session, or failed when it did, is
+// asked about with Depend, and run if the answer is Go, after its own
+// dependencies. A dependency the answer skips is left as it is. It
+// returns errStopped if an answer was Stop, a *depError if a dependency
+// failed or ended its shell, and ctx's error if ctx ended. ran, if not
+// nil, gets each block it runs.
+func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Block]bool) error {
+	for _, id := range b.Depends() {
+		i := slices.IndexFunc(s.d.Blocks, func(x *doc.Block) bool { return x.ID == id })
+		if i < 0 {
+			return fmt.Errorf("%s depends on unknown block %q", s.d.Label(b), id)
+		}
+		dep := s.d.Blocks[i]
+		if r := s.results[i]; r != nil && r.Ran && !r.Failed() {
+			continue
+		}
+		if !Runnable(dep) {
+			return fmt.Errorf("%s depends on %s, but mdsh can't run %s blocks", s.d.Label(b), s.d.Label(dep), dep.Lang)
+		}
+		a, err := s.depend(dep, b)
+		if err != nil {
+			return err
+		}
+		switch a {
+		case Stop:
+			return errStopped
+		case Skip:
+			continue
+		}
+		if err := s.runDepends(ctx, dep, ran); err != nil {
+			return err
+		}
+		s.Reap()
+		r := &Result{Block: dep}
+		s.results[i] = r
+		s.run(ctx, dep, r)
+		if ran != nil {
+			ran[dep] = true
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if r.Failed() {
+			return &depError{dep: dep, label: s.d.Label(b)}
+		}
+	}
+	return nil
+}
+
+func (s *Session) depend(dep, b *doc.Block) (Answer, error) {
+	if s.opts.Depend == nil {
+		return Stop, fmt.Errorf("%w: %s depends on %s, which hasn't run", ErrNoConfirm, s.d.Label(b), s.d.Label(dep))
+	}
+	return s.opts.Depend(dep, b), nil
 }
 
 func (s *Session) confirm(b *doc.Block) (Answer, error) {

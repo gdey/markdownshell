@@ -30,7 +30,7 @@ func (b *Block) IsInclude() bool { return b.Attrs.Has(IncludeAttr) }
 
 // notForIncludes are the attributes that make a block a step of the run,
 // so an include block can't have them.
-var notForIncludes = []string{"env", "share", "run", "confirm", "timeout", "background", "tty", "out", "on_error", "show-output", "show-stderr", "collapse-output"}
+var notForIncludes = []string{"env", "share", "run", "confirm", "timeout", "background", "tty", "out", "on_error", "show-output", "show-stderr", "collapse-output", "depends"}
 
 // Include reads an include block's attributes.
 func (b *Block) Include() (Include, error) {

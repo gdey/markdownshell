@@ -15,6 +15,13 @@ follow [Semantic Versioning](https://semver.org/).
   source pane, completing `file=` offers the files beside the document
   and those in the assets folder as `res://` paths, and `out=image:`
   the assets folder's. A path with spaces is put in quotes.
+- `depends=a,b` on a block lists blocks to run before it, in order.
+  Each one that hasn't run in this session, or failed when it did, is
+  asked about first (run it, skip it or stop), on the terminal in `mdsh`,
+  in the TUI's prompt line and in mdsh-gui's card. `--yes` runs them
+  without asking, and with no terminal the run stops with an error. A
+  failed dependency keeps the block from running. Unknown ids, a block
+  depending on itself and cycles are parse errors.
 - `mdsh-gui`: the active block (the selected card, or the block the
   source pane's cursor is in) has a play button by its name in the
   outline, which runs it as the card's play button does. Moving the

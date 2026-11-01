@@ -61,6 +61,12 @@ type Options struct {
 	// If Confirm is nil, the run stops at the first such block with
 	// ErrNoConfirm, since nobody can answer.
 	Confirm func(*doc.Block) Answer
+	// Depend is asked before running dep, a block that b's depends=
+	// names and that hasn't run in this session (or failed when it
+	// did). Go runs dep first, Skip goes on without it, and Stop runs
+	// neither. Answering Go also answers dep's own confirm. If Depend
+	// is nil, the run stops there with ErrNoConfirm, as for Confirm.
+	Depend func(dep, b *doc.Block) Answer
 	// TTY is the terminal that blocks marked tty run on. If it is nil,
 	// such blocks fail with ErrNoTTY.
 	TTY *os.File
@@ -100,6 +106,10 @@ const (
 // ErrNoConfirm is returned when a block needs confirming and the run has
 // no way to ask.
 var ErrNoConfirm = errors.New("block needs confirmation")
+
+// ErrDependency is a block's error when a block its depends= names
+// failed, so it didn't run.
+var ErrDependency = errors.New("a block it depends on failed")
 
 // ErrNoTTY is a tty block's error when the run has no terminal to give it.
 var ErrNoTTY = errors.New("block needs a terminal (tty) and there is none")

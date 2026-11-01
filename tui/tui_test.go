@@ -420,3 +420,31 @@ func TestBackgroundBlock(t *testing.T) {
 		t.Errorf("background output not saved:\n%s", got)
 	}
 }
+
+func TestDependsAsksInTUI(t *testing.T) {
+	src := "```sh {#deploy depends=build}\necho deploy\n```\n\n```sh {#build}\necho built\n```\n"
+	for _, tc := range []struct {
+		key        string
+		dep, block bool
+	}{{"r", true, true}, {"k", false, true}, {"s", false, false}, {"enter", false, false}} {
+		m, file := newModel(t, src, Options{AutoSave: true})
+		press(m, "enter")
+		pump(t, m)
+		if m.prompt == nil || m.prompt.block.ID != "build" {
+			t.Fatalf("%s: not asked about build", tc.key)
+		}
+		if v := m.View(); !strings.Contains(v, "deploy depends on build") {
+			t.Errorf("%s: prompt not shown:\n%s", tc.key, v)
+		}
+		press(m, "o") // not an answer here
+		if m.prompt == nil {
+			t.Fatalf("%s: o answered a dependency's question", tc.key)
+		}
+		press(m, tc.key)
+		pump(t, m)
+		got := read(t, file)
+		if dep, block := strings.Contains(got, "for=build"), strings.Contains(got, "for=deploy"); dep != tc.dep || block != tc.block {
+			t.Errorf("%s: build ran %v, deploy ran %v; want %v, %v", tc.key, dep, block, tc.dep, tc.block)
+		}
+	}
+}
