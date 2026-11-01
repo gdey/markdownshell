@@ -94,13 +94,43 @@ func (n *Notebook) Cells() []Cell {
 		}
 	}
 	pos, line := 0, 1
+	bounds := d.Boundaries()
 	for i := range l.cells {
 		c := &l.cells[i]
 		line += bytes.Count(d.Src[pos:c.From], []byte("\n"))
 		pos = c.From
 		c.Line = line
+		bi := c.Block
+		if c.Textbox != nil {
+			bi = c.Textbox.Block
+		} else if c.Choice != nil {
+			bi = c.Choice.Block
+		}
+		if bi >= 0 {
+			if end, ok := unitEnd(d, bi, bounds); ok {
+				c.Movable, c.LastLine = true, lineNo(d.Src, max(end-1, c.From))
+			}
+		}
 	}
 	return l.cells
+}
+
+// unitEnd is where the unit that moves with block i ends, as
+// doc.Document.Unit has it, given the document's boundaries, and false
+// for a block that can't move. It saves Unit's parse for every block.
+func unitEnd(d *doc.Document, i int, bounds []int) (int, bool) {
+	b := d.Blocks[i]
+	if b.Prefix != "" || !slices.Contains(bounds, b.Span.Start) {
+		return 0, false
+	}
+	end := b.Output.End
+	if i+1 < len(d.Blocks) {
+		t := d.Blocks[i+1]
+		if t.IsTape() && t.Attrs["for"] == b.ID && len(bytes.TrimSpace(d.Src[end:t.Span.Start])) == 0 {
+			end = t.Output.End
+		}
+	}
+	return end, true
 }
 
 // layout is the state Cells keeps while it lays out the prose.

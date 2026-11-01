@@ -76,6 +76,11 @@ type Cell struct {
 	To   int `json:"to"`
 	// Line is the line From is on, counting from 1.
 	Line int `json:"line"`
+	// Movable is set on a top-level block, which can move up and down
+	// the document (see MoveBlock), and LastLine is the last line of the
+	// block with its output and tape.
+	Movable  bool `json:"movable,omitempty"`
+	LastLine int  `json:"lastLine,omitempty"`
 }
 
 // Event is what OnEvent reports while a block runs.

@@ -447,6 +447,39 @@ func (a *App) SetTextbox(ctx context.Context, i int, text string) error {
 	return err
 }
 
+// MoveBlock moves top-level block i up (dir < 0) or down past the next
+// cell, or with byBlock past the next block. Undo takes it back.
+func (a *App) MoveBlock(ctx context.Context, i, dir int, byBlock bool) (notebook.Move, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Move{}, err
+	}
+	m, err := n.MoveBlock(i, dir, byBlock)
+	t.changed()
+	return m, err
+}
+
+// PlanMove works out MoveBlock's move without making it, for the source
+// view to make as its own edit.
+func (a *App) PlanMove(ctx context.Context, i, dir int, byBlock bool) (notebook.Move, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Move{}, err
+	}
+	m, err := n.PlanMove(i, dir, byBlock)
+	t.changed()
+	return m, err
+}
+
+// BlockAt is the top-level block on line of the file, or -1.
+func (a *App) BlockAt(ctx context.Context, line int) (int, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return -1, err
+	}
+	return n.BlockAt(line), nil
+}
+
 // Undo takes back the rendered view's last edit, such as checking a task,
 // and says what it was: "" when there is none.
 func (a *App) Undo(ctx context.Context) (string, error) {
