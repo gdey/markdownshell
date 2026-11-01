@@ -132,6 +132,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `mdsh-gui`'s outline marks what each entry is: an H for a heading, a
+  run icon for a block, and, in purple, a textbox or choice icon for a
+  control. A block's name shows its underscores as spaces, so `make_db`
+  reads as "make db"; its tooltip keeps the name as written.
 - `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
 - Folding in `mdsh-gui`: a block's code and its output each fold to one
   line, and a heading folds its section. `collapse[=COND]`,

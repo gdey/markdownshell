@@ -10,6 +10,7 @@
   --link: #0969da;
   --ok: #1a7f37;
   --bad: #cf222e;
+  --control: #8250df;
   --warn-bg: #fff8c5;
   --warn-border: #d4a72c;
   --selection: rgb(84 174 255 / 0.35);
@@ -49,6 +50,7 @@
     --accent-fg: #ffffff;
     --link: #4493f8;
     --ok: #3fb950;
+    --control: #a475f9;
     --bad: #f85149;
     --warn-bg: #2b2611;
     --warn-border: #9e6a03;
@@ -85,6 +87,7 @@
   --accent-fg: #ffffff;
   --link: #4493f8;
   --ok: #3fb950;
+  --control: #a475f9;
   --bad: #f85149;
   --warn-bg: #2b2611;
   --warn-border: #9e6a03;
@@ -175,6 +178,11 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 #outline .item.heading { font-weight: 500; }
 #outline .item.step .text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); }
 #outline .mark { flex: none; width: 1em; text-align: center; color: var(--muted); }
+/* What an entry is: a block, a heading, or a control (textbox or choice). */
+#outline .kind { flex: none; display: inline-flex; align-items: center; color: var(--muted); }
+#outline .kind svg { width: 12px; height: 12px; fill: currentColor; }
+#outline .item.step .kind { color: var(--accent); }
+#outline .item.input .kind { color: var(--control); }
 #outline .ok .mark { color: var(--ok); }
 #outline .bad .mark { color: var(--bad); }
 #outline .now .mark, #running .now .mark { color: var(--accent); }

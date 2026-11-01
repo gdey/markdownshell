@@ -1233,7 +1233,8 @@ function drawOutline() {
       // An input whose var= binds nothing is marked !.
       const taken = e.classList.contains("taken");
       const name = e.querySelector(".name")?.textContent ?? "";
-      const item = outlineItem(name, level + 1, e, "step input" + (taken ? " bad" : ""), taken ? "!" : "");
+      const kind = e.classList.contains("choice-cell") ? "choice" : "textbox";
+      const item = outlineItem(name, level + 1, e, "step input" + (taken ? " bad" : ""), taken ? "!" : "", kind);
       items.push(outlineRow(item, e, 0));
       continue;
     }
@@ -1241,7 +1242,7 @@ function drawOutline() {
       const ask = e.querySelector<HTMLElement>(".ask");
       const mark = blockMark(e);
       const name = e.querySelector(".name")?.firstChild?.textContent ?? "";
-      const item = outlineItem(name, level + 1, e, "step" + markClass(mark), mark);
+      const item = outlineItem(name, level + 1, e, "step" + markClass(mark), mark, "mdsh", blockTitle(name));
       if (mark === "▶") item.title = name + " (running now)";
       else if (mark === "◐") item.title = name + " (running in the background)";
       const block = Number(e.dataset.block);
@@ -1256,7 +1257,7 @@ function drawOutline() {
     }
     for (const h of e.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")) {
       level = Number(h.tagName[1]);
-      const item = outlineItem(h.textContent ?? "", level, h, "heading", "");
+      const item = outlineItem(h.textContent ?? "", level, h, "heading", "", "heading");
       if (e.dataset.fold) {
         // The mark folds the section, in the outline and the view.
         const mark = item.querySelector<HTMLElement>(".mark")!;
@@ -1310,6 +1311,13 @@ function markClass(mark: string): string {
   return { "✗": " bad", "✓": " ok", "▶": " now", "◐": " bg", "?": " now" }[mark] ?? "";
 }
 
+// blockTitle is how the outline shows a block's name: with spaces for
+// its underscores, so make_db reads as make db. Its tooltip, and
+// everywhere else, keeps the name as written.
+function blockTitle(name: string): string {
+  return name.replaceAll("_", " ");
+}
+
 // outlineRow holds an outline entry for cell, with a grip to drag the
 // block, or with level the heading's whole section, when it can move.
 function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLElement {
@@ -1325,8 +1333,11 @@ function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLEl
   return row;
 }
 
-function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string): HTMLElement {
-  const b = el("button", { className: "item " + kind, title: text }, el("span", { className: "mark" }, mark), el("span", { className: "text" }, text));
+// outlineItem is an outline entry for target, named text, or shown as
+// label. Its mark is its state, or a heading's fold, and icon says what
+// it is: a block, a heading, a textbox or a choice.
+function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string, icon: keyof typeof icons, label = text): HTMLElement {
+  const b = el("button", { className: "item " + kind, title: text }, el("span", { className: "mark" }, mark), el("span", { className: "kind" }, svg(icons[icon])), el("span", { className: "text" }, label));
   b.style.paddingLeft = 8 + (level - 1) * 12 + "px";
   b.onclick = () => jumpTo(target);
   return b;
