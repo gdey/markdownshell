@@ -130,6 +130,12 @@ type Model struct {
 	// told.
 	optsChanged bool
 
+	// undo are the moves u can take back.
+	undo []moved
+	// notice is what the last move broke, shown in place of the keys'
+	// help until the next key.
+	notice string
+
 	// back is set when the TUI came from the start screen: q goes back
 	// to it rather than quitting.
 	back bool
@@ -531,6 +537,7 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	quitArmed, forceArm, reloadArmed := m.quitArmed, m.forceArm, m.reloadArmed
+	m.notice = ""
 	m.quitArmed, m.forceArm, m.reloadArmed = false, false, false
 	switch k.String() {
 	case "ctrl+c":
@@ -562,6 +569,12 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveTo(m.navAt(m.cursor + 1))
 	case "k", "up", "shift+tab":
 		m.moveTo(m.navAt(m.cursor - 1))
+	case "alt+up", "K":
+		m.moveBlock(-1)
+	case "alt+down", "J":
+		m.moveBlock(1)
+	case "u":
+		m.undoMove()
 	case "g", "home":
 		m.moveTo(m.navAt(0))
 	case "G", "end":
@@ -1219,8 +1232,10 @@ func (m *Model) footer() string {
 		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
+	case m.notice != "":
+		help = promptStyle.Render(m.notice)
 	default:
-		help = helpStyle.Render("j/k move · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
+		help = helpStyle.Render("j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }

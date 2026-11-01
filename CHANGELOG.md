@@ -13,6 +13,11 @@ follow [Semantic Versioning](https://semver.org/).
   of its own. Opened in a tab beside others, it leaves the window's
   size alone. The Settings window remembers its size as well. Both are
   kept in `gui.json`, not in the file.
+- `mdsh -i`: alt+↑/↓, or `K`/`J`, moves the block under the cursor,
+  with its output and tape, up or down past the paragraph, heading or
+  block next to it, as in `mdsh-gui`; `u` undoes it. New order
+  warnings, and a note when the block ran in the old order, show in
+  the footer.
 - `mdsh-gui`: dragging a dependency line over a folded section's heading
   opens the section for the moment, so a block in it can be dropped on.
   It folds again when the line leaves it; dropping on a block in it

@@ -33,7 +33,7 @@ type Move struct {
 
 // ErrNoMove is returned for a move up from the top or down from the
 // bottom.
-var ErrNoMove = errors.New("the block can't move further that way")
+var ErrNoMove = doc.ErrNoMove
 
 // MoveBlock moves top-level block i, with its output and tape, up
 // (dir < 0) or down past the cell next to it, or with byBlock past the
@@ -139,7 +139,7 @@ func stepMove(i, dir int, byBlock bool) moveFn {
 		}
 		b := d.Blocks[i]
 		line := lineNo(d.Src, b.Span.Start)
-		at, err := moveTarget(d, b, dir, byBlock)
+		at, err := d.StepTarget(b, dir, byBlock)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -218,62 +218,6 @@ func (n *Notebook) tryMove(fn moveFn, block int) (Move, []int, error) {
 		m.Warnings = append(m.Warnings, p.Text)
 	}
 	return m, order, nil
-}
-
-// moveTarget is where b's unit goes to move one step up (dir < 0) or
-// down: past the cell next to it, or with byBlock past the next
-// top-level block.
-func moveTarget(d *doc.Document, b *doc.Block, dir int, byBlock bool) (int, error) {
-	u, err := d.Unit(b)
-	if err != nil {
-		return 0, err
-	}
-	bounds := d.Boundaries()
-	// tops are the top-level blocks.
-	var tops []*doc.Block
-	for _, t := range d.Blocks {
-		if t.Prefix == "" && slices.Contains(bounds, t.Span.Start) && t.Span.Start != u.Start {
-			if t.Span.Start > u.Start && t.Span.Start < u.End {
-				continue // b's tape
-			}
-			tops = append(tops, t)
-		}
-	}
-	after := func(pos int) (int, bool) { // the first boundary at or after pos
-		k, _ := slices.BinarySearch(bounds, pos)
-		return bounds[min(k, len(bounds)-1)], k < len(bounds)
-	}
-	end, _ := after(u.End)
-	if dir < 0 {
-		at := -1
-		for _, p := range bounds {
-			if p < u.Start && (!byBlock || slices.ContainsFunc(tops, func(t *doc.Block) bool { return t.Span.Start == p })) {
-				at = p
-			}
-		}
-		if at < 0 {
-			return 0, ErrNoMove
-		}
-		return at, nil
-	}
-	if end >= len(d.Src) {
-		return 0, ErrNoMove
-	}
-	if byBlock {
-		for _, t := range tops {
-			if t.Span.Start >= end {
-				tu, err := d.Unit(t)
-				if err != nil {
-					return 0, err
-				}
-				at, _ := after(tu.End)
-				return at, nil
-			}
-		}
-		return 0, ErrNoMove
-	}
-	at, _ := after(end + 1)
-	return at, nil
 }
 
 // BlockAt is the top-level block whose fence, body, output or tape is on
