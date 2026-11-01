@@ -168,6 +168,13 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh -i`: `E` edits the whole file in `$EDITOR`, at the block under
   the cursor, as it would be saved. Blocks whose code didn't change keep
   their output, wherever they moved, as in `mdsh-gui`'s source view.
+- `mdsh -i`: `p` creates a report (PDF, HTML or markdown, with or
+  without code and output, of this run, a run of every block or the
+  saved file) and shows the matching `mdsh` command, as `mdsh-gui`'s
+  Create Report does. `,` sets the file's run options: arguments,
+  `--only`, `--step` and `--stop-on-error`. The command line both show
+  now comes from `report.Command`, and `SplitArgs` and `JoinArgs` moved
+  from `mdsh-gui` into `run`.
 
 ### Changed
 

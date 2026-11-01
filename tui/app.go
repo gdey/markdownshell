@@ -52,6 +52,9 @@ type app struct {
 	start *start
 	st    state
 	size  tea.WindowSizeMsg
+	// runOpts are the run options set for each file opened, which it
+	// keeps when opened again.
+	runOpts map[string]RunOptions
 }
 
 // openMsg asks the app to open a file, or the same one again.
@@ -79,6 +82,9 @@ func (a *app) open(file string) error {
 		return err
 	}
 	opts.View = a.st.View
+	if ro, ok := a.runOpts[opts.Run.File]; ok {
+		opts.Run.Args, opts.Run.Only, opts.Run.Step, opts.Run.StopOnError = ro.Args, ro.Only, ro.Step, ro.StopOnError
+	}
 	m, err := New(d, opts)
 	if err != nil {
 		return err
@@ -137,6 +143,12 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case savedAsMsg:
 		a.opened(msg.file)
+		return a, nil
+	case runOptsMsg:
+		if a.runOpts == nil {
+			a.runOpts = map[string]RunOptions{}
+		}
+		a.runOpts[msg.file] = msg.ro
 		return a, nil
 	case viewMsg:
 		a.st.View = View(msg)
