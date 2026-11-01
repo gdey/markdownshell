@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/report"
@@ -96,65 +95,18 @@ func (n *Notebook) WriteReport(r Report) error {
 // paths under home as ~/…. For a report of the window's output, it is
 // the command for the saved file, which is the same once it is saved.
 func (n *Notebook) ReportCommand(r Report, home string) string {
-	dir := filepath.Dir(n.File())
-	path := func(p string) string {
-		if filepath.Dir(p) == dir {
-			return JoinArgs([]string{filepath.Base(p)})
-		}
-		if home != "" {
-			if rest, ok := strings.CutPrefix(p, home+string(filepath.Separator)); ok && JoinArgs([]string{rest}) == rest {
-				return "~/" + filepath.ToSlash(rest)
-			}
-		}
-		return JoinArgs([]string{p})
-	}
 	ro := n.RunOptions()
-	cmd := []string{"mdsh"}
-	runs := r.Ran && !r.Saved
-	if !runs {
-		cmd = append(cmd, "-n")
-	} else {
-		if ro.Only != "" {
-			cmd = append(cmd, "--only", JoinArgs([]string{ro.Only}))
-		}
-		if ro.Step {
-			cmd = append(cmd, "--step")
-		}
-		if ro.StopOnError {
-			cmd = append(cmd, "--stop-on-error")
-		}
-	}
-	if r.HideCode {
-		cmd = append(cmd, "--hide-code")
-	}
-	if r.HideOutput {
-		cmd = append(cmd, "--hide-output")
-	}
-	dest := path(r.Dest)
-	if r.Dest == "" {
-		dest = "FILE"
-	}
-	redirect := false
-	switch r.Format {
-	case report.PDF:
-		cmd = append(cmd, "--pdf", dest)
-	case report.HTML:
-		cmd = append(cmd, "--html", dest)
-	default:
-		// -o saves the printed view only with -n; a run's printout
-		// goes to stdout.
-		if runs {
-			redirect = true
-		} else {
-			cmd = append(cmd, "-o", dest)
-		}
-	}
-	cmd = append(cmd, path(n.File()))
-	if runs && len(ro.Args) > 0 {
-		cmd = append(cmd, JoinArgs(ro.Args))
-	}
-	if redirect {
-		cmd = append(cmd, ">", dest)
-	}
-	return strings.Join(cmd, " ")
+	return report.Command{
+		File:        n.File(),
+		Dest:        r.Dest,
+		Format:      r.Format,
+		HideCode:    r.HideCode,
+		HideOutput:  r.HideOutput,
+		Run:         r.Ran && !r.Saved,
+		Args:        ro.Args,
+		Only:        ro.Only,
+		Step:        ro.Step,
+		StopOnError: ro.StopOnError,
+		Home:        home,
+	}.String()
 }

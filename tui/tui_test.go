@@ -51,6 +51,16 @@ func press(m *Model, keys ...string) {
 		switch k {
 		case "enter":
 			msg = tea.KeyMsg{Type: tea.KeyEnter}
+		case "esc":
+			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "down":
+			msg = tea.KeyMsg{Type: tea.KeyDown}
+		case "right":
+			msg = tea.KeyMsg{Type: tea.KeyRight}
+		case "space":
+			msg = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")}
+		case "ctrl+u":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlU}
 		default:
 			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 		}
@@ -553,7 +563,7 @@ func do(a *app, msg tea.Msg) {
 		msg = nil
 		if cmd != nil {
 			switch next := cmd().(type) {
-			case openMsg, backMsg, savedAsMsg, viewMsg:
+			case openMsg, backMsg, savedAsMsg, viewMsg, runOptsMsg:
 				msg = next
 			}
 		}
@@ -747,5 +757,124 @@ func TestEditFile(t *testing.T) {
 	press(m, "w")
 	if got := read(t, file); !strings.Contains(got, "echo zero") || !strings.Contains(got, "{for=one exit=0}\nhi\n") {
 		t.Errorf("saved file:\n%s", got)
+	}
+}
+
+func TestReportForm(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	dir := filepath.Dir(file)
+	press(m, "enter")
+	pump(t, m)
+	press(m, "p")
+	v := m.View()
+	for _, want := range []string{"Create report", "this run (1 of 2 ran)", "mdsh -n --pdf doc.pdf doc.md"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("report form is missing %q:\n%s", want, v)
+		}
+	}
+	// Markdown, without the code, of this run: the output not saved yet
+	// is in it.
+	press(m, "right", "right", "down", "space")
+	if v := m.View(); !strings.Contains(v, "mdsh -n --hide-code -o doc-report.md doc.md") {
+		t.Errorf("the command doesn't follow the form:\n%s", v)
+	}
+	press(m, "enter")
+	if m.form != nil {
+		t.Fatalf("the form is still up: %s", m.form.status)
+	}
+	got := read(t, filepath.Join(dir, "doc-report.md"))
+	if !strings.Contains(got, "hi") || strings.Contains(got, "X=hi; echo $X") {
+		t.Errorf("doc-report.md:\n%s", got)
+	}
+	if !strings.Contains(m.status, "report saved to") {
+		t.Errorf("status = %q", m.status)
+	}
+
+	// Again, of the saved file, which has no output yet: it asks before
+	// overwriting.
+	press(m, "p", "right", "right", "down", "down", "down", "right", "right", "enter")
+	if m.form == nil || !strings.Contains(m.form.status, "exists") {
+		t.Fatalf("it didn't ask before overwriting")
+	}
+	press(m, "enter")
+	if got := read(t, filepath.Join(dir, "doc-report.md")); strings.Contains(got, "\nhi") || !strings.Contains(got, "X=hi; echo $X") {
+		t.Errorf("report of the saved file:\n%s", got)
+	}
+
+	// esc closes the form and writes nothing.
+	press(m, "p", "esc")
+	if m.form != nil {
+		t.Error("esc didn't close the form")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "doc.pdf")); err == nil {
+		t.Error("esc wrote a report")
+	}
+}
+
+func TestReportRunAllFirst(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	press(m, "p", "right", "down", "down", "down", "right")
+	if v := m.View(); !strings.Contains(v, "mdsh --html doc.html doc.md") {
+		t.Errorf("the command isn't a run:\n%s", v)
+	}
+	press(m, "enter")
+	if !m.running {
+		t.Fatal("run all first didn't run")
+	}
+	pump(t, m)
+	got := read(t, strings.TrimSuffix(file, ".md")+".html")
+	if !strings.Contains(got, "hi again") {
+		t.Errorf("doc.html doesn't have the run's output:\n%s", got)
+	}
+}
+
+func TestRunOptionsForm(t *testing.T) {
+	src := "```sh {#args}\necho \"$1-$2\"\n```\n\n```sh {#other}\necho other\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, ",")
+	if v := m.View(); !strings.Contains(v, "Run options") || !strings.Contains(v, "Stop on error") {
+		t.Fatalf("run options form:\n%s", v)
+	}
+	press(m, "a 'b c", "enter")
+	if m.form == nil || !strings.Contains(m.form.status, "unclosed quote") {
+		t.Fatal("a bad argument list was taken")
+	}
+	press(m, "'", "down", "nope", "enter")
+	if m.form == nil || !strings.Contains(m.form.status, "no block has the id nope") {
+		t.Fatal("an unknown --only was taken")
+	}
+	press(m, "ctrl+u", "enter")
+	if m.form != nil {
+		t.Fatalf("the form is still up: %s", m.form.status)
+	}
+	if got := m.opts.Run.Args; len(got) != 2 || got[1] != "b c" {
+		t.Fatalf("args = %q", got)
+	}
+	press(m, "enter")
+	pump(t, m)
+	if v := m.View(); !strings.Contains(v, "a-b c") {
+		t.Errorf("the block didn't get the arguments:\n%s", v)
+	}
+
+	// Step mode asks before every block.
+	press(m, ",", "down", "down", "space", "enter", "a")
+	pump(t, m)
+	if m.prompt == nil {
+		t.Fatal("step mode didn't ask")
+	}
+	press(m, "s")
+	pump(t, m)
+}
+
+func TestRunOptionsKept(t *testing.T) {
+	a, _ := newTestApp(t)
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	for _, k := range []string{",", "x", "y"} {
+		do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
+	}
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	if got := a.doc.opts.Run.Args; len(got) != 1 || got[0] != "xy" {
+		t.Errorf("args after reload = %q", got)
 	}
 }
