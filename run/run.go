@@ -552,6 +552,9 @@ func saveRecording(b *doc.Block, rec termrec.Recording, opts Options) (string, e
 		return "", fmt.Errorf("recording: %w", err)
 	}
 	_, rel := outKind(b)
+	if rel, err = resolveRes(rel, opts); err != nil {
+		return "", err
+	}
 	castRel := ""
 	if rel != "" {
 		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
@@ -578,13 +581,16 @@ func OutKind(b *doc.Block) string {
 // terminal-style image: PNG if the path ends in .png, else SVG.
 func saveImage(b *doc.Block, data []byte, opts Options) (string, error) {
 	kind, rel := outKind(b)
+	rel, err := resolveRes(rel, opts)
+	if err != nil {
+		return "", err
+	}
 	var mime, ext string
 	if kind == "image" {
 		if mime, ext = sniffImage(data); mime == "" {
 			return "", fmt.Errorf("out=image: output is not a PNG, JPEG, GIF or SVG image (use out=screenshot to draw text)")
 		}
 	} else {
-		var err error
 		if strings.EqualFold(filepath.Ext(rel), ".png") {
 			if data, err = textimg.PNG(string(data)); err != nil {
 				return "", err
@@ -627,11 +633,36 @@ func saveAsset(b *doc.Block, rel string, data []byte, mime, ext string, opts Opt
 // defaultAsset is where a block's file goes when nothing says where:
 // <doc>.assets/<block id><ext>, relative to the document.
 func defaultAsset(b *doc.Block, ext string, opts Options) string {
+	return filepath.ToSlash(filepath.Join(assetsDir(opts), b.ID+ext))
+}
+
+// assetsDir is the document's assets folder, <doc>.assets, relative to
+// opts.Dir.
+func assetsDir(opts Options) string {
 	base := "mdsh"
 	if opts.File != "" {
 		base = filepath.Base(opts.File)
 	}
-	return filepath.ToSlash(filepath.Join(base+".assets", b.ID+ext))
+	return base + ".assets"
+}
+
+// ResScheme starts a path in the document's assets folder:
+// res://notes.md is <doc>.assets/notes.md.
+const ResScheme = "res://"
+
+// resolveRes turns a res:// path into one relative to opts.Dir, in the
+// document's assets folder. Other paths are returned as they are. A
+// res:// path must name a file inside the folder.
+func resolveRes(path string, opts Options) (string, error) {
+	name, ok := strings.CutPrefix(path, ResScheme)
+	if !ok {
+		return path, nil
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(name)))
+	if name == "" || clean == "." || filepath.IsAbs(name) || strings.HasPrefix(name, "/") || clean == ".." || strings.HasPrefix(clean, "../") {
+		return "", fmt.Errorf("%s must name a file in %s", path, assetsDir(opts))
+	}
+	return filepath.ToSlash(filepath.Join(assetsDir(opts), clean)), nil
 }
 
 // assetPath is the file rel names, or the default for b and ext if rel

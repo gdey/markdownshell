@@ -394,6 +394,7 @@ func (n *Notebook) start(f func(context.Context) error) error {
 
 	n.mu.Lock()
 	n.running, n.cancel = false, nil
+	n.readIncludes()
 	if ferr := n.fold(); err == nil {
 		err = ferr
 	}
@@ -579,6 +580,17 @@ func (n *Notebook) write(file string) error {
 // fold writes the results into the document's source, as saving will, so
 // the source pane shows the output as soon as a run ends. No block
 // changes, so every result stays.
+// readIncludes reads the include blocks' files again, since the run may
+// have written them, as a block saving an image an include shows.
+func (n *Notebook) readIncludes() {
+	n.sess.ReadIncludes()
+	for i, r := range n.sess.Results() {
+		if r.Block.IsInclude() {
+			n.results[i] = r
+		}
+	}
+}
+
 func (n *Notebook) fold() error {
 	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: environ()})
 	if bytes.Equal(out, n.d.Src) {

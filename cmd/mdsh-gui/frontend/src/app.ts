@@ -20,7 +20,7 @@ let ranHere = false; // the run going on was started from this page
 let selected = -1; // index into the block cards, for j/k
 let settings: Settings;
 let attrs: AttrSpec[] = [];
-let known: Names = { ids: [], envs: [] }; // for completion in the source pane
+let known: Names = { ids: [], envs: [], assets: [], files: [], assetsDir: "" }; // for completion in the source pane
 
 // The view: what each tab shows. It starts as the last tab left it.
 // split shows the source pane and rendered the rendered view; at least
@@ -758,7 +758,7 @@ async function names(): Promise<Names> {
   try {
     return await App.Names();
   } catch {
-    return { ids: [], envs: [] };
+    return { ids: [], envs: [], assets: [], files: [], assetsDir: "" };
   }
 }
 

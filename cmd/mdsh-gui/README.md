@@ -61,8 +61,10 @@ Each file opens in a tab of its own, with its own shells.
 - **Editing** happens in the source view. The pencil (or `e`) on a block
   opens it with the cursor on the block's code, and clicking prose opens
   it on that text. New blocks are typed there too. Inside
-  `{…}` the editor completes attribute names and values, explains an
-  attribute on hover and underlines mistakes. Vim key bindings are a
+  `{…}` the editor completes attribute names and values (for `file=`,
+  the files beside the document and, as `res://` paths, those in its
+  assets folder; for `out=image:`, the assets folder's),
+  explains an attribute on hover and underlines mistakes. Vim key bindings are a
   setting; with them, `:w` saves and `:RunBlock` runs the block at the
   cursor, as cmd/ctrl+enter does.
 - **Checkboxes, textboxes and choices:** task list items (`- [ ] label`)

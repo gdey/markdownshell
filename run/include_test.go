@@ -99,3 +99,45 @@ func TestIncludeFence(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
+
+// res://name reads name from the document's assets folder.
+func TestIncludeRes(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "doc.md")
+	if err := os.MkdirAll(filepath.Join(dir, "doc.md.assets", "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "doc.md.assets", "sub", "n.md"), []byte("from assets\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "doc.md.assets", "my notes.md"), []byte("spaced\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := "```md {<include file=res://sub/n.md}\n```\n\n" +
+		"```md {<include file=\"res://my notes.md\"}\n```\n\n" +
+		"```md {<include file=res://../doc.md}\n```\n\n" +
+		"```md {<include file=res://}\n```\n"
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: file})
+	if r := results[0]; r.Err != nil || string(r.Stdout) != "from assets\n" {
+		t.Errorf("res://sub/n.md = %q, %v", r.Stdout, r.Err)
+	}
+	if r := results[1]; r.Err != nil || string(r.Stdout) != "spaced\n" {
+		t.Errorf("quoted res:// path = %q, %v", r.Stdout, r.Err)
+	}
+	for _, r := range results[2:] {
+		if r.Err == nil || !strings.Contains(r.Err.Error(), "must name a file in doc.md.assets") {
+			t.Errorf("%s: err = %v", r.Block.Attrs["file"], r.Err)
+		}
+	}
+}
+
+// An include after the block that writes its file reads what the block
+// wrote, in the same run.
+func TestIncludeAfterWriter(t *testing.T) {
+	dir := t.TempDir()
+	src := "```sh {#w}\necho fresh > out.txt\n```\n\n```text {<include file=out.txt}\n```\n"
+	_, results := runDoc(t, src, run.Options{Dir: dir})
+	if r := results[1]; r.Err != nil || string(r.Stdout) != "fresh\n" {
+		t.Errorf("include = %q, %v", r.Stdout, r.Err)
+	}
+}

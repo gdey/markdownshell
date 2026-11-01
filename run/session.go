@@ -148,7 +148,8 @@ var ErrRestart = errors.New("the first tty block needs mdsh to start again")
 // started: blocks appended, as by doc.AppendBlock, blocks edited in
 // place, as by doc.Document.SetBlock, and a new source, as by
 // doc.Document.SetSource. A block that kept its identity keeps its
-// result, wherever it moved; a new block starts with none. Call it
+// result, wherever it moved; a new block starts with none, except that
+// a new include block is read. Call it
 // while nothing runs.
 func (s *Session) Sync() error {
 	byBlock := make(map[*doc.Block]*Result, len(s.results))
@@ -165,6 +166,9 @@ func (s *Session) Sync() error {
 		if _, ok := s.selected[b]; !ok {
 			s.selected[b] = true
 		}
+		if b.IsInclude() {
+			results[i] = s.readInclude(b)
+		}
 	}
 	s.results = results
 	s.refs()
@@ -172,6 +176,27 @@ func (s *Session) Sync() error {
 		return ErrRestart
 	}
 	return nil
+}
+
+// ReadIncludes reads every include block's file again, as after a run
+// whose blocks may have written them. Call it while nothing runs.
+func (s *Session) ReadIncludes() {
+	for i, b := range s.d.Blocks {
+		if b.IsInclude() {
+			s.results[i] = s.readInclude(b)
+		}
+	}
+}
+
+// readInclude reads include block b's file, or skips it with skip.
+func (s *Session) readInclude(b *doc.Block) *Result {
+	r := &Result{Block: b}
+	if b.Attrs.Has("skip") {
+		r.Skipped = true
+		return r
+	}
+	includeBlock(b, r, s.opts)
+	return r
 }
 
 // Close ends the session's shells, and any background block still
@@ -200,7 +225,10 @@ func (s *Session) RunFrom(ctx context.Context, from int) error {
 		s.Reap()
 		b := d.Blocks[i]
 		if b.IsInclude() {
-			if r := s.results[i]; r.Ran {
+			// Read it again: a block above may have just written it.
+			r := s.readInclude(b)
+			s.results[i] = r
+			if r.Ran {
 				s.emit(Event{Kind: Done, Block: b, Result: r})
 			}
 			continue
@@ -262,7 +290,7 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 	r := &Result{Block: b}
 	switch {
 	case b.IsInclude():
-		includeBlock(b, r, s.opts.Dir)
+		includeBlock(b, r, s.opts)
 		s.results[i] = r
 		s.emit(Event{Kind: Done, Block: b, Result: r})
 		return r, nil

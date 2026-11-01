@@ -68,7 +68,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "out", Kind: AttrChoice, Values: []string{"text", "markdown", "image", "image:", "screenshot", "screenshot:", "recording:"}, Default: "text", Help: "How output is inserted: fenced text, raw markdown, or an image saved beside the file"},
 	{Name: "embed", Kind: AttrChoice, Values: []string{"inline"}, Default: "off", Help: "With out=image or out=screenshot, write a data URI instead of a file"},
 	{Name: IncludeAttr, Kind: AttrFlag, Include: true, Help: "Fill the block with lines from another file; it never runs"},
-	{Name: "file", Kind: AttrText, Include: true, Help: "The file to include, relative to the document's folder"},
+	{Name: "file", Kind: AttrText, Include: true, Help: "The file to include, relative to the document's folder; res://name is name in the document's assets folder"},
 	{Name: "from", Kind: AttrNumber, Include: true, Default: "the first line", Help: "The first line to include, counting from 1"},
 	{Name: "to", Kind: AttrNumber, Include: true, Default: "the last line", Help: "The last line to include"},
 	{Name: "number_on", Kind: AttrFlag, Include: true, Default: "off", Help: "Show each included line's number in the file"},

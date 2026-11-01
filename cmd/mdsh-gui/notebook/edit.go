@@ -3,6 +3,8 @@ package notebook
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -27,31 +29,49 @@ func (n *Notebook) sync() error {
 			n.results[i] = &run.Result{Block: b}
 		}
 	}
-	err := n.sess.Sync()
-	if !errors.Is(err, run.ErrRestart) {
-		return err
+	if err := n.sess.Sync(); err != nil {
+		if !errors.Is(err, run.ErrRestart) {
+			return err
+		}
+		sess, err := n.newSession(n.opts.Run)
+		if err != nil {
+			return err
+		}
+		n.closeSession()
+		n.sess = sess
 	}
-	sess, err := n.newSession(n.opts.Run)
-	if err != nil {
-		return err
+	// The session reads include blocks that are new, so a typed
+	// include shows its file's lines without a run.
+	for i, r := range n.sess.Results() {
+		if r.Block.IsInclude() && old[r.Block] == nil {
+			n.results[i] = r
+		}
 	}
-	n.closeSession()
-	n.sess = sess
 	return nil
 }
 
 // Names are what attribute completion offers: block ids, for conditions,
-// and env names.
+// env names, and files for paths: those in the document's assets folder,
+// for res:// paths, and those beside the document.
 type Names struct {
-	IDs  []string `json:"ids"`
-	Envs []string `json:"envs"`
+	IDs    []string `json:"ids"`
+	Envs   []string `json:"envs"`
+	Assets []string `json:"assets"`
+	Files  []string `json:"files"`
+	// AssetsDir is the assets folder's name, <doc>.assets.
+	AssetsDir string `json:"assetsDir"`
 }
 
-// Names lists the document's block ids and envs.
+// Names lists the document's block ids and envs, the files in its assets
+// folder (<doc>.assets) as slash paths inside it, and the files in its
+// folder as slash paths relative to it.
 func (n *Notebook) Names() Names {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	var names Names
+	names.AssetsDir = filepath.Base(n.file) + ".assets"
+	names.Assets = listFiles(n.file + ".assets")
+	names.Files = slices.DeleteFunc(listFiles(filepath.Dir(n.file)), func(f string) bool { return f == filepath.Base(n.file) })
 	for _, b := range n.d.Blocks {
 		if b.IsInclude() || b.IsTape() {
 			continue
@@ -63,6 +83,50 @@ func (n *Notebook) Names() Names {
 	}
 	slices.Sort(names.Envs)
 	return names
+}
+
+// Limits on what listFiles lists, so a document in a big folder, such as
+// a home folder, doesn't stall completion.
+const (
+	maxListDepth = 3
+	maxListFiles = 500
+)
+
+// listFiles lists the regular files under dir, as sorted slash paths
+// relative to it. It leaves out hidden files and folders, node_modules,
+// vendor and .assets folders (res:// paths name what is in those), goes
+// at most maxListDepth folders down and stops at maxListFiles. It is
+// empty if dir doesn't exist.
+func listFiles(dir string) []string {
+	var files []string
+	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if len(files) >= maxListFiles {
+			return filepath.SkipAll
+		}
+		if err != nil {
+			return filepath.SkipDir
+		}
+		if path == dir {
+			return nil
+		}
+		name := d.Name()
+		if d.IsDir() {
+			rel, _ := filepath.Rel(dir, path)
+			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || strings.HasSuffix(name, ".assets") || strings.Count(rel, string(filepath.Separator)) >= maxListDepth {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasPrefix(name, ".") || !d.Type().IsRegular() {
+			return nil
+		}
+		if rel, err := filepath.Rel(dir, path); err == nil {
+			files = append(files, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	slices.Sort(files)
+	return files
 }
 
 // Problem is something wrong in a fence's info string, for the block

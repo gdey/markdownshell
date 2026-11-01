@@ -139,14 +139,37 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
     const spec = attrs.find((a) => a.name === key);
     if (!spec) return null;
     const known = names();
-    const from = tok.start + eq + 1;
+    let from = tok.start + eq + 1;
     let values: Completion[] = [];
+    // A value typed with an opening quote is completed inside it.
+    let value = tok.text.slice(eq + 1);
+    const opened = value.startsWith('"');
+    if (opened) value = value.slice(1);
+    // path is a completion for a file path. A value with spaces or braces
+    // needs quotes; one with a quote can't be written at all.
+    const path = (label: string, detail: string, boost?: number): Completion[] => {
+      if (label.includes('"')) return [];
+      const apply = opened ? label + '"' : /[\s{}]/.test(label) ? `"${label}"` : label;
+      return [{ label, apply, detail, type: "text", boost }];
+    };
+    // res://name is name in the document's assets folder; other paths
+    // are relative to the document.
+    const assetsDir = known.assetsDir ? known.assetsDir + "/" : "the assets folder";
+    const res = (prefix: string): Completion[] => (known.assets ?? []).flatMap((f) => path(prefix + "res://" + f, "in " + assetsDir, 1));
+    const files = (): Completion[] => (known.files ?? []).flatMap((f) => path(f, "beside the document"));
     switch (spec.kind) {
-      case AttrKind.AttrChoice:
+      case AttrKind.AttrChoice: {
+        const kind = key === "out" ? /^(image|screenshot|recording):/.exec(value) : null;
+        if (kind) {
+          values = res(kind[0]);
+          break;
+        }
         values = (spec.values ?? []).map((v) => ({ label: v, type: "enum" }));
         break;
+      }
       case AttrKind.AttrText:
         if (key === "env") values = known.envs?.map((v) => ({ label: v, type: "variable" })) ?? [];
+        if (key === "file") values = value.startsWith("res:") ? res("") : [...res(""), ...files()];
         break;
       case AttrKind.AttrCond:
         values = [
@@ -165,6 +188,7 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
         break;
     }
     if (!values.length) return null;
+    if (opened) from++;
     return { from, options: values };
   };
 }
