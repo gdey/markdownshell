@@ -221,11 +221,19 @@ func (s *Session) emit(e Event) {
 // block ends its shell or fails with on_error stop. Blocks it runs again
 // get new results.
 func (s *Session) RunFrom(ctx context.Context, from int) error {
+	return s.RunRange(ctx, from, len(s.d.Blocks))
+}
+
+// RunRange runs blocks from up to but not including to, as RunFrom
+// runs them: confirm, run=, skip, depends= and on_error all apply, and
+// a block's dependencies run first even when they are outside the
+// range. mdsh-gui uses it to run a section.
+func (s *Session) RunRange(ctx context.Context, from, to int) error {
 	d, opts := s.d, s.opts
 	// ran holds the blocks already run as dependencies on the way, so
 	// they don't run twice.
 	ran := map[*doc.Block]bool{}
-	for i := from; i < len(d.Blocks); i++ {
+	for i := max(from, 0); i < min(to, len(d.Blocks)); i++ {
 		s.Reap()
 		b := d.Blocks[i]
 		if ran[b] {

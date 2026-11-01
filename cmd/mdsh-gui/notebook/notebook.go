@@ -63,6 +63,11 @@ type Cell struct {
 	// Heading is the level of a prose cell that is a heading, 1 to 6;
 	// its section runs to the next heading of the same or a higher level.
 	Heading int `json:"heading,omitempty"`
+	// SectionFrom and SectionTo are the blocks a heading's section
+	// holds, its subsections' included: Blocks[SectionFrom:SectionTo],
+	// for RunRange. They are both 0 when no block in it runs.
+	SectionFrom int `json:"sectionFrom,omitempty"`
+	SectionTo   int `json:"sectionTo,omitempty"`
 	// Collapsed is true when the view should open with a block's code, or
 	// a heading's section, folded: collapse= holds, or an mdsh:collapse
 	// line in the section does. CollapsedOutput is collapse-output='s.
@@ -389,6 +394,12 @@ func (n *Notebook) RunBlock(i int) error {
 // RunFrom runs block i and every block after it, as mdsh does.
 func (n *Notebook) RunFrom(i int) error {
 	return n.start(func(ctx context.Context) error { return n.sess.RunFrom(ctx, i) })
+}
+
+// RunRange runs blocks from up to but not including to, as RunFrom
+// runs them; a heading's SectionFrom and SectionTo run its section.
+func (n *Notebook) RunRange(from, to int) error {
+	return n.start(func(ctx context.Context) error { return n.sess.RunRange(ctx, from, to) })
 }
 
 func (n *Notebook) start(f func(context.Context) error) error {

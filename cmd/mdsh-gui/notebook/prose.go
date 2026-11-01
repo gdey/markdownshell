@@ -93,6 +93,7 @@ func (n *Notebook) Cells() []Cell {
 			}
 		}
 	}
+	sections(d, l.cells)
 	pos, line := 0, 1
 	bounds := d.Boundaries()
 	for i := range l.cells {
@@ -113,6 +114,27 @@ func (n *Notebook) Cells() []Cell {
 		}
 	}
 	return l.cells
+}
+
+// sections sets the heading cells' SectionFrom and SectionTo. A section
+// runs to the next heading drawn of the same or a higher level, as it
+// folds; headings mdsh:if leaves out don't end one.
+func sections(d *doc.Document, cells []Cell) {
+	var hs []doc.Heading
+	var at []int
+	for i, c := range cells {
+		if c.Heading > 0 {
+			hs = append(hs, doc.Heading{Level: c.Heading, Span: doc.Span{Start: c.From}})
+			at = append(at, i)
+		}
+	}
+	doc.CloseSections(hs, len(d.Src))
+	for k, h := range hs {
+		from, to := d.BlocksIn(h.Span)
+		if slices.ContainsFunc(d.Blocks[from:to], run.Runnable) {
+			cells[at[k]].SectionFrom, cells[at[k]].SectionTo = from, to
+		}
+	}
 }
 
 // unitEnd is where the unit that moves with block i ends, as

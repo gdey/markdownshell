@@ -45,7 +45,9 @@ Each file opens in a tab of its own, with its own shells.
   output that isn't saved, and closing or quitting asks first.
 - **Run:** Run Current Block (cmd/ctrl+enter: the block the source
   view's cursor is in, or the selected card without the source view),
-  Run All (cmd/ctrl+R, the toolbar button turns into Stop while
+  Run Section (cmd/ctrl+shift+enter: the section of the selected
+  heading, or the one the source view's cursor or the selected card is
+  in), Run All (cmd/ctrl+R, the toolbar button turns into Stop while
   blocks run), Stop (cmd/ctrl+.), Clear All Outputs and Run Options…
   for the file's arguments, `--only`, step mode and stop on error.
   Clear All Outputs takes every block's output, output copy and stored
@@ -113,7 +115,8 @@ Each file opens in a tab of its own, with its own shells.
   markdown editor beside the rendered view. Typing re-renders after a
   pause, and the two scroll together; clicking a block lines the source
   up with it. Blocks whose code didn't change
-  keep their output. The play button in the gutter runs a block. The
+  keep their output. The play button in the gutter runs a block, or by
+  a heading, its section. The
   rendered view can be turned off too (its button or
   cmd/ctrl+shift+\\), to work in the source alone.
 - **Markdown bar** over the source view, and Insert in its right-click
@@ -175,6 +178,15 @@ run yet.
 The outline lists the headings and blocks, with a mark for each block's
 state. The selected block, or the one the source pane's cursor is in,
 has a play button in the outline that runs it.
+
+Each heading with a block under it has a play button beside it that
+runs its section: the blocks under it, its subsections' included, down
+to the next heading of the same or a higher level. They run as Run All
+runs them, so `confirm` asks, `skip`, `run=` and `run=once` hold,
+`depends=` runs what a block needs first even outside the section, and
+`on_error=stop` ends the run. Click a heading, or pick it in the
+outline, to select it: its play button shows in the outline, and enter
+or `s` runs it. `s` on a selected block runs the section it is in.
 While blocks run, the toolbar lists them, the run's current step (▶)
 first and then those in the background (◐); click one to go to it.
 

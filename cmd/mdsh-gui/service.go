@@ -98,6 +98,18 @@ func (a *App) RunFrom(ctx context.Context, i int) error {
 	return err
 }
 
+// RunSection runs blocks from up to but not including to, a heading's
+// section, as Run all runs them.
+func (a *App) RunSection(ctx context.Context, from, to int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = t.run(func() error { return n.RunRange(from, to) })
+	a.afterRun(t, n)
+	return err
+}
+
 // afterRun marks the title and saves if autosave is on. It doesn't
 // save over a file that changed on disk; the banner asks about that.
 func (a *App) afterRun(t *docTab, n *notebook.Notebook) {

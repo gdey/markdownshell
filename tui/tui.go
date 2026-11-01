@@ -448,6 +448,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.start(false)
 	case "a":
 		m.start(true)
+	case "s":
+		m.startSection()
 	case "e":
 		if cmd := m.edit(); cmd != nil {
 			return m, cmd
@@ -678,6 +680,33 @@ func (m *Model) start(all bool) {
 	}()
 }
 
+// startSection runs the blocks of the section the block under the
+// cursor is in, its subsections included, as a would: the innermost
+// heading above the block, down to the next heading of the same or a
+// higher level.
+func (m *Model) startSection() {
+	if m.running {
+		m.status = "a block is running; ctrl+c stops it"
+		return
+	}
+	i := m.cur()
+	if i < 0 {
+		return
+	}
+	h, ok := doc.SectionAt(m.d.Headings(), m.d.Blocks[i].Span.Start)
+	if !ok {
+		m.status = "the block isn't under a heading"
+		return
+	}
+	from, to := m.d.BlocksIn(h.Span)
+	ctx, cancel := context.WithCancel(context.Background())
+	m.running, m.cancel, m.status = true, cancel, ""
+	m.skipSaved = false
+	go func() {
+		m.events <- runDoneMsg{m.sess.RunRange(ctx, from, to)}
+	}()
+}
+
 // save writes the results into the file. It won't overwrite changes made
 // to the file since it was opened unless force is set.
 func (m *Model) save(force bool) {
@@ -813,7 +842,7 @@ func (m *Model) footer() string {
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a run from here · i new · e edit · v view · w save · q quit")
+		help = helpStyle.Render("j/k move · enter run · a run from here · s run section · i new · e edit · v view · w save · q quit")
 	}
 	return line1 + "\n" + help
 }

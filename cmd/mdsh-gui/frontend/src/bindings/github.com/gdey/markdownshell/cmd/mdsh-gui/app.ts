@@ -276,6 +276,14 @@ export function RunFrom(i: number): $CancellablePromise<void> {
 }
 
 /**
+ * RunSection runs blocks from up to but not including to, a heading's
+ * section, as Run all runs them.
+ */
+export function RunSection($from: number, to: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.RunSection", $from, to);
+}
+
+/**
  * Save writes the output into the file.
  */
 export function Save(): $CancellablePromise<void> {
