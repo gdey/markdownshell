@@ -12,12 +12,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
@@ -35,10 +37,11 @@ type Options struct {
 	// blocks depends= names, without
 	// asking.
 	Yes bool
-	// Save writes the document's new contents to Run.File.
-	Save func([]byte) error
+	// Save writes the document's new contents to file: Run.File, or
+	// the file picked by save as.
+	Save func(file string, out []byte) error
 	// AutoSave saves after every block that runs. Otherwise output is
-	// saved when w is pressed.
+	// saved when w or ctrl+s is pressed.
 	AutoSave bool
 	// Images turns on image previews, drawn with colored half blocks.
 	Images bool
@@ -48,18 +51,8 @@ type Options struct {
 	// Style is the glamour style prose is drawn in, such as "dark",
 	// "light" or "notty".
 	Style string
-}
-
-// Run shows d full screen until the user quits.
-func Run(d *doc.Document, opts Options) error {
-	m, err := New(d, opts)
-	if err != nil {
-		return err
-	}
-	defer m.Close()
-	var replies replyFilter
-	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithFilter(replies.filter)).Run()
-	return err
+	// View is how the file is shown at first.
+	View View
 }
 
 // Model is the TUI's state. It is a tea.Model.
@@ -95,6 +88,7 @@ type Model struct {
 	cursor int // index into nav
 	vp     viewport.Model
 	width  int
+	height int
 	ready  bool
 	tops   map[int]int // first and last content line of each block
 	bots   map[int]int
@@ -108,6 +102,39 @@ type Model struct {
 	status    string
 	quitArmed bool
 	forceArm  bool
+	// reloadArmed is set after R with unsaved output: R again reloads.
+	reloadArmed bool
+	// changed is set when the file changed on disk since it was opened
+	// or saved, until it is reloaded or kept.
+	changed bool
+	// saveAs is the prompt for the file to save as, while naming is set.
+	saveAs    textinput.Model
+	naming    bool
+	overwrite string // the existing file enter again overwrites
+
+	// shown is how the file is shown: the outline, code and output.
+	shown View
+
+	// pane is the terminal tty blocks run in, and termBlock the block
+	// it is drawn in while one runs, or -1.
+	pane      *pane
+	termBlock int
+
+	// form is the report or run options form, while one is up;
+	// formKind says which: "report" or "run".
+	form     *form
+	formKind string
+	// report is the report to write when the run going on ends.
+	report *pendingReport
+	// optsChanged is set when the run options changed, until the app is
+	// told.
+	optsChanged bool
+
+	// back is set when the TUI came from the start screen: q goes back
+	// to it rather than quitting.
+	back bool
+	// done is closed by Close, so nothing waits on events after it.
+	done chan struct{}
 }
 
 // part is a piece of the screen: prose between blocks, or a block.
@@ -134,34 +161,12 @@ type confirmMsg struct {
 type runDoneMsg struct{ err error }
 
 // reapMsg is the tick that checks for background blocks that ended.
-type reapMsg struct{}
+// Ticks name their model, so a model that replaced it ignores them.
+type reapMsg struct{ m *Model }
 
 // reapEvery is how often the TUI checks on background blocks while
 // nothing else runs.
 const reapEvery = 250 * time.Millisecond
-
-// handOff gives the terminal to a tty block. As a tea.ExecCommand, Bubble
-// Tea runs it with the terminal released: it lets the block start, waits
-// for it to finish, and then for enter, so the block's last screen can be
-// read before the TUI draws over it.
-type handOff struct {
-	label      string // the block, as doc.Document.Label names it
-	tty        *os.File
-	start, end chan struct{}
-}
-
-func (h *handOff) Run() error {
-	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s runs on the terminal ---\r\n", h.label)
-	close(h.start)
-	<-h.end
-	fmt.Fprintf(h.tty, "\r\n--- mdsh: block %s is done; press enter to go back ---", h.label)
-	bufio.NewReader(h.tty).ReadString('\n')
-	return nil
-}
-
-func (h *handOff) SetStdin(io.Reader)  {}
-func (h *handOff) SetStdout(io.Writer) {}
-func (h *handOff) SetStderr(io.Writer) {}
 
 type ttyBackMsg struct{}
 
@@ -207,27 +212,24 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		opts.Style = "dark"
 	}
 	m := &Model{
-		d:      d,
-		opts:   opts,
-		index:  map[*doc.Block]int{},
-		events: make(chan tea.Msg, 64),
-		active: -1,
-		live:   map[int][]chunk{},
-		bg:     map[int]bool{},
-		md:     map[string]string{},
-		images: map[string]string{},
+		d:         d,
+		opts:      opts,
+		index:     map[*doc.Block]int{},
+		events:    make(chan tea.Msg, 64),
+		done:      make(chan struct{}),
+		shown:     opts.View,
+		active:    -1,
+		pane:      newPane(),
+		termBlock: -1,
+		live:      map[int][]chunk{},
+		bg:        map[int]bool{},
+		md:        map[string]string{},
+		images:    map[string]string{},
 	}
 	if info, err := os.Stat(opts.Run.File); err == nil {
 		m.mtime = info.ModTime()
 	}
-	ro := opts.Run
-	ro.OnEvent = func(e run.Event) { m.events <- eventMsg(e) }
-	ro.Confirm = m.confirm
-	ro.Depend = m.depend
-	if ro.TTY != nil {
-		ro.TakeTTY = m.takeTTY
-	}
-	sess, err := run.NewSession(d, ro)
+	sess, err := m.newSession(opts.Run)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +240,19 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	m.input = textinput.New()
 	m.input.Prompt = "$ "
 	m.input.Placeholder = "a command to add to the document as a new block"
+	m.saveAs = textinput.New()
+	m.saveAs.Prompt = "save as: "
 	return m, nil
+}
+
+// newSession starts a session that runs d with ro, reporting to m.
+func (m *Model) newSession(ro run.Options) (*run.Session, error) {
+	ro.OnEvent = func(e run.Event) { m.send(eventMsg(e)) }
+	ro.Confirm = m.confirm
+	ro.Depend = m.depend
+	// tty blocks run in a terminal drawn in their card.
+	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
+	return run.NewSession(m.d, ro)
 }
 
 // layout splits the document into prose and the blocks the cursor
@@ -261,7 +275,24 @@ func (m *Model) layout() {
 }
 
 // Close ends the shells blocks ran in.
-func (m *Model) Close() { m.sess.Close() }
+func (m *Model) Close() {
+	m.sess.Close()
+	select {
+	case <-m.done:
+	default:
+		close(m.done)
+	}
+}
+
+// send passes msg to Update, unless the model is closed.
+func (m *Model) send(msg tea.Msg) bool {
+	select {
+	case m.events <- msg:
+		return true
+	case <-m.done:
+		return false
+	}
+}
 
 // confirm asks the user from the run's goroutine and waits for the answer.
 func (m *Model) confirm(b *doc.Block) run.Answer {
@@ -269,8 +300,15 @@ func (m *Model) confirm(b *doc.Block) run.Answer {
 		return run.Go
 	}
 	reply := make(chan run.Answer)
-	m.events <- confirmMsg{block: b, reply: reply}
-	return <-reply
+	if !m.send(confirmMsg{block: b, reply: reply}) {
+		return run.Stop
+	}
+	select {
+	case a := <-reply:
+		return a
+	case <-m.done:
+		return run.Stop
+	}
 }
 
 // depend asks whether to run dep, which b depends on, first.
@@ -283,16 +321,31 @@ func (m *Model) depend(dep, b *doc.Block) run.Answer {
 	return <-reply
 }
 
-// takeTTY hands the terminal to block b, from the run's goroutine, and
-// returns once the TUI has stepped aside.
-func (m *Model) takeTTY(b *doc.Block) func() {
-	h := &handOff{label: m.d.Label(b), tty: m.opts.Run.TTY, start: make(chan struct{}), end: make(chan struct{})}
-	m.events <- h
-	<-h.start
-	return func() { close(h.end) }
+func (m *Model) wait() tea.Msg {
+	select {
+	case msg := <-m.events:
+		return msg
+	case <-m.done:
+		return nil
+	}
 }
 
-func (m *Model) wait() tea.Msg { return <-m.events }
+// checkMsg is the tick that checks whether the file changed on disk.
+type checkMsg struct{ m *Model }
+
+// checkEvery is how often the TUI looks at the file's modification time.
+const checkEvery = time.Second
+
+func (m *Model) check() tea.Cmd {
+	return tea.Tick(checkEvery, func(time.Time) tea.Msg { return checkMsg{m} })
+}
+
+// diskChanged reports whether the file changed on disk since it was
+// opened or saved.
+func (m *Model) diskChanged() bool {
+	info, err := os.Stat(m.opts.Run.File)
+	return err == nil && !info.ModTime().Equal(m.mtime)
+}
 
 // tick schedules a check on background blocks, if any are running and
 // none is scheduled.
@@ -301,11 +354,11 @@ func (m *Model) tick() tea.Cmd {
 		return nil
 	}
 	m.ticking = true
-	return tea.Tick(reapEvery, func(time.Time) tea.Msg { return reapMsg{} })
+	return tea.Tick(reapEvery, func(time.Time) tea.Msg { return reapMsg{m} })
 }
 
-// Init starts listening for run events.
-func (m *Model) Init() tea.Cmd { return m.wait }
+// Init starts listening for run events, and watching the file.
+func (m *Model) Init() tea.Cmd { return tea.Batch(m.wait, m.check(), m.watchPane) }
 
 // Update handles a key, a window size or a run event.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -318,7 +371,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case eventMsg:
 		m.event(run.Event(msg))
 		return m, tea.Batch(m.wait, m.tick())
+	case checkMsg:
+		if msg.m != m {
+			return m, nil
+		}
+		if !m.changed && m.diskChanged() {
+			m.changed = true
+			m.refresh()
+		}
+		return m, m.check()
 	case reapMsg:
+		if msg.m != m {
+			return m, nil
+		}
 		m.ticking = false
 		// A run checks on them itself, before each block; the session
 		// runs one thing at a time.
@@ -336,8 +401,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.refresh()
 		return m, m.wait
-	case *handOff:
-		return m, tea.Batch(m.wait, tea.Exec(msg, func(error) tea.Msg { return ttyBackMsg{} }))
+	case paneTurnMsg:
+		i := m.index[msg.block]
+		if msg.end {
+			m.termBlock = -1
+			m.refresh()
+			return m, m.wait
+		}
+		m.pane.take(i)
+		m.termBlock = i
+		close(msg.reply)
+		m.moveTo(i)
+		m.follow(i)
+		return m, m.wait
+	case paneMsg:
+		if msg.m != m {
+			return m, nil
+		}
+		if m.termBlock >= 0 {
+			m.refresh()
+			m.follow(m.termBlock)
+		}
+		return m, m.watchPane
 	case editedMsg:
 		m.edited(msg)
 		m.refresh()
@@ -353,6 +438,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "stopped"
 		case msg.err != nil:
 			m.status = msg.err.Error()
+		}
+		if r := m.report; r != nil {
+			m.report = nil
+			if errors.Is(msg.err, context.Canceled) {
+				m.status = "stopped; the report wasn't saved"
+			} else {
+				was := m.status
+				m.writeReport(*r)
+				if was != "" {
+					m.status = was + " · " + m.status
+				}
+			}
 		}
 		m.refresh()
 		return m, m.wait
@@ -393,6 +490,15 @@ func (m *Model) event(e run.Event) {
 }
 
 func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// While a tty block runs in its card, keys are for it.
+	if m.termBlock >= 0 {
+		if k.String() == "ctrl+]" {
+			m.cancel()
+		} else {
+			m.pane.typeKey(k)
+		}
+		return m, nil
+	}
 	// Keys typed quickly can arrive together; take them one at a time.
 	if k.Type == tea.KeyRunes && len(k.Runes) > 1 && !k.Paste {
 		var cmds []tea.Cmd
@@ -405,13 +511,19 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.typing {
 		return m, m.typed(k)
 	}
+	if m.naming {
+		return m, m.named(k)
+	}
+	if m.form != nil {
+		return m, m.formed(k)
+	}
 	if m.prompt != nil {
 		m.answer(k.String())
 		m.refresh()
 		return m, nil
 	}
-	quitArmed, forceArm := m.quitArmed, m.forceArm
-	m.quitArmed, m.forceArm = false, false
+	quitArmed, forceArm, reloadArmed := m.quitArmed, m.forceArm, m.reloadArmed
+	m.quitArmed, m.forceArm, m.reloadArmed = false, false, false
 	switch k.String() {
 	case "ctrl+c":
 		if m.running {
@@ -419,16 +531,25 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, tea.Quit
-	case "q":
+	case "q", "ctrl+w":
+		// q goes back to the start screen, if the file came from it;
+		// ctrl+w closes the tab. Closing the last tab quits.
+		key := k.String()
 		switch {
 		case m.running:
 			m.status = "a block is running; ctrl+c stops it"
 		case m.dirty && !quitArmed:
-			m.status = "output is not saved; q again quits anyway, w saves"
+			m.status = "output is not saved; " + key + " again " + m.quitWord(key) + "s anyway, w saves"
 			m.quitArmed = true
+		case m.back && key == "q":
+			return m, func() tea.Msg { return backMsg{} }
 		default:
-			return m, tea.Quit
+			return m, func() tea.Msg { return closeTabMsg{} }
 		}
+	case "]":
+		return m, func() tea.Msg { return nextTabMsg{1} }
+	case "[":
+		return m, func() tea.Msg { return nextTabMsg{-1} }
 	case "j", "down", "tab":
 		m.moveTo(m.navAt(m.cursor + 1))
 	case "k", "up", "shift+tab":
@@ -455,12 +576,55 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd := m.edit(); cmd != nil {
 			return m, cmd
 		}
+	case "E":
+		if cmd := m.editAll(); cmd != nil {
+			return m, cmd
+		}
 	case "v":
 		if cmd := m.view(); cmd != nil {
 			return m, cmd
 		}
-	case "w":
+	case "w", "ctrl+s":
 		m.save(forceArm)
+	case "W":
+		if m.running {
+			m.status = "a block is running; ctrl+c stops it"
+			break
+		}
+		m.naming, m.overwrite = true, ""
+		m.saveAs.SetValue(m.opts.Run.File)
+		m.saveAs.CursorEnd()
+		m.refresh()
+		return m, m.saveAs.Focus()
+	case "R":
+		switch {
+		case m.running:
+			m.status = "a block is running; ctrl+c stops it"
+		case m.dirty && !reloadArmed:
+			m.status = "output is not saved; R again reloads anyway"
+			m.reloadArmed = true
+		default:
+			file := m.opts.Run.File
+			return m, func() tea.Msg { return openMsg{file: file} }
+		}
+	case "M":
+		if m.changed {
+			m.keepMine()
+		}
+	case "p":
+		if cmd := m.reportForm(); cmd != nil {
+			return m, cmd
+		}
+	case ",":
+		if cmd := m.runOptionsForm(); cmd != nil {
+			return m, cmd
+		}
+	case "o":
+		return m, m.toggle(&m.shown.Outline)
+	case "C":
+		return m, m.toggle(&m.shown.HideCode)
+	case "O":
+		return m, m.toggle(&m.shown.HideOutput)
 	case "i", ":":
 		if m.running {
 			m.status = "a block is running; ctrl+c stops it"
@@ -474,11 +638,14 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// editedMsg reports that the editor opened by edit has exited.
+// editedMsg reports that the editor opened by edit or editAll has
+// exited.
 type editedMsg struct {
-	block int
+	block int // -1 for the whole file
 	file  string
-	err   error
+	// text is what the editor was given, for the whole file.
+	text string
+	err  error
 }
 
 // edit opens the block under the cursor, fences and all, in $VISUAL,
@@ -534,7 +701,103 @@ func (m *Model) getenv(name string) string {
 	return ""
 }
 
-// edited puts the edited block into the document.
+// editAll opens the whole file in $VISUAL, $EDITOR or vi, as it would
+// be saved, so output not saved yet is in it, with the cursor on the
+// block under the TUI's cursor where the editor takes a +line argument.
+// This is the TUI's source view: mdsh-gui edits the whole file too.
+func (m *Model) editAll() tea.Cmd {
+	switch {
+	case m.running:
+		m.status = "a block is running; ctrl+c stops it"
+		return nil
+	case len(m.bg) > 0:
+		m.status = "a block is running in the background; wait for it to end"
+		return nil
+	}
+	text, line := m.fileText()
+	f, err := os.CreateTemp("", "mdsh-*.md")
+	if err == nil {
+		_, err = f.WriteString(text)
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		m.status = "edit: " + err.Error()
+		return nil
+	}
+	editor := strings.Fields(m.editor())
+	args := editor[1:]
+	if takesLine(editor[0]) {
+		args = append(args, fmt.Sprintf("+%d", line))
+	}
+	cmd := exec.Command(editor[0], append(args, f.Name())...)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg { return editedMsg{block: -1, file: f.Name(), text: text, err: err} })
+}
+
+// fileText is the file as it would be saved, and the line the block
+// under the cursor starts on in it.
+func (m *Model) fileText() (string, int) {
+	text := string(render.Markdown(m.d, m.results, render.Options{WriteBack: true, Env: m.opts.Run.Environ}))
+	line := 1
+	if d, err := doc.Parse([]byte(text)); err == nil && m.cur() >= 0 && len(d.Blocks) == len(m.d.Blocks) {
+		line = 1 + strings.Count(text[:d.Blocks[m.cur()].Span.Start], "\n")
+	}
+	return text, line
+}
+
+// takesLine reports whether editor opens a file at a line given as +N.
+func takesLine(editor string) bool {
+	switch filepath.Base(editor) {
+	case "vi", "vim", "nvim", "gvim", "view", "nano", "pico", "emacs", "emacsclient", "micro", "kak", "joe", "ne", "mg", "jed", "mcedit":
+		return true
+	}
+	return false
+}
+
+// editedAll puts the edited file into the document. Blocks whose code
+// didn't change keep their output, wherever they moved; edited and new
+// blocks start with none, as in mdsh-gui.
+func (m *Model) editedAll(text string, was string) {
+	if text == was {
+		return
+	}
+	var b *doc.Block // the block under the cursor
+	if i := m.cur(); i >= 0 {
+		b = m.d.Blocks[i]
+	}
+	if err := m.d.SetSource([]byte(text)); err != nil {
+		m.status = "edit: " + err.Error()
+		return
+	}
+	if err := m.sess.Sync(); err != nil {
+		m.status = "edited; " + err.Error()
+	} else {
+		m.status = "edited"
+	}
+	m.results = append([]*run.Result(nil), m.sess.Results()...)
+	m.index = map[*doc.Block]int{}
+	m.layout()
+	m.cursor = min(m.cursor, max(len(m.nav)-1, 0))
+	// The cursor stays on its block, or one with its id if it was edited.
+	if i, ok := m.index[b]; ok && b != nil {
+		m.moveTo(i)
+	} else if b != nil {
+		for _, i := range m.nav {
+			if m.d.Blocks[i].ID == b.ID {
+				m.moveTo(i)
+				break
+			}
+		}
+	}
+	m.md = map[string]string{}
+	m.dirty = true
+	if m.opts.AutoSave {
+		m.save(false)
+	}
+}
+
+// edited puts the edited block, or file, into the document.
 func (m *Model) edited(msg editedMsg) {
 	defer os.Remove(msg.file)
 	if msg.err != nil {
@@ -544,6 +807,10 @@ func (m *Model) edited(msg editedMsg) {
 	text, err := os.ReadFile(msg.file)
 	if err != nil {
 		m.status = "edit: " + err.Error()
+		return
+	}
+	if msg.block < 0 {
+		m.editedAll(string(text), msg.text)
 		return
 	}
 	b := m.d.Blocks[msg.block]
@@ -714,32 +981,101 @@ func (m *Model) save(force bool) {
 	if m.opts.Save == nil {
 		return
 	}
-	file := m.opts.Run.File
-	if info, err := os.Stat(file); err == nil && !info.ModTime().Equal(m.mtime) && !force {
+	if m.diskChanged() && !force {
+		m.changed = true
 		m.status = "the file changed on disk; press w twice to overwrite it"
 		m.forceArm = true
 		return
 	}
+	// Saving the file itself names its unnamed blocks.
 	renames, err := run.NameBlocks(m.d, m.results, m.opts.Run)
 	if err == nil && len(renames) > 0 {
 		err = m.sess.Sync()
+	}
+	if err == nil {
+		err = m.write(m.opts.Run.File)
 	}
 	if err != nil {
 		m.status = "save: " + err.Error()
 		return
 	}
+	if !m.opts.AutoSave {
+		m.status = "saved"
+	}
+}
+
+// write saves the document with its results to file, which then is the
+// file the TUI watches.
+func (m *Model) write(file string) error {
 	out := render.Markdown(m.d, m.results, render.Options{WriteBack: true, Env: m.opts.Run.Environ})
-	if err := m.opts.Save(out); err != nil {
-		m.status = "save: " + err.Error()
-		return
+	if err := m.opts.Save(file, out); err != nil {
+		return err
 	}
 	if info, err := os.Stat(file); err == nil {
 		m.mtime = info.ModTime()
 	}
-	m.dirty = false
-	if !m.opts.AutoSave {
-		m.status = "saved"
+	m.dirty, m.changed = false, false
+	return nil
+}
+
+// keepMine answers the file-changed notice by keeping what is shown: the
+// next save overwrites the file.
+func (m *Model) keepMine() {
+	if info, err := os.Stat(m.opts.Run.File); err == nil {
+		m.mtime = info.ModTime()
 	}
+	m.changed = false
+	m.dirty = true
+	m.status = "kept yours; saving overwrites the file"
+}
+
+// named handles a key while the save as prompt is up. Enter saves to the
+// file typed, asking again if it is another file that exists, and the
+// TUI then follows the new file; esc cancels.
+func (m *Model) named(k tea.KeyMsg) tea.Cmd {
+	switch k.Type {
+	case tea.KeyEsc, tea.KeyCtrlC:
+		m.naming = false
+		m.saveAs.Blur()
+		m.refresh()
+		return nil
+	case tea.KeyEnter:
+		name := strings.TrimSpace(m.saveAs.Value())
+		if name == "" {
+			return nil
+		}
+		name = m.path(name)
+		if _, err := os.Stat(name); err == nil && name != m.opts.Run.File && name != m.overwrite {
+			m.overwrite = name
+			m.status = filepath.Base(name) + " exists; enter again overwrites it"
+			m.refresh()
+			return nil
+		}
+		m.naming = false
+		m.saveAs.Blur()
+		return m.saveTo(name)
+	}
+	m.overwrite = ""
+	var c tea.Cmd
+	m.saveAs, c = m.saveAs.Update(k)
+	return c
+}
+
+// saveTo saves to file and follows it. In another folder, blocks run
+// there, so the file is opened again with fresh shells, as mdsh-gui does.
+func (m *Model) saveTo(file string) tea.Cmd {
+	defer m.refresh()
+	if err := m.write(file); err != nil {
+		m.status = "save: " + err.Error()
+		return nil
+	}
+	moved := filepath.Dir(file) != filepath.Dir(m.opts.Run.File)
+	m.opts.Run.File = file
+	m.status = "saved as " + file
+	if moved {
+		return func() tea.Msg { return openMsg{file: file} }
+	}
+	return func() tea.Msg { return savedAsMsg{file: file} }
 }
 
 // hasOutput reports whether block i has output saved, or ran this session.
@@ -790,14 +1126,25 @@ func (m *Model) resize(w, h int) {
 	if w != m.width {
 		m.md = map[string]string{}
 	}
-	m.width = w
+	m.width, m.height = w, h
+	m.fit()
 	if !m.ready {
-		m.vp = viewport.New(w, h-footerLines)
+		m.vp = viewport.New(m.docWidth(), m.vpHeight())
 		m.ready = true
 	} else {
-		m.vp.Width, m.vp.Height = w, h-footerLines
+		m.vp.Width, m.vp.Height = m.docWidth(), m.vpHeight()
 	}
 	m.refresh()
+}
+
+// vpHeight is the height left for the document, under the banner, if
+// one shows, and over the footer.
+func (m *Model) vpHeight() int {
+	h := m.height - footerLines
+	if m.changed {
+		h--
+	}
+	return max(h, 1)
 }
 
 // View draws the document above a status line and a key help line.
@@ -805,14 +1152,26 @@ func (m *Model) View() string {
 	if !m.ready {
 		return "loading…"
 	}
-	return m.vp.View() + "\n" + m.footer()
+	view := m.vp.View()
+	if m.form != nil {
+		view = m.form.view(m.docWidth(), m.vp.Height)
+	}
+	if m.showOutline() {
+		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
+		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
+	}
+	view += "\n" + m.footer()
+	if m.changed {
+		view = bannerStyle.Width(m.width).Render("The file changed on disk.  R reload it · M keep yours") + "\n" + view
+	}
+	return view
 }
 
 func (m *Model) footer() string {
-	name := m.opts.Run.File
+	name := m.tilde(m.opts.Run.File)
 	state := ""
 	if m.dirty {
-		state = " " + dirtyStyle.Render("● not saved")
+		state = " " + dirtyStyle.Render("• not saved")
 	}
 	status := m.status
 	if m.running {
@@ -824,28 +1183,46 @@ func (m *Model) footer() string {
 		}
 		status += fmt.Sprintf("%d in background", n)
 	}
-	line1 := titleStyle.Render(name) + state
+	rest := state
 	if status != "" {
-		line1 += "  " + statusStyle.Render(status)
+		rest += "  " + statusStyle.Render(status)
 	}
+	// A long path gives way to the status: it loses its start.
+	if room := max(m.width-lipgloss.Width(rest), 12); len([]rune(name)) > room {
+		r := []rune(name)
+		name = "…" + string(r[len(r)-room+1:])
+	}
+	line1 := titleStyle.Render(name) + rest
 	var help string
 	switch {
+	case m.termBlock >= 0:
+		help = promptStyle.Render(m.name(m.d.Blocks[m.termBlock])+" runs in its card:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.typing:
 		help = m.input.View()
+	case m.naming:
+		help = m.saveAs.View()
+	case m.form != nil && m.formKind == "report":
+		help = helpStyle.Render(formHelp + "save · esc cancel")
+	case m.form != nil:
+		help = helpStyle.Render(formHelp + "apply · esc cancel")
 	case m.prompt != nil && m.prompt.of != nil:
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", m.d.Label(m.prompt.of), m.d.Label(m.prompt.block)))
 	case m.prompt != nil:
-		q := m.prompt.block.Attrs["confirm"]
-		if q == "" {
-			q = "Run this block?"
-		}
-		help = promptStyle.Render(fmt.Sprintf("%s  [r]un  s[k]ip  [o]nly blocks without saved output  [s]top", q))
+		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
 	case m.running:
 		help = helpStyle.Render("j/k move · ctrl+c stop")
 	default:
-		help = helpStyle.Render("j/k move · enter run · a run from here · s run section · i new · e edit · v view · w save · q quit")
+		help = helpStyle.Render("j/k move · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
 	}
-	return line1 + "\n" + help
+	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }
 
 const footerLines = 2
+
+// quitWord is what key, q or ctrl+w, does.
+func (m *Model) quitWord(key string) string {
+	if m.back || key == "ctrl+w" {
+		return "close"
+	}
+	return "quit"
+}

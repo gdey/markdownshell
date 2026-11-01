@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +35,7 @@ func newModel(t *testing.T, src string, opts Options) (*Model, string) {
 	opts.Run.Environ = []string{"PATH=" + os.Getenv("PATH")}
 	opts.Style = "notty"
 	if opts.Save == nil {
-		opts.Save = func(b []byte) error { return os.WriteFile(file, b, 0o644) }
+		opts.Save = func(file string, b []byte) error { return os.WriteFile(file, b, 0o644) }
 	}
 	m, err := New(d, opts)
 	if err != nil {
@@ -50,6 +52,16 @@ func press(m *Model, keys ...string) {
 		switch k {
 		case "enter":
 			msg = tea.KeyMsg{Type: tea.KeyEnter}
+		case "esc":
+			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "down":
+			msg = tea.KeyMsg{Type: tea.KeyDown}
+		case "right":
+			msg = tea.KeyMsg{Type: tea.KeyRight}
+		case "space":
+			msg = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")}
+		case "ctrl+u":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlU}
 		default:
 			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 		}
@@ -307,7 +319,7 @@ func TestImagePreview(t *testing.T) {
 		d, _ := doc.Parse([]byte(read(t, file)))
 		m, err := New(d, Options{
 			Run:      run.Options{File: file, Environ: []string{"PATH=" + os.Getenv("PATH")}},
-			Save:     func(b []byte) error { return os.WriteFile(file, b, 0o644) },
+			Save:     func(file string, b []byte) error { return os.WriteFile(file, b, 0o644) },
 			AutoSave: true, Images: true, Style: "notty",
 		})
 		if err != nil {
@@ -406,7 +418,7 @@ func TestBackgroundBlock(t *testing.T) {
 		if time.Now().After(deadline) {
 			t.Fatal("the background block never ended")
 		}
-		m.Update(reapMsg{})
+		m.Update(reapMsg{m})
 		for len(m.events) > 0 {
 			m.Update(<-m.events)
 		}
@@ -435,6 +447,9 @@ func TestDependsAsksInTUI(t *testing.T) {
 		}
 		if v := m.View(); !strings.Contains(v, "deploy depends on build") {
 			t.Errorf("%s: prompt not shown:\n%s", tc.key, v)
+		}
+		if v := m.View(); !strings.Contains(v, "deploy depends on this block") {
+			t.Errorf("%s: question not in build's card:\n%s", tc.key, v)
 		}
 		press(m, "o") // not an answer here
 		if m.prompt == nil {
@@ -465,5 +480,615 @@ func TestRunSection(t *testing.T) {
 	press(m, "g", "s")
 	if !strings.Contains(m.View(), "isn't under a heading") {
 		t.Errorf("no status for a block under no heading:\n%s", m.View())
+	}
+}
+
+func TestSaveAs(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	press(m, "enter")
+	pump(t, m)
+	other := filepath.Join(filepath.Dir(file), "copy.md")
+	press(m, "W")
+	m.saveAs.SetValue("copy.md")
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !strings.Contains(read(t, other), "for=one") {
+		t.Fatal("save as didn't write the output")
+	}
+	if strings.Contains(read(t, file), "for=one") {
+		t.Error("save as wrote the old file")
+	}
+	if m.opts.Run.File != other || m.dirty {
+		t.Errorf("after save as: file %s, dirty %v", m.opts.Run.File, m.dirty)
+	}
+	if msg, ok := cmd().(savedAsMsg); !ok || msg.file != other {
+		t.Errorf("save as in the same folder sent %#v", msg)
+	}
+
+	// Another file that exists takes enter twice.
+	press(m, "W")
+	m.saveAs.SetValue(file)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.naming || strings.Contains(read(t, file), "for=one") {
+		t.Fatal("save as overwrote a file without asking")
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.naming || !strings.Contains(read(t, file), "for=one") {
+		t.Error("enter again didn't overwrite")
+	}
+}
+
+func TestFileChangedOnDisk(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	later := time.Now().Add(time.Hour)
+	os.WriteFile(file, []byte("edited\n"), 0o644)
+	os.Chtimes(file, later, later)
+	m.Update(checkMsg{m})
+	if !m.changed || !strings.Contains(m.View(), "changed on disk") {
+		t.Fatal("no notice for a file changed on disk")
+	}
+	press(m, "M")
+	if m.changed || !m.dirty {
+		t.Fatalf("keep mine: changed %v, dirty %v", m.changed, m.dirty)
+	}
+	press(m, "w")
+	if !strings.Contains(read(t, file), "# Title") {
+		t.Error("w after keep mine didn't overwrite")
+	}
+
+	os.WriteFile(file, []byte("edited again\n"), 0o644)
+	os.Chtimes(file, later.Add(time.Hour), later.Add(time.Hour))
+	m.Update(checkMsg{m})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	if cmd == nil {
+		t.Fatal("R didn't reload")
+	}
+	if msg, ok := cmd().(openMsg); !ok || msg.file != file {
+		t.Errorf("R sent %#v", msg)
+	}
+}
+
+// newApp opens the start screen on a folder holding two runbooks.
+func newTestApp(t *testing.T) (*app, string) {
+	t.Helper()
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "a.md"), []byte("---\ndescription: |\n  The first\n  runbook.\n---\n"+twoBlocks), 0o644)
+	os.MkdirAll(filepath.Join(dir, "sub"), 0o755)
+	os.WriteFile(filepath.Join(dir, "sub", "b.md"), []byte("```sh\necho b\n```\n"), 0o644)
+	recent := filepath.Join(t.TempDir(), "tui.json")
+	a, err := newApp(Config{Dir: dir, State: recent, Open: func(file string) (*doc.Document, Options, error) {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			return nil, Options{}, err
+		}
+		d, err := doc.Parse(src)
+		return d, Options{
+			Run:   run.Options{File: file, Environ: []string{"PATH=" + os.Getenv("PATH")}},
+			Save:  func(file string, b []byte) error { return os.WriteFile(file, b, 0o644) },
+			Style: "notty",
+		}, err
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(a.close)
+	a.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	return a, dir
+}
+
+// do sends msg to a, and what its command sends back, until one is not
+// for the app itself.
+func do(a *app, msg tea.Msg) {
+	for msg != nil {
+		_, cmd := a.Update(msg)
+		msg = nil
+		if cmd != nil {
+			if next, ok := cmd().(tabMsg); ok {
+				switch next.msg.(type) {
+				case openMsg, backMsg, savedAsMsg, viewMsg, runOptsMsg, closeTabMsg, nextTabMsg, quitAllMsg:
+					msg = next
+				}
+			}
+		}
+	}
+}
+
+func TestStartScreen(t *testing.T) {
+	a, dir := newTestApp(t)
+	view := a.View()
+	for _, want := range []string{"This folder", "a.md", "2 blocks", "The first runbook.", "sub/", "b.md", "1 block"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("start screen is missing %q:\n%s", want, view)
+		}
+	}
+	for _, r := range "sub" {
+		a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if v := a.View(); strings.Contains(v, "a.md") || !strings.Contains(v, "b.md") {
+		t.Errorf("filter sub:\n%s", v)
+	}
+	a.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	for _, r := range "first" {
+		a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if v := a.View(); !strings.Contains(v, "a.md") || strings.Contains(v, "b.md") {
+		t.Errorf("filter on the description:\n%s", v)
+	}
+
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	if a.tab().doc == nil || a.tab().doc.opts.Run.File != filepath.Join(dir, "a.md") {
+		t.Fatal("enter didn't open a.md")
+	}
+	if !a.tab().doc.back {
+		t.Error("q should go back to the start screen")
+	}
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if a.tab().doc != nil {
+		t.Fatal("q didn't go back to the start screen")
+	}
+	v := a.View()
+	if i, j := strings.Index(v, "Recent"), strings.Index(v, "This folder"); i < 0 || j < i {
+		t.Errorf("a.md isn't listed as recent first:\n%s", v)
+	}
+	if got := loadState(a.c.State).Recent; len(got) != 1 || got[0] != filepath.Join(dir, "a.md") {
+		t.Errorf("recent files kept: %v", got)
+	}
+}
+
+func TestSaveAsAnotherFolderReopens(t *testing.T) {
+	a, dir := newTestApp(t)
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	m := a.tab().doc
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pump(t, m)
+	press(m, "W")
+	m.saveAs.SetValue(filepath.Join(dir, "sub", "c.md"))
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	if a.tab().doc == m || a.tab().doc.opts.Run.File != filepath.Join(dir, "sub", "c.md") {
+		t.Fatal("save as into another folder didn't open the new file")
+	}
+	if !strings.Contains(a.View(), "hi") {
+		t.Error("the new file doesn't show the output saved")
+	}
+}
+
+func TestOutline(t *testing.T) {
+	src := "---\ntitle: x\n# not a heading\n---\n# Ops\n\n## Disk ##\n\n```sh {#disk}\n# a comment, not a heading\necho freed\n```\n\n```text\n# nor this\n```\n\n#not-a-heading\n\n## Other\n\n```sh {#two}\nexit 3\n```\n"
+	m, _ := newModel(t, src, Options{})
+	var got []string
+	for _, e := range m.entries() {
+		if e.level > 0 {
+			got = append(got, fmt.Sprintf("h%d %s", e.level, e.text))
+		} else {
+			got = append(got, "#"+m.d.Blocks[e.block].ID)
+		}
+	}
+	if want := "h1 Ops|h2 Disk|#disk|h2 Other|#two"; strings.Join(got, "|") != want {
+		t.Errorf("outline entries:\n got %s\nwant %s", strings.Join(got, "|"), want)
+	}
+
+	press(m, "j", "enter")
+	pump(t, m)
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	v := m.View()
+	if !strings.Contains(v, "✗ #two") || !strings.Contains(v, "│") {
+		t.Errorf("outline doesn't show #two failed:\n%s", v)
+	}
+	if msg, ok := cmd().(viewMsg); !ok || !msg.Outline {
+		t.Errorf("o sent %#v", msg)
+	}
+}
+
+func TestHideCodeAndOutput(t *testing.T) {
+	m, _ := newModel(t, twoBlocks, Options{})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	if !strings.Contains(v, "X=hi; echo $X") || !strings.Contains(v, "\n    hi") {
+		t.Fatalf("code or output missing:\n%s", v)
+	}
+	press(m, "C")
+	if v := m.View(); strings.Contains(v, "X=hi; echo $X") || !strings.Contains(v, "#one") {
+		t.Errorf("C didn't hide the code but keep the block:\n%s", v)
+	}
+	press(m, "C", "O")
+	if v := m.View(); !strings.Contains(v, "X=hi; echo $X") || strings.Contains(v, "\n    hi") {
+		t.Errorf("O didn't hide the output:\n%s", v)
+	}
+}
+
+func TestConfirmInCard(t *testing.T) {
+	src := "```sh {#disk confirm=\"Free up disk space?\"}\necho freed\n```\n\nAfter.\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	q, code, after := strings.Index(v, "Free up disk space?"), strings.Index(v, "echo freed"), strings.Index(v, "After.")
+	if q < 0 || !(code < q && q < after) {
+		t.Errorf("the question isn't under the block's code:\n%s", v)
+	}
+	press(m, "r")
+	pump(t, m)
+}
+
+func TestViewKept(t *testing.T) {
+	a, _ := newTestApp(t)
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("C")})
+	if !loadState(a.c.State).View.HideCode {
+		t.Fatal("the view wasn't kept")
+	}
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	if !a.tab().doc.shown.HideCode {
+		t.Error("the next file didn't open in the view kept")
+	}
+}
+
+func TestStatusBeatsLongPath(t *testing.T) {
+	m, _ := newModel(t, twoBlocks, Options{})
+	m.opts.Run.File = "/" + strings.Repeat("very-long-folder/", 8) + "doc.md"
+	m.status = "the status"
+	line := strings.SplitN(m.footer(), "\n", 2)[0]
+	if !strings.Contains(line, "the status") || !strings.Contains(line, "/doc.md") {
+		t.Errorf("status line: %q", line)
+	}
+}
+
+func TestOutlineNamesUnnamedBlocksByLine(t *testing.T) {
+	m, _ := newModel(t, "# T\n\n```sh\necho hi\n```\n", Options{View: View{Outline: true}})
+	if v := m.View(); !strings.Contains(v, "block at line 3") {
+		t.Errorf("outline:\n%s", v)
+	}
+}
+
+func TestEditFile(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	press(m, "enter")
+	pump(t, m)
+	press(m, "j")
+	text, line := m.fileText()
+	if !strings.Contains(text, "{for=one exit=0}\nhi\n") {
+		t.Fatalf("the editor doesn't get the output not saved:\n%s", text)
+	}
+	if got := strings.Split(text, "\n")[line-1]; got != "```sh {#two}" {
+		t.Errorf("line %d is %q, want #two's fence", line, got)
+	}
+	if !takesLine("/usr/bin/vim") || takesLine("code") {
+		t.Error("takesLine")
+	}
+
+	// A new block before both, #one moved, #two edited: #one keeps its
+	// output, and the cursor stays on #two.
+	edited := strings.Replace(text, "# Title\n", "# Title\n\n```sh {#zero}\necho zero\n```\n", 1)
+	edited = strings.Replace(edited, "echo \"$X again\"", "echo \"$X once more\"", 1)
+	f := filepath.Join(t.TempDir(), "file.md")
+	os.WriteFile(f, []byte(edited), 0o644)
+	m.Update(editedMsg{block: -1, file: f, text: text})
+	if len(m.d.Blocks) != 3 || len(m.results) != 3 {
+		t.Fatalf("blocks %d, results %d", len(m.d.Blocks), len(m.results))
+	}
+	if !m.results[1].Ran || m.results[0].Ran || m.results[2].Ran {
+		t.Errorf("results kept: zero %v, one %v, two %v", m.results[0].Ran, m.results[1].Ran, m.results[2].Ran)
+	}
+	if m.cur() != 2 || !m.dirty {
+		t.Errorf("cursor on %d, dirty %v", m.cur(), m.dirty)
+	}
+	if strings.Contains(read(t, file), "zero") {
+		t.Error("saved without w")
+	}
+	press(m, "w")
+	if got := read(t, file); !strings.Contains(got, "echo zero") || !strings.Contains(got, "{for=one exit=0}\nhi\n") {
+		t.Errorf("saved file:\n%s", got)
+	}
+}
+
+func TestReportForm(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	dir := filepath.Dir(file)
+	press(m, "enter")
+	pump(t, m)
+	press(m, "p")
+	v := m.View()
+	for _, want := range []string{"Create report", "this run (1 of 2 ran)", "mdsh -n --pdf doc.pdf doc.md"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("report form is missing %q:\n%s", want, v)
+		}
+	}
+	// Markdown, without the code, of this run: the output not saved yet
+	// is in it.
+	press(m, "right", "right", "down", "space")
+	if v := m.View(); !strings.Contains(v, "mdsh -n --hide-code -o doc-report.md doc.md") {
+		t.Errorf("the command doesn't follow the form:\n%s", v)
+	}
+	press(m, "enter")
+	if m.form != nil {
+		t.Fatalf("the form is still up: %s", m.form.status)
+	}
+	got := read(t, filepath.Join(dir, "doc-report.md"))
+	if !strings.Contains(got, "hi") || strings.Contains(got, "X=hi; echo $X") {
+		t.Errorf("doc-report.md:\n%s", got)
+	}
+	if !strings.Contains(m.status, "report saved to") {
+		t.Errorf("status = %q", m.status)
+	}
+
+	// Again, of the saved file, which has no output yet: it asks before
+	// overwriting.
+	press(m, "p", "right", "right", "down", "down", "down", "right", "right", "enter")
+	if m.form == nil || !strings.Contains(m.form.status, "exists") {
+		t.Fatalf("it didn't ask before overwriting")
+	}
+	press(m, "enter")
+	if got := read(t, filepath.Join(dir, "doc-report.md")); strings.Contains(got, "\nhi") || !strings.Contains(got, "X=hi; echo $X") {
+		t.Errorf("report of the saved file:\n%s", got)
+	}
+
+	// esc closes the form and writes nothing.
+	press(m, "p", "esc")
+	if m.form != nil {
+		t.Error("esc didn't close the form")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "doc.pdf")); err == nil {
+		t.Error("esc wrote a report")
+	}
+}
+
+func TestReportRunAllFirst(t *testing.T) {
+	m, file := newModel(t, twoBlocks, Options{})
+	press(m, "p", "right", "down", "down", "down", "right")
+	if v := m.View(); !strings.Contains(v, "mdsh --html doc.html doc.md") {
+		t.Errorf("the command isn't a run:\n%s", v)
+	}
+	press(m, "enter")
+	if !m.running {
+		t.Fatal("run all first didn't run")
+	}
+	pump(t, m)
+	got := read(t, strings.TrimSuffix(file, ".md")+".html")
+	if !strings.Contains(got, "hi again") {
+		t.Errorf("doc.html doesn't have the run's output:\n%s", got)
+	}
+}
+
+func TestRunOptionsForm(t *testing.T) {
+	src := "```sh {#args}\necho \"$1-$2\"\n```\n\n```sh {#other}\necho other\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, ",")
+	if v := m.View(); !strings.Contains(v, "Run options") || !strings.Contains(v, "Stop on error") {
+		t.Fatalf("run options form:\n%s", v)
+	}
+	press(m, "a 'b c", "enter")
+	if m.form == nil || !strings.Contains(m.form.status, "unclosed quote") {
+		t.Fatal("a bad argument list was taken")
+	}
+	press(m, "'", "down", "nope", "enter")
+	if m.form == nil || !strings.Contains(m.form.status, "no block has the id nope") {
+		t.Fatal("an unknown --only was taken")
+	}
+	press(m, "ctrl+u", "enter")
+	if m.form != nil {
+		t.Fatalf("the form is still up: %s", m.form.status)
+	}
+	if got := m.opts.Run.Args; len(got) != 2 || got[1] != "b c" {
+		t.Fatalf("args = %q", got)
+	}
+	press(m, "enter")
+	pump(t, m)
+	if v := m.View(); !strings.Contains(v, "a-b c") {
+		t.Errorf("the block didn't get the arguments:\n%s", v)
+	}
+
+	// Step mode asks before every block.
+	press(m, ",", "down", "down", "space", "enter", "a")
+	pump(t, m)
+	if m.prompt == nil {
+		t.Fatal("step mode didn't ask")
+	}
+	press(m, "s")
+	pump(t, m)
+}
+
+func TestRunOptionsKept(t *testing.T) {
+	a, _ := newTestApp(t)
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	for _, k := range []string{",", "x", "y"} {
+		do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
+	}
+	do(a, tea.KeyMsg{Type: tea.KeyEnter})
+	do(a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	if got := a.tab().doc.opts.Run.Args; len(got) != 1 || got[0] != "xy" {
+		t.Errorf("args after reload = %q", got)
+	}
+}
+
+// until feeds run events to m until ok holds.
+func until(t *testing.T, m *Model, what string, ok func() bool) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for !ok() {
+		select {
+		case msg := <-m.events:
+			m.Update(msg)
+		case <-m.pane.drawn:
+			m.Update(paneMsg{m})
+		case <-time.After(20 * time.Millisecond):
+		case <-deadline:
+			t.Fatalf("timed out waiting for %s:\n%s", what, m.View())
+		}
+	}
+}
+
+func TestTTYInCard(t *testing.T) {
+	src := "```sh {#ask tty}\nprintf '\\033[1mname?\\033[0m '; read n; echo \"hi $n\"\n```\n\nAfter.\n"
+	m, file := newModel(t, src, Options{})
+	press(m, "enter")
+	until(t, m, "the question", func() bool { return strings.Contains(m.pane.screen(), "name?") })
+	v := m.View()
+	q, after := strings.Index(v, "name?"), strings.Index(v, "After.")
+	if q < 0 || (after >= 0 && after < q) {
+		t.Errorf("the terminal isn't in the block's card:\n%s", v)
+	}
+	if !strings.Contains(v, "keys go to it") {
+		t.Errorf("the footer doesn't say keys go to the block:\n%s", v)
+	}
+	// Keys, q included, go to the block.
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("qbob")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pump(t, m)
+	if m.termBlock != -1 {
+		t.Error("the terminal is still shown after the block ended")
+	}
+	if r := m.results[0]; !r.Ran || r.Status != 0 {
+		t.Fatalf("result: %+v", r)
+	}
+	img := m.results[0].Image
+	cast := read(t, filepath.Join(filepath.Dir(file), strings.TrimSuffix(img, ".gif")+".cast"))
+	if !strings.Contains(cast, "hi qbob") {
+		t.Errorf("the recording doesn't have the answer:\n%s", cast)
+	}
+}
+
+func TestTTYStop(t *testing.T) {
+	src := "```sh {#wait tty}\necho waiting; sleep 30\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	until(t, m, "the block", func() bool { return strings.Contains(m.pane.screen(), "waiting") })
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlCloseBracket})
+	pump(t, m)
+	if m.status != "stopped" {
+		t.Errorf("status = %q", m.status)
+	}
+}
+
+func TestKeyBytes(t *testing.T) {
+	for _, c := range []struct {
+		k    tea.KeyMsg
+		want string
+	}{
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("é")}, "é"},
+		{tea.KeyMsg{Type: tea.KeyEnter}, "\r"},
+		{tea.KeyMsg{Type: tea.KeyCtrlC}, "\x03"},
+		{tea.KeyMsg{Type: tea.KeyBackspace}, "\x7f"},
+		{tea.KeyMsg{Type: tea.KeyUp}, "\x1b[A"},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b"), Alt: true}, "\x1bb"},
+		{tea.KeyMsg{Type: tea.KeyF2}, "\x1bOQ"},
+	} {
+		if got := string(keyBytes(c.k)); got != c.want {
+			t.Errorf("%v: %q, want %q", c.k, got, c.want)
+		}
+	}
+}
+
+// typeKeys sends each key to a, as do does.
+func typeKeys(a *app, ks ...string) {
+	for _, k := range ks {
+		var msg tea.KeyMsg
+		switch k {
+		case "enter":
+			msg = tea.KeyMsg{Type: tea.KeyEnter}
+		case "esc":
+			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "ctrl+t":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlT}
+		case "ctrl+w":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlW}
+		case "ctrl+c":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlC}
+		default:
+			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+		}
+		do(a, msg)
+	}
+}
+
+func TestTabs(t *testing.T) {
+	a, dir := newTestApp(t)
+	typeKeys(a, "enter")
+	first := a.tab()
+	if strings.Contains(a.View(), "Start") {
+		t.Error("a tab bar shows with one tab")
+	}
+	typeKeys(a, "ctrl+t")
+	if len(a.tabs) != 2 || a.at != 1 || a.tab().start == nil {
+		t.Fatal("ctrl+t didn't open the start screen in a new tab")
+	}
+	if v := a.View(); !strings.HasPrefix(v, a.bar()) || !strings.Contains(a.bar(), "a.md") || !strings.Contains(a.bar(), "Start") {
+		t.Errorf("tab bar:\n%s", v)
+	}
+	typeKeys(a, "sub/b", "enter")
+	second := a.tab()
+	if second.doc == nil || second.doc.opts.Run.File != filepath.Join(dir, "sub", "b.md") {
+		t.Fatal("the new tab didn't open b.md")
+	}
+	if first.doc.opts.Run.File != filepath.Join(dir, "a.md") {
+		t.Fatal("opening b.md changed the first tab")
+	}
+	typeKeys(a, "[")
+	if a.at != 0 {
+		t.Fatal("[ didn't go to the tab before")
+	}
+	typeKeys(a, "]")
+	if a.at != 1 {
+		t.Fatal("] didn't go to the next tab")
+	}
+
+	// A run in a tab behind goes on, and its output reaches that tab.
+	m := first.doc
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	for done := false; !done; {
+		select {
+		case msg := <-m.events:
+			_, done = msg.(runDoneMsg)
+			a.Update(tabMsg{first, msg})
+		case <-time.After(10 * time.Second):
+			t.Fatal("timed out waiting for the run")
+		}
+	}
+	if !m.results[0].Ran || second.doc.results[0].Ran {
+		t.Fatal("the run's output went to the wrong tab")
+	}
+	if !strings.Contains(a.bar(), "a.md •") {
+		t.Errorf("the tab bar doesn't mark output not saved: %s", a.bar())
+	}
+
+	// A file open in another tab is shown there.
+	typeKeys(a, "ctrl+t", "a.md", "enter")
+	if a.tab() != first || len(a.tabs) != 3 {
+		t.Fatalf("opening a.md again didn't go to its tab: at %d of %d", a.at, len(a.tabs))
+	}
+
+	// ctrl+w closes a tab; esc on the start screen closes its tab.
+	typeKeys(a, "]", "ctrl+w")
+	if len(a.tabs) != 2 || slices.Contains(a.tabs, second) {
+		t.Fatal("ctrl+w didn't close b.md's tab")
+	}
+	// The start screen still has "a.md" typed: esc clears it first.
+	typeKeys(a, "]", "esc", "esc")
+	if len(a.tabs) != 1 || a.tab() != first {
+		t.Fatal("esc didn't close the start screen's tab")
+	}
+
+	// Quitting from another tab stops first at output not saved.
+	typeKeys(a, "ctrl+t")
+	a.Update(tabMsg{a.tab(), quitAllMsg{}})
+	if a.tab() != first || !a.quitArmed || !strings.Contains(first.doc.status, "not saved") {
+		t.Fatalf("quit didn't stop at output not saved: %q", first.doc.status)
+	}
+	if _, cmd := a.Update(tabMsg{first, quitAllMsg{}}); cmd == nil {
+		t.Error("quitting again didn't quit")
+	}
+}
+
+func TestWrapKeepsTeaMessages(t *testing.T) {
+	a, _ := newTestApp(t)
+	tb := a.tab()
+	if got := a.wrap(tb, func() tea.Msg { return runDoneMsg{} })(); got.(tabMsg).t != tb {
+		t.Errorf("a tab's message isn't marked: %#v", got)
+	}
+	if got := a.wrap(tb, tea.Quit)(); got.(tabMsg).msg != (quitAllMsg{}) {
+		t.Errorf("quit isn't checked by the app: %#v", got)
+	}
+	if _, ok := a.wrap(tb, tea.ClearScreen)().(tabMsg); ok {
+		t.Error("a Bubble Tea message was marked")
 	}
 }

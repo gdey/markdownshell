@@ -187,6 +187,7 @@ mdsh --yes notes.md        # run confirm blocks without asking
 mdsh --step notes.md       # ask before every block: run, skip or stop
 mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
+mdsh -i ~/notes            # pick a file under ~/notes first (mdsh -i alone: this folder)
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -205,7 +206,17 @@ Printed markdown is styled when stdout is a terminal; `--color=never`,
 
 `mdsh -i notes.md` opens the document full screen, with its prose styled
 and each block in a box. Pick a block and run it; its output streams in
-under it and is saved to the file as soon as it finishes. Blocks keep
+under it. A • in the status line marks output that isn't saved; `w`
+saves it, and `--autosave` saves after every block that runs.
+
+Without a file, or with a folder, `mdsh -i` starts on a list of the
+markdown files under the folder, as `mdsh-gui` does: the files opened
+recently first, then the rest grouped by folder, each with its block
+count, when it changed and the `description` (else `summary`, else
+`abstract`) from its front matter. Typing filters the list by path and
+description, and enter opens the file picked; `q` goes back to the list.
+Recent files, and the view the last file was left in, are kept in
+`mdsh/tui.json` in the user's config folder. Blocks keep
 their envs between runs, the same as in one `mdsh` run, so running a
 block again runs it in the env as the earlier runs left it, and replaces
 its output.
@@ -220,18 +231,30 @@ its output.
 | `s` | run the section the block is in, its subsections included, as `a` would: from the heading above it to the next heading of the same or a higher level |
 | `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
 | `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
+| `E` | edit the whole file in `$VISUAL`, `$EDITOR` or `vi`, at the block under the cursor, with output not saved yet in it. Blocks whose code didn't change keep their output, as in `mdsh-gui`'s source view; save with `w` |
 | `v` | show the block's image or recording full screen; enter goes back |
-| `w` | save now |
+| `o` | show or hide the outline: the headings and blocks down the left, with each block's state (✓ ran, ✗ failed, ? waiting for an answer, … running) |
+| `C` / `O` | hide or show the code / the output of blocks |
+| `p` | create a report, as `mdsh-gui`'s Create Report: PDF, HTML or markdown, with or without code and output, of this run, of a run of every block, or of the file as saved. It shows the `mdsh` command that makes the same report |
+| `,` | run options for this file: the arguments `$1` and on, `--only`, `--step` and `--stop-on-error`. Setting them starts new shells, and the file keeps them when opened again |
+| `w` or ctrl+s | save now |
+| `W` | save as: type a path (relative to the file's folder); mdsh follows the new file. In another folder it opens it again, with fresh shells |
+| `R` | reload the file from disk, dropping output not saved |
+| `M` | when the file changed on disk, keep what is shown; the next save overwrites the file |
 | ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
-| `q` | quit |
+| `q` | go back to the list of files, or close the tab; the last tab quits |
+| ctrl+t | open a new tab with the list of files; picking a file already open in a tab goes to that tab |
+| `]` / `[` | the next or previous tab. The tab bar marks a file with • when its output isn't saved, … while a block runs and ? while one waits for an answer. Blocks go on running in the tabs behind |
+| ctrl+w | close the tab (esc on the list of files closes its tab). Quitting stops at a tab with output not saved first |
 
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
-under `--step` or `step: true` when running with `a`, ask in the footer
-with the same choices as on the command line. `--yes`, `--stop-on-error`
-and block arguments work as usual. A `tty` block gets the whole terminal
-while it runs, and the TUI comes back when you press enter after it ends;
-a taped block's run is shown the same way. Images and recordings
+under `--step` or `step: true` when running with `a`, ask in the
+block's card, under its code, with the same choices as on the command line. `--yes`, `--stop-on-error`
+and block arguments work as usual. A `tty` block runs in a terminal drawn
+in its card, as in `mdsh-gui`: up to 24 rows, as wide as the card. While
+it runs every key goes to it, ctrl+c included, and ctrl+] stops it. A
+taped block's run is shown the same way. Images and recordings
 show under their block as a preview in colored half blocks (any terminal
 with 24-bit color; off with `NO_COLOR`). `v` shows one full size, through
 the kitty, iTerm2 or sixel protocol when mdsh recognizes the terminal
@@ -239,7 +262,8 @@ the kitty, iTerm2 or sixel protocol when mdsh recognizes the terminal
 `TERM`), and in half blocks otherwise. SVG images show only as a link. Include blocks show the file's lines,
 numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
-is open, mdsh won't save over it until you press `w` twice.
+is open, a banner offers to reload it (`R`) or keep yours (`M`), and mdsh
+won't save over it until you pick one or press `w` twice.
 
 ## PDF output
 

@@ -152,6 +152,38 @@ follow [Semantic Versioning](https://semver.org/).
   the start screen: it offers the markdown files in the new
   **Templates folder** setting to start from, or a blank file with a
   heading named for it, then asks where to save it and opens it.
+- `mdsh -i` with no file, or with a folder, starts on a list of the
+  markdown files under it, as `mdsh-gui` does: recent files first, the
+  rest grouped by folder, with block counts and front matter
+  descriptions, filtered as you type. `q` in a file goes back to it.
+  The `library` package that finds them moved out of `mdsh-gui` into
+  the root module, so both use it.
+- `mdsh -i`: `W` saves as another file and follows it, ctrl+s saves,
+  and a banner says when the file changed on disk, with `R` to reload
+  it and `M` to keep yours.
+- `mdsh -i`: an outline of the headings and blocks, with each block's
+  state, beside the document (`o`), and `C` and `O` to hide the code and
+  the output of blocks, as in `mdsh-gui`'s View menu. The view is kept
+  for the next file.
+- `mdsh -i`: `E` edits the whole file in `$EDITOR`, at the block under
+  the cursor, as it would be saved. Blocks whose code didn't change keep
+  their output, wherever they moved, as in `mdsh-gui`'s source view.
+- `mdsh -i`: `p` creates a report (PDF, HTML or markdown, with or
+  without code and output, of this run, a run of every block or the
+  saved file) and shows the matching `mdsh` command, as `mdsh-gui`'s
+  Create Report does. `,` sets the file's run options: arguments,
+  `--only`, `--step` and `--stop-on-error`. The command line both show
+  now comes from `report.Command`, and `SplitArgs` and `JoinArgs` moved
+  from `mdsh-gui` into `run`.
+- `mdsh -i`: a `tty` block runs in a terminal drawn in its card, as in
+  `mdsh-gui`, instead of taking over the screen: up to 24 rows, as wide
+  as the card, and following it when the window resizes. Keys go to the
+  block while it runs, and ctrl+] stops it.
+- `mdsh -i` has tabs, as `mdsh-gui` does: ctrl+t opens one on the list
+  of files, `]` and `[` move between them, and ctrl+w closes one. Each
+  tab has its own shells, and runs go on in the tabs behind. The tab bar
+  marks output not saved, running blocks and questions waiting, and
+  quitting stops at a tab with output not saved first.
 
 ### Changed
 
@@ -159,6 +191,11 @@ follow [Semantic Versioning](https://semver.org/).
   run icon for a block, and, in purple, a textbox or choice icon for a
   control. A block's name shows its underscores as spaces, so `make_db`
   reads as "make db"; its tooltip keeps the name as written.
+- `mdsh -i` saves when asked (`w`), as `mdsh-gui` does, and marks
+  output not saved with a •. `--autosave` saves after every block that
+  runs, as before.
+- `mdsh -i` asks a confirm question in the block's card, under its
+  code, rather than in the footer.
 - `mdsh-gui` New Window moves to cmd/ctrl+shift+N, for New File.
 - Folding in `mdsh-gui`: a block's code and its output each fold to one
   line, and a heading folds its section. `collapse[=COND]`,

@@ -11,11 +11,11 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/library"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/zshrc"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
 )
@@ -59,7 +59,7 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	t.mu.Unlock()
 	ro := n.RunOptions()
 	cols, rows := n.TerminalSize()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: notebook.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -300,7 +300,7 @@ func (a *App) SetRunOptions(ctx context.Context, args, only string, step, stopOn
 	if err != nil {
 		return err
 	}
-	list, err := notebook.SplitArgs(args)
+	list, err := run.SplitArgs(args)
 	if err != nil {
 		return fmt.Errorf("arguments: %w", err)
 	}
