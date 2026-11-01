@@ -20,6 +20,9 @@ let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
 let selected = -1; // index into the block cards, for j/k
+// selectedSection is the selected heading's dataset.fold, or "". A
+// heading and a block aren't selected both at once.
+let selectedSection = "";
 let settings: Settings;
 let attrs: AttrSpec[] = [];
 let known: Names = { ids: [], envs: [], assets: [], files: [], assetsDir: "" }; // for completion in the source pane
@@ -125,6 +128,7 @@ function drawDoc() {
   applyFolds();
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
+  markSection();
   drawOutline();
   sizeTerminal();
   restore();
@@ -204,12 +208,23 @@ function drawProse(c: Cell): HTMLElement {
   highlightProse(s);
   s.onclick = (e) => {
     if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
+    if (c.heading) selectSection(s);
     void showInSource(s, c.line, true);
   };
   enableTasks(s, c.tasks);
   if (c.heading) {
     s.classList.add("heading-cell");
     s.dataset.level = String(c.heading);
+    if (c.sectionTo) {
+      s.dataset.sectionFrom = String(c.sectionFrom ?? 0);
+      s.dataset.sectionTo = String(c.sectionTo);
+      const play = iconButton("play", "Run this section (s)", () => void runSection(s));
+      play.classList.add("run-section");
+      play.disabled = running;
+      // Next to the heading's text, which names it in the outline and
+      // its fold, and a button's svg adds none.
+      (s.querySelector("h1, h2, h3, h4, h5, h6") ?? s).append(play);
+    }
     s.dataset.foldDefault = c.collapsed ? "1" : "";
     const note = el("button", { className: "fold-note", title: "Unfold this section" });
     note.onclick = (e) => {
@@ -682,10 +697,71 @@ function select(i: number, scroll = true) {
   const all = blocks();
   for (const b of all) b.classList.remove("selected");
   selected = i;
+  if (i >= 0 && selectedSection) {
+    selectedSection = "";
+    markSection();
+  }
   markOutline();
   if (i < 0 || i >= all.length) return;
   all[i].classList.add("selected");
   if (scroll) all[i].scrollIntoView({ block: "nearest" });
+}
+
+// selectSection selects the heading cell, so its play button shows in
+// the outline and s and Run Section run its section.
+function selectSection(cell: HTMLElement) {
+  if (!cell.dataset.fold) return;
+  select(-1, false);
+  selectedSection = cell.dataset.fold;
+  markSection();
+}
+
+// markSection marks the selected heading in the view and the outline.
+function markSection() {
+  for (const e of document.querySelectorAll<HTMLElement>("#doc > .heading-cell")) {
+    e.classList.toggle("selected", !!selectedSection && e.dataset.fold === selectedSection);
+  }
+  markOutline();
+}
+
+// sectionCell is the heading whose section runs for Run Section and s:
+// the selected heading, or else the innermost section holding line, by
+// default the selected block's.
+function sectionCell(line?: number): HTMLElement | null {
+  const headings = [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")];
+  if (line === undefined) {
+    const h = selectedSection ? headings.find((e) => e.dataset.fold === selectedSection) : undefined;
+    if (h) return h;
+    const b = blocks()[selected];
+    if (!b) return null;
+    line = Number(b.dataset.line);
+  }
+  let found: HTMLElement | null = null;
+  for (const e of headings) {
+    if (Number(e.dataset.line) > line) break;
+    found = e;
+  }
+  return found;
+}
+
+// runSection runs the blocks of cell's section and its subsections, as
+// Run all runs them: confirm, run=once, depends= and on_error apply.
+async function runSection(cell: HTMLElement | null) {
+  if (running || !doc.file) return;
+  if (!cell) {
+    status("no section selected");
+    return;
+  }
+  if (!cell.dataset.sectionTo) {
+    status("no block in this section runs");
+    return;
+  }
+  // What was typed is applied first, which can draw the cells anew.
+  const key = cell.dataset.fold;
+  await applySource();
+  const now = [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")].find((e) => e.dataset.fold === key);
+  if (!now?.dataset.sectionTo) return;
+  await run(() => App.RunSection(Number(now.dataset.sectionFrom), Number(now.dataset.sectionTo)));
 }
 
 function runAllButton() {
@@ -699,16 +775,20 @@ function busy(on: boolean) {
   running = on;
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   runAllButton();
-  for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run")) x.disabled = on;
+  for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run, .heading-cell .run-section")) x.disabled = on;
 }
 
-async function start(method: "RunBlock" | "RunFrom", block: number) {
+function start(method: "RunBlock" | "RunFrom", block: number) {
+  return run(() => App[method](block));
+}
+
+async function run(call: () => Promise<void>) {
   if (running) return;
   busy(true);
   ranHere = true;
   status("running");
   try {
-    await App[method](block);
+    await call();
     status("");
   } catch (err) {
     fail(err);
@@ -903,10 +983,12 @@ async function loadSourceNow() {
   }
 }
 
-// markRunLines puts a run button on each runnable block's first line.
+// markRunLines puts a run button on each runnable block's first line,
+// and on each heading whose section has one.
 function markRunLines() {
   const lines = cells.filter((c) => c.block >= 0).map((c) => c.line);
-  source?.view.dispatch({ effects: setRunLines.of(lines) });
+  const sections = cells.filter((c) => c.heading && c.sectionTo).map((c) => c.line);
+  source?.view.dispatch({ effects: setRunLines.of({ blocks: lines, sections }) });
 }
 
 // runLine runs the block whose fence opens on line of the source pane,
@@ -915,7 +997,19 @@ async function runLine(line: number) {
   if (running) return;
   await applySource();
   const c = cells.find((c) => c.block >= 0 && c.line === line);
-  if (c) await start("RunBlock", c.block);
+  if (c) return start("RunBlock", c.block);
+  if (cells.some((c) => c.heading && c.line === line)) await runSection(sectionCell(line));
+}
+
+// runCurrentSection runs the section the source pane's cursor is in, or
+// without the source pane the selected heading's or block's.
+async function runCurrentSection() {
+  if (running || !doc.file) return;
+  if (!source) return runSection(sectionCell());
+  await applySource();
+  if (!source) return;
+  const cm = source.view.state;
+  await runSection(sectionCell(cm.doc.lineAt(cm.selection.main.head).number));
 }
 
 // runCurrent runs the block the source pane's cursor is in: on its
@@ -972,6 +1066,7 @@ function markCurrent(line: number) {
   const cell = cellAt(line);
   cell?.classList.add("current");
   if (cell?.classList.contains("block")) select(blocks().indexOf(cell), false);
+  else if (cell?.classList.contains("heading-cell") && Number(cell.dataset.line) === line) selectSection(cell);
 }
 
 // syncScroll scrolls one side of the split view to match the other.
@@ -1055,17 +1150,29 @@ function drawOutline() {
           foldSection(e);
         };
       }
-      items.push(item);
+      if (!e.dataset.sectionTo) {
+        items.push(item);
+        continue;
+      }
+      const play = iconButton("play", "Run this section (s)", () => void runSection(e));
+      play.classList.add("run");
+      play.disabled = running;
+      const row = el("div", { className: "row" }, item, play);
+      row.dataset.section = e.dataset.fold ?? "";
+      items.push(row);
     }
   }
   nav.replaceChildren(...(items.length ? items : [el("p", { className: "muted" }, "No headings or blocks")]));
   markOutline();
 }
 
-// markOutline shows the play button on the selected block's entry.
+// markOutline shows the play button on the selected block's or
+// heading's entry.
 function markOutline() {
   const b = blocks()[selected]?.dataset.block;
-  for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) row.classList.toggle("active", row.dataset.block === b);
+  for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) {
+    row.classList.toggle("active", row.dataset.section !== undefined ? !!selectedSection && row.dataset.section === selectedSection : row.dataset.block === b);
+  }
 }
 
 // blockMark is the mark for a block card's state: ? waiting for an
@@ -1100,6 +1207,8 @@ function jumpTo(target: HTMLElement) {
   target.scrollIntoView({ block: "start", behavior: "smooth" });
   const i = blocks().indexOf(target);
   if (i >= 0) select(i, false);
+  const heading = target.closest<HTMLElement>("#doc > .heading-cell");
+  if (heading) selectSection(heading);
   const cell = target.closest<HTMLElement>("[data-line]");
   if (source && cell) {
     const cm = source.view;
@@ -1218,6 +1327,7 @@ const actions: Record<string, () => Promise<void> | void> = {
     await refresh();
   },
   runcurrent: () => runCurrent(),
+  runsection: () => runCurrentSection(),
   report: () => (doc.file && !running ? openReport() : undefined),
   stop: () => App.Stop(),
   runoptions: () => openRunOptions(),
@@ -1742,7 +1852,7 @@ $("keep").onclick = () => {
 
 // Keys follow mdsh -i where they don't clash with the OS: j/k move
 // between blocks, enter runs the selected one, a runs from it and e edits
-// it.
+// it. s runs the selected heading's section, or the selected block's.
 document.addEventListener("keydown", (e) => {
   if (!doc.file || e.metaKey || e.ctrlKey || e.altKey) return;
   const target = e.target as HTMLElement | null;
@@ -1758,9 +1868,13 @@ document.addEventListener("keydown", (e) => {
       break;
     case "Enter":
       if (selected >= 0) void start("RunBlock", current());
+      else if (selectedSection) void runSection(sectionCell());
       break;
     case "a":
       if (selected >= 0) void start("RunFrom", current());
+      break;
+    case "s":
+      void runSection(sectionCell());
       break;
     case "e":
       if (selected >= 0) {

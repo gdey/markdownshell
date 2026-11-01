@@ -91,6 +91,14 @@ export interface Cell {
     "heading"?: number;
 
     /**
+     * SectionFrom and SectionTo are the blocks a heading's section
+     * holds, its subsections' included: Blocks[SectionFrom:SectionTo],
+     * for RunRange. They are both 0 when no block in it runs.
+     */
+    "sectionFrom"?: number;
+    "sectionTo"?: number;
+
+    /**
      * Collapsed is true when the view should open with a block's code, or
      * a heading's section, folded: collapse= holds, or an mdsh:collapse
      * line in the section does. CollapsedOutput is collapse-output='s.

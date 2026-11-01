@@ -162,6 +162,9 @@ func (a *App) buildMenu() *application.Menu {
 
 	run := m.AddSubmenu("Run")
 	run.Add("Run Current Block").SetAccelerator("CmdOrCtrl+Enter").OnClick(send("runcurrent"))
+	// The section is the selected heading's, or the one the selected
+	// block or the source pane's cursor is in; see runCurrentSection.
+	run.Add("Run Section").SetAccelerator("CmdOrCtrl+Shift+Enter").OnClick(send("runsection"))
 	run.Add("Run All").SetAccelerator("CmdOrCtrl+R").OnClick(send("runall"))
 	run.Add("Stop").SetAccelerator("CmdOrCtrl+.").OnClick(send("stop"))
 	run.Add("Clear All Outputs").OnClick(send("clearoutputs"))

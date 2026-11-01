@@ -1,6 +1,8 @@
 package notebook
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -166,5 +168,37 @@ func TestCollapsed(t *testing.T) {
 		if c.Heading == 2 && strings.Contains(c.HTML, ">C<") && !c.Collapsed {
 			t.Errorf("## C isn't collapsed after picking yes")
 		}
+	}
+}
+
+func TestCellsSections(t *testing.T) {
+	src := "Intro.\n\n```sh {#pre}\necho pre\n```\n\n# Setup\n\n```sh {#a}\necho a\n```\n\n## Notes\n\nNo blocks here.\n\n## Check\n\n```sh {#hidden show=false}\necho hidden\n```\n\n# Deploy\n\n```sh {#d}\necho d\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var got []string
+	for _, c := range n.Cells() {
+		if c.Heading > 0 {
+			got = append(got, fmt.Sprintf("%d:%d-%d", c.Line, c.SectionFrom, c.SectionTo))
+		}
+	}
+	// Setup holds its subsections; Notes has no block; Check's block is
+	// hidden but still runs.
+	if want := []string{"7:1-3", "13:0-0", "17:2-3", "23:3-4"}; !slices.Equal(got, want) {
+		t.Errorf("sections = %v, want %v", got, want)
+	}
+	if err := n.RunRange(1, 3); err != nil {
+		t.Fatal(err)
+	}
+	var ran []string
+	for i, r := range n.results {
+		if r.Ran {
+			ran = append(ran, n.d.Blocks[i].ID)
+		}
+	}
+	if want := []string{"a", "hidden"}; !slices.Equal(ran, want) {
+		t.Errorf("ran %v, want %v", ran, want)
 	}
 }

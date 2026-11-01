@@ -448,3 +448,22 @@ func TestDependsAsksInTUI(t *testing.T) {
 		}
 	}
 }
+
+func TestRunSection(t *testing.T) {
+	src := "```sh {#pre}\necho pre\n```\n\n# A\n\n```sh {#a1}\necho a1\n```\n\n## B\n\n```sh {#b1}\necho b1\n```\n\n# C\n\n```sh {#c1}\necho c1\n```\n"
+	m, file := newModel(t, src, Options{AutoSave: true})
+	// On a1, s runs A: a1 and b1, in its subsection.
+	press(m, "j", "s")
+	pump(t, m)
+	got := read(t, file)
+	for id, want := range map[string]bool{"pre": false, "a1": true, "b1": true, "c1": false} {
+		if ran := strings.Contains(got, "for="+id+" "); ran != want {
+			t.Errorf("%s ran = %v, want %v:\n%s", id, ran, want, got)
+		}
+	}
+	// pre is under no heading.
+	press(m, "g", "s")
+	if !strings.Contains(m.View(), "isn't under a heading") {
+		t.Errorf("no status for a block under no heading:\n%s", m.View())
+	}
+}

@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Run a section: in `mdsh-gui`, each heading with a block under it has a
+  play button that runs the blocks of its section and its
+  subsections, following Run All's rules (confirm, `skip`, `run=once`,
+  `depends=`, `on_error`). Selecting a heading shows its play button in
+  the outline, and enter or `s` runs it; Run › Run Section
+  (cmd/ctrl+shift+enter) and the source view's gutter run one too. In
+  `mdsh -i`, `s` runs the section the block is in.
 - `mdsh-gui`: alt+↑/↓ (Edit › Move Block Up/Down) moves a block, with
   its output and tape, past the cell above or below it, and alt+shift+↑/↓
   past the block above or below. It works on the selected card, the

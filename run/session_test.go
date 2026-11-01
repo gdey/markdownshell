@@ -203,3 +203,37 @@ func TestSessionRunOnce(t *testing.T) {
 		t.Errorf("RunBlock(b): ran=%v stdout=%q", r.Ran, r.Stdout)
 	}
 }
+
+func TestSessionRunRange(t *testing.T) {
+	// A section's blocks: b to d. b needs a, outside it, so a runs
+	// first; once's saved output skips it, c is skip, and fail stops the
+	// run before d. e is outside the range.
+	d := parse(t, "```sh {#a}\necho a\n```\n\n"+
+		"```sh {#b depends=a}\necho b\n```\n\n"+
+		"```sh {#once run=once}\necho once\n```\n```output {for=once}\nonce\n```\n\n"+
+		"```sh {#c skip}\necho c\n```\n\n"+
+		"```sh {#fail on_error=stop}\nfalse\n```\n\n"+
+		"```sh {#d}\necho d\n```\n\n"+
+		"```sh {#e}\necho e\n```\n")
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: func(_, _ *doc.Block) run.Answer { return run.Go }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.RunRange(context.Background(), 1, 6); err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []bool{true, true, false, false, true, false, false} {
+		r := s.Results()[i]
+		if r.Ran != want {
+			t.Errorf("%s: ran = %v, want %v", d.Blocks[i].ID, r.Ran, want)
+		}
+	}
+	// The run ends at the end of the range.
+	if err := s.RunRange(context.Background(), 5, 6); err != nil {
+		t.Fatal(err)
+	}
+	if r := s.Results(); !r[5].Ran || r[6].Ran {
+		t.Errorf("RunRange(5, 6): d ran = %v, e ran = %v", r[5].Ran, r[6].Ran)
+	}
+}
