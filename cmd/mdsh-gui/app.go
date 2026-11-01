@@ -46,6 +46,9 @@ type App struct {
 	dragging  *docTab
 	prefs     *application.WebviewWindow
 	quitting  bool
+	// startImages are the collection icons and backgrounds the start
+	// screen shows, by real path, which the window may load.
+	startImages map[string]bool
 
 	started atomic.Bool // the app is running, so menus change on its main thread
 }

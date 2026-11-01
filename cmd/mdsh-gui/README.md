@@ -24,6 +24,8 @@ With no file, the start screen lists the markdown files under the current
 folder, or under `folder` when one is given (or the start folder from Settings, when started from Finder or
 the Dock) to pick from, with the description from each file's front
 matter (`description`, else `summary`, else `abstract`) under its name.
+A folder with a `.mdsh.yaml` shows as a collection, with its own title,
+icon, color, background and tags (see [Collections](#collections)).
 Each file opens in a tab of its own, with its own shells.
 
 - **Tabs:** New Tab (cmd/ctrl+T, or the + in the tab bar) opens the
@@ -244,6 +246,30 @@ The start screen lists the runbooks in a folder, with the description
 from each one's front matter. Type to filter.
 
 ![The start screen: four runbooks in ~/runbooks, each with a description](../../site/static/images/gui/start.png)
+
+### Collections
+
+A `.mdsh.yaml` file in a folder of runbooks turns the folder into a
+collection on the start screen: a header with an icon, title,
+description and tags, in the folder's color, over a background image.
+
+```yaml
+title: Deploys
+description: Ship, roll back and check the prod stack.
+icon: rocket.svg      # an image in the folder, or one emoji: "🚀"
+color: "#3b82f6"      # #hex, rgb(), hsl() or a CSS color name
+background: banner.png
+tags: [ops, prod]
+```
+
+Every key is optional. Image paths are relative to the folder and must
+stay inside it. A file's tags are those of the collections it is in,
+from the listed folder down, plus the `tags:` in its own front matter.
+The tag bar under the filter lists them all; click one, or type
+`#ops`, to show only the files tagged `ops`. A header's tooltip lists
+anything in `.mdsh.yaml` that was ignored, and a folder whose
+`.mdsh.yaml` doesn't parse shows as a plain folder with a ⚠ that says
+why.
 
 Run All streams each block's output in under it as it runs.
 

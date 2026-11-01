@@ -58,3 +58,28 @@ func TestDocFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestStartImages(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"banner.png", "other.png"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("png"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	banner, err := filepath.EvalSymlinks(filepath.Join(dir, "banner.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &App{tabs: map[int]*docTab{}, startImages: map[string]bool{banner: true}}
+	h := a.assets(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTeapot) }))
+	for path, want := range map[string]int{
+		notebook.DocURL(filepath.Join(dir, "banner.png")): http.StatusOK,
+		notebook.DocURL(filepath.Join(dir, "other.png")):  http.StatusNotFound,
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != want {
+			t.Errorf("GET %s = %d, want %d", path, rec.Code, want)
+		}
+	}
+}

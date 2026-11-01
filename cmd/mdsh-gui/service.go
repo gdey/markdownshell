@@ -225,8 +225,8 @@ func (a *App) Templates() ([]library.File, error) {
 	if dir == "" {
 		return nil, nil
 	}
-	files, _, err := library.List(dir)
-	return files, err
+	l, err := library.List(dir)
+	return l.Files, err
 }
 
 // OpenPath opens file, from the start screen.
@@ -366,21 +366,39 @@ func (a *App) HistoryPrompt(ctx context.Context) (notebook.Prompt, error) {
 
 // Start is what the start screen lists.
 type Start struct {
-	Dir    string         `json:"dir"`
-	Home   string         `json:"home"` // for showing paths as ~/…
-	Files  []library.File `json:"files"`
-	Full   bool           `json:"full"` // more files than listed
-	Recent []string       `json:"recent"`
+	Dir         string               `json:"dir"`
+	Home        string               `json:"home"` // for showing paths as ~/…
+	Files       []library.File       `json:"files"`
+	Collections []library.Collection `json:"collections"`
+	Full        bool                 `json:"full"` // more files than listed
+	Recent      []string             `json:"recent"`
 }
 
 // StartScreen lists the markdown files under the start folder, and the
 // recent files that still exist.
 func (a *App) StartScreen() (Start, error) {
 	dir := a.startDir()
-	files, full, err := library.List(dir)
+	l, err := library.List(dir)
 	if err != nil {
 		return Start{}, err
 	}
+	// The window may load the collections' images, and nothing else
+	// outside the open documents' folders.
+	images := map[string]bool{}
+	for i := range l.Collections {
+		c := &l.Collections[i]
+		if c.IconPath != "" {
+			images[c.IconPath] = true
+			c.IconURL = notebook.DocURL(c.IconPath)
+		}
+		if c.Background != "" {
+			images[c.Background] = true
+			c.BackgroundURL = notebook.DocURL(c.Background)
+		}
+	}
+	a.mu.Lock()
+	a.startImages = images
+	a.mu.Unlock()
 	var recent []string
 	for _, f := range a.settings.Get().Recent {
 		if _, err := os.Stat(f); err == nil {
@@ -388,7 +406,7 @@ func (a *App) StartScreen() (Start, error) {
 		}
 	}
 	home, _ := os.UserHomeDir()
-	return Start{Dir: dir, Home: home, Files: files, Full: full, Recent: recent}, nil
+	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: recent}, nil
 }
 
 // Settings are the app-wide settings.

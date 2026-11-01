@@ -26,10 +26,11 @@ func (a *App) assets(pages http.Handler) http.Handler {
 }
 
 // serveDocFile serves the file at path if it is in the folder of an open
-// document, or under it, and nothing else.
+// document, or under it, or is an image the start screen shows, and
+// nothing else.
 func (a *App) serveDocFile(w http.ResponseWriter, r *http.Request, path string) {
 	real, err := filepath.EvalSymlinks(filepath.Clean(path))
-	if err != nil || !a.underDoc(real) {
+	if err != nil || !a.underDoc(real) && !a.startImage(real) {
 		http.NotFound(w, r)
 		return
 	}
@@ -46,6 +47,14 @@ func (a *App) serveDocFile(w http.ResponseWriter, r *http.Request, path string) 
 	}
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
+}
+
+// startImage reports whether path is a collection's icon or background
+// on the start screen.
+func (a *App) startImage(path string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.startImages[path]
 }
 
 // underDoc reports whether path is under the folder of a document open
