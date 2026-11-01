@@ -2,6 +2,8 @@ package run
 
 import (
 	"encoding/json"
+
+	"github.com/gdey/markdownshell/audit"
 	"sort"
 	"strings"
 	"sync"
@@ -38,7 +40,7 @@ type ctlState struct {
 // mdsh.
 func (s *Session) startCtl() {
 	s.ctl = &ctlState{vars: map[string]ctlVar{}, unset: map[string]bool{}}
-	srv, err := ctl.Listen(s.handleCtl)
+	srv, err := ctl.Listen(s.handleLogged)
 	if err != nil {
 		return
 	}
@@ -140,10 +142,12 @@ func (s *Session) handleCtl(caller any, req ctl.Request) ctl.Response {
 		if s.inputBinds(name) {
 			return ctl.Refuse("set: $%s belongs to an input in the document; change the input instead", name)
 		}
+		old := s.varNow(name)
 		s.ctl.mu.Lock()
 		s.ctl.vars[name] = ctlVar{value: a.Value, secret: a.Secret}
 		delete(s.ctl.unset, name)
 		s.ctl.mu.Unlock()
+		s.logVar(b, name, old, &ctlVar{value: a.Value, secret: a.Secret})
 		return ctl.Done("")
 	case "unset":
 		var a ctl.NameArgs
@@ -154,12 +158,17 @@ func (s *Session) handleCtl(caller any, req ctl.Request) ctl.Response {
 		if !ok {
 			return resp
 		}
+		old := s.varNow(name)
 		s.ctl.mu.Lock()
-		if _, ok := s.ctl.vars[name]; ok {
+		_, ok = s.ctl.vars[name]
+		if ok {
 			delete(s.ctl.vars, name)
 			s.ctl.unset[name] = true
 		}
 		s.ctl.mu.Unlock()
+		if ok {
+			s.logVar(b, name, old, nil)
+		}
 		return ctl.Done("")
 	case "get":
 		var a ctl.NameArgs
@@ -193,4 +202,74 @@ func (s *Session) ctlName(cmd, name string) (string, ctl.Response, bool) {
 		return "", ctl.Refuse("%s: %q is not a variable name: use letters, digits and _", cmd, name), false
 	}
 	return doc.VarPrefix + name, ctl.Response{}, true
+}
+
+// handleLogged answers a call and logs it.
+func (s *Session) handleLogged(caller any, req ctl.Request) ctl.Response {
+	resp := s.handleCtl(caller, req)
+	if s.opts.Audit == nil {
+		return resp
+	}
+	f := audit.Fields{"cmd": req.Cmd, "ok": resp.OK, "code": resp.Code}
+	if b, ok := caller.(*doc.Block); ok {
+		f["block"], f["env"] = b.ID, blockEnv(b)
+	}
+	var args map[string]any
+	if json.Unmarshal(req.Args, &args) == nil {
+		if secret, _ := args["secret"].(bool); secret {
+			v, _ := args["value"].(string)
+			args["value"] = s.opts.Audit.Secret(v)
+		}
+		f["args"] = args
+	}
+	if resp.Error != "" {
+		f["error"] = resp.Error
+	}
+	s.opts.Audit.Event("ctl", f)
+	return resp
+}
+
+// ctlOld is a variable as it was before a change, for the log.
+type ctlOld struct {
+	value  string
+	secret bool
+	set    bool // whether it had a value: from ctl, an input or the caller
+}
+
+// varNow is name as it is now, before a change.
+func (s *Session) varNow(name string) ctlOld {
+	s.ctl.mu.Lock()
+	v, ok := s.ctl.vars[name]
+	s.ctl.mu.Unlock()
+	if ok {
+		return ctlOld{v.value, v.secret, true}
+	}
+	value, _ := s.ctlLookup(s.baseLookup)(doc.Ref{Var: name})
+	return ctlOld{value: value, set: value != ""}
+}
+
+// logVar logs that name changed from old to now, nil when unset, by a
+// call from b.
+func (s *Session) logVar(b *doc.Block, name string, old ctlOld, now *ctlVar) {
+	l := s.opts.Audit
+	if l == nil {
+		return
+	}
+	show := func(value string, secret bool) any {
+		if secret {
+			return l.Secret(value)
+		}
+		return value
+	}
+	f := audit.Fields{"name": name, "by": "ctl", "old": nil, "new": nil}
+	if b != nil {
+		f["block"], f["env"] = b.ID, blockEnv(b)
+	}
+	if old.set {
+		f["old"] = show(old.value, old.secret)
+	}
+	if now != nil {
+		f["new"] = show(now.value, now.secret)
+	}
+	l.Event("var", f)
 }

@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/termrec"
@@ -72,6 +74,9 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Init: init,
 		}),
 		tty: hasTTY(d) || opts.PTY,
+	}
+	if opts.Audit != nil {
+		s.stack.OnStart = s.logEnv
 	}
 	// Includes are part of the document, not steps of the run, so they
 	// are read whatever runs.
@@ -282,22 +287,40 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 		if !Runnable(b) || b.Attrs.Has("skip") || !s.selected[b] {
 			r.Skipped = true
 			s.results[i] = r
+			switch {
+			case !Runnable(b):
+			case b.Attrs.Has("skip"):
+				s.logSkip(b, "skip", nil)
+			default:
+				s.logSkip(b, "--only", nil)
+			}
 			continue
 		}
-		if c, ok := b.Cond("run"); ok && (c.Once && s.hasOutput(i) || !c.Eval(LookupAt(s.lookup, d, s.results, b.Span.Start))) {
-			r.Skipped = true
-			s.results[i] = r
-			continue
+		if c, ok := b.Cond("run"); ok {
+			lookup := LookupAt(s.lookup, d, s.results, b.Span.Start)
+			once := c.Once && s.hasOutput(i)
+			if once || !c.Eval(lookup) {
+				r.Skipped = true
+				s.results[i] = r
+				if once {
+					s.logSkip(b, "once", nil)
+				} else {
+					s.logSkip(b, "run=", s.condSaw(c, lookup))
+				}
+				continue
+			}
 		}
 		if b.Attrs.Has("confirm") || opts.Step || d.Options.Step {
 			a, err := s.confirm(b)
 			if err != nil || a == Stop {
 				s.results[i].Declined = true
+				s.logSkip(b, "stop", nil)
 				return err
 			}
 			if a == Skip {
 				r.Skipped = true
 				s.results[i] = r
+				s.logSkip(b, "confirm", nil)
 				continue
 			}
 		}
@@ -306,6 +329,7 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 			switch {
 			case errors.Is(err, errStopped):
 				s.results[i].Declined = true
+				s.logSkip(b, "stop", nil)
 				return s.Wait(ctx)
 			case errors.As(err, &de):
 				// As if the dependency had failed in place: the
@@ -313,6 +337,7 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 				// run goes on.
 				r.Skipped = true
 				s.results[i] = r
+				s.logSkip(b, "depends", audit.Fields{"failed": de.dep.ID})
 				if stopOnError(d, de.dep, opts) {
 					return s.Wait(ctx)
 				}
@@ -495,6 +520,8 @@ func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bo
 	t.JobControl = true
 	rec := termrec.NewRecorder(t.Dims())
 	pre, revoke := s.issue(b)
+	s.logStart(b)
+	defer s.logEnd(b, r, time.Now())
 	giveBack := takeTTY(b, s.opts)
 	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, pre+b.Body, t, rec)
 	giveBack()
@@ -524,10 +551,12 @@ func (s *Session) confirm(b *doc.Block) (Answer, error) {
 
 func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	s.emit(Event{Kind: Started, Block: b})
+	s.logStart(b)
 	if b.Attrs.Has("background") {
 		s.background(ctx, b, r)
 		return
 	}
+	defer s.logEnd(b, r, time.Now())
 	pre, revoke := s.issue(b)
 	runBlock(ctx, s.stack, s.d, b, pre, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
 	revoke()
