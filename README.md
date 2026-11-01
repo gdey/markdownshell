@@ -271,6 +271,10 @@ Every `sh` and `zsh` block runs, top to bottom. Blocks without `env=` share
 one shell, so variables, functions and the working directory carry over.
 Blocks run in `/bin/sh` unless `shell:` under `mdsh:` in the front matter
 says otherwise; a document with any `zsh` block runs in `zsh` by default.
+mdsh hands each block to the shell as written. In zsh a lone `}` ends a
+`{ }` group wherever it is on the line, so `echo }` is a parse error
+there; quote it, as in `echo '}'`. mdsh checks a block's syntax before
+running it, so `setopt ignore_close_braces` in the block can't help.
 
 | Attribute | Meaning |
 | --- | --- |

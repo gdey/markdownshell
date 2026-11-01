@@ -49,6 +49,40 @@ func TestErrorsNameTheBlock(t *testing.T) {
 	}
 }
 
+// zsh takes a lone } as the end of a group even as an argument, so
+// echo } is a syntax error there; the error says how to fix it.
+func TestZshCloseBraceHint(t *testing.T) {
+	for _, path := range shells(t) {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			sh, err := Start(Config{Path: path, Env: []string{"PATH=" + os.Getenv("PATH")}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer sh.Close()
+			var out, errb bytes.Buffer
+			rc, _, err := sh.Run(context.Background(), "echo -n a {\necho b\necho }\n", &out, &errb)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hinted := strings.Contains(errb.String(), "echo '}'")
+			if filepath.Base(path) != "zsh" {
+				if rc != 0 || hinted {
+					t.Errorf("status %d, stderr %q; want 0 and no hint", rc, errb.String())
+				}
+				return
+			}
+			if rc != 2 || !strings.Contains(errb.String(), "block:3: parse error") || !hinted {
+				t.Errorf("status %d, stderr %q; want 2, the error on line 3 and the hint", rc, errb.String())
+			}
+			out.Reset()
+			errb.Reset()
+			if rc, _, _ := sh.Run(context.Background(), "echo {\necho '}'\n", &out, &errb); rc != 0 || out.String() != "{\n}\n" {
+				t.Errorf("quoted: status %d, stdout %q, stderr %q", rc, out.String(), errb.String())
+			}
+		})
+	}
+}
+
 func TestCdDashAcrossRuns(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "a", "b"), 0o755); err != nil {
