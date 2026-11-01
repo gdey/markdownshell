@@ -200,8 +200,13 @@ function showEnd(block: HTMLElement, up: boolean) {
   if (Math.abs(d) > 1) pane.scrollTo({ top: pane.scrollTop + d, behavior: "smooth" });
 }
 
+// scrolledByHand says the rendered view was scrolled by hand since the
+// run started, so the run doesn't scroll back when it's over.
+let scrolledByHand = false;
+
 function stopFollowing() {
   following = null;
+  scrolledByHand = true;
 }
 
 function drawCell(c: Cell): HTMLElement {
@@ -873,7 +878,10 @@ async function runSection(cell: HTMLElement | null) {
   await applySource();
   const now = [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")].find((e) => e.dataset.fold === key);
   if (!now?.dataset.sectionTo) return;
-  await run(() => App.RunSection(Number(now.dataset.sectionFrom), Number(now.dataset.sectionTo)));
+  // The view comes back to the heading, as Run this block comes back to
+  // its block.
+  const home = () => [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")].find((e) => e.dataset.fold === key) ?? null;
+  await run(() => App.RunSection(Number(now.dataset.sectionFrom), Number(now.dataset.sectionTo)), home);
 }
 
 function runAllButton() {
@@ -893,11 +901,22 @@ function busy(on: boolean) {
 }
 
 function start(method: "RunBlock" | "RunFrom", block: number) {
-  return run(() => App[method](block));
+  // Run this block comes back to the block when it's done, though its
+  // depends= ran first above it. Run from here ends where the run does.
+  const home = method === "RunBlock" ? () => document.getElementById("block-" + block) : undefined;
+  return run(() => App[method](block), home);
 }
 
-async function run(call: () => Promise<void>) {
+// run runs call, following its blocks as they run. With home, the card
+// the run started from, the view comes back to that card when the run
+// is over, where it was, and the card is selected: following the run
+// may have scrolled away, up to the blocks it depends on. Scrolling by
+// hand during the run leaves the view where it is. home finds the card
+// anew, since the run draws the document again.
+async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   if (running) return;
+  const back = home ? homeOffset(home()) : null;
+  scrolledByHand = false;
   // The History pane may have set the terminal's size to its own.
   sizeTerminal();
   busy(true);
@@ -912,10 +931,44 @@ async function run(call: () => Promise<void>) {
   ranHere = false;
   busy(false);
   await refresh();
+  const card = home?.();
+  if (card) {
+    following = null;
+    if (!scrolledByHand) goHome(card, back);
+    if (card.classList.contains("block")) {
+      const i = blocks().indexOf(card);
+      if (i >= 0) select(i, false);
+    } else selectSection(card);
+  }
   // The output is drawn in full now, and may be longer than it was.
   if (following) showEnd(following, false);
   following = null;
   backgroundStatus();
+}
+
+// homeOffset is how far card's top is below the rendered view's top,
+// or null if the card isn't in sight.
+function homeOffset(card: HTMLElement | null): number | null {
+  const pane = $("doc-scroll");
+  if (!card || pane.hidden) return null;
+  const p = pane.getBoundingClientRect();
+  const offset = card.getBoundingClientRect().top - p.top;
+  return offset >= 0 && offset < p.height - followMargin ? offset : null;
+}
+
+// goHome scrolls the rendered view so card's top is offset below the
+// view's top, or near the top without offset, and then down, as far as
+// its top, until its end is in sight.
+function goHome(card: HTMLElement, offset: number | null) {
+  const pane = $("doc-scroll");
+  if (pane.hidden) return;
+  const p = pane.getBoundingClientRect();
+  const r = card.getBoundingClientRect();
+  const top = pane.scrollTop + r.top - p.top;
+  const bottom = top + r.height;
+  const at = top - (offset ?? followMargin);
+  const to = Math.max(at, Math.min(bottom + followMargin - p.height, top - followMargin));
+  if (Math.abs(to - pane.scrollTop) > 1) pane.scrollTo({ top: to, behavior: "smooth" });
 }
 
 // Editing happens in the source pane. The pencil and a click on prose
