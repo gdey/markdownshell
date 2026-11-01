@@ -51,7 +51,12 @@ export class NvimPane {
   private observer: ResizeObserver;
   private wheel = 0;
 
-  constructor(private parent: HTMLElement) {
+  // onKey sees each key first; true takes it from Neovim, as for the
+  // app's own keys like cmd/ctrl+enter.
+  constructor(
+    private parent: HTMLElement,
+    private onKey: (e: KeyboardEvent) => boolean = () => false,
+  ) {
     this.canvas = document.createElement("canvas");
     this.canvas.className = "nvim-grid";
     this.input = document.createElement("textarea");
@@ -85,6 +90,11 @@ export class NvimPane {
 
   focus() {
     this.input.focus({ preventScroll: true });
+  }
+
+  // rowHeight is the height of a grid row, in CSS pixels.
+  get rowHeight(): number {
+    return this.ch;
   }
 
   destroy() {
@@ -268,6 +278,10 @@ export class NvimPane {
     const send = (keys: string) => void App.NvimInput(keys).catch(() => {});
     this.input.addEventListener("keydown", (e) => {
       if (e.isComposing || this.composing) return;
+      if (this.onKey(e)) {
+        e.preventDefault();
+        return;
+      }
       const keys = keyNotation(e);
       if (keys === null) return;
       e.preventDefault();
@@ -330,6 +344,47 @@ export class NvimPane {
       { passive: false },
     );
   }
+}
+
+// colorTokens are the page's color tokens (style.css) Neovim's colors
+// are made of, by their names there.
+const colorTokens = [
+  "bg", "fg", "muted", "border", "code-bg", "hover", "accent", "accent-fg", "link", "ok", "bad", "control",
+  "warn-bg", "warn-border", "selection", "active-line",
+  "syn-keyword", "syn-string", "syn-number", "syn-comment", "syn-variable", "syn-function", "syn-type", "syn-punct", "syn-heading", "syn-link", "syn-meta",
+];
+
+// nvimColors are the theme's colors as Neovim takes them: #rrggbb, with
+// translucent ones (the selection, the active line) laid over the code
+// background, and dark if the theme is. Keys have _ for -.
+export function nvimColors(): Record<string, string | boolean> {
+  const style = getComputedStyle(document.documentElement);
+  const under = rgba(style.getPropertyValue("--code-bg")) ?? [255, 255, 255, 1];
+  const out: Record<string, string | boolean> = {};
+  for (const name of colorTokens) {
+    const c = rgba(style.getPropertyValue("--" + name));
+    if (!c) continue;
+    const [r, g, b, a] = c;
+    const mix = (x: number, y: number) => Math.round(x * a + y * (1 - a));
+    out[name.replaceAll("-", "_")] = hex((mix(r, under[0]) << 16) | (mix(g, under[1]) << 8) | mix(b, under[2]));
+  }
+  out.dark = style.colorScheme.includes("dark");
+  return out;
+}
+
+// rgba reads a CSS color as red, green and blue from 0 to 255 and alpha
+// from 0 to 1, or null.
+function rgba(css: string): [number, number, number, number] | null {
+  const probe = document.createElement("canvas").getContext("2d")!;
+  probe.fillStyle = "#000001";
+  probe.fillStyle = css.trim();
+  const v = String(probe.fillStyle);
+  if (v === "#000001" && css.trim() !== "#000001") return null;
+  let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(v);
+  if (m) return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16), 1];
+  m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)$/.exec(v);
+  if (m) return [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? 1 : Number(m[4])];
+  return null;
 }
 
 function hex(rgb: number): string {

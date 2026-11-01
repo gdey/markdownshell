@@ -16,6 +16,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "/wails
 import * as notebook$0 from "./notebook/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as nvim$0 from "./nvim/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as settings$0 from "./settings/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -280,6 +283,23 @@ export function NewWindow(): $CancellablePromise<void> {
 }
 
 /**
+ * NvimApply gives Neovim text, Go's text merged with what was typed, as
+ * edits to the text Neovim last had, so typing elsewhere in the moment
+ * since isn't lost. If an edit's lines changed, the whole text is set.
+ */
+export function NvimApply(text: string, edits: nvim$0.Edit[] | null): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimApply", text, edits);
+}
+
+/**
+ * NvimCall calls fn in mdsh.lua with args, a JSON array, and returns its
+ * result as JSON: the cursor, setting the run buttons or folds, and so on.
+ */
+export function NvimCall(fn: string, args: string): $CancellablePromise<string> {
+    return $Call.ByName("main.App.NvimCall", fn, args);
+}
+
+/**
  * NvimInput types keys, in Neovim's notation.
  */
 export function NvimInput(keys: string): $CancellablePromise<void> {
@@ -510,9 +530,9 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
 
 /**
  * SetSettings saves the settings the Settings window edits: autosave,
- * Vim mode, Neovim, theme, shell, the view files open in, the start
- * folder and the templates folder. Open windows hear of it with a
- * "settings" event.
+ * Vim mode, spell checking, Neovim, theme, shell, the view files open
+ * in, the start folder and the templates folder. Open windows hear of
+ * it with a "settings" event.
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetSettings", s);

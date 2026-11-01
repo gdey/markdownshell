@@ -2,6 +2,7 @@ package nvim
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -171,4 +172,213 @@ func gridText(ev [][]any) string {
 		}
 	}
 	return b.String()
+}
+
+// startTest starts a Neovim on text for a test, sending its events to
+// events, and quits it when the test ends.
+func startTest(t *testing.T, text string, events chan [2]string) *Editor {
+	t.Helper()
+	path := testNvim(t)
+	e, err := Start(Options{
+		Path:  path,
+		Cols:  60,
+		Rows:  20,
+		Name:  "mdsh://test.md",
+		Text:  text,
+		Clean: true,
+		Event: func(name, data string) {
+			select {
+			case events <- [2]string{name, data}:
+			default:
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { e.Close() })
+	return e
+}
+
+func bufLines(t *testing.T, e *Editor) string {
+	t.Helper()
+	var got []string
+	if err := e.v.ExecLua("return vim.api.nvim_buf_get_lines(0, 0, -1, false)", &got); err != nil {
+		t.Fatal(err)
+	}
+	return strings.Join(got, "\n")
+}
+
+// eventNamed waits for the event called name, skipping others.
+func eventNamed(t *testing.T, events chan [2]string, name string) string {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev[0] == name {
+				return ev[1]
+			}
+		case <-deadline:
+			t.Fatalf("no %s event", name)
+		}
+	}
+}
+
+const runbook = "# Setup\n\nSome prose.\n\n```sh {#a}\necho a\n```\n\n## More\n\n```sh {#b depends=a}\necho b\n```\n"
+
+func TestApplyEdits(t *testing.T) {
+	e := startTest(t, "one\ntwo\nthree\n", make(chan [2]string, 100))
+	// Typing on the first line meanwhile doesn't stop an edit lower down.
+	if err := e.v.ExecLua(`vim.api.nvim_buf_set_lines(0, 0, 1, false, {"one!"})`, nil); err != nil {
+		t.Fatal(err)
+	}
+	err := e.ApplyEdits("one\ntwo\nTHREE\nfour\n", []Edit{{Start: 2, End: 3, Old: []string{"three"}, New: []string{"THREE", "four"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := bufLines(t, e), "one!\ntwo\nTHREE\nfour"; got != want {
+		t.Errorf("after the edit: %q, want %q", got, want)
+	}
+	// An edit whose lines changed sets the whole text.
+	err = e.ApplyEdits("x\ny\n", []Edit{{Start: 0, End: 1, Old: []string{"nope"}, New: []string{"x"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := bufLines(t, e), "x\ny"; got != want {
+		t.Errorf("after a stale edit: %q, want %q", got, want)
+	}
+}
+
+func TestCalls(t *testing.T) {
+	events := make(chan [2]string, 100)
+	e := startTest(t, runbook, events)
+	call := func(fn string, args ...any) string {
+		t.Helper()
+		b, _ := json.Marshal(args)
+		if args == nil {
+			b = []byte("[]")
+		}
+		out, err := e.Call(fn, string(b))
+		if err != nil {
+			t.Fatalf("%s: %v", fn, err)
+		}
+		return out
+	}
+
+	// jump puts the cursor on a line; state reports it, and the text.
+	call("jump", 6, 0, true, 0)
+	var st struct {
+		Text string `json:"text"`
+		Mode string `json:"mode"`
+		Line int    `json:"line"`
+	}
+	if err := json.Unmarshal([]byte(call("state")), &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Line != 6 || st.Text != runbook || st.Mode != "n" {
+		t.Errorf("state = %+v", st)
+	}
+	if got := eventNamed(t, events, "cursor"); got != `{"line":6}` {
+		t.Errorf("cursor event = %s", got)
+	}
+
+	// :RunBlock and a click on a run button ask mdsh-gui to run.
+	call("set_runs", []int{5, 11}, []int{1})
+	if err := e.Input(":RunBlock<CR>"); err != nil {
+		t.Fatal(err)
+	}
+	if got := eventNamed(t, events, "run"); got != `{"what":"block"}` {
+		t.Errorf("run event = %s", got)
+	}
+	var signs int
+	if err := e.v.ExecLua(`return #vim.api.nvim_buf_get_extmarks(0, vim.api.nvim_get_namespaces().mdsh_runs, 0, -1, {})`, &signs); err != nil {
+		t.Fatal(err)
+	}
+	if signs != 3 {
+		t.Errorf("%d run buttons, want 3", signs)
+	}
+	call("jump", 1, 0, false, 0)
+	if err := e.Mouse("left", "press", "", 4, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := eventNamed(t, events, "run"); got != `{"line":5}` {
+		t.Errorf("run event for a click = %s", got)
+	}
+	e.Mouse("left", "release", "", 4, 0)
+
+	// Folds: a section folds to its last line, a fence to its closing one.
+	var folds []int
+	call("set_folds", []int{5, 9})
+	if err := json.Unmarshal([]byte(call("folds")), &folds); err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(folds) != "[5 9]" {
+		t.Errorf("closed folds = %v, want [5 9]", folds)
+	}
+	var end int
+	if err := e.v.ExecLua(`return vim.fn.foldclosedend(9)`, &end); err != nil {
+		t.Fatal(err)
+	}
+	if end != 13 {
+		t.Errorf("## More folds to line %d, want 13", end)
+	}
+	if err := e.v.ExecLua(`vim.cmd("normal! zR"); return vim.fn.foldlevel(11)`, &end); err != nil {
+		t.Fatal(err)
+	}
+	if end != 3 {
+		t.Errorf("foldlevel in b's fence = %d, want 3", end)
+	}
+
+	// Typing in a fence's attributes asks for completions.
+	call("jump", 11, 0, true, -1)
+	if err := e.Input("i en"); err != nil {
+		t.Fatal(err)
+	}
+	var ask struct {
+		Line, Col int
+		Tick      int
+	}
+	if err := json.Unmarshal([]byte(eventNamed(t, events, "complete")), &ask); err != nil {
+		t.Fatal(err)
+	}
+	if ask.Line != 11 {
+		t.Errorf("complete asked on line %d, want 11", ask.Line)
+	}
+	e.Input("<Esc>")
+
+	// The app's colors, and back to Neovim's own with the setting off.
+	colors := map[string]any{"dark": true, "fg": "#e6edf3", "code_bg": "#151b23", "bg": "#0d1117", "accent": "#2f81f7"}
+	call("set_colors", colors, true)
+	var scheme struct {
+		Name string `msgpack:"name"`
+		Bg   int    `msgpack:"bg"`
+		Back string `msgpack:"back"`
+	}
+	read := `return { name = vim.g.colors_name or "", bg = vim.api.nvim_get_hl(0, { name = "Normal" }).bg or -1, back = vim.o.background }`
+	if err := e.v.ExecLua(read, &scheme); err != nil {
+		t.Fatal(err)
+	}
+	if scheme.Name != "mdsh" || scheme.Bg != 0x151b23 || scheme.Back != "dark" {
+		t.Errorf("with the app's colors: %+v", scheme)
+	}
+	colors["dark"] = false
+	call("set_colors", colors, false)
+	if err := e.v.ExecLua(read, &scheme); err != nil {
+		t.Fatal(err)
+	}
+	if scheme.Name == "mdsh" || scheme.Bg == 0x151b23 || scheme.Back != "light" {
+		t.Errorf("with the app's colors off: %+v", scheme)
+	}
+
+	call("set_spell", true)
+	var spell bool
+	if err := e.v.ExecLua(`return vim.wo.spell`, &spell); err != nil || !spell {
+		t.Errorf("spell = %v, %v", spell, err)
+	}
+	call("diagnostics", []map[string]any{{"line": 11, "col": 13, "end_line": 11, "end_col": 20, "error": true, "message": "bad"}})
+	var n int
+	if err := e.v.ExecLua(`return #vim.diagnostic.get(0)`, &n); err != nil || n != 1 {
+		t.Errorf("%d diagnostics, %v", n, err)
+	}
 }

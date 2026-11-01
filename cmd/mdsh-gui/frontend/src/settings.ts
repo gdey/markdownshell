@@ -28,6 +28,7 @@ function draw() {
   input("neovim").checked = s.neovim;
   input("neovim").disabled = !s.vim;
   input("neovim-clean").checked = s.neovimClean;
+  input("neovim-colors").checked = !s.neovimOwnColors;
   input("neovim-path").value = s.neovimPath;
   select("theme").value = s.theme;
   applyTheme(s.theme);
@@ -78,6 +79,7 @@ input("vim").onchange = () => ((s.vim = input("vim").checked), save().then(draw)
 input("spellcheck").onchange = () => ((s.noSpellCheck = !input("spellcheck").checked), save());
 input("neovim").onchange = () => ((s.neovim = input("neovim").checked), save());
 input("neovim-clean").onchange = () => ((s.neovimClean = input("neovim-clean").checked), save());
+input("neovim-colors").onchange = () => ((s.neovimOwnColors = !input("neovim-colors").checked), save());
 input("neovim-path").onchange = async () => {
   s.neovimPath = input("neovim-path").value.trim();
   await save();
