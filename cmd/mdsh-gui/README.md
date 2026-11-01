@@ -48,9 +48,10 @@ Each file opens in a tab of its own, with its own shells.
   Run Section (cmd/ctrl+shift+enter: the section of the selected
   heading, or the one the source view's cursor or the selected card is
   in), Run All (cmd/ctrl+R, the toolbar button turns into Stop while
-  blocks run), Stop (cmd/ctrl+.), Clear All Outputs and Run Options…
-  for the file's arguments, `--only`, step mode and stop on error.
-  Clear All Outputs takes every block's output, output copy and stored
+  blocks run), Stop (cmd/ctrl+.), Clear All Outputs… (cmd/ctrl+alt+K,
+  or the toolbar's eraser button) and Run Options… for the file's
+  arguments, `--only`, step mode and stop on error. Clear All Outputs
+  asks first, then takes every block's output, output copy and stored
   block value out of the document and starts the shells again, as if
   nothing had run. It isn't saved until you save; with the source view
   open, undo there brings the output back. A block marked

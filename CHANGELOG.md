@@ -8,6 +8,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: Clear All Outputs has a shortcut, cmd/ctrl+alt+K, and an
+  eraser button in the toolbar beside Run all. It now asks before it
+  clears, from the menu, the key or the button.
 - `mdsh-gui`: a Console (View › Console, cmd/ctrl+shift+Y, or the
   toolbar's console button) along the bottom of the window shows what
   the app logs, with the time and level: errors from what you did, such
