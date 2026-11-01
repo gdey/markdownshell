@@ -890,6 +890,7 @@ function runAllButton() {
   b.replaceChildren(svg(running ? icons.stop : icons.play), el("span", {}, running ? "Stop" : "Run all"));
   b.classList.toggle("stop", running);
   b.disabled = !running && !cells.some((c) => c.block >= 0);
+  $<HTMLButtonElement>("clear-outputs").disabled = running || !cells.some((c) => c.block >= 0);
 }
 
 function busy(on: boolean) {
@@ -1542,10 +1543,11 @@ const actions: Record<string, () => Promise<void> | void> = {
     }
   },
   runall: () => (running ? actions.stop() : start("RunFrom", 0)),
-  // clearoutputs takes all output out of the document. In the source
-  // pane it is one edit, so undo brings the output back.
+  // clearoutputs takes all output out of the document, once asked. In
+  // the source pane it is one edit, so undo brings the output back.
   async clearoutputs() {
-    if (!doc.file || running) return;
+    if (!doc.file || running || $<HTMLDialogElement>("clear-dialog").open) return;
+    if (!(await confirmClear())) return;
     await applySource();
     try {
       await App.ClearOutputs();
@@ -1819,6 +1821,15 @@ function confirmDelete(name: string): Promise<boolean> {
   dialog.showModal();
   $("delete-ok").focus();
   return new Promise((resolve) => (dialog.onclose = () => resolve(dialog.returnValue === "delete")));
+}
+
+// confirmClear asks whether to clear all outputs.
+function confirmClear(): Promise<boolean> {
+  const dialog = $<HTMLDialogElement>("clear-dialog");
+  dialog.returnValue = "";
+  dialog.showModal();
+  $("clear-ok").focus();
+  return new Promise((resolve) => (dialog.onclose = () => resolve(dialog.returnValue === "clear")));
 }
 
 // Dragging
@@ -2329,6 +2340,7 @@ Events.On("settings", (ev: { data: Settings }) => {
 });
 
 $("run-all").onclick = () => void actions.runall();
+$("clear-outputs").onclick = () => void actions.clearoutputs();
 let resizeTimer = 0;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);

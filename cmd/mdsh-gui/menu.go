@@ -167,7 +167,8 @@ func (a *App) buildMenu() *application.Menu {
 	run.Add("Run Section").SetAccelerator("CmdOrCtrl+Shift+Enter").OnClick(send("runsection"))
 	run.Add("Run All").SetAccelerator("CmdOrCtrl+R").OnClick(send("runall"))
 	run.Add("Stop").SetAccelerator("CmdOrCtrl+.").OnClick(send("stop"))
-	run.Add("Clear All Outputs").OnClick(send("clearoutputs"))
+	// It asks first; see the frontend's clearoutputs.
+	run.Add("Clear All Outputs…").SetAccelerator("CmdOrCtrl+Alt+K").OnClick(send("clearoutputs"))
 	run.AddSeparator()
 	run.Add("Run Options…").OnClick(send("runoptions"))
 
