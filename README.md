@@ -255,6 +255,15 @@ mdsh --serve=localhost:9000 docs # the files under docs, on port 9000
 
 The address comes after `=`: `--serve host:port` would take
 `host:port` for the file. Each browser tab is a window with its own tabs.
+The desktop app's menu shortcuts work in the page, with cmd on macOS and
+ctrl elsewhere: `S` saves, `shift+S` saves as, `R` runs all, `.` stops,
+`O` opens a file, `,` opens Settings, `\` and `shift+\` show or hide the
+source and rendered views, `shift+O` the outline, and `shift+]` and
+`shift+[` switch tabs. The browser keeps ctrl+T and ctrl+W for itself,
+so use the + and × on the tab bar. The gear on the tab bar opens
+Settings too. Open, Save As and a report's destination list the folders
+on the machine mdsh runs on, since that is where the files are.
+
 Closing the browser tab leaves its shells running; opening the address
 again picks the window up, and closing its last tab ends it. Ctrl+C
 stops the server and every shell, without saving.
