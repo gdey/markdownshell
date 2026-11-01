@@ -130,7 +130,9 @@ func TestBlockAt(t *testing.T) {
 func TestCellsMovable(t *testing.T) {
 	src := "```sh {#a tty}\nsh\n```\n```tape {for=a}\nEnter\n```\n\n" +
 		"```textbox {#t}\n```\n\n" +
-		"- ```sh {#n}\n  true\n  ```\n"
+		"- ```sh {#n}\n  true\n  ```\n\n" +
+		"```go\nfunc main() {}\n```\n\n" +
+		"```mermaid\ngraph TD\n```\n"
 	n, err := Open(write(t, src), Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -140,7 +142,72 @@ func TestCellsMovable(t *testing.T) {
 	for _, c := range n.Cells() {
 		got = append(got, fmt.Sprintf("%d-%d:%v", c.Line, c.LastLine, c.Movable))
 	}
-	if want := "1-6:true 4-0:false 8-9:true 11-0:false"; strings.Join(got, " ") != want {
+	if want := "1-6:true 4-0:false 8-9:true 11-0:false 15-17:true 19-21:true"; strings.Join(got, " ") != want {
 		t.Errorf("cells %q, want %q", strings.Join(got, " "), want)
+	}
+}
+
+func TestMoveTo(t *testing.T) {
+	src := "# One\n\nA.\n\n```sh\necho a\n```\n\n" +
+		"# Two\n\n```sh\necho b\n```\n\nB.\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	from := func(text string) int {
+		t.Helper()
+		for _, c := range n.Cells() {
+			if strings.HasPrefix(n.Text()[c.From:], text) {
+				if !c.Drop {
+					t.Errorf("cell %q has no drop", text)
+				}
+				return c.From
+			}
+		}
+		t.Fatalf("no cell %q", text)
+		return 0
+	}
+	// Dragging block a to the end names the blocks first, so nothing is
+	// renamed, and the offsets still hold.
+	m, err := n.MoveTo(from("```sh\necho a"), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(n.Text(), "B.\n\n```sh {#"+n.d.Blocks[1].ID+"}\necho a\n```\n") || m.Block != 1 || m.Note == "" {
+		t.Errorf("block %d, note %q:\n%s", m.Block, m.Note, n.Text())
+	}
+	// Section Two goes first, and Undo puts it back.
+	m, err = n.MoveTo(from("# Two"), from("# One"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(n.Text(), "# Two\n") || m.Block != -1 || m.Line != 1 || m.FromLine != 5 {
+		t.Errorf("line %d from %d:\n%s", m.Line, m.FromLine, n.Text())
+	}
+	if what, err := n.Undo(); err != nil || what != "move section" || !strings.HasPrefix(n.Text(), "# One\n") {
+		t.Errorf("undo %q %v:\n%s", what, err, n.Text())
+	}
+	// A section can't go into the middle of another.
+	if _, err := n.MoveTo(from("# Two"), from("A.")); err == nil {
+		t.Error("section moved mid-section")
+	}
+}
+
+func TestMoveFence(t *testing.T) {
+	src := "A.\n\n```go\nfunc main() {}\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if _, err := n.MoveTo(strings.Index(src, "```"), 0); err != nil {
+		t.Fatal(err)
+	}
+	if want := "```go\nfunc main() {}\n```\n\nA.\n"; n.Text() != want {
+		t.Errorf("text %q, want %q", n.Text(), want)
 	}
 }

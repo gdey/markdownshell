@@ -126,6 +126,17 @@ Each file opens in a tab of its own, with its own shells.
   picks as `$MDSH_VAR_name`; a later input reusing a name is marked, with
   `!` in the outline, and ignored. All are edits like typing in the source
   view: Save writes them.
+- **Dragging blocks and sections:** a block card's grip (⋮⋮, at the left
+  of its head, shown on hover) drags the block, with its output, to a
+  spot between top-level cells; a line shows where it will go, the view
+  scrolls near its edges and Esc cancels. A top-level fence that doesn't
+  run, such as a Go example or a diagram, has a grip in the margin to its
+  left and drags the same way. In the outline each block and
+  heading has a grip too: a heading's drags its whole section (prose,
+  blocks, output and subsections), which goes only before a heading of
+  its level or higher, or to the end. A section that only partly holds
+  an `mdsh:if` section doesn't move. Drags are edits like the keys below,
+  with the same warnings and Undo.
 - **Moving blocks:** alt+↑ and alt+↓ (Edit › Move Block Up and Move
   Block Down) move the selected block, or the textbox or choice being
   used, past the cell above or below it; with shift they move it past

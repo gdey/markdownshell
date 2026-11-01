@@ -56,6 +56,12 @@ follow [Semantic Versioning](https://semver.org/).
   the diagram or picture they draw, with a button to switch to the code.
   d2 diagrams are drawn with the d2 library built into the app; when one
   has a mistake, the code shows with d2's message.
+- `mdsh-gui`: drag a block by the grip on its card to move it, with its
+  output, between top-level cells, or drag a block or a heading in the
+  outline; a heading carries its whole section. A fence that doesn't
+  run, such as a Go example or a diagram, has a grip in the margin
+  beside it and drags the same way. Undo takes a drag back, and order
+  warnings show as for alt+↑/↓.
 - `mdsh-gui`: alt+↑/↓ (Edit › Move Block Up/Down) moves a block, with
   its output and tape, past the cell above or below it, and alt+shift+↑/↓
   past the block above or below. It works on the selected card, the

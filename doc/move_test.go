@@ -305,3 +305,41 @@ func TestMoveEverywhere(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveSection(t *testing.T) {
+	src := "Intro.\n\n# One\n\nA.\n\n## One.a\n\n```sh {#a}\necho a\n```\n\n" +
+		"# Two\n\nB.\n\nSetext\n------\n\nC.\n"
+	d := mustParse(t, src)
+	var hs []string
+	for _, h := range d.Headings() {
+		line, _, _ := strings.Cut(src[h.Span.Start:], "\n")
+		hs = append(hs, fmt.Sprintf("%d %s", h.Level, line))
+	}
+	if got := strings.Join(hs, "|"); got != "1 # One|2 ## One.a|1 # Two|2 Setext" {
+		t.Errorf("headings %s", got)
+	}
+	span, level, err := d.Section(spot(t, d, "## One.a"))
+	if err != nil || level != 2 || src[span.End:span.End+5] != "# Two" {
+		t.Errorf("section %v %d %v", span, level, err)
+	}
+	// ## One.a can't go mid-section or before a deeper heading.
+	if _, err := d.MoveSection(spot(t, d, "## One.a"), spot(t, d, "C.")); err == nil {
+		t.Error("moved into the middle of a section")
+	}
+	// It can go at the end, making it Two's last subsection.
+	if _, err := d.MoveSection(spot(t, d, "## One.a"), len(d.Src)); err != nil {
+		t.Fatal(err)
+	}
+	want := "Intro.\n\n# One\n\nA.\n\n# Two\n\nB.\n\nSetext\n------\n\nC.\n\n## One.a\n\n```sh {#a}\necho a\n```\n"
+	if string(d.Src) != want {
+		t.Errorf("src =\n%s\nwant\n%s", d.Src, want)
+	}
+	// # Two goes before # One, subsections and all.
+	if _, err := d.MoveSection(spot(t, d, "# Two"), spot(t, d, "# One")); err != nil {
+		t.Fatal(err)
+	}
+	want = "Intro.\n\n# Two\n\nB.\n\nSetext\n------\n\nC.\n\n## One.a\n\n```sh {#a}\necho a\n```\n\n# One\n\nA.\n"
+	if string(d.Src) != want {
+		t.Errorf("src =\n%s\nwant\n%s", d.Src, want)
+	}
+}

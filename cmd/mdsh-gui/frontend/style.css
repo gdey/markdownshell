@@ -619,3 +619,14 @@ body.shell { overflow: hidden; }
 }
 #drop-here[hidden] { display: none; }
 #drop-here.over { color: var(--fg); border-color: var(--accent); }
+
+/* Grips drag a block, or in the outline a section, to another spot. They
+   show on hover, and not while a block runs. */
+.grip { flex: none; border: 0; background: none; padding: 0 4px; color: var(--muted); cursor: grab; font-size: 12px; letter-spacing: -2px; visibility: hidden; touch-action: none; }
+.block:hover .grip, .block.selected .grip, .input-cell:hover .grip, .fence:hover > .grip, #outline .row:hover .grip { visibility: visible; }
+.running .grip { display: none; }
+.prose.fence { position: relative; }
+.prose.fence > .grip { position: absolute; left: -18px; top: 6px; }
+.dragging { opacity: 0.5; }
+.drop-line { position: fixed; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; z-index: 100; }
+#outline .row .grip { padding: 0 2px; margin-left: 2px; }

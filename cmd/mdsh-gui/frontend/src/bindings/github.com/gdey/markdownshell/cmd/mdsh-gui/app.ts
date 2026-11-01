@@ -234,6 +234,14 @@ export function MoveBlock(i: number, dir: number, byBlock: boolean): $Cancellabl
 }
 
 /**
+ * MoveTo moves the block or heading's section that starts at from to
+ * at, a cell's From or -1 for the end, as dragging does.
+ */
+export function MoveTo($from: number, at: number): $CancellablePromise<notebook$0.Move> {
+    return $Call.ByName("main.App.MoveTo", $from, at);
+}
+
+/**
  * Names are the block ids and envs in the file, for completion.
  */
 export function Names(): $CancellablePromise<notebook$0.Names> {

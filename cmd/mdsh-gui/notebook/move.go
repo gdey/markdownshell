@@ -1,6 +1,7 @@
 package notebook
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"slices"
@@ -42,7 +43,7 @@ var ErrNoMove = errors.New("the block can't move further that way")
 func (n *Notebook) MoveBlock(i, dir int, byBlock bool) (Move, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	m, err := n.planMove(i, dir, byBlock)
+	m, err := n.plan(stepMove(i, dir, byBlock), i)
 	if err != nil {
 		return m, err
 	}
@@ -56,17 +57,104 @@ func (n *Notebook) MoveBlock(i, dir int, byBlock bool) (Move, error) {
 func (n *Notebook) PlanMove(i, dir int, byBlock bool) (Move, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	return n.planMove(i, dir, byBlock)
+	return n.plan(stepMove(i, dir, byBlock), i)
 }
 
-func (n *Notebook) planMove(i, dir int, byBlock bool) (Move, error) {
+// MoveTo moves what starts at from, a cell's From, to at, one of the
+// spots doc.Document.Boundaries lists (a cell's From where its Drop is
+// set, or -1 for the end of the file), as dragging does: a top-level
+// block with its output and tape, or a heading's whole section, which
+// only goes before a heading of its level or higher, or to the end.
+// Block is -1 for a section. Undo takes it back.
+func (n *Notebook) MoveTo(from, at int) (Move, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if n.running || len(n.bg) > 0 {
 		return Move{}, ErrBusy
 	}
-	if i < 0 || i >= len(n.d.Blocks) {
-		return Move{}, fmt.Errorf("no block %d", i)
+	// Offsets change if blocks get ids first, so the move is kept as
+	// the block or heading and the boundary, by number.
+	if at < 0 {
+		at = len(n.d.Src)
 	}
-	m, err := n.tryMove(i, dir, byBlock)
+	bounds := n.d.Boundaries()
+	b := slices.Index(bounds, at)
+	if b < 0 {
+		return Move{}, errors.New("that isn't a spot a block or section can go")
+	}
+	i := slices.IndexFunc(n.d.Blocks, func(b *doc.Block) bool { return b.Span.Start == from })
+	h := slices.IndexFunc(n.d.Headings(), func(h doc.Heading) bool { return h.Span.Start == from })
+	if i < 0 && h < 0 {
+		return Move{}, errors.New("only a top-level block or a heading's section moves")
+	}
+	what := "move block"
+	fn := func(d *doc.Document) ([]int, int, int, error) {
+		blk := d.Blocks[i]
+		line := lineNo(d.Src, blk.Span.Start)
+		order, err := d.MoveBlock(blk, d.Boundaries()[b])
+		return order, line, lineNo(d.Src, blk.Span.Start), err
+	}
+	if i < 0 {
+		what = "move section"
+		fn = func(d *doc.Document) ([]int, int, int, error) {
+			from, at := d.Headings()[h].Span.Start, d.Boundaries()[b]
+			span, _, err := d.Section(from)
+			if err != nil {
+				return nil, 0, 0, err
+			}
+			piece := bytes.TrimRight(d.Src[span.Start:span.End], " \t\r\n")
+			line := lineNo(d.Src, from)
+			order, err := d.MoveSection(from, at)
+			if err != nil {
+				return nil, 0, 0, err
+			}
+			lo := at - 2
+			if at > span.Start {
+				lo -= span.End - span.Start
+			}
+			lo = max(lo, 0)
+			k := bytes.Index(d.Src[lo:], piece)
+			return order, line, lineNo(d.Src, lo+max(k, 0)), nil
+		}
+	}
+	m, err := n.plan(fn, i)
+	if err != nil {
+		return m, err
+	}
+	if m.Text == m.Base {
+		return m, nil
+	}
+	return m, n.change(what, "", []byte(m.Text), nil)
+}
+
+// moveFn makes a move on a copy of the document, returning the blocks'
+// new order and the line the moved text starts on before and after.
+type moveFn func(d *doc.Document) (order []int, from, to int, err error)
+
+// stepMove is MoveBlock's move.
+func stepMove(i, dir int, byBlock bool) moveFn {
+	return func(d *doc.Document) ([]int, int, int, error) {
+		if i < 0 || i >= len(d.Blocks) {
+			return nil, 0, 0, fmt.Errorf("no block %d", i)
+		}
+		b := d.Blocks[i]
+		line := lineNo(d.Src, b.Span.Start)
+		at, err := moveTarget(d, b, dir, byBlock)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		order, err := d.MoveBlock(b, at)
+		return order, line, lineNo(d.Src, b.Span.Start), err
+	}
+}
+
+// plan plans a move, giving blocks ids first if it needs them. block is
+// the moved block's index, or -1 for a section.
+func (n *Notebook) plan(fn moveFn, block int) (Move, error) {
+	if n.running || len(n.bg) > 0 {
+		return Move{}, ErrBusy
+	}
+	m, order, err := n.tryMove(fn, block)
 	if err != nil && !errors.Is(err, ErrNoMove) && n.unnamed() {
 		// Give blocks ids, as saving would, and try again.
 		if _, nerr := run.NameBlocks(n.d, n.results, run.Options{File: n.file}); nerr != nil {
@@ -76,15 +164,34 @@ func (n *Notebook) planMove(i, dir int, byBlock bool) (Move, error) {
 		if serr := n.sync(); serr != nil {
 			return Move{}, serr
 		}
-		m, err = n.tryMove(i, dir, byBlock)
+		m, order, err = n.tryMove(fn, block)
 	}
 	if err != nil {
 		return Move{}, err
 	}
-	if r := n.results[i]; r != nil && r.Ran {
-		m.Note = "It ran in the old order; run it again to check."
+	// The blocks that moved are those whose place changed against the
+	// others; one that ran ran in the old order.
+	for j, i := range order {
+		if r := n.results[i]; r != nil && r.Ran && (i == block || block < 0 && movedPast(order, j)) {
+			m.Note = "It ran in the old order; run it again to check."
+			if block < 0 {
+				m.Note = "Blocks in it ran in the old order; run them again to check."
+			}
+			break
+		}
 	}
 	return m, nil
+}
+
+// movedPast reports whether the block at j in order is out of its old
+// order with some other block.
+func movedPast(order []int, j int) bool {
+	for k, i := range order {
+		if (k < j) != (i < order[j]) && k != j {
+			return true
+		}
+	}
+	return false
 }
 
 // unnamed reports whether a block that runs has no id of its own.
@@ -92,28 +199,25 @@ func (n *Notebook) unnamed() bool {
 	return slices.ContainsFunc(n.d.Blocks, func(b *doc.Block) bool { return run.Runnable(b) && !b.Named() })
 }
 
-// tryMove plans the move on a copy of the document.
-func (n *Notebook) tryMove(i, dir int, byBlock bool) (Move, error) {
+// tryMove plans a move on a copy of the document.
+func (n *Notebook) tryMove(fn moveFn, block int) (Move, []int, error) {
 	d, err := doc.Parse(n.d.Src)
 	if err != nil {
-		return Move{}, err
-	}
-	b := d.Blocks[i]
-	from := lineNo(d.Src, b.Span.Start)
-	at, err := moveTarget(d, b, dir, byBlock)
-	if err != nil {
-		return Move{}, err
+		return Move{}, nil, err
 	}
 	before := d.OrderProblems(run.Runnable)
-	order, err := d.MoveBlock(b, at)
+	order, from, to, err := fn(d)
 	if err != nil {
-		return Move{}, err
+		return Move{}, nil, err
 	}
-	m := Move{Base: string(n.d.Src), Text: string(d.Src), Block: slices.Index(order, i), Line: lineNo(d.Src, b.Span.Start), FromLine: from}
+	m := Move{Base: string(n.d.Src), Text: string(d.Src), Block: -1, Line: to, FromLine: from}
+	if block >= 0 {
+		m.Block = slices.Index(order, block)
+	}
 	for _, p := range doc.NewProblems(before, d.OrderProblems(run.Runnable)) {
 		m.Warnings = append(m.Warnings, p.Text)
 	}
-	return m, nil
+	return m, order, nil
 }
 
 // moveTarget is where b's unit goes to move one step up (dir < 0) or

@@ -107,11 +107,21 @@ func (n *Notebook) cells() []Cell {
 		line += bytes.Count(d.Src[pos:c.From], []byte("\n"))
 		pos = c.From
 		c.Line = line
+		c.Drop = slices.Contains(bounds, c.From)
 		bi := c.Block
 		if c.Textbox != nil {
 			bi = c.Textbox.Block
 		} else if c.Choice != nil {
 			bi = c.Choice.Block
+		} else if bi < 0 && c.Heading == 0 {
+			// A fence that doesn't run, drawn as it reads, moves too.
+			// A tape moves with its block, not on its own.
+			bi = slices.IndexFunc(d.Blocks, func(b *doc.Block) bool { return b.Span.Start == c.From })
+			if bi > 0 {
+				if end, ok := unitEnd(d, bi-1, bounds); ok && end > c.From {
+					bi = -1
+				}
+			}
 		}
 		if bi >= 0 {
 			if end, ok := unitEnd(d, bi, bounds); ok {
