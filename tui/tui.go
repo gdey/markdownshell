@@ -476,6 +476,14 @@ func (m *Model) event(e run.Event) {
 		delete(m.live, i)
 		delete(m.bg, i)
 		m.results[i] = e.Result
+		// The block is done even while the run goes on, such as while a
+		// later block waits for an answer.
+		if m.active == i {
+			m.active = -1
+			if m.cur() == i {
+				defer m.follow(i)
+			}
+		}
 		if e.Result.Ran {
 			m.dirty = true
 			if m.opts.AutoSave {

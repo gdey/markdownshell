@@ -1092,3 +1092,26 @@ func TestWrapKeepsTeaMessages(t *testing.T) {
 		t.Error("a Bubble Tea message was marked")
 	}
 }
+
+// TestDoneBlockNotRunning checks that a block that ended doesn't show as
+// running while a later block waits for an answer.
+func TestDoneBlockNotRunning(t *testing.T) {
+	src := "```sh {#first}\necho one\n```\n\n```sh {#second confirm}\necho two\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "a")
+	pump(t, m)
+	if m.prompt == nil {
+		t.Fatal("second didn't ask")
+	}
+	if m.active != -1 {
+		t.Errorf("active = %d while second waits", m.active)
+	}
+	if v := m.block(0); strings.Contains(v, "running") {
+		t.Errorf("first still shows as running:\n%s", v)
+	}
+	if mark := m.mark(0); !strings.Contains(mark, "✓") {
+		t.Errorf("outline marks first %q, want ✓", mark)
+	}
+	press(m, "s")
+	pump(t, m)
+}

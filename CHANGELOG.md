@@ -277,6 +277,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `mdsh -i` no longer shows a block that ended as running while the
+  run goes on, such as while a later block waits for an answer.
 - In a zsh block, a lone `}` anywhere on a line, as in `echo }`, is a
   parse error in zsh itself. mdsh now adds a line after zsh's error
   saying to quote it, as in `echo '}'`.
