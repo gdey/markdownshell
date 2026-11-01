@@ -156,6 +156,26 @@ export interface ChoiceCell {
 }
 
 /**
+ * Fold is a fold made by hand in the rendered view, for SetFolds to
+ * write to the file.
+ */
+export interface Fold {
+    /**
+     * Block is the block whose code, or with Output its output, folds,
+     * or -1 for a section.
+     */
+    "block": number;
+    "output": boolean;
+
+    /**
+     * Heading is where a section's heading starts in the file: its
+     * cell's From.
+     */
+    "heading": number;
+    "on": boolean;
+}
+
+/**
  * Move is a block move, planned or done.
  */
 export interface Move {

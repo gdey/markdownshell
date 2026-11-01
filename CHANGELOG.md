@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: folding a block's code or output, or a section, by hand
+  now saves the fold in the file, so it opens folded next time: a bare
+  `collapse` or `collapse-output` on the block, or a
+  `<!-- mdsh:collapse -->` line under the heading, which other markdown
+  renderers hide. Unfolding takes them out, and Undo takes a fold back.
+  Folds the file sets by a condition are left alone.
 - Run a section: in `mdsh-gui`, each heading with a block under it has a
   play button that runs the blocks of its section and its
   subsections, following Run All's rules (confirm, `skip`, `run=once`,

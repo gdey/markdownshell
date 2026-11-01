@@ -498,7 +498,8 @@ Sections nest, and their comment lines never appear in printed output.
 A `<!-- mdsh:collapse -->` line, optionally with a condition, makes
 mdsh-gui open with the heading section it is in folded. With an input's
 `var=`, `<!-- mdsh:collapse {{$MDSH_VAR_details}}!=yes -->` keeps a
-section folded until someone picks yes.
+section folded until someone picks yes. Folding a block or section by
+hand in mdsh-gui writes these for you, and unfolding takes them out.
 `show=`, `show-output=` and sections only change what is printed: `-w`
 keeps everything in the file. Use `run=` to keep a block from running.
 

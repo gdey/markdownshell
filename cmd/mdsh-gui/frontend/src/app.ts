@@ -3,7 +3,7 @@ import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Move, type Names, type Settings, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
@@ -433,12 +433,17 @@ function drawBlock(c: Cell): HTMLElement {
 // Folds in the rendered view. A block's code and its output each fold
 // to their first line, and a heading folds its section, down to the next
 // heading of the same or a higher level. collapse=, collapse-output= and
-// mdsh:collapse lines say how the file opens; a click lasts while the
-// tab is open, and is never written to the file. The source pane keeps
-// folds of its own, and the Folding menu copies them either way.
+// mdsh:collapse lines say how the file opens. A click, the Folding menu
+// and the outline write the fold to the file, as a bare collapse or
+// collapse-output or an mdsh:collapse line under the heading, so it
+// opens that way next time (saveFolds). Where the file folds by a
+// condition, or while a block runs, the fold lasts only while the tab is
+// open. The source pane keeps folds of its own, and the Folding menu
+// copies them either way.
 
-// folds are the clicked folds, by key: the block's id and part, or the
-// heading's dataset.fold. The rest are as the file says.
+// folds are the clicked folds the file doesn't hold, by key: the block's
+// id and part, or the heading's dataset.fold. The rest are as the file
+// says.
 const folds = new Map<string, boolean>();
 
 type Part = "code" | "output";
@@ -477,12 +482,39 @@ function foldPart(part: Part, full: HTMLElement, toggle: () => void): HTMLElemen
 function foldBlock(block: HTMLElement, part: Part, on = !blockFolded(block, part)) {
   folds.set(partKey(block, part), on);
   drawPart(block, part);
+  void saveFolds([blockFold(block, part, on)]);
 }
 
 function foldSection(cell: HTMLElement, on = !sectionFolded(cell)) {
   folds.set(cell.dataset.fold ?? "", on);
   applyFolds();
   drawOutline();
+  const f = sectionFold(cell, on);
+  if (f) void saveFolds([f]);
+}
+
+const blockFold = (block: HTMLElement, part: Part, on: boolean): Fold => ({ block: Number(block.dataset.block), output: part === "output", heading: 0, on });
+
+function sectionFold(cell: HTMLElement, on: boolean): Fold | null {
+  const c = cells.find((c) => String(c.line) === cell.dataset.line);
+  return c?.heading ? { block: -1, output: false, heading: c.from, on } : null;
+}
+
+// saveFolds writes folds to the file, then forgets the clicks the file
+// now holds, so that Undo and edits to the file show. The file can't
+// change while a block runs, so then the folds aren't saved.
+async function saveFolds(list: Fold[]) {
+  if (!list.length || running) return;
+  if (!(await edit(() => App.SetFolds(list)))) return;
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    const held = (key: string, file: boolean) => folds.get(key) === file && folds.delete(key);
+    if (e.classList.contains("block")) {
+      held(partKey(e, "code"), !!e.dataset.foldCode);
+      held(partKey(e, "output"), !!e.dataset.foldOutput);
+    } else if (e.dataset.fold) held(e.dataset.fold, !!e.dataset.foldDefault);
+  }
+  // Where the file folds by a condition, nothing changed.
+  $("dirty").hidden = !(await App.Doc()).dirty;
 }
 
 // drawPart shows a block's code or output whole, or as its first line.
@@ -557,16 +589,26 @@ function reveal(cell: HTMLElement) {
 
 // foldAll folds or unfolds every block's code and output, or every
 // section.
-function foldAll(what: "blocks" | "sections", on: boolean) {
+function foldAll(what: "blocks" | "sections", on: boolean): Fold[] {
+  const list: Fold[] = [];
   for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
     if (what === "blocks" && e.classList.contains("block")) {
-      folds.set(partKey(e, "code"), on);
-      folds.set(partKey(e, "output"), on);
+      for (const part of ["code", "output"] as const) {
+        // Only blocks with output get collapse-output.
+        const empty = part === "output" && !e.querySelector(".output")?.innerHTML.trim();
+        if (blockFolded(e, part) !== on && !(on && empty)) list.push(blockFold(e, part, on));
+        folds.set(partKey(e, part), on);
+      }
     }
-    if (what === "sections" && e.dataset.fold) folds.set(e.dataset.fold, on);
+    if (what === "sections" && e.dataset.fold) {
+      const f = sectionFolded(e) !== on && sectionFold(e, on);
+      if (f) list.push(f);
+      folds.set(e.dataset.fold, on);
+    }
   }
   applyFolds();
   drawOutline();
+  return list;
 }
 
 // renderedFoldLines are the source lines of the rendered view's folds,
@@ -594,18 +636,27 @@ async function foldsToSource() {
 function foldsToRendered() {
   if (!source) return status("open the source view to copy its folds");
   const lines = new Set(sourceFolds(source.view));
+  const list: Fold[] = [];
   for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
     const c = cells.find((c) => String(c.line) === e.dataset.line);
     if (!c) continue;
-    if (c.heading && e.dataset.fold) folds.set(e.dataset.fold, lines.has(c.line));
+    if (c.heading && e.dataset.fold) {
+      const on = lines.has(c.line);
+      if (sectionFolded(e) !== on) list.push({ block: -1, output: false, heading: c.from, on });
+      folds.set(e.dataset.fold, on);
+    }
     if (c.block >= 0) {
-      folds.set(partKey(e, "code"), lines.has(c.line));
-      folds.set(partKey(e, "output"), !!c.outputLine && lines.has(c.outputLine));
+      const on = { code: lines.has(c.line), output: !!c.outputLine && lines.has(c.outputLine) };
+      for (const part of ["code", "output"] as const) {
+        if (blockFolded(e, part) !== on[part]) list.push(blockFold(e, part, on[part]));
+        folds.set(partKey(e, part), on[part]);
+      }
     }
   }
   if (!view.rendered) toggle("rendered", true);
   applyFolds();
   drawOutline();
+  void saveFolds(list);
 }
 
 // followLinks makes a click on a link in the rendered view follow it,
@@ -1336,11 +1387,10 @@ const actions: Record<string, () => Promise<void> | void> = {
   outline: () => toggle("outline"),
   code: () => toggle("code"),
   output: () => toggle("output"),
-  foldblocks: () => foldAll("blocks", true),
-  foldsections: () => foldAll("sections", true),
+  foldblocks: () => void saveFolds(foldAll("blocks", true)),
+  foldsections: () => void saveFolds(foldAll("sections", true)),
   unfoldall() {
-    foldAll("blocks", false);
-    foldAll("sections", false);
+    void saveFolds([...foldAll("blocks", false), ...foldAll("sections", false)]);
   },
   foldstosource: () => foldsToSource(),
   foldstorendered: () => foldsToRendered(),

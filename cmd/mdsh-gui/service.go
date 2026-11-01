@@ -448,6 +448,18 @@ func (a *App) SetTask(ctx context.Context, task int, done bool) error {
 	return err
 }
 
+// SetFolds writes folds made by hand in the rendered view to the file,
+// as collapse attributes and mdsh:collapse lines, so it opens with them.
+func (a *App) SetFolds(ctx context.Context, folds []notebook.Fold) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetFolds(folds)
+	t.changed()
+	return err
+}
+
 // SetTextbox replaces the text of textbox block i, as typed in it.
 func (a *App) SetTextbox(ctx context.Context, i int, text string) error {
 	t, n, err := a.notebook(ctx)
