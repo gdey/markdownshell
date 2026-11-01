@@ -39,6 +39,23 @@ export interface About {
 }
 
 /**
+ * ConsoleEntry is one line of the console.
+ */
+export interface ConsoleEntry {
+    /**
+     * counts up from 1, so a page can tell it missed one
+     */
+    "seq": number;
+    "time": string;
+    "level": string;
+
+    /**
+     * the message, then its attributes as key=value
+     */
+    "message": string;
+}
+
+/**
  * Doc is what the frontend shows about the open file.
  */
 export interface Doc {
@@ -191,6 +208,11 @@ export interface View {
      * the History pane
      */
     "history": boolean;
+
+    /**
+     * the Console pane
+     */
+    "console": boolean;
 }
 
 /**

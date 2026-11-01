@@ -524,6 +524,30 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-input::placeholder { color: rgb(212 212 212 / 0.45); }
 #history-input:disabled { opacity: 0.5; }
 
+/* The Console pane, under the document and over the History bar,
+   whatever screen the tab shows. */
+#console { order: 2; flex: none; position: relative; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border); background: var(--bg); font-size: 12px; }
+#history { order: 3; }
+#console-grip { position: absolute; z-index: 3; top: -3px; left: 0; right: 0; height: 7px; cursor: ns-resize; }
+#console-grip:hover { background: var(--accent); opacity: 0.4; }
+#console .console-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--border); }
+#console .console-title { font-weight: 600; }
+#console-note { flex: 1; min-width: 0; color: var(--muted); }
+#console .console-bar button { font-size: 12px; padding: 1px 8px; }
+#console .console-bar button.icon { padding: 2px 4px; background: none; }
+#console .console-bar svg { width: 12px; height: 12px; fill: currentColor; }
+#console-log { flex: 1; min-height: 0; overflow: auto; padding: 2px 0; font: 12px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; outline: none; user-select: text; }
+#console-log .entry { display: flex; gap: 8px; padding: 0 8px; }
+#console-log .entry:hover { background: var(--hover); }
+#console-log time { flex: none; color: var(--muted); }
+#console-log .level { flex: none; width: 3ch; font-weight: 700; color: var(--muted); }
+#console-log .message { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#console-log .warn .level { color: var(--warn-border); }
+#console-log .error .level, #console-log .error .message { color: var(--bad); }
+#console-empty { position: absolute; top: 28px; left: 8px; margin: 0; font-size: 12px; pointer-events: none; }
+#console-toggle { position: relative; }
+#console-toggle .badge { position: absolute; top: -3px; right: -4px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; background: var(--bad); color: #fff; font-size: 10px; line-height: 14px; text-align: center; }
+
 /* A window: the tab bar, and the tab in front under it. */
 body.shell { overflow: hidden; }
 #tabbar {

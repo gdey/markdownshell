@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a Console (View › Console, cmd/ctrl+shift+Y, or the
+  toolbar's console button) along the bottom of the window shows what
+  the app logs, with the time and level: errors from what you did, such
+  as a file that no longer parses, and notes at info and above. The
+  button counts warnings and errors that came while it was closed. Copy
+  copies the selected lines, or all of them; Clear empties it in every
+  window. It keeps the last 1000 lines.
 - `mdsh-gui`: a block's `depends=` is drawn as lines in the margin of
   the rendered view, from the block up to each block it names, faint
   behind the cards: the first dependency in purple, then pink, teal and

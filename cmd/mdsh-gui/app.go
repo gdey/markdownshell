@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,9 +31,10 @@ type App struct {
 	cwd      string // the folder mdsh-gui started in
 	dir      string // the folder given on the command line, if any
 	source   string // the files given to --source, read at startup
+	console  *console
 
 	menu       *application.Menu
-	viewItems  struct{ split, rendered, outline, history, code, output *application.MenuItem }
+	viewItems  struct{ split, rendered, outline, history, console, code, output *application.MenuItem }
 	recentMenu *application.Menu
 
 	mu        sync.Mutex
@@ -381,6 +383,7 @@ func (a *App) opened(file string) {
 }
 
 func (a *App) showError(win application.Window, err error) {
+	slog.Error(err.Error())
 	d := a.app.Dialog.Error().SetTitle("mdsh").SetMessage(err.Error())
 	if win != nil {
 		d.AttachToWindow(win)
