@@ -21,6 +21,10 @@ follow [Semantic Versioning](https://semver.org/).
   the outline, and enter or `s` runs it; Run › Run Section
   (cmd/ctrl+shift+enter) and the source view's gutter run one too. In
   `mdsh -i`, `s` runs the section the block is in.
+- `mdsh-gui`: fenced `d2` and `svg` blocks show in the rendered view as
+  the diagram or picture they draw, with a button to switch to the code.
+  d2 diagrams are drawn with the d2 library built into the app; when one
+  has a mistake, the code shows with d2's message.
 - `mdsh-gui`: alt+↑/↓ (Edit › Move Block Up/Down) moves a block, with
   its output and tape, past the cell above or below it, and alt+shift+↑/↓
   past the block above or below. It works on the selected card, the

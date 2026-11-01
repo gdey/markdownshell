@@ -206,6 +206,7 @@ function drawProse(c: Cell): HTMLElement {
   // goldmark's HTML, with raw HTML in the markdown left out.
   const s = el("section", { className: "prose", innerHTML: c.html ?? "", title: "Click to show it in the source" });
   highlightProse(s);
+  enableDiagrams(s);
   s.onclick = (e) => {
     if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
     if (c.heading) selectSection(s);
@@ -235,6 +236,34 @@ function drawProse(c: Cell): HTMLElement {
     s.append(note);
   }
   return s;
+}
+
+// shownAsCode holds the source of the diagrams switched to their code,
+// so a redraw keeps them that way.
+const shownAsCode = new Set<string>();
+
+// enableDiagrams gives each d2 or svg diagram Go drew in e a button that
+// switches between the picture and its code. A diagram Go couldn't draw
+// shows only its code and a note saying why.
+function enableDiagrams(e: HTMLElement) {
+  for (const fig of e.querySelectorAll<HTMLElement>("figure.diagram")) {
+    if (!fig.querySelector(".diagram-image")) continue;
+    const key = fig.dataset.lang + "\n" + (fig.querySelector("pre")?.textContent ?? "");
+    let b: HTMLButtonElement;
+    const show = (code: boolean) => {
+      fig.dataset.show = code ? "code" : "image";
+      if (code) shownAsCode.add(key);
+      else shownAsCode.delete(key);
+      const title = code ? "Show the diagram" : "Show the " + fig.dataset.lang + " source";
+      b.title = title;
+      b.setAttribute("aria-label", title);
+      b.replaceChildren(svg(icons[code ? "image" : "code"]));
+    };
+    b = iconButton("code", "", () => show(fig.dataset.show !== "code"));
+    b.classList.add("diagram-toggle");
+    fig.prepend(b);
+    show(shownAsCode.has(key));
+  }
 }
 
 // enableTasks makes the task list checkboxes in e check and uncheck
@@ -418,6 +447,7 @@ function drawBlock(c: Cell): HTMLElement {
   // Checkboxes in output, such as out=markdown's, are edited in place
   // too, until the block runs again.
   enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
+  enableDiagrams(block.querySelector<HTMLElement>(".output")!);
   block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
     const img = (e.target as HTMLElement).closest("img");
     if (img) viewImage(img);

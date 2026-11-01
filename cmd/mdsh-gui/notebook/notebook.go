@@ -203,7 +203,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		quit:  make(chan struct{}),
 	}
 	n.idle = sync.NewCond(&n.mu)
-	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer()))
+	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer(), diagramTransformer()), goldmark.WithRendererOptions(diagramRendererOption()))
 	for i, b := range d.Blocks {
 		n.index[b] = i
 	}
