@@ -158,3 +158,22 @@ func TestRunDepends(t *testing.T) {
 		t.Errorf("a failed=%v, b ran=%v, c ran=%v; want a failed and nothing else run", results[1].Failed(), results[0].Ran, results[2].Ran)
 	}
 }
+
+// A depends= naming no block is ignored: the block runs as if it
+// weren't there.
+func TestRunDependsUnknown(t *testing.T) {
+	d := parse(t, "```sh {#a}\necho a\n```\n\n```sh {#b depends=\"nope, a\"}\necho b\n```\n")
+	asked := 0
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: func(_, _ *doc.Block) run.Answer { asked++; return run.Go }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r, err := s.RunBlock(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ran(s); asked != 1 || string(r.Stdout) != "b\n" || !slices.Equal(got, []string{"a", "b"}) {
+		t.Errorf("asked %d times, b's stdout %q, ran %q; want a asked about and run, then b", asked, r.Stdout, got)
+	}
+}

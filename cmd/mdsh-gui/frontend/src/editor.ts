@@ -7,7 +7,7 @@ import { autocompletion, type Completion, type CompletionContext, type Completio
 import { type Diagnostic, linter } from "@codemirror/lint";
 import { Vim } from "@replit/codemirror-vim";
 
-import { App, AttrKind, type AttrSpec, type Names } from "./api.js";
+import { App, AttrKind, type AttrSpec, type Names, type SourceBlock } from "./api.js";
 
 // fence matches an opening fence line: the fence, then the info string.
 const fence = /^(\s*(?:`{3,}|~{3,}))(.*)$/;
@@ -92,10 +92,45 @@ function infoRange(state: EditorState, pos: number): { from: number; text: strin
   return { from: line.from + m[1].length, text: m[2] };
 }
 
+// dependsRe finds a depends= in an info string: its value, quoted or not.
+const dependsRe = /([{\s]depends=)(?:"([^"]*)"?|([^\s}]*))/;
+
+// sourceBlocks is the blocks in the editor's text, as Go parses it, or
+// null if it doesn't parse.
+async function sourceBlocks(state: EditorState): Promise<SourceBlock[] | null> {
+  try {
+    return await App.SourceBlocks(state.doc.toString());
+  } catch {
+    return null;
+  }
+}
+
+// checkDepends underlines the names in a fence's depends= that aren't a
+// block that runs: mdsh ignores them.
+function checkDepends(blocks: SourceBlock[], from: number, info: string, out: Diagnostic[]) {
+  const m = dependsRe.exec(info);
+  if (!m) return;
+  const quoted = m[2] !== undefined;
+  let at = from + m.index + m[1].length + (quoted ? 1 : 0);
+  for (const part of (quoted ? m[2] : m[3]).split(",")) {
+    const name = part.trim();
+    const start = at + part.indexOf(name);
+    at += part.length + 1;
+    if (!name) continue;
+    const b = blocks.find((b) => b.id === name);
+    if (b?.runs) continue;
+    const message = b ? `${name} is an input, which never runs, so depends= ignores it` : `There is no block ${name}, so depends= ignores it`;
+    out.push({ from: start, to: start + name.length, severity: "error", message });
+  }
+}
+
 // checkInfo checks the attributes of every fence with some.
 async function checkInfo(view: EditorView): Promise<Diagnostic[]> {
   const out: Diagnostic[] = [];
   const doc = view.state.doc;
+  // The blocks are only needed, and parsed, if a depends= is there.
+  const blocks = doc.toString().includes("depends=") ? await sourceBlocks(view.state) : null;
+  const fences = new Set(blocks?.map((b) => b.line));
   const vars = new Map<string, number>(); // var= names, and the line binding each
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
@@ -106,6 +141,7 @@ async function checkInfo(view: EditorView): Promise<Diagnostic[]> {
     for (const p of problems) {
       out.push({ from: r.from + p.from, to: r.from + p.to, severity: p.severity === "error" ? "error" : "warning", message: p.message });
     }
+    if (blocks && fences.has(n)) checkDepends(blocks, r.from, r.text, out);
     // Only one textbox or choice can bind a variable, or the last would
     // quietly win.
     const v = /^\s*(?:textbox|choice)\b/.test(r.text) && !r.text.includes("<include") ? /[{\s]var="?([A-Za-z0-9_]+)"?/.exec(r.text) : null;
@@ -139,7 +175,7 @@ function tokenAt(state: EditorState, pos: number): { start: number; text: string
 const inputAttrs = new Set(["#", "show"]);
 
 function attrCompletions(attrs: AttrSpec[], names: () => Names) {
-  return (ctx: CompletionContext): CompletionResult | null => {
+  return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
     const tok = tokenAt(ctx.state, ctx.pos);
     if (!tok) return null;
     const eq = tok.text.indexOf("=");
@@ -162,6 +198,7 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
     const key = tok.text.slice(0, eq);
     const spec = attrs.find((a) => a.name === key);
     if (!spec) return null;
+    if (key === "depends") return dependsCompletions(ctx, tok.start + eq + 1, tok.text.slice(eq + 1));
     const known = names();
     let from = tok.start + eq + 1;
     let values: Completion[] = [];
@@ -215,6 +252,25 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
     if (opened) from++;
     return { from, options: values };
   };
+}
+
+// dependsCompletions offers, for the name being typed in a depends=
+// whose value starts at from, the blocks above this one that run and
+// aren't listed already.
+async function dependsCompletions(ctx: CompletionContext, from: number, value: string): Promise<CompletionResult | null> {
+  const blocks = await sourceBlocks(ctx.state);
+  if (!blocks || ctx.aborted) return null;
+  const line = ctx.state.doc.lineAt(ctx.pos).number;
+  const opened = value.startsWith('"');
+  const comma = value.lastIndexOf(",");
+  const listed = new Set(value.slice(opened ? 1 : 0, Math.max(comma, 0)).split(",").map((s) => s.trim()));
+  let start = from + (comma >= 0 ? comma + 1 : opened ? 1 : 0);
+  while (start < ctx.pos && /\s/.test(ctx.state.sliceDoc(start, start + 1))) start++;
+  const options: Completion[] = blocks
+    .filter((b) => b.line < line && b.runs && !listed.has(b.id))
+    .map((b) => ({ label: b.id, detail: `line ${b.line}`, type: "variable" }));
+  if (!options.length) return null;
+  return { from: start, options, validFor: /^[\w-]*$/ };
 }
 
 function attrHover(attrs: AttrSpec[]) {

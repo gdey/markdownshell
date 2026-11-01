@@ -1,6 +1,8 @@
 package notebook
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -64,5 +66,56 @@ func TestSetDepends(t *testing.T) {
 	saved, _ := os.ReadFile(file)
 	if !strings.Contains(string(saved), "depends=build,login") {
 		t.Errorf("saved:\n%s", saved)
+	}
+}
+
+// Names depends= ignores stay when the dependencies are edited, and a
+// textbox can't be made one.
+func TestSetDependsKeepsUnknown(t *testing.T) {
+	file := write(t, "```sh {#a}\n```\n\n```textbox {#name}\n```\n\n```sh {#b depends=\"nope, a\"}\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.SetDepends(2, nil); err != nil {
+		t.Fatal(err)
+	}
+	if text := string(n.d.Src); !strings.Contains(text, "{#b depends=nope}") {
+		t.Errorf("after remove:\n%s", text)
+	}
+	if err := n.SetDepends(2, []int{0}); err != nil {
+		t.Fatal(err)
+	}
+	if text := string(n.d.Src); !strings.Contains(text, "{#b depends=a,nope}") {
+		t.Errorf("after add:\n%s", text)
+	}
+	if err := n.SetDepends(2, []int{1}); err == nil || !strings.Contains(err.Error(), "never runs") {
+		t.Errorf("textbox: err = %v", err)
+	}
+}
+
+// A depends= naming no block is logged once, for the console, and again
+// only if it comes back after going.
+func TestDependsWarningLogged(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(old)
+	file := write(t, "```sh {#a depends=nope}\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if got := strings.Count(buf.String(), `depends= names unknown block \"nope\"`); got != 1 {
+		t.Fatalf("logged %d times after open:\n%s", got, buf.String())
+	}
+	// An edit that only moves it down a line doesn't log it again.
+	if _, err := n.SetText(string(n.d.Src), "# T\n\n"+string(n.d.Src)); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(buf.String(), "unknown block"); got != 1 {
+		t.Errorf("logged %d times after an edit:\n%s", got, buf.String())
 	}
 }

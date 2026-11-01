@@ -1,6 +1,7 @@
 package notebook
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,5 +35,17 @@ func TestCheckInfo(t *testing.T) {
 		if g := strings.Join(got, ", "); g != c.want {
 			t.Errorf("CheckInfo(%s) = %s, want %s", c.info, g, c.want)
 		}
+	}
+}
+
+func TestSourceBlocks(t *testing.T) {
+	text := "# T\n\n```sh {#a}\n```\n\n```sh {<include file=x.sh}\n```\n\n```textbox {#name}\n```\n\n```sh {depends=\"a, nope\"}\n```\n"
+	got := SourceBlocks(text)
+	want := []SourceBlock{{3, "a", true}, {9, "name", false}, {12, "block-3", true}}
+	if !slices.Equal(got, want) {
+		t.Errorf("SourceBlocks = %+v, want %+v", got, want)
+	}
+	if got := SourceBlocks("```sh {#a depends=a}\n```\n"); got != nil {
+		t.Errorf("SourceBlocks of a cycle = %+v, want nil", got)
 	}
 }

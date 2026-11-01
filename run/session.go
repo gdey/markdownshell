@@ -403,11 +403,13 @@ func (e *depError) Unwrap() error { return ErrDependency }
 // nil, gets each block it runs.
 func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Block]bool) error {
 	for _, id := range b.Depends() {
-		i := slices.IndexFunc(s.d.Blocks, func(x *doc.Block) bool { return x.ID == id })
-		if i < 0 {
-			return fmt.Errorf("%s depends on unknown block %q", s.d.Label(b), id)
+		// A name that isn't a block that can run is ignored: the
+		// document warned about it when it was parsed.
+		dep := s.d.Dep(id)
+		if dep == nil {
+			continue
 		}
-		dep := s.d.Blocks[i]
+		i := slices.Index(s.d.Blocks, dep)
 		if r := s.results[i]; r != nil && r.Ran && !r.Failed() {
 			continue
 		}

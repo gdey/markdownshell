@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -16,6 +18,7 @@ import (
 // kept their identity keep their results. A document that gains its
 // first tty block needs new shells.
 func (n *Notebook) sync() error {
+	n.logWarnings()
 	n.waitReap()
 	old := make(map[*doc.Block]*run.Result, len(n.results))
 	for _, r := range n.results {
@@ -197,10 +200,57 @@ func CheckInfo(info string) []Problem {
 	return problems
 }
 
+// SourceBlock is a block in the source pane's text, for completing and
+// checking depends= there.
+type SourceBlock struct {
+	// Line is the line its opening fence is on, from 1.
+	Line int    `json:"line"`
+	ID   string `json:"id"`
+	// Runs says whether depends= can name it: an input never runs.
+	Runs bool `json:"runs"`
+}
+
+// SourceBlocks lists the blocks in text, the source pane's, in order,
+// leaving out includes and tapes, which have no name. It is nil if text
+// doesn't parse.
+func SourceBlocks(text string) []SourceBlock {
+	d, err := doc.Parse([]byte(text))
+	if err != nil {
+		return nil
+	}
+	var out []SourceBlock
+	for _, b := range d.Blocks {
+		if b.IsInclude() || b.IsTape() {
+			continue
+		}
+		line := strings.Count(text[:b.Span.Start], "\n") + 1
+		out = append(out, SourceBlock{Line: line, ID: b.ID, Runs: !b.IsInput()})
+	}
+	return out
+}
+
 // unquote matches doc's reading of "quoted" values.
 func unquote(v string) string {
 	if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
 		return strings.ReplaceAll(v[1:len(v)-1], `\"`, `"`)
 	}
 	return v
+}
+
+// lineRe is the line number a document warning starts with.
+var lineRe = regexp.MustCompile(`^line \d+: `)
+
+// logWarnings logs, for the console, the document's warnings that are
+// new since it last did, such as a depends= naming no block. One that
+// only moved to another line isn't new.
+func (n *Notebook) logWarnings() {
+	now := make(map[string]bool, len(n.d.Warnings))
+	for _, w := range n.d.Warnings {
+		key := lineRe.ReplaceAllString(w, "")
+		now[key] = true
+		if !n.warned[key] {
+			slog.Warn(filepath.Base(n.file) + ": " + w)
+		}
+	}
+	n.warned = now
 }
