@@ -124,9 +124,11 @@ Each file opens in a tab of its own, with its own shells.
   config unless you turn it off). It works as the built-in editor does:
   `:w` saves, `:RunBlock` and `:RunSection` run what the cursor is in,
   as cmd/ctrl+enter and cmd/ctrl+shift+enter do, and the ▶ in the sign
-  column runs a block or section. Typing in a fence's `{…}` offers the
-  same completions, `K` explains the attribute under the cursor, and
-  mistakes show as diagnostics. Spelling follows the setting, with
+  column runs a block or section. The pane attaches mdsh's language
+  server (`mdsh lsp`, run as `mdsh-gui --lsp`): typing in a fence's
+  `{…}` offers the same completions, there or through a completion
+  plugin such as nvim-cmp, `K` explains the attribute under the cursor,
+  and mistakes show as diagnostics. Spelling follows the setting, with
   Neovim's `spell`. Headings, fences and output fold (`zc`, `zo`), as
   the file's folds say when it opens; the cursor's cell is marked and
   the panes scroll together; and the outline and a card's edit button

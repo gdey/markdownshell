@@ -1,8 +1,9 @@
 -- mdsh-gui's side of the embedded Neovim: the buffer holding the file,
 -- kept in step with mdsh-gui over RPC. Run once with nvim_exec_lua, with
--- the channel to mdsh-gui, the buffer's name and its lines.
+-- the channel to mdsh-gui, the buffer's name, its lines and the command
+-- that starts mdsh's language server.
 
-local chan, name, lines = ...
+local chan, name, lines, lsp_cmd = ...
 
 local group = vim.api.nvim_create_augroup("mdsh", { clear = true })
 local buf = vim.api.nvim_create_buf(true, false)
@@ -328,65 +329,55 @@ function calls.set_background(bg)
   end
 end
 
--- Lint: mdsh-gui checks the fences' attributes and sends what it finds.
-local lint = vim.api.nvim_create_namespace("mdsh_lint")
-function calls.diagnostics(list)
-  local out = {}
-  for _, d in ipairs(list) do
-    out[#out + 1] = {
-      lnum = d.line - 1,
-      col = d.col,
-      end_lnum = d.end_line - 1,
-      end_col = d.end_col,
-      severity = d.error and vim.diagnostic.severity.ERROR or vim.diagnostic.severity.WARN,
-      message = d.message,
-      source = "mdsh",
-    }
-  end
-  vim.diagnostic.set(lint, buf, out)
-end
-
--- Completion of a fence's attributes, and depends='s block names: typing
--- in a fence's {…} asks mdsh-gui, which answers with complete.
+-- mdsh's language server completes a fence's attributes and depends=
+-- names, explains the attribute under the cursor (K, Neovim's hover) and
+-- reports mistakes in them as diagnostics.
 local function fence_attrs(text, col)
   local before = text:sub(1, col)
   return before:match("^%s*[>%s]*[-*+%d.)%s]*[`~][`~][`~]+[^{]*{[^}]*$") ~= nil
+end
+
+if lsp_cmd and #lsp_cmd > 0 then
+  vim.lsp.start({
+    name = "mdsh",
+    cmd = lsp_cmd,
+    root_dir = vim.fn.fnamemodify(lsp_cmd[3] or ".", ":h"),
+  }, { bufnr = buf, reuse_client = function(c, conf) return c.name == conf.name end })
+end
+
+-- Without a completion plugin, typing in a fence's {…} opens the
+-- server's completions, as the built-in editor does. A plugin such as
+-- nvim-cmp or blink.cmp asks the server itself.
+local function has_plugin()
+  return package.loaded["cmp"] ~= nil or package.loaded["blink.cmp"] ~= nil or package.loaded["mini.completion"] ~= nil
 end
 
 vim.api.nvim_create_autocmd("TextChangedI", {
   group = group,
   buffer = buf,
   callback = function()
-    local c = vim.api.nvim_win_get_cursor(0)
-    local text = vim.api.nvim_get_current_line()
-    if c[2] == 0 or not fence_attrs(text, c[2]) or not text:sub(c[2], c[2]):match('[%w#<=,"_-]') then
+    if has_plugin() or vim.fn.pumvisible() == 1 or vim.bo[buf].omnifunc == "" then
       return
     end
-    notify("complete", {
-      text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n") .. "\n",
-      line = c[1],
-      col = c[2],
-      tick = vim.b[buf].changedtick,
-    })
+    local c = vim.api.nvim_win_get_cursor(0)
+    local text = vim.api.nvim_get_current_line()
+    if c[2] == 0 or not fence_attrs(text, c[2]) or not text:sub(c[2], c[2]):match('[%w#<=,"_{%s-]') then
+      return
+    end
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-x><C-o>", true, false, true), "n", false)
   end,
 })
 
--- complete shows items for the word starting at start (bytes from 0),
--- unless the text changed since mdsh-gui was asked.
-function calls.complete(tick, start, items)
-  if vim.b[buf].changedtick ~= tick or not vim.api.nvim_get_mode().mode:match("^i") then
-    return
-  end
-  vim.fn.complete(start + 1, items)
-end
-
--- While typing in the buffer, a completion menu doesn't pick or put in
--- an item until asked.
+-- While typing in the buffer, that menu doesn't pick or put in an item
+-- until asked.
 local saved_completeopt
 vim.api.nvim_create_autocmd("InsertEnter", {
   group = group,
   buffer = buf,
   callback = function()
+    if has_plugin() then
+      return
+    end
     saved_completeopt = vim.o.completeopt
     vim.o.completeopt = "menuone,noinsert,noselect"
   end,
@@ -401,22 +392,6 @@ vim.api.nvim_create_autocmd("InsertLeave", {
     end
   end,
 })
-
--- K on a fence's attributes asks mdsh-gui for their help, which comes
--- back to hover; elsewhere it is K.
-vim.keymap.set("n", "K", function()
-  local c = vim.api.nvim_win_get_cursor(0)
-  local text = vim.api.nvim_get_current_line()
-  if fence_attrs(text, #text) or text:match("^%s*[>%s]*[-*+%d.)%s]*[`~][`~][`~]+[^{]*{") then
-    notify("hover", { text = text, line = c[1], col = c[2] })
-    return
-  end
-  vim.cmd("normal! K")
-end, { buffer = buf, desc = "mdsh: help for the attribute under the cursor" })
-
-function calls.hover(lines)
-  vim.lsp.util.open_floating_preview(lines, "markdown", { focus_id = "mdsh_hover", border = "rounded" })
-end
 
 -- Folds: a heading folds its section, down to the next heading of the
 -- same or a higher level, and a fence or an mdsh:output region folds to

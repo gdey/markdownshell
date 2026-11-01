@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gdey/markdownshell/lsp"
 )
 
 func TestParseVersion(t *testing.T) {
@@ -330,23 +332,6 @@ func TestCalls(t *testing.T) {
 		t.Errorf("foldlevel in b's fence = %d, want 3", end)
 	}
 
-	// Typing in a fence's attributes asks for completions.
-	call("jump", 11, 0, true, -1)
-	if err := e.Input("i en"); err != nil {
-		t.Fatal(err)
-	}
-	var ask struct {
-		Line, Col int
-		Tick      int
-	}
-	if err := json.Unmarshal([]byte(eventNamed(t, events, "complete")), &ask); err != nil {
-		t.Fatal(err)
-	}
-	if ask.Line != 11 {
-		t.Errorf("complete asked on line %d, want 11", ask.Line)
-	}
-	e.Input("<Esc>")
-
 	// The app's colors, and back to Neovim's own with the setting off.
 	colors := map[string]any{"dark": true, "fg": "#e6edf3", "code_bg": "#151b23", "bg": "#0d1117", "accent": "#2f81f7"}
 	call("set_colors", colors, true)
@@ -376,9 +361,72 @@ func TestCalls(t *testing.T) {
 	if err := e.v.ExecLua(`return vim.wo.spell`, &spell); err != nil || !spell {
 		t.Errorf("spell = %v, %v", spell, err)
 	}
-	call("diagnostics", []map[string]any{{"line": 11, "col": 13, "end_line": 11, "end_col": 20, "error": true, "message": "bad"}})
-	var n int
-	if err := e.v.ExecLua(`return #vim.diagnostic.get(0)`, &n); err != nil || n != 1 {
-		t.Errorf("%d diagnostics, %v", n, err)
+}
+
+// TestMain runs the language server when a test's Neovim starts this
+// test binary as it, as mdsh-gui runs itself with --lsp.
+func TestMain(m *testing.M) {
+	if os.Getenv("MDSH_TEST_LSP") == "1" {
+		if err := lsp.Serve(os.Stdin, os.Stdout, ""); err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
+func TestLanguageServer(t *testing.T) {
+	path := testNvim(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MDSH_TEST_LSP", "1")
+	e, err := Start(Options{
+		Path:  path,
+		Cols:  60,
+		Rows:  20,
+		Name:  "mdsh://test.md",
+		Text:  runbook + "\n```sh {#c depends=zz}\n```\n",
+		Clean: true,
+		LSP:   []string{exe},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { e.Close() })
+
+	// The server attaches and reports the unknown depends= name.
+	var got string
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := e.v.ExecLua(`local d = vim.diagnostic.get(0); return #d > 0 and d[1].lnum .. ":" .. d[1].col .. " " .. d[1].message or ""`, &got); err != nil {
+			t.Fatal(err)
+		}
+		if got != "" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if want := "14:18 There is no block zz, so depends= ignores it"; got != want {
+		t.Errorf("diagnostic %q, want %q", got, want)
+	}
+
+	// Completion through the client, as omnifunc and plugins ask.
+	var labels []string
+	err = e.v.ExecLua(`
+		local client = vim.lsp.get_clients({ name = "mdsh" })[1]
+		local res = client.request_sync("textDocument/completion", {
+			textDocument = { uri = vim.uri_from_bufnr(0) },
+			position = { line = 10, character = 19 },
+		}, 5000, 0)
+		local out = {}
+		for _, it in ipairs(res.result.items) do out[#out + 1] = it.label end
+		return out`, &labels)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(labels) != "[a]" {
+		t.Errorf("depends= completions %v, want [a]", labels)
 	}
 }

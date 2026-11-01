@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
@@ -56,6 +57,11 @@ func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) 
 	if err != nil {
 		return "", err
 	}
+	// The language server is this program, run with --lsp.
+	var lspCmd []string
+	if exe, err := os.Executable(); err == nil {
+		lspCmd = []string{exe, "--lsp", n.File()}
+	}
 	var e *nvim.Editor
 	e, err = nvim.Start(nvim.Options{
 		Path:    f.Path,
@@ -65,6 +71,7 @@ func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) 
 		Text:    text,
 		Clean:   s.NeovimClean,
 		Dark:    background == "dark",
+		LSP:     lspCmd,
 		Redraw:  func(ev [][]any) { t.emitNow("nvim-redraw", ev) },
 		Changed: func(text string) { t.emitNow("nvim-text", text) },
 		Write:   func(text string) { t.emitNow("nvim-write", text) },
