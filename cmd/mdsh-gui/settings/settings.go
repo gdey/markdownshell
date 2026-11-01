@@ -21,6 +21,9 @@ type Settings struct {
 	Autosave bool `json:"autosave"`
 	// Vim turns on Vim key bindings in the code editors.
 	Vim bool `json:"vim"`
+	// NoSpellCheck turns off spell checking of the prose in the code
+	// editor, which is on by default.
+	NoSpellCheck bool `json:"noSpellCheck"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
 	// Shell, if set, overrides the front matter's shell for every file.

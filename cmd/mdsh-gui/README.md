@@ -213,7 +213,8 @@ Each file opens in a tab of its own, with its own shells.
   Linux) has tabs: General for the theme (System, Light or Dark), the
   view files open in (rendered, source or both; by default the view
   the last tab had) and the start folder; Editing for autosave after
-  each run and Vim mode; Shell for a shell for every file and the file
+  each run, Vim mode and spell checking of the prose in the
+  source view (on by default; not code, links or HTML); Shell for a shell for every file and the file
   the History pane's shell reads; and Files for the templates folder
   for New File…. They are kept in
   `mdsh/gui.json` in the user's config folder. Shell has one more,
