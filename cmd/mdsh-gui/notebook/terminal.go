@@ -16,7 +16,8 @@ type terminal struct {
 
 	mu         sync.Mutex
 	cols, rows int
-	block      int // the block using it, or -1
+	block      int  // the block using it, or -1
+	history    bool // the block was typed in the History pane
 }
 
 func newTerminal() *terminal {
@@ -60,15 +61,21 @@ func (o termOut) Write(p []byte) (int, error) {
 
 // take marks block i as using the terminal, emitting "terminal" so the
 // window opens the pane, and "terminal-end" when the block gives it back.
+// A block typed in the History pane says so in the event's Data, since
+// it shows there rather than in its card.
 func (t *terminal) take(i int, emit func(Event)) (giveBack func()) {
 	t.mu.Lock()
 	t.block = i
+	pane := ""
+	if t.history {
+		pane = "history"
+	}
 	t.mu.Unlock()
 	// Keys typed before the block started aren't for it.
 	for len(t.keys) > 0 {
 		<-t.keys
 	}
-	emit(Event{Kind: "terminal", Block: i})
+	emit(Event{Kind: "terminal", Block: i, Data: pane})
 	return func() {
 		t.mu.Lock()
 		t.block = -1
@@ -91,6 +98,15 @@ func (n *Notebook) Type(keys string) {
 	case t.keys <- []byte(keys):
 	default:
 	}
+}
+
+// TerminalSize is the terminal size the front matter asks for, in
+// cells, with 0 for either it leaves to the window.
+func (n *Notebook) TerminalSize() (cols, rows int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	t := n.d.Options.Terminal
+	return t.Cols, t.Rows
 }
 
 // SetTerminalSize sets the terminal pane's size in cells. The next tty

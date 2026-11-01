@@ -33,6 +33,18 @@ export interface Doc {
      * Args is Run.Args as one line, quoted as a shell would need.
      */
     "args": string;
+
+    /**
+     * History is set while the History pane is on for the file.
+     */
+    "history": boolean;
+
+    /**
+     * TermCols and TermRows are the terminal size the front matter asks
+     * for, 0 where it doesn't.
+     */
+    "termCols": number;
+    "termRows": number;
 }
 
 /**
@@ -114,6 +126,11 @@ export interface View {
     "outline": boolean;
     "code": boolean;
     "output": boolean;
+
+    /**
+     * the History pane
+     */
+    "history": boolean;
 }
 
 /**

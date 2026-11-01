@@ -24,7 +24,14 @@ type Options struct {
 	// ShowStderr shows every block's stderr. Blocks can override it
 	// with show-stderr=. By default stderr shows only for failed blocks.
 	ShowStderr *bool `yaml:"show_stderr"`
-	Env        struct {
+	// Terminal is the size, in cells, of the terminal tty blocks run on
+	// where mdsh draws it, as in the GUI. A zero cols fits the window;
+	// a zero rows is 24.
+	Terminal struct {
+		Cols int `yaml:"cols"`
+		Rows int `yaml:"rows"`
+	} `yaml:"terminal"`
+	Env struct {
 		// Share lists the variables passed into the top-level env from
 		// the caller, and the default for sub-envs. Nil means all.
 		Share []string `yaml:"share"`
@@ -60,6 +67,9 @@ func parseFrontMatter(src []byte, pos int) (Span, Options, error) {
 			case "", "continue", "stop":
 			default:
 				return Span{}, opts, fmt.Errorf("front matter: on_error must be continue or stop, got %q", fm.Mdsh.OnError)
+			}
+			if t := fm.Mdsh.Terminal; t.Cols < 0 || t.Rows < 0 || t.Cols > 1000 || t.Rows > 500 {
+				return Span{}, opts, fmt.Errorf("front matter: terminal cols must be 0 to 1000 and rows 0 to 500, got %d by %d", t.Cols, t.Rows)
 			}
 			return Span{pos, e}, fm.Mdsh, nil
 		}

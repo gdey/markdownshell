@@ -32,7 +32,7 @@ type App struct {
 	source   string // the files given to --source, read at startup
 
 	menu       *application.Menu
-	viewItems  struct{ split, rendered, outline, code, output *application.MenuItem }
+	viewItems  struct{ split, rendered, outline, history, code, output *application.MenuItem }
 	recentMenu *application.Menu
 
 	mu        sync.Mutex
@@ -48,10 +48,11 @@ type App struct {
 	started atomic.Bool // the app is running, so menus change on its main thread
 }
 
-// runOptions are the options a file opens with: the shell from Settings
-// and what --source read.
+// runOptions are the options a file opens with: the shell and History
+// rc file from Settings, and what --source read.
 func (a *App) runOptions() notebook.RunOptions {
-	return notebook.RunOptions{Shell: a.settings.Get().Shell, Source: a.source}
+	s := a.settings.Get()
+	return notebook.RunOptions{Shell: s.Shell, Source: a.source, HistoryRC: s.HistoryRC}
 }
 
 // errNoFile is returned by calls that need a file before one is open.

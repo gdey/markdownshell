@@ -55,11 +55,46 @@ Each file opens in a tab of its own, with its own shells.
   nothing had run. It isn't saved until you save; with the source view
   open, undo there brings the output back. A block marked
   `tty` runs in a terminal in its card: type at it as you would in a
-  terminal. When it ends the card shows the recording, as `mdsh` saves
+  terminal. It is as wide as the card and 24 lines high, unless
+  `cols:` and `rows:` under `terminal:` in the front matter say
+  otherwise. When it ends the card shows the recording, as `mdsh` saves
   it. A block marked `background` starts and lets other blocks run: its
   card has a dashed edge and says it is running in the background, the
   status line counts them, and its output shows when it ends. Closing
   the window kills those still running.
+- **History** (View › History, cmd/ctrl+shift+H): a terminal along the
+  bottom that works like a paper tape. Closed, it is a status bar with
+  the shell's prompt, the status, and buttons to stop (ctrl+c for a
+  command typed in the pane), start the shells again, and open it, when
+  the terminal slides up out of the bar. Type a command and press enter:
+  it runs in the file's shell, sharing variables and the working
+  directory with the blocks, and is added to the end of the file as a
+  block, `#history-1`, `#history-2`…, with its output and exit status,
+  failures included. It runs on a real terminal, so you can type at a
+  prompt it shows, and a full-screen program such as `vi` or `top` is
+  kept as a `tty` block with its recording. A line starting with `#` is
+  added as prose, without the `#`; notes typed one after another make
+  one paragraph. Shift+enter starts another line, and so does enter on
+  an unfinished command, such as one ending in `\` or inside quotes.
+  Up and down recall what you typed, and Tab completes a command, a
+  file or a `$` variable, as the shell sees them: in its directory,
+  with what blocks set. The prompt is the shell's own `PS1`, expanded
+  as the shell would (zsh's `%` escapes and `precmd` hooks, bash's `\`
+  escapes), with `PS2` on continuation lines, or `$` if it has none.
+  The shells aren't interactive, so they don't read your rc file
+  themselves: name it, such as `~/.zshrc`, in Settings › File the
+  History pane's shell reads, and the shells read it when History is
+  turned on, for your aliases, functions and prompt. ctrl+Z stops a
+  command and ends its block with the stop status; `jobs`, `fg` and `bg`
+  then work as in a terminal, in shells that allow it, such as dash, the
+  `sh` of Debian and Ubuntu (bash and zsh have no job control unless
+  interactive, so there ctrl+Z is ignored). A command ending in a
+  lone `&` is added as a `background` block instead, without the `&`,
+  and its output goes to the block when it ends. Drag the pane's top edge to make it taller, or
+  as short as one line. The blocks are added as `zsh` when
+  the file runs in zsh, else `sh`. Turning History on starts the shells
+  again, on a terminal, with `TERM=xterm-256color`, unless a `tty` block
+  already did.
 - **Editing** happens in the source view. The pencil (or `e`) on a block
   opens it with the cursor on the block's code, and clicking prose opens
   it on that text. New blocks are typed there too. Inside
@@ -114,7 +149,8 @@ Each file opens in a tab of its own, with its own shells.
 - **Source view** (the `<>` button or cmd/ctrl+\\): the whole file in a
   markdown editor beside the rendered view. Typing re-renders after a
   pause, and the two scroll together; clicking a block lines the source
-  up with it. Blocks whose code didn't change
+  up with it. Drag the line between them to share the width
+  differently; a double click shares it evenly again. Blocks whose code didn't change
   keep their output. The play button in the gutter runs a block, or by
   a heading, its section. The
   rendered view can be turned off too (its button or
@@ -215,6 +251,12 @@ Image, screenshot and recording output shows in the block.
 A `tty` block runs in a terminal in its card.
 
 ![A tty block asking "Your name?" in a terminal in its card](../../site/static/images/gui/tty.png)
+
+View › History opens a terminal along the bottom. Each command typed
+there is added to the end of the file with its output, and each `#`
+line as prose.
+
+![The History pane under a document: notes and commands typed in the pane, and the same notes as prose and commands as blocks with their output in the file](../../site/static/images/gui/history.png)
 
 If the file changes on disk, a banner offers to reload it.
 

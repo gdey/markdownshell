@@ -14,6 +14,7 @@ function draw() {
   applyTheme(s.theme);
   $<HTMLSelectElement>("view").value = s.view;
   input("shell").value = s.shell;
+  input("history-rc").value = s.historyRC;
   $<HTMLSelectElement>("start-mode").value = s.startFolder ? "fixed" : "last";
   input("start-folder").value = s.startFolder;
   input("template-folder").value = s.templateFolder;
@@ -62,6 +63,7 @@ $<HTMLSelectElement>("theme").onchange = async () => {
 };
 $<HTMLSelectElement>("view").onchange = () => ((s.view = $<HTMLSelectElement>("view").value), save());
 input("shell").onchange = () => ((s.shell = input("shell").value.trim()), save());
+input("history-rc").onchange = () => ((s.historyRC = input("history-rc").value.trim()), save());
 $<HTMLSelectElement>("start-mode").onchange = async () => {
   if ($<HTMLSelectElement>("start-mode").value === "last") {
     s.startFolder = "";

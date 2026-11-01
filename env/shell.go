@@ -55,6 +55,12 @@ type Terminal struct {
 	Size func() (cols, rows int)
 	// Resized, if not nil, says when Size changes.
 	Resized <-chan struct{}
+	// JobControl runs the script with the shell's job control on, as
+	// in an interactive shell: ctrl+z stops a command and the shell
+	// carries on, and jobs, fg and bg work. Off, or in a shell that
+	// can't do job control without being interactive, such as bash and
+	// zsh, ctrl+z is ignored.
+	JobControl bool
 }
 
 // Dims is t's size, or 80 by 24 if it has none.
@@ -174,11 +180,12 @@ func Start(cfg Config) (*Shell, error) {
 // stdin is /dev/null. If the script ends the shell, Run returns ErrExited
 // and the shell's exit status. If ctx ends first, the shell is killed.
 func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer) (status int, exited bool, err error) {
-	return s.run(ctx, script, stdout, stderr, false)
+	return s.run(ctx, script, stdout, stderr, false, false)
 }
 
-// run runs script, on the shell's terminal if onTTY is set.
-func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer, onTTY bool) (status int, exited bool, err error) {
+// run runs script, on the shell's terminal if onTTY is set, with job
+// control if jobs is set too.
+func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer, onTTY, jobs bool) (status int, exited bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -211,10 +218,21 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		// The INT trap keeps ctrl+c from ending the shell along with the
 		// command it is waiting for. Commands start with the default
 		// action, since a trap isn't inherited.
+		//
+		// Without job control nothing could bring a stopped command
+		// back, so ctrl+z and the other stop signals are ignored, which
+		// commands inherit: vim and less, among others, then don't
+		// suspend. With job control (set -m), ctrl+z stops the command
+		// and the shell carries on, keeping it as a job for fg or bg.
+		//
 		// A marker on the terminal too tells when all the block wrote
 		// there has been read.
 		s.ttyRun++
-		cmd = fmt.Sprintf("trap : INT\n. %s </dev/tty >/dev/tty 2>/dev/tty\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark, s.ttyRun, s.mark)
+		before, after := "trap '' TSTP TTIN TTOU\n", "trap - TSTP TTIN TTOU\n"
+		if jobs && s.jobControl() {
+			before, after = s.jobsOn(), "set +m\ntrap - TSTP TTIN TTOU\n"
+		}
+		cmd = fmt.Sprintf("trap : INT\n%s. %s </dev/tty >/dev/tty 2>/dev/tty\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\n%sprintf '%%s0\\n' '%s' >&2\n", before, quote(f), s.mark, s.mark, s.ttyRun, after, s.mark)
 	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited
@@ -251,6 +269,33 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		return 0, false, fmt.Errorf("bad status %q", outRC)
 	}
 	return rc, false, nil
+}
+
+// jobControl reports whether the shell might turn job control on with
+// set -m while it isn't interactive; jobsOn checks. zsh can't: it only
+// takes the terminal for its jobs in an interactive shell.
+func (s *Shell) jobControl() bool {
+	return filepath.Base(s.cmd.Path) != "zsh"
+}
+
+// jobsOn is the script that turns job control on before a block, if
+// the shell can: set -m works only where it gives a command the
+// terminal, which dash does and bash, unless interactive, doesn't.
+// The first time, a command checks it is the terminal's foreground
+// group, and the shell keeps the answer. Without job control, the stop
+// signals are ignored instead.
+func (s *Shell) jobsOn() string {
+	f := quote(filepath.Join(s.tmp, "jobs"))
+	return `if [ -z "${__mdsh_jobs-}" ]; then
+__mdsh_jobs=no
+set -m
+sh -c 'ps -o pgid= -o tpgid= -p $$' </dev/tty >` + f + ` 2>/dev/null
+set +m
+read -r __mdsh_g __mdsh_t <` + f + ` && [ -n "$__mdsh_g" ] && [ "$__mdsh_g" = "$__mdsh_t" ] && __mdsh_jobs=yes
+unset __mdsh_g __mdsh_t
+fi
+if [ "$__mdsh_jobs" = yes ]; then set -m; else trap '' TSTP TTIN TTOU; fi
+`
 }
 
 // kill ends the shell and whatever it started, and stops reading its

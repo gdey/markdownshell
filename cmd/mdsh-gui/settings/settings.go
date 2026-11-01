@@ -25,6 +25,9 @@ type Settings struct {
 	Theme string `json:"theme"`
 	// Shell, if set, overrides the front matter's shell for every file.
 	Shell string `json:"shell"`
+	// HistoryRC is a file, such as ~/.zshrc, the shells read while the
+	// History pane is on. Empty reads none.
+	HistoryRC string `json:"historyRC"`
 	// View is how a file opens: "rendered", "source" or "both".
 	// Empty keeps the view the last tab had.
 	View string `json:"view"`

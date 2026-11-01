@@ -204,6 +204,11 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 .cm-run svg { width: 11px; height: 11px; fill: currentColor; }
 #doc-scroll { flex: 1; overflow: auto; min-width: 0; }
 #workspace.split #doc-scroll { flex: 1; }
+/* The grip over the source view's right edge, to drag. */
+#split-grip { flex: none; position: relative; z-index: 3; width: 7px; margin: 0 -4px 0 -3px; cursor: col-resize; }
+#split-grip[hidden] { display: none; }
+#split-grip:hover { background: var(--accent); opacity: 0.4; }
+body.resizing-cols { cursor: col-resize; user-select: none; }
 .cm-mdsh-attrs { color: var(--accent); }
 
 header .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; }
@@ -401,9 +406,54 @@ dialog#report { width: min(560px, 92vw); }
 
 /* Terminal pane, where a tty block runs */
 :root { --term-bg: #1e1e1e; --term-fg: #d4d4d4; }
-.block .output .terminal { margin: 12px 0; padding: 6px; background: var(--term-bg); border-radius: 6px; }
+.block .output .terminal { margin: 12px 0; padding: 6px; overflow-x: auto; background: var(--term-bg); border-radius: 6px; }
 .block .output .terminal :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
 .block .output:has(.terminal) { padding: 0 12px 0 22px; }
+
+/* The History pane: a terminal along the bottom whose commands are
+   added to the file. */
+#history { flex: none; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--term-bg); }
+#history[hidden] { display: none; }
+#history { position: relative; }
+/* The pane is dark in either theme, so the prompt's colors are the
+   dark theme's. */
+#history {
+  --ansi-0: #484f58; --ansi-1: #ff7b72; --ansi-2: #3fb950; --ansi-3: #d29922;
+  --ansi-4: #58a6ff; --ansi-5: #bc8cff; --ansi-6: #39c5cf; --ansi-7: #b1bac4;
+  --ansi-8: #6e7681; --ansi-9: #ffa198; --ansi-10: #56d364; --ansi-11: #e3b341;
+  --ansi-12: #79c0ff; --ansi-13: #d2a8ff; --ansi-14: #56d4dd; --ansi-15: #ffffff;
+}
+#history-grip { position: absolute; z-index: 3; top: -3px; left: 0; right: 0; height: 7px; cursor: ns-resize; }
+#history-grip:hover { background: var(--accent); opacity: 0.4; }
+body.resizing-rows { cursor: ns-resize; user-select: none; }
+#history-term { padding: 4px 8px 0; overflow-x: auto; overflow-y: hidden; }
+/* Closed, the pane is a status bar: the prompt line, with the status in
+   place of the input. Opening slides the transcript up out of it. */
+#history-body { overflow: hidden; transition: height 0.18s ease-out; }
+#history.closed #history-grip, #history.closed #history-input, #history.closed #history-prompt-head { display: none; }
+#history:not(.closed) #history-status { display: none; }
+#history-status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(212 212 212 / 0.6); line-height: 18px; }
+#history .history-controls { flex: none; display: inline-flex; gap: 2px; margin: -2px -4px -2px 4px; }
+#history .history-controls button.icon { color: var(--term-fg); background: none; padding: 2px 4px; }
+#history .history-controls button.icon:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); }
+#history .history-controls button.icon:disabled { opacity: 0.35; }
+#history .history-controls svg { width: 13px; height: 13px; fill: currentColor; }
+#history-toggle svg { transition: transform 0.18s; }
+#history:not(.closed) #history-toggle svg { transform: rotate(180deg); }
+#history.closed .history-line { border-top: 0; padding-top: 3px; padding-bottom: 3px; }
+#history-term :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
+#history .history-line { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px 6px; border-top: 1px solid rgb(255 255 255 / 0.08); font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#history .prompt { flex: none; color: #4ec94e; font-weight: 700; line-height: 18px; }
+/* The shell's own PS1, in its colors. It ends with its own space, and
+   all but its last line goes above the input. */
+#history .prompt.custom { color: var(--term-fg); font-weight: normal; white-space: pre; }
+#history .history-line:has(.prompt.custom) { gap: 0; }
+#history-prompt-head { padding: 4px 8px 0; border-top: 1px solid rgb(255 255 255 / 0.08); color: var(--term-fg); font: 13px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: hidden; }
+#history-prompt-head[hidden] { display: none; }
+#history:has(#history-prompt-head:not([hidden])):not(.closed) .history-line { border-top: 0; padding-top: 0; }
+#history-input { flex: 1; resize: none; border: 0; outline: none; padding: 0; background: transparent; color: var(--term-fg); font: inherit; line-height: 18px; }
+#history-input::placeholder { color: rgb(212 212 212 / 0.45); }
+#history-input:disabled { opacity: 0.5; }
 
 /* A window: the tab bar, and the tab in front under it. */
 body.shell { overflow: hidden; }

@@ -69,7 +69,7 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 		forward(fd, tty, ptm, stop)
 	}()
 
-	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true)
+	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true, false)
 
 	s.pty.attach(nil)
 	close(stop)
@@ -117,7 +117,7 @@ func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec 
 		}
 	}()
 
-	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true)
+	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true, t.JobControl)
 
 	s.pty.attach(nil)
 	close(stop)
@@ -159,7 +159,7 @@ func (s *Shell) RunScripted(ctx context.Context, script string, cols, rows int, 
 	}
 	ran := make(chan result, 1)
 	go func() {
-		st, ex, err := s.run(runCtx, script, io.Discard, io.Discard, true)
+		st, ex, err := s.run(runCtx, script, io.Discard, io.Discard, true, false)
 		ran <- result{st, ex, err}
 	}()
 	driveCtx, stopDrive := context.WithCancel(ctx)

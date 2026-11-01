@@ -1,12 +1,19 @@
 package run_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -235,5 +242,102 @@ func TestSessionRunRange(t *testing.T) {
 	}
 	if r := s.Results(); !r[5].Ran || r[6].Ran {
 		t.Errorf("RunRange(5, 6): d ran = %v, e ran = %v", r[5].Ran, r[6].Ran)
+	}
+}
+
+// TestRunTyped runs blocks on a terminal the caller draws, as typed
+// there: a plain block keeps the text it showed, sharing the shell with
+// the other blocks, and a full-screen one gets a recording.
+func TestRunTyped(t *testing.T) {
+	d := parse(t, "```sh {#a}\nX=from-a; cd /\n```\n\n```sh {#b}\nprintf '\\033[1mbold\\033[0m %s %s\\n' \"$X\" \"$PWD\"; [ -t 1 ] && echo tty; exit 3\n```\n")
+	dir := t.TempDir()
+	var shown bytes.Buffer
+	var mu sync.Mutex
+	out := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return shown.Write(p)
+	})
+	s, err := run.NewSession(d, run.Options{
+		Dir:      dir,
+		File:     filepath.Join(dir, "d.md"),
+		PTY:      true,
+		Terminal: &env.Terminal{Keys: make(chan []byte), Out: out},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	r, full, err := s.RunTyped(ctx, 1)
+	if err != nil || full {
+		t.Fatalf("b: err %v, full screen %v", err, full)
+	}
+	if got := string(r.Stdout); got != "bold from-a /\ntty\n" || r.Status != 3 || !r.Exited {
+		t.Errorf("b: stdout %q, status %d, exited %v", got, r.Status, r.Exited)
+	}
+	if mu.Lock(); !strings.Contains(shown.String(), "\033[1mbold") {
+		t.Errorf("shown %q", shown.String())
+	}
+	mu.Unlock()
+}
+
+func TestRunTypedFullScreen(t *testing.T) {
+	d := parse(t, "```sh {#c}\nprintf '\\033[?1049hfull\\033[?1049l'\n```\n")
+	dir := t.TempDir()
+	s, err := run.NewSession(d, run.Options{
+		Dir:      dir,
+		File:     filepath.Join(dir, "d.md"),
+		PTY:      true,
+		Terminal: &env.Terminal{Keys: make(chan []byte), Out: io.Discard},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r, full, err := s.RunTyped(context.Background(), 0)
+	if err != nil || !full || r.Failed() {
+		t.Fatalf("err %v, full screen %v, result err %v", err, full, r.Err)
+	}
+	if r.Image == "" || len(r.Stdout) != 0 {
+		t.Errorf("image %q, stdout %q", r.Image, r.Stdout)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "d.md.assets", "c.cast")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestRunTypedNoTerminal(t *testing.T) {
+	s, err := run.NewSession(parse(t, "```sh\necho\n```\n"), run.Options{Environ: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, _, err := s.RunTyped(context.Background(), 0); !errors.Is(err, run.ErrNoTTY) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestAsk(t *testing.T) {
+	d := parse(t, "```sh\nX=set; cd /\n```\n")
+	dir := t.TempDir()
+	s, err := run.NewSession(d, run.Options{Dir: dir, File: filepath.Join(dir, "d.md")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Ask(ctx, `(printf '%s %s\n' "$X" "$PWD"; cd /tmp; Y=1)`)
+	if err != nil || got != "set /\n" {
+		t.Fatalf("Ask = %q, %v", got, err)
+	}
+	if got, _ := s.Ask(ctx, `printf '%s %s' "$PWD" "${Y-unset}"`); got != "/ unset" {
+		t.Errorf("after Ask: %q", got)
 	}
 }

@@ -116,6 +116,10 @@ type RunOptions struct {
 	// Source runs in every shell as it starts, like the files given to
 	// mdsh --source. It isn't sent to the window.
 	Source string `json:"-"`
+	// HistoryRC is a file, such as ~/.zshrc, the shells read as they
+	// start while the History pane is on, so the pane can be used as an
+	// everyday shell. It isn't sent to the window.
+	HistoryRC string `json:"-"`
 }
 
 // Options configure a Notebook.
@@ -154,6 +158,11 @@ type Notebook struct {
 	// it does, and idle tells those waiting for it that it is done.
 	bg      map[*doc.Block]bool
 	reaping bool
+	// history is set while the History pane is on, and noteEnd is the
+	// length of the source when the last note added there ended it, or
+	// -1.
+	history bool
+	noteEnd int
 	idle    *sync.Cond
 	quit    chan struct{}
 	// undo and redo are the rendered view's edits, for Undo and Redo.
@@ -194,13 +203,14 @@ func Open(file string, opts Options) (*Notebook, error) {
 		return nil, fmt.Errorf("%s: %w", file, err)
 	}
 	n := &Notebook{
-		file:  abs,
-		opts:  opts,
-		d:     d,
-		index: map[*doc.Block]int{},
-		term:  newTerminal(),
-		bg:    map[*doc.Block]bool{},
-		quit:  make(chan struct{}),
+		file:    abs,
+		opts:    opts,
+		d:       d,
+		index:   map[*doc.Block]int{},
+		term:    newTerminal(),
+		bg:      map[*doc.Block]bool{},
+		quit:    make(chan struct{}),
+		noteEnd: -1,
 	}
 	n.idle = sync.NewCond(&n.mu)
 	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer(), diagramTransformer()), goldmark.WithRendererOptions(diagramRendererOption()))
@@ -227,14 +237,15 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		Step:        ro.Step,
 		StopOnError: ro.StopOnError,
 		Shell:       ro.Shell,
-		Source:      ro.Source,
-		Environ:     environ(),
+		Source:      n.source(ro),
+		Environ:     n.shellEnv(),
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
 		Depend:      n.depend,
 		Terminal:    n.term.env(n.emit),
 		TakeTTY:     n.takeTTY,
 		Mode:        run.ModeInteractive,
+		PTY:         n.history,
 	})
 }
 
@@ -452,6 +463,26 @@ func (n *Notebook) ClearOutputs() error {
 	if err := n.setSource(render.Clear(n.d)); err != nil {
 		return err
 	}
+	sess, err := n.newSession(n.opts.Run)
+	if err != nil {
+		return err
+	}
+	n.closeSession()
+	n.sess = sess
+	n.results = append([]*run.Result(nil), sess.Results()...)
+	return nil
+}
+
+// Restart ends the shells, and any background block still running, and
+// starts them again, as if nothing had run, keeping the document as it
+// is.
+func (n *Notebook) Restart() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return ErrBusy
+	}
+	n.waitReap()
 	sess, err := n.newSession(n.opts.Run)
 	if err != nil {
 		return err

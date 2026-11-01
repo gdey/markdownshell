@@ -80,6 +80,10 @@ type Options struct {
 	// Mode is $MDSH_MODE: ModeRunning, ModeInteractive or ModeReport.
 	// Defaults to ModeRunning.
 	Mode string
+	// PTY starts every shell with a terminal of its own, as a document
+	// with a tty block does, so Session.RunTyped can run any block on
+	// Terminal.
+	PTY bool
 }
 
 // The values of $MDSH_MODE, which tells blocks how they are being run.

@@ -49,8 +49,26 @@
       <div id="source-bar"></div>
       <div id="source-editor"></div>
     </div>
+    <div id="split-grip" title="Drag to resize; double-click to share evenly" hidden></div>
     <div id="doc-scroll"><main id="doc"></main></div>
   </div>
+  <section id="history" class="closed" aria-label="History" hidden>
+    <div id="history-grip" title="Drag to resize" aria-hidden="true"></div>
+    <div id="history-body">
+      <div id="history-term"></div>
+      <div id="history-prompt-head" hidden></div>
+    </div>
+    <div class="history-line">
+      <span id="history-prompt" class="prompt" aria-hidden="true">$</span>
+      <textarea id="history-input" rows="1" spellcheck="false" autocomplete="off" placeholder="A command to run and add to the file, or # a note"></textarea>
+      <span id="history-status" role="status"></span>
+      <span class="history-controls">
+        <button id="history-stop" class="icon" title="Stop: ctrl+c for a command typed here" aria-label="Stop" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg></button>
+        <button id="history-restart" class="icon" title="Start the shells again, as if nothing had run" aria-label="Restart the shells"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 5.2 3.7l-1.4.5A4 4 0 1 1 8 4v2.2l3.2-3-3.2-3z"/></svg></button>
+        <button id="history-toggle" class="icon" title="History (cmd/ctrl+shift+H)" aria-label="History" aria-expanded="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.3 10.3 8 5.6l4.7 4.7-1.1 1.1L8 7.8l-3.6 3.6z"/></svg></button>
+      </span>
+    </div>
+  </section>
 
   <main id="start" hidden>
     <h1>Open a runbook</h1>

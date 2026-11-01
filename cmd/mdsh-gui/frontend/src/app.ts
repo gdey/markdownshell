@@ -8,14 +8,16 @@ import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
+import { fitHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
+import { initSplitGrip, showSplitGrip } from "./split.js";
 import { diff } from "./sync.js";
-import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal } from "./terminal.js";
+import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "" };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0 };
 let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
@@ -36,8 +38,9 @@ interface View {
   outline: boolean;
   code: boolean;
   output: boolean;
+  history: boolean;
 }
-let view: View = { split: false, rendered: true, outline: false, code: true, output: true, ...loadView() };
+let view: View = { split: false, rendered: true, outline: false, code: true, output: true, history: false, ...loadView() };
 
 function loadView(): Partial<View> {
   try {
@@ -55,6 +58,7 @@ function mine<T>(handler: (data: T) => void) {
 
 function status(text: string) {
   $("status").textContent = text;
+  historyStatus(text);
 }
 
 function fail(err: unknown) {
@@ -64,10 +68,13 @@ function fail(err: unknown) {
 // refresh reads the document's state and draws whichever screen fits.
 async function refresh() {
   doc = await App.Doc();
+  wantTerminalSize(doc.termCols, doc.termRows);
+  fitHistory();
   const open = doc.file !== "";
   $("toolbar").hidden = !open;
   $("workspace").hidden = !open;
   $("start").hidden = open;
+  syncHistory();
   if (!open) {
     $("changed").hidden = true;
     return drawStart();
@@ -856,6 +863,7 @@ function busy(on: boolean) {
   running = on;
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   runAllButton();
+  historyBusy(on);
   for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run, .heading-cell .run-section")) x.disabled = on;
 }
 
@@ -865,6 +873,8 @@ function start(method: "RunBlock" | "RunFrom", block: number) {
 
 async function run(call: () => Promise<void>) {
   if (running) return;
+  // The History pane may have set the terminal's size to its own.
+  sizeTerminal();
   busy(true);
   ranHere = true;
   status("running");
@@ -1326,11 +1336,13 @@ function applyView() {
   $("source").hidden = !view.split;
   $("doc-scroll").hidden = !view.rendered;
   $("workspace").classList.toggle("split", view.split);
+  showSplitGrip(view.split && view.rendered);
   document.body.classList.toggle("hide-code", !view.code);
   document.body.classList.toggle("hide-output", !view.output);
   $("outline-toggle").classList.toggle("on", view.outline);
   $("view-split").classList.toggle("on", view.split);
   $("view-rendered").classList.toggle("on", view.rendered);
+  syncHistory();
   if (view.split) openSource();
   else closeSource();
   drawOutline();
@@ -1350,6 +1362,20 @@ function showFile(file: string): string {
   $("file").title = file;
   $("changed-text").textContent = name + " changed on disk.";
   return name;
+}
+
+// syncHistory shows the History pane if the view has it, and tells Go
+// when that changes, as when the file opens or is read again.
+function syncHistory() {
+  if (!doc.file) {
+    showBar(false);
+    return;
+  }
+  if ($("history").hidden) showBar(true);
+  if (view.history === doc.history && $("history").classList.contains("closed") === !view.history) return;
+  const had = doc.history;
+  doc.history = view.history;
+  void showHistory(view.history, had);
 }
 
 // openView shows the view the settings open files in, if they name one.
@@ -1430,6 +1456,7 @@ const actions: Record<string, () => Promise<void> | void> = {
   movedown: () => void moveAction(1, false),
   moveblockup: () => void moveAction(-1, true),
   moveblockdown: () => void moveAction(1, true),
+  history: () => toggle("history"),
 };
 
 // Moving blocks
@@ -1767,6 +1794,11 @@ interface Question {
 const liveColors = new WeakMap<HTMLElement, Record<string, Ansi>>();
 
 function onBlock(e: BlockEvent) {
+  // A command typed in the History pane runs there, before its card is
+  // drawn.
+  if (e.kind === "terminal" && historyTerminal(e.block, e.data)) return;
+  if (e.kind === "tty" && historyWrite(e.block, e.bytes)) return;
+  if (e.kind === "terminal-end" && historyEnd(e.block)) return;
   const block = document.getElementById("block-" + e.block);
   if (!block) return;
   const out = block.querySelector(".output")!;
@@ -1908,7 +1940,39 @@ $("run-all").onclick = () => void actions.runall();
 let resizeTimer = 0;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(() => doc.file && sizeTerminal(), 200);
+  resizeTimer = window.setTimeout(() => {
+    if (!doc.file) return;
+    sizeTerminal();
+    fitHistory();
+  }, 200);
+});
+initSplitGrip();
+initHistory({
+  canRun: () => !running,
+  async enter(call) {
+    busy(true);
+    ranHere = true;
+    status("running");
+    await call();
+    status("");
+    ranHere = false;
+    busy(false);
+    await refresh();
+    // What was added is at the end.
+    const scroll = $("doc-scroll");
+    scroll.scrollTop = scroll.scrollHeight;
+  },
+  status: (i) => cells.find((c) => c.block === i)?.status,
+  toggle: () => void actions.history(),
+  stop: () => void actions.stop(),
+  async restart() {
+    try {
+      await App.RestartShells();
+    } catch (err) {
+      fail(err);
+    }
+    await refresh();
+  },
 });
 initReport({
   dirty: () => !$("dirty").hidden,
