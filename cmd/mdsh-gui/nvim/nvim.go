@@ -162,6 +162,9 @@ type Options struct {
 	Changed func(text string)
 	// Write gets the buffer's text for :w.
 	Write func(text string)
+	// Event gets what the buffer's mdsh side reports, such as the
+	// cursor moving or :RunBlock: the event's name and its data as JSON.
+	Event func(name, data string)
 	// Exit is called once Neovim has quit, with why if it failed.
 	Exit func(err error)
 }
@@ -228,6 +231,11 @@ func Start(o Options) (*Editor, error) {
 		e.mu.Unlock()
 		if o.Write != nil {
 			o.Write(text)
+		}
+	})
+	v.RegisterHandler("mdsh_event", func(name, data string) {
+		if o.Event != nil {
+			o.Event(name, data)
 		}
 	})
 	go func() {
@@ -307,6 +315,51 @@ func (e *Editor) SetText(text string) error {
 	}
 	return e.v.ExecLua("mdsh.set_text(...)", nil, lines(text))
 }
+
+// ApplyEdits applies edits to the buffer: each replaces lines
+// [Start, End), counted from 0, which must still hold Old, with New.
+// Edits are in order and don't overlap. If any edit's lines changed, the
+// whole text is replaced with text instead. Either way the buffer then
+// has text, as far as mdsh-gui knows; typing since may follow.
+func (e *Editor) ApplyEdits(text string, edits []Edit) error {
+	e.mu.Lock()
+	same := text == e.text
+	e.text = text
+	e.mu.Unlock()
+	if same {
+		return nil
+	}
+	var ok bool
+	if err := e.v.ExecLua("return mdsh.apply(...)", &ok, edits); err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	return e.v.ExecLua("mdsh.set_text(...)", nil, lines(text))
+}
+
+// Edit replaces lines [Start, End) of a buffer, counted from 0, which
+// hold Old, with New.
+type Edit struct {
+	Start int      `msgpack:"start" json:"start"`
+	End   int      `msgpack:"end" json:"end"`
+	Old   []string `msgpack:"old" json:"old"`
+	New   []string `msgpack:"new" json:"new"`
+}
+
+// Call calls the function called fn in the buffer's mdsh side with
+// args, a JSON array, and returns what it returns, as JSON.
+func (e *Editor) Call(fn, args string) (string, error) {
+	if !callable.MatchString(fn) {
+		return "", fmt.Errorf("no Neovim call %q", fn)
+	}
+	var out string
+	err := e.v.ExecLua("return mdsh.call(...)", &out, fn, args)
+	return out, err
+}
+
+var callable = regexp.MustCompile(`^[a-z_]+$`)
 
 // Saved marks the buffer unchanged, once its text is written.
 func (e *Editor) Saved() error {

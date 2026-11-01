@@ -38,6 +38,12 @@ export interface Settings {
     "neovimClean": boolean;
 
     /**
+     * NeovimOwnColors keeps the colorscheme from the user's Neovim
+     * config, rather than the app's theme, which is the default.
+     */
+    "neovimOwnColors": boolean;
+
+    /**
      * Theme is "light" or "dark"; empty follows the system.
      */
     "theme": string;
