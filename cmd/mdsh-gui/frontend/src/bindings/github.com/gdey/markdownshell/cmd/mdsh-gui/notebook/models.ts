@@ -171,6 +171,22 @@ export interface Completion {
 }
 
 /**
+ * Deleted is what a block delete did.
+ */
+export interface Deleted {
+    /**
+     * Name is how the status line names the block, as #id.
+     */
+    "name": string;
+
+    /**
+     * Warnings are what the delete left behind, such as output copies of
+     * the block elsewhere in the file.
+     */
+    "warnings"?: string[] | null;
+}
+
+/**
  * Fold is a fold made by hand in the rendered view, for SetFolds to
  * write to the file.
  */

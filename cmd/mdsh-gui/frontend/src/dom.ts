@@ -20,6 +20,7 @@ export const icons = {
   stop: '<rect x="3.5" y="3.5" width="9" height="9" rx="1"/>',
   pencil: '<path d="M11.1 1.9a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L5.6 13.4 2 14l.6-3.6z"/>',
   sliders: '<rect x="2" y="3.3" width="12" height="1.4"/><rect x="2" y="7.3" width="12" height="1.4"/><rect x="2" y="11.3" width="12" height="1.4"/><circle cx="5" cy="4" r="1.8"/><circle cx="11" cy="8" r="1.8"/><circle cx="7" cy="12" r="1.8"/>',
+  trash: '<path d="M6 1.5h4l.5 1H14v1.4H2V2.5h3.5zM3.2 5h9.6l-.7 9.5H3.9zm2.3 1.6.3 6.4h1.2l-.2-6.4zm3.8 0-.2 6.4h1.2l.3-6.4z"/>',
   info: '<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="7.3" y="7" width="1.4" height="4.5"/><rect x="7.3" y="4.4" width="1.4" height="1.4"/>',
   // The markdown bar, the outline drawer and the view switch.
   heading: '<path d="M3 2.5h1.6v4.7h6.8V2.5H13v11h-1.6V8.7H4.6v4.8H3z"/>',

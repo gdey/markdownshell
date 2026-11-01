@@ -139,6 +139,7 @@ button:hover:not(:disabled) { background: var(--hover); }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 button.primary.stop { background: var(--bad); border-color: var(--bad); }
+button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
 button svg { width: 12px; height: 12px; fill: currentColor; vertical-align: -1px; }
 button.primary svg { margin-right: 4px; }
 button.icon { background: none; border-color: transparent; padding: 3px 6px; color: var(--muted); }
@@ -302,6 +303,12 @@ th { background: var(--code-bg); }
 
 .block { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; background: var(--bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.block .head button.trash { display: none; }
+.block.selected .head button.trash { display: inline-block; }
+.block .output-part > button.clear-output { position: absolute; top: 2px; right: 6px; display: none; }
+.block.selected .output-part > button.clear-output { display: inline-block; }
+.block .part > button.trash:hover:not(:disabled) { color: var(--bad); }
+.block .head button.trash:hover:not(:disabled) { color: var(--bad); }
 .block.ran { border-left: 3px solid var(--ok); }
 .block.failed { border-left: 3px solid var(--bad); }
 .block.background { border-left: 3px dashed var(--accent); }

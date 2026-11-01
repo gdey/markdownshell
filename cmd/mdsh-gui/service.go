@@ -570,6 +570,30 @@ func (a *App) MoveBlock(ctx context.Context, i, dir int, byBlock bool) (notebook
 	return m, err
 }
 
+// DeleteBlock takes top-level block i, with its output and tape, out of
+// the file. Undo puts it back.
+func (a *App) DeleteBlock(ctx context.Context, i int) (notebook.Deleted, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Deleted{}, err
+	}
+	del, err := n.DeleteBlock(i)
+	t.changed()
+	return del, err
+}
+
+// ClearOutput takes block i's output out of the file and forgets its
+// run. Undo puts it back.
+func (a *App) ClearOutput(ctx context.Context, i int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.ClearOutput(i)
+	t.changed()
+	return err
+}
+
 // PlanMove works out MoveBlock's move without making it, for the source
 // view to make as its own edit.
 func (a *App) PlanMove(ctx context.Context, i, dir int, byBlock bool) (notebook.Move, error) {

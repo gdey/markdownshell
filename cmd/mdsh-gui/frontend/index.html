@@ -180,6 +180,16 @@
       </div>
     </form>
   </dialog>
+  <dialog id="delete-dialog">
+    <form method="dialog">
+      <h2>Delete <span id="delete-name"></span>?</h2>
+      <p class="muted">The block goes from the file, with its output and its tape. Edit › Undo puts it back.</p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="delete-ok" value="delete" class="danger">Delete</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="viewer" title="Click or press esc to close"><img alt=""></dialog>
 </body>
 </html>
