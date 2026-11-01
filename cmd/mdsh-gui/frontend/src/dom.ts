@@ -36,6 +36,9 @@ export const icons = {
   table: '<path d="M1.5 2.5h13v11h-13zm1.4 1.4v2.2h4.4V3.9zm5.8 0v2.2h4.4V3.9zM2.9 7.5v4.6h4.4V7.5zm5.8 0v4.6h4.4V7.5z"/>',
   fence: '<path d="M2 2.5h12v11H2zm1.4 1.4v8.2h9.2V3.9zm1.4 1.5 2.3 2.3-2.3 2.3-.9-.9 1.4-1.4-1.4-1.4zm3 3.7h3.4v1.2H7.8z"/>',
   mdsh: '<path d="M2 2.5h12v11H2zm1.4 1.4v8.2h9.2V3.9zM6 5.5l4.5 2.5L6 10.5z"/>',
+  // The outline's marks for a textbox and a choice.
+  textbox: '<path d="M1.5 4.5h13v7h-13zm1.4 1.4v4.2h10.2V5.9zM4 6.8h1.2v2.4H4z"/>',
+  choice: '<circle cx="3.5" cy="4.5" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="3.5" cy="11.5" r="2"/><rect x="7" y="3.8" width="7.5" height="1.4"/><rect x="7" y="10.8" width="7.5" height="1.4"/>',
   sidebar: '<path d="M1.5 2.5h13v11h-13zm1.4 1.4v8.2h3.2V3.9zm4.6 0v8.2h5.6V3.9z"/>',
   // A fold: open points down, and CSS turns it right when closed.
   chevron: '<path d="M3.7 5.6 8 9.9l4.3-4.3 1 1L8 11.9 2.7 6.6z"/>',
