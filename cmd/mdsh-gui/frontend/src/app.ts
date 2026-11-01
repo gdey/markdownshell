@@ -1521,6 +1521,21 @@ document.addEventListener(
   true,
 );
 
+// setDepends writes block i's depends= as the blocks deps names, from a
+// drag or a click on a dependency line. It is a rendered-view edit, so
+// Undo takes it back.
+async function setDepends(i: number, deps: number[], what: string) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  try {
+    await App.SetDepends(i, deps);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  status(what);
+}
+
 // moveRendered moves block i as a rendered-view edit, which Undo takes
 // back.
 async function moveRendered(i: number, dir: number, byBlock: boolean) {
@@ -1952,7 +1967,7 @@ window.addEventListener("resize", () => {
   }, 200);
 });
 initSplitGrip();
-initDeps($("doc-scroll"), jumpTo);
+initDeps($("doc-scroll"), { jump: jumpTo, setDepends });
 initHistory({
   canRun: () => !running,
   async enter(call) {

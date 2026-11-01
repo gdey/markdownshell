@@ -367,6 +367,14 @@ export function SetChoice(i: number, checked: boolean[] | null): $CancellablePro
 }
 
 /**
+ * SetDepends sets block i's depends= to the blocks deps names, by index,
+ * or takes it out when deps is empty. Undo takes it back.
+ */
+export function SetDepends(i: number, deps: number[] | null): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetDepends", i, deps);
+}
+
+/**
  * SetFolds writes folds made by hand in the rendered view to the file,
  * as collapse attributes and mdsh:collapse lines, so it opens with them.
  */

@@ -14,6 +14,14 @@ follow [Semantic Versioning](https://semver.org/).
   orange, and any past four in gray. Selecting a block lights its lines
   and outlines the blocks they lead to in the same colors. Hovering a
   line says what it joins, and double-clicking one goes to its far end.
+- `mdsh-gui`: the dependency lines are edited in place. Each card has
+  a ring at the top of its edge, where its lines leave, and a dot at the
+  bottom, where lines from the blocks that depend on it arrive. Drag
+  the ring onto a block above to add it to `depends=`, click
+  the dot at a line's corner to take that dependency out, or drag the
+  dot to another block above to depend on that one instead, or out past
+  the lines, away from the cards, to tear it off. Undo takes
+  each back; blocks without ids get them first, as moving one does.
 - `mdsh-gui`: folding a block's code or output, or a section, by hand
   now saves the fold in the file, so it opens folded next time: a bare
   `collapse` or `collapse-output` on the block, or a

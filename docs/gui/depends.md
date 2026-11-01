@@ -1,6 +1,6 @@
 # Dependency lines in mdsh-gui
 
-Status: design, Nov 1, 2026. Part 1 (the lines) is built; part 2 (editing) follows.
+Status: design, Nov 1, 2026. Both parts are built.
 
 `depends=` (on main, #91) says which blocks must have run before a
 block. The rendered view draws those as lines in the page margin, painted
@@ -9,10 +9,13 @@ onto the background, and lets you make, move and break them by hand.
 ## What is drawn
 
 - **One line per dependency.** A line runs from the dependent block up
-  to the block it depends on. Both ends attach at the card's head row,
-  so folding code or output doesn't move them. The upper end carries a
-  small dot on the card's edge: that is the attachment, and later the
-  thing to click or drag.
+  to the block it depends on. Each card has two anchors on its edge: a
+  ring at the top, on the head row, where its own lines leave and are
+  dragged from, and a dot at the bottom, where lines from the blocks
+  that depend on it arrive (j, Nov 1). A dot sits at the line's
+  corner on the dependency's row, in the line's own lane: every line
+  into a card arrives at the same spot on its edge, so the corner is
+  what tells them apart, and it is the thing to click or drag.
 - **Four colors, by position.** A block's first dependency is drawn in
   color 1, its second in color 2, and so on to four, in the order the
   file lists them (`depends=push,migrate,login,build` is purple, pink,
@@ -47,15 +50,17 @@ same change path as moves and folds, so Undo takes them back and the
 source pane shows the new attribute at once. Blocks without ids get
 them first, as moving a block does.
 
-- **Make one.** Each card has a handle at its head, on the line side.
-  Drag it up: a line follows the pointer, and a card above lights up as
-  you pass over it. Drop to add that card's id to the end of
+- **Make one.** Drag a card's top anchor up: a line follows the
+  pointer, and a card above lights up as you pass over it, with the line
+  snapping to its bottom anchor. The line only goes up; below the block's own row it
+  stays put and nothing is a target. Drop to add that card's id to the end of
   `depends=`, in the next color. Dropping below the block, on the block
   itself, or on a block that can't be depended on (an include, a tape, a
   textbox or choice) does nothing and the status line says why.
-- **Break one.** Click the dot where a line attaches to its dependency:
-  that id comes out of `depends=`. If it was the last one, the attribute
-  goes.
+- **Break one.** Click the dot at a line's corner: that id comes out of
+  `depends=`. If it was the last one, the attribute goes. Dragging the
+  dot out past the lanes, away from the cards, where the line could no
+  longer turn back to them, tears it off the same way when let go.
 - **Move one.** Drag the dot to another card above the dependent block:
   the id is replaced in place, so the line keeps its color.
 - **Jump.** Double-click a line to scroll to its far end: from near the
@@ -70,14 +75,20 @@ refused with mdsh's message.
 
 - `notebook.Cell` gains `depends`, the block's `depends=` ids, so the
   frontend has the edges without parsing attributes.
-- A new `deps.ts` keeps the SVG layer: it measures cards after each
-  draw, fold or resize (a `ResizeObserver` on `#doc`), assigns lanes and
-  draws paths. Edges are `{from, to, k}` by block index; a target hidden
-  in a folded section attaches to the section's heading instead.
-- Part 2 adds `Notebook.SetDepends(block int, ids []string)`, which
-  rewrites the info string with `doc.SplitInfo` / `Info.Set` and the
-  block's `InfoSpan`, through `change` for Undo. Parsing the result runs
-  `checkDepends`, so cycles and bad targets come back as errors.
+- A new `deps.ts` keeps two SVG layers over the scrolling pane: the
+  paint, behind the cards, and a clear one over everything holding the
+  dots, the rings and unseen wider copies of the lines to click, since
+  the paint can't be reached where the page is over it. It measures
+  cards after each draw, fold or resize (a `ResizeObserver` on the pane
+  and `#doc`), assigns lanes and draws paths. Edges are `{from, to, k}`
+  by block index; a target hidden in a folded section attaches to the
+  section's heading instead.
+- `Notebook.SetDepends(block int, deps []int)` takes the dependencies
+  by block index, since a block without an id can be dragged to; it
+  names the blocks first, as a move does, rewrites the info string with
+  `doc.SplitInfo` / `Info.Set` and the block's `InfoSpan`, and goes
+  through `change` for Undo. Parsing the result runs `checkDepends`, so
+  cycles and bad targets come back as errors and change nothing.
 
 ## Split
 

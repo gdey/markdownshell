@@ -535,6 +535,18 @@ func (a *App) SetFolds(ctx context.Context, folds []notebook.Fold) error {
 	return err
 }
 
+// SetDepends sets block i's depends= to the blocks deps names, by index,
+// or takes it out when deps is empty. Undo takes it back.
+func (a *App) SetDepends(ctx context.Context, i int, deps []int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetDepends(i, deps)
+	t.changed()
+	return err
+}
+
 // SetTextbox replaces the text of textbox block i, as typed in it.
 func (a *App) SetTextbox(ctx context.Context, i int, text string) error {
 	t, n, err := a.notebook(ctx)
