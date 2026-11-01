@@ -633,6 +633,7 @@ type View struct {
 	Code     bool `json:"code"`
 	Output   bool `json:"output"`
 	History  bool `json:"history"` // the History pane
+	Console  bool `json:"console"` // the Console pane
 }
 
 // defaultView is what a new tab shows until its page says.

@@ -9,6 +9,7 @@ import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
+import { initConsole, showConsole } from "./console.js";
 import { fitHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
@@ -40,8 +41,9 @@ interface View {
   code: boolean;
   output: boolean;
   history: boolean;
+  console: boolean;
 }
-let view: View = { split: false, rendered: true, outline: false, code: true, output: true, history: false, ...loadView() };
+let view: View = { split: false, rendered: true, outline: false, code: true, output: true, history: false, console: false, ...loadView() };
 
 function loadView(): Partial<View> {
   try {
@@ -1347,6 +1349,7 @@ function applyView() {
   $("outline-toggle").classList.toggle("on", view.outline);
   $("view-split").classList.toggle("on", view.split);
   $("view-rendered").classList.toggle("on", view.rendered);
+  showConsole(view.console);
   syncHistory();
   if (view.split) openSource();
   else closeSource();
@@ -1462,6 +1465,7 @@ const actions: Record<string, () => Promise<void> | void> = {
   moveblockup: () => void moveAction(-1, true),
   moveblockdown: () => void moveAction(1, true),
   history: () => toggle("history"),
+  console: () => toggle("console"),
 };
 
 // Moving blocks
@@ -1995,6 +1999,7 @@ initHistory({
     await refresh();
   },
 });
+initConsole({ toggle: () => void actions.console() });
 initReport({
   dirty: () => !$("dirty").hidden,
   before: applySource,

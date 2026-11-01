@@ -62,6 +62,13 @@ Each file opens in a tab of its own, with its own shells.
   card has a dashed edge and says it is running in the background, the
   status line counts them, and its output shows when it ends. Closing
   the window kills those still running.
+- **Console** (View › Console, cmd/ctrl+shift+Y, or the toolbar's
+  console button): what the app logs, errors and notes, each with its
+  time and level, such as a call that failed because the file no longer
+  parses. A badge on the button counts warnings and errors that came
+  while it was closed. Copy takes the selected lines, or all of them;
+  Clear empties it in every window. Drag its top edge to resize it.
+  Code in the app reports to it by logging with `log/slog`.
 - **History** (View › History, cmd/ctrl+shift+H): a terminal along the
   bottom that works like a paper tape. Closed, it is a status bar with
   the shell's prompt, the status, and buttons to stop (ctrl+c for a

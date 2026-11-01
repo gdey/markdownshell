@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -56,7 +56,10 @@ func main() {
 		return
 	}
 	if err := mdshGUI(o); err != nil {
-		log.Fatal("mdsh-gui: ", err)
+		// Not log.Fatal: slog's default logger, which the log package
+		// writes to once the app starts, may not reach the terminal.
+		fmt.Fprintln(os.Stderr, "mdsh-gui:", err)
+		os.Exit(1)
 	}
 }
 
@@ -140,7 +143,12 @@ func mdshGUI(o options) error {
 		args = nil
 	}
 	cwd, _ := os.Getwd()
-	a := &App{settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	// What Wails and the app log goes to the Console pane, as well as
+	// where Wails would send it.
+	cons := newConsole()
+	logger := slog.New(newConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
+	slog.SetDefault(logger)
+	a := &App{console: cons, settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
@@ -150,9 +158,13 @@ func mdshGUI(o options) error {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 		ShouldQuit: a.shouldQuit,
+		Logger:     logger,
 	})
 	a.app = app
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { a.started.Store(true) })
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		a.started.Store(true)
+		go cons.send(app.Context(), func(e ConsoleEntry) { app.Event.Emit("console", e) })
+	})
 	a.menu = a.buildMenu()
 	a.buildSourceMenu()
 	a.buildLinkMenu()

@@ -92,6 +92,13 @@ export function ChooseReport(format: report$0.Format, dest: string): $Cancellabl
 }
 
 /**
+ * ClearConsole empties the console, in every window.
+ */
+export function ClearConsole(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ClearConsole");
+}
+
+/**
  * ClearOutputs takes every block's output out of the document and
  * starts its shells again.
  */
@@ -104,6 +111,14 @@ export function ClearOutputs(): $CancellablePromise<void> {
  */
 export function CloseTab(id: number): $CancellablePromise<void> {
     return $Call.ByName("main.App.CloseTab", id);
+}
+
+/**
+ * Console returns what the console holds, oldest first. New entries come
+ * as "console" events, and a "console-cleared" event says it was cleared.
+ */
+export function Console(): $CancellablePromise<$models.ConsoleEntry[] | null> {
+    return $Call.ByName("main.App.Console");
 }
 
 /**
