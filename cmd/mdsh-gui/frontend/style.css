@@ -379,8 +379,45 @@ label { display: block; font-size: 13px; margin: 10px 0; }
 label input[type="text"], label select { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
 label.check { display: flex; gap: 8px; align-items: center; }
 .buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-.settings { padding: 8px 24px; }
-.settings p { font-size: 13px; margin: 4px 0 12px; }
+
+/* Settings window: tabs across the top, one section showing under them */
+body.settings main { flex: 1; overflow: auto; max-width: none; margin: 0; width: 100%; box-sizing: border-box; padding: 4px 24px 24px; }
+.tabs { flex: none; display: flex; gap: 2px; padding: 8px 16px 0; border-bottom: 1px solid var(--border); background: var(--bg); }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 6px 12px; margin-bottom: -1px; }
+.tabs button:hover:not(:disabled) { color: var(--fg); background: none; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.setting { display: flex; gap: 20px; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.setting:last-child { border-bottom: 0; }
+.setting .text { flex: 1; min-width: 0; }
+.setting .text label { margin: 0; font-size: 14px; }
+.setting .text p { font-size: 12px; margin: 2px 0 0; }
+.setting > select { flex: none; width: 200px; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.setting > input[type="checkbox"] { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.setting.path { gap: 8px; }
+.setting.path input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.setting:has(+ .setting.path:not([hidden])) { border-bottom: 0; padding-bottom: 2px; }
+body.settings #error { font-size: 13px; margin: 12px 0 0; }
+
+/* The About tab */
+#about .app { display: flex; gap: 16px; align-items: center; padding: 12px 0 8px; }
+#about .app img { flex: none; }
+#about .app > div { flex: 1; min-width: 0; }
+#about h1 { font-size: 20px; margin: 0; }
+#about h1 span { font-weight: 400; color: var(--muted); }
+#about .app p { font-size: 12px; margin: 2px 0 0; }
+#about h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 20px 0 6px; }
+#about > p.muted { font-size: 12px; margin: 0 0 6px; }
+dl.info { display: grid; grid-template-columns: max-content 1fr; gap: 0; margin: 0; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+dl.info dt, dl.info dd { margin: 0; padding: 6px 12px; border-top: 1px solid var(--border); }
+dl.info dt:first-of-type, dl.info dd:first-of-type { border-top: 0; }
+dl.info dt { color: var(--muted); }
+dl.info dd { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+dl.info .value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+dl.info dd > .muted, dl.info .missing { font-size: 12px; }
+dl.info .missing { color: var(--bad); }
+dl.info .note { flex-basis: 100%; }
+dl.info dd button { margin-left: auto; padding: 1px 8px; font-size: 12px; }
+#about .links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin: 0; }
 button.file .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Block editor */

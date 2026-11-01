@@ -7,60 +7,131 @@
   <link rel="stylesheet" href="style.css">
   <script type="module" src="bundle/settings.js"></script>
 </head>
-<body>
-  <main class="settings">
-    <label class="check"><input id="autosave" type="checkbox"> Save the file after each run</label>
-    <p class="muted">Off by default: the window shows • while output isn't saved.</p>
+<body class="settings">
+  <nav class="tabs" role="tablist" aria-label="Settings">
+    <button role="tab" data-tab="general" aria-selected="true">General</button>
+    <button role="tab" data-tab="editing">Editing</button>
+    <button role="tab" data-tab="shell">Shell</button>
+    <button role="tab" data-tab="files">Files</button>
+    <button role="tab" data-tab="about">About</button>
+  </nav>
+  <main>
+    <section id="general" role="tabpanel">
+      <div class="setting">
+        <div class="text">
+          <label for="theme">Theme</label>
+          <p class="muted">The editors' colors follow it. Match the system follows the OS.</p>
+        </div>
+        <select id="theme">
+          <option value="">Match the system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="view">Open files in</label>
+          <p class="muted">The view a file opens in. Each tab can switch views from its toolbar.</p>
+        </div>
+        <select id="view">
+          <option value="">The view the last tab had</option>
+          <option value="rendered">The rendered view</option>
+          <option value="source">The source view</option>
+          <option value="both">Both, side by side</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="start-mode">Start folder</label>
+          <p class="muted">What the start screen lists when mdsh isn't started from a terminal. From a terminal, it lists the current folder.</p>
+        </div>
+        <select id="start-mode">
+          <option value="last">The last folder used</option>
+          <option value="fixed">A fixed folder</option>
+        </select>
+      </div>
+      <div id="fixed" class="setting path" hidden>
+        <input id="start-folder" type="text" spellcheck="false" readonly>
+        <button id="choose">Choose…</button>
+      </div>
+    </section>
 
-    <label class="check"><input id="vim" type="checkbox"> Vim key bindings in the code editor</label>
-    <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
+    <section id="editing" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="autosave">Save the file after each run</label>
+          <p class="muted">Off by default: the window shows • while output isn't saved.</p>
+        </div>
+        <input id="autosave" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="vim">Vim key bindings in the code editor</label>
+          <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
+        </div>
+        <input id="vim" type="checkbox">
+      </div>
+    </section>
 
-    <label>Theme
-      <select id="theme">
-        <option value="">Match the system</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </label>
+    <section id="shell" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="shell">Shell for every file</label>
+          <p class="muted">Overrides the shell from each file's front matter. Empty uses the file's: zsh when it has zsh blocks, else sh.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="shell" type="text" spellcheck="false" placeholder="From the file's front matter (default)">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="history-rc">File the History pane's shell reads</label>
+          <p class="muted">Read as History is turned on, as an interactive shell reads its rc file, for your aliases, functions and prompt. Blocks get them too while History is on.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="history-rc" type="text" spellcheck="false" placeholder="None, or a file such as ~/.zshrc">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="zsh-wrapper">Give blocks your zsh aliases and functions</label>
+          <p class="muted">Adds an <code>mdsh</code> function to <span id="zshrc">~/.zshrc</span> that passes them to <code>mdsh</code> in a terminal with <code>--source</code>. New terminals pick it up. This app isn't started from your shell, so it can't see them.</p>
+        </div>
+        <input id="zsh-wrapper" type="checkbox">
+      </div>
+    </section>
 
-    <label>Open files in
-      <select id="view">
-        <option value="">The view the last tab had</option>
-        <option value="rendered">The rendered view</option>
-        <option value="source">The source view</option>
-        <option value="both">Both, side by side</option>
-      </select>
-    </label>
+    <section id="files" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="template-folder">Templates folder</label>
+          <p class="muted">New File… offers the markdown files in this folder to start from, as well as a blank file.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="template-folder" type="text" spellcheck="false" readonly placeholder="None: new files start blank">
+        <button id="choose-templates">Choose…</button>
+        <button id="clear-templates">Clear</button>
+      </div>
+    </section>
 
-    <label>Shell for every file
-      <input id="shell" type="text" spellcheck="false" placeholder="From the file's front matter (default)">
-    </label>
-
-    <label>File the History pane's shell reads
-      <input id="history-rc" type="text" spellcheck="false" placeholder="None, or a file such as ~/.zshrc">
-    </label>
-    <p class="muted">Read as History is turned on, as an interactive shell reads its rc file, for your aliases, functions and prompt. Blocks get them too while History is on.</p>
-
-    <label>Start folder
-      <select id="start-mode">
-        <option value="last">The last folder used</option>
-        <option value="fixed">A fixed folder</option>
-      </select>
-    </label>
-    <div id="fixed" class="start-bar" hidden>
-      <input id="start-folder" type="text" spellcheck="false" readonly>
-      <button id="choose">Choose…</button>
-    </div>
-    <p class="muted">Used when mdsh isn't started from a terminal. From a terminal, the start screen lists the current folder.</p>
-    <label>Templates folder</label>
-    <div class="start-bar">
-      <input id="template-folder" type="text" spellcheck="false" readonly placeholder="None: new files start blank">
-      <button id="choose-templates">Choose…</button>
-      <button id="clear-templates">Clear</button>
-    </div>
-    <p class="muted">New File… offers the markdown files in this folder to start from, as well as a blank file.</p>
-    <label class="check"><input id="zsh-wrapper" type="checkbox"> Give blocks your zsh aliases and functions</label>
-    <p class="muted">Adds an <code>mdsh</code> function to <span id="zshrc">~/.zshrc</span> that passes them to <code>mdsh</code> in a terminal with <code>--source</code>. New terminals pick it up. This app isn't started from your shell, so it can't see them.</p>
+    <section id="about" role="tabpanel" hidden>
+      <div class="app">
+        <img src="appicon.svg" alt="" width="64" height="64">
+        <div>
+          <h1>mdsh-gui <span id="version"></span></h1>
+          <p class="muted" id="build"></p>
+        </div>
+        <button id="copy" title="Copy the version, build, paths and tools, for a bug report">Copy</button>
+      </div>
+      <h2>Paths</h2>
+      <dl id="paths" class="info"></dl>
+      <h2>Tools</h2>
+      <p class="muted">Programs mdsh-gui runs, as found on this app's PATH.</p>
+      <dl id="tools" class="info"></dl>
+      <h2>Links</h2>
+      <p id="links" class="links"></p>
+    </section>
 
     <p id="error" class="error" hidden></p>
   </main>

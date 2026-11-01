@@ -9,6 +9,36 @@ import * as library$0 from "./library/models.js";
 import * as notebook$0 from "./notebook/models.js";
 
 /**
+ * About is what the Settings window's About tab shows.
+ */
+export interface About {
+    "version": string;
+    "commit": string;
+    "buildTime": string;
+    "modified": boolean;
+    "goVersion": string;
+    "os": string;
+    "arch": string;
+
+    /**
+     * Home is for showing paths as ~/….
+     */
+    "home": string;
+
+    /**
+     * SettingsFile is the JSON file the settings live in.
+     */
+    "settingsFile": string;
+
+    /**
+     * Zshrc is the .zshrc the zsh wrapper setting edits.
+     */
+    "zshrc": string;
+    "tools": Tool[] | null;
+    "links": Link[] | null;
+}
+
+/**
  * Doc is what the frontend shows about the open file.
  */
 export interface Doc {
@@ -45,6 +75,14 @@ export interface Doc {
      */
     "termCols": number;
     "termRows": number;
+}
+
+/**
+ * Link is a place to read more.
+ */
+export interface Link {
+    "name": string;
+    "url": string;
 }
 
 /**
@@ -108,6 +146,28 @@ export interface Tab {
 export interface Tabs {
     "tabs": Tab[] | null;
     "active": number;
+}
+
+/**
+ * Tool is a program mdsh-gui uses, and whether it was found on PATH.
+ */
+export interface Tool {
+    "name": string;
+
+    /**
+     * what it's for
+     */
+    "note": string;
+
+    /**
+     * where it was found, or ""
+     */
+    "path": string;
+
+    /**
+     * what --version said, or ""
+     */
+    "version": string;
 }
 
 /**

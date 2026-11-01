@@ -32,6 +32,13 @@ import * as report$0 from "../../report/models.js";
 import * as $models from "./models.js";
 
 /**
+ * About gathers the version, build, paths and tools for the About tab.
+ */
+export function About(): $CancellablePromise<$models.About> {
+    return $Call.ByName("main.App.About");
+}
+
+/**
  * Answer replies to the question a confirm event asked: "run", "skip"
  * or "stop".
  */
@@ -248,6 +255,13 @@ export function OpenLink(href: string): $CancellablePromise<void> {
  */
 export function OpenPath(file: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.OpenPath", file);
+}
+
+/**
+ * OpenURL opens a web address in the browser, for the About tab's links.
+ */
+export function OpenURL(u: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.OpenURL", u);
 }
 
 /**
