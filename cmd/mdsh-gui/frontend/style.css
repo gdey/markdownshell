@@ -264,8 +264,10 @@ body.hide-code .block > .code-part { display: none; }
 body.hide-output .block > .output-part { display: none !important; }
 
 /* Folds: a block's code and output fold to one line, a heading to its
-   line. The chevron points down when open and right when folded. */
-button.fold { position: absolute; display: inline-flex; padding: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 3px; }
+   line. The chevron points down when open and right when folded. The
+   button sits over the dependency lines' clear layer (#deps-ui), so a
+   line or dot crossing it never hides it or takes its click. */
+button.fold { position: absolute; z-index: 2; display: inline-flex; padding: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 3px; }
 button.fold:hover { color: var(--fg); background: var(--hover); }
 button.fold svg, #outline .mark.fold svg { width: 12px; height: 12px; fill: currentColor; transition: transform 0.1s; }
 .folded > button.fold svg, #outline .mark.fold.closed svg { transform: rotate(-90deg); }
@@ -280,7 +282,10 @@ button.fold svg, #outline .mark.fold svg { width: 12px; height: 12px; fill: curr
 .block .output-part:has(> .output:empty) { display: none; }
 #outline .mark.fold { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .heading-cell { position: relative; }
-.heading-cell > button.fold { left: -22px; top: 50%; transform: translateY(-50%); }
+/* In the margin, where the lines run, the page's color under the
+   chevron keeps it clear of them. */
+.heading-cell > button.fold { left: -22px; top: 50%; transform: translateY(-50%); background: var(--bg); }
+.heading-cell > button.fold:hover { background: var(--hover); }
 .heading-cell .fold-note { position: absolute; right: 0; top: 50%; transform: translateY(-50%); padding: 0 6px; border: 0; background: none; color: var(--muted); font-size: 13px; cursor: pointer; vertical-align: middle; }
 .heading-cell .fold-note:empty { display: none; }
 .heading-cell button.run-section { margin-left: 6px; padding: 2px 5px; vertical-align: middle; color: var(--accent); opacity: 0.55; }
