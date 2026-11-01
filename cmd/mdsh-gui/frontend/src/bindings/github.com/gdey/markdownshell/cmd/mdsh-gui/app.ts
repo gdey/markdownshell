@@ -40,6 +40,13 @@ export function Answer(reply: string): $CancellablePromise<void> {
 }
 
 /**
+ * BlockAt is the top-level block on line of the file, or -1.
+ */
+export function BlockAt(line: number): $CancellablePromise<number> {
+    return $Call.ByName("main.App.BlockAt", line);
+}
+
+/**
  * BlockAttrs describes the block attributes, for completion, hover help
  * and the attribute form.
  */
@@ -149,6 +156,14 @@ export function Live(): $CancellablePromise<$models.liveEvent[] | null> {
 }
 
 /**
+ * MoveBlock moves top-level block i up (dir < 0) or down past the next
+ * cell, or with byBlock past the next block. Undo takes it back.
+ */
+export function MoveBlock(i: number, dir: number, byBlock: boolean): $CancellablePromise<notebook$0.Move> {
+    return $Call.ByName("main.App.MoveBlock", i, dir, byBlock);
+}
+
+/**
  * Names are the block ids and envs in the file, for completion.
  */
 export function Names(): $CancellablePromise<notebook$0.Names> {
@@ -201,6 +216,14 @@ export function OpenLink(href: string): $CancellablePromise<void> {
  */
 export function OpenPath(file: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.OpenPath", file);
+}
+
+/**
+ * PlanMove works out MoveBlock's move without making it, for the source
+ * view to make as its own edit.
+ */
+export function PlanMove(i: number, dir: number, byBlock: boolean): $CancellablePromise<notebook$0.Move> {
+    return $Call.ByName("main.App.PlanMove", i, dir, byBlock);
 }
 
 /**

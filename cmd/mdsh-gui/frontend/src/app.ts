@@ -1,15 +1,16 @@
 import "./tab.js";
-import { redo, undo } from "@codemirror/commands";
+import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Names, type Settings, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
+import { diff } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 
@@ -1235,7 +1236,142 @@ const actions: Record<string, () => Promise<void> | void> = {
   foldstorendered: () => foldsToRendered(),
   undo: () => undoEdit(false),
   redo: () => undoEdit(true),
+  moveup: () => void moveAction(-1, false),
+  movedown: () => void moveAction(1, false),
+  moveblockup: () => void moveAction(-1, true),
+  moveblockdown: () => void moveAction(1, true),
 };
+
+// Moving blocks
+//
+// alt+↑/↓ moves a block past the cell above or below it, and with shift
+// past the block above or below, prose and all. It moves the selected
+// card, the input being typed in, or in the source view the block the
+// cursor is in, with its output and tape. Elsewhere in the source view
+// the keys are the editor's own (move or copy lines).
+//
+// The keys are the Edit menu's too. Whichever sees them first acts: a
+// key the page took isn't sent on to the menu, and on some systems the
+// menu takes it before the page sees it. keyMoved stops both acting.
+let keyMoved = 0;
+
+function moveAction(dir: number, byBlock: boolean, key = false): boolean {
+  if (!key && Date.now() - keyMoved < 300) return true;
+  if (!doc.file) return false;
+  const at = document.activeElement as HTMLElement | null;
+  const cm = at?.closest<HTMLElement>(".cm-editor");
+  if (cm) {
+    if (!source || source.view.dom !== cm) return false;
+    const view = source.view;
+    const line = view.state.doc.lineAt(view.state.selection.main.head).number;
+    const inBlock = cells.some((c) => c.movable && c.line <= line && line <= (c.lastLine ?? c.line));
+    if (!inBlock) {
+      if (key) return false; // the editor's own keys
+      lineCommand(dir, byBlock)(view);
+      return true;
+    }
+    void moveInSource(dir, byBlock);
+    return true;
+  }
+  if (key && at?.tagName === "SELECT") return false; // alt+↓ opens a dropdown
+  const input = at?.closest<HTMLElement>("#doc [data-input]")?.dataset.input;
+  const i = input != null ? Number(input) : selected >= 0 ? Number(blocks()[selected]?.dataset.block ?? -1) : -1;
+  if (i < 0 || !cells.some((c) => c.movable && (c.block === i || c.textbox?.block === i || c.choice?.block === i))) return false;
+  void moveRendered(i, dir, byBlock);
+  return true;
+}
+
+function lineCommand(dir: number, byBlock: boolean) {
+  if (byBlock) return dir < 0 ? copyLineUp : copyLineDown;
+  return dir < 0 ? moveLineUp : moveLineDown;
+}
+
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (!e.altKey || e.metaKey || e.ctrlKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    if (moveAction(e.key === "ArrowUp" ? -1 : 1, e.shiftKey, true)) {
+      keyMoved = Date.now();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  },
+  true,
+);
+
+// moveRendered moves block i as a rendered-view edit, which Undo takes
+// back.
+async function moveRendered(i: number, dir: number, byBlock: boolean) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  const input = (document.activeElement as HTMLElement | null)?.closest("#doc [data-input]") != null;
+  let m: Move;
+  try {
+    m = await App.MoveBlock(i, dir, byBlock);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  if (input) document.querySelector<HTMLElement>(`#doc [data-input="${m.block}"]`)?.focus();
+  else {
+    const k = blocks().findIndex((b) => Number(b.dataset.block) === m.block);
+    if (k >= 0) select(k);
+  }
+  showMoved(m, () => undoEdit(false));
+}
+
+// moveInSource moves the block at the source view's cursor as an edit of
+// the source view's own, which its undo takes back.
+async function moveInSource(dir: number, byBlock: boolean) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  const ed = source;
+  if (!ed) return;
+  const view = ed.view;
+  const head = view.state.selection.main.head;
+  const cursor = view.state.doc.lineAt(head);
+  let m: Move;
+  try {
+    const i = await App.BlockAt(cursor.number);
+    if (i < 0) return void lineCommand(dir, byBlock)(view);
+    m = await App.PlanMove(i, dir, byBlock);
+  } catch (err) {
+    return fail(err);
+  }
+  if (source !== ed) return;
+  // Giving blocks ids first is Go's change, not one to undo.
+  if (view.state.doc.toString() !== m.base) ed.load(m.base);
+  if (view.state.doc.toString() !== m.base) return status("the file changed; try again");
+  const line = Math.min(cursor.number + m.line - m.fromLine, 1 + m.text.split("\n").length - 1);
+  view.dispatch({ changes: diff(m.base, m.text), userEvent: "move.line", scrollIntoView: true });
+  const to = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)));
+  view.dispatch({ selection: { anchor: Math.min(to.from + (head - cursor.from), to.to) }, scrollIntoView: true });
+  await applySource();
+  showMoved(m, () => {
+    if (source === ed) undo(ed.view);
+    void applySource();
+  });
+}
+
+// showMoved says what a move changed that depends on block order, with
+// an Undo button, or just that it moved.
+function showMoved(m: Move, undoIt: () => unknown) {
+  const bar = $("moved");
+  const warnings = m.warnings ?? [];
+  if (!warnings.length) {
+    bar.hidden = true;
+    status(m.note ? `moved. ${m.note}` : "moved");
+    return;
+  }
+  $("moved-text").textContent = [...warnings, m.note ?? ""].filter(Boolean).join(" ");
+  $("moved-undo").onclick = () => {
+    bar.hidden = true;
+    void undoIt();
+  };
+  bar.hidden = false;
+  status("moved");
+}
+$("moved-close").onclick = () => ($("moved").hidden = true);
 
 // undoEdit is Edit › Undo, or Redo. Where the focus is decides what it
 // takes back: the source view keeps its own history, a text field its

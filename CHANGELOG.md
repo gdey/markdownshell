@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: alt+↑/↓ (Edit › Move Block Up/Down) moves a block, with
+  its output and tape, past the cell above or below it, and alt+shift+↑/↓
+  past the block above or below. It works on the selected card, the
+  textbox or choice being used, and in the source view on the block at
+  the cursor. A bar with Undo shows what a move changed that depends on
+  block order, such as a condition now reading a block below it.
 - `mdsh-gui`: Edit › Undo and Redo work in the rendered view, taking
   back and redoing checking tasks, typing in textboxes and picking
   choices. Where the focus is decides what they undo: the source view

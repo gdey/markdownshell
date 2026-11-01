@@ -82,9 +82,24 @@ Each file opens in a tab of its own, with its own shells.
   picks as `$MDSH_VAR_name`; a later input reusing a name is marked, with
   `!` in the outline, and ignored. All are edits like typing in the source
   view: Save writes them.
+- **Moving blocks:** alt+↑ and alt+↓ (Edit › Move Block Up and Move
+  Block Down) move the selected block, or the textbox or choice being
+  used, past the cell above or below it; with shift they move it past
+  the block above or below, prose and all. Its output and its tape, when
+  the tape comes right after it, move with it; prose never does. Blocks
+  in a list or quote don't move. In the source view the keys move the
+  block the cursor is in, and anywhere else are the editor's own (move
+  or copy lines). A move keeps the block's output and status; if it
+  ran, the status line says it ran in the old order. When a move
+  changes something that depends on order, such as a condition that now
+  reads a block below it, a `$?` that now reads another block, a block
+  going in or out of an `mdsh:if` section, or which input sets a shared
+  `var=`, a bar says so with an Undo button. Undo takes a move back like
+  any other edit, in whichever view made it. Blocks without ids get them
+  first, as saving gives them.
 - **Undo in the rendered view:** Edit › Undo (cmd/ctrl+Z) takes back the
-  rendered view's last edit (checking a task, picking a choice, or what
-  was typed into a textbox since moving to it) and Redo
+  rendered view's last edit (checking a task, picking a choice, moving
+  a block, or what was typed into a textbox since moving to it) and Redo
   (cmd/ctrl+shift+Z) does it again, up to 100 edits back. It is its own
   history: in the source view, and in a textbox while typing, undo is
   that editor's own. Once the file changes some other way, such as

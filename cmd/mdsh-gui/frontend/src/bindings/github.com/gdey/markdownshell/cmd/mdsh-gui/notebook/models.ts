@@ -114,6 +114,14 @@ export interface Cell {
      * Line is the line From is on, counting from 1.
      */
     "line": number;
+
+    /**
+     * Movable is set on a top-level block, which can move up and down
+     * the document (see MoveBlock), and LastLine is the last line of the
+     * block with its output and tape.
+     */
+    "movable"?: boolean;
+    "lastLine"?: number;
 }
 
 /**
@@ -137,6 +145,40 @@ export interface ChoiceCell {
      * Problem is why its var= binds nothing, if it doesn't.
      */
     "problem"?: string;
+}
+
+/**
+ * Move is a block move, planned or done.
+ */
+export interface Move {
+    /**
+     * Base is the file the move applies to, and Text the file after it.
+     * Base can differ from the file before the move was asked for, when
+     * blocks had to be given ids first (see PlanMove).
+     */
+    "base": string;
+    "text": string;
+
+    /**
+     * Block is the block's index after the move, and Line the line its
+     * fence starts on, counting from 1. FromLine is the line it started
+     * on before, in Base.
+     */
+    "block": number;
+    "line": number;
+    "fromLine": number;
+
+    /**
+     * Warnings are what the move broke or changed that depends on block
+     * order, such as a condition that now reads a block below it.
+     */
+    "warnings"?: string[] | null;
+
+    /**
+     * Note is a softer word, for a block that ran: it ran in the old
+     * order.
+     */
+    "note"?: string;
 }
 
 /**

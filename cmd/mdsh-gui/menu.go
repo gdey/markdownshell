@@ -144,6 +144,13 @@ func (a *App) buildMenu() *application.Menu {
 	edit.Add("Undo").SetAccelerator("CmdOrCtrl+Z").OnClick(a.undo("undo"))
 	edit.Add("Redo").SetAccelerator("CmdOrCtrl+Shift+Z").OnClick(a.undo("redo"))
 	edit.AddSeparator()
+	// Moves act on the selected block, or in the source view on the
+	// block at the cursor; see the frontend's moveAction.
+	edit.Add("Move Block Up").SetAccelerator("Alt+Up").OnClick(send("moveup"))
+	edit.Add("Move Block Down").SetAccelerator("Alt+Down").OnClick(send("movedown"))
+	edit.Add("Move Block Above Previous Block").SetAccelerator("Alt+Shift+Up").OnClick(send("moveblockup"))
+	edit.Add("Move Block Below Next Block").SetAccelerator("Alt+Shift+Down").OnClick(send("moveblockdown"))
+	edit.AddSeparator()
 	edit.AddRole(application.Cut)
 	edit.AddRole(application.Copy)
 	edit.AddRole(application.Paste)
