@@ -108,3 +108,21 @@ func TestClearOutput(t *testing.T) {
 		t.Errorf("redo a: %v", err)
 	}
 }
+
+func TestCellsUndeletable(t *testing.T) {
+	src := "```sh {#a}\necho a\n```\n\n```sh {#b depends=a}\necho b\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	why := map[int]string{}
+	for _, c := range n.Cells() {
+		if c.Block >= 0 {
+			why[c.Block] = c.Undeletable
+		}
+	}
+	if !strings.Contains(why[0], "#b's depends=") || why[1] != "" {
+		t.Errorf("undeletable: %v", why)
+	}
+}

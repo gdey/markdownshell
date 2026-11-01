@@ -308,7 +308,9 @@ th { background: var(--code-bg); }
 .block .output-part > button.clear-output { position: absolute; top: 2px; right: 6px; display: none; }
 .block.selected .output-part > button.clear-output { display: inline-block; }
 .block .part > button.trash:hover:not(:disabled) { color: var(--bad); }
-.block .head button.trash:hover:not(:disabled) { color: var(--bad); }
+.block .head button.trash:hover:not(:disabled):not(.off) { color: var(--bad); }
+.block .head button.trash.off { opacity: 0.4; cursor: not-allowed; }
+.block .head button.trash.off:hover { background: none; }
 .block.ran { border-left: 3px solid var(--ok); }
 .block.failed { border-left: 3px solid var(--bad); }
 .block.background { border-left: 3px dashed var(--accent); }

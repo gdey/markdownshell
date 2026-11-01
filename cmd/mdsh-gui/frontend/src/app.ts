@@ -433,6 +433,7 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
         // A var= input can change what mdsh:collapse and collapse= say.
         if (c.heading) card.dataset.foldDefault = c.collapsed ? "1" : "";
         if (c.block >= 0) {
+          markTrash(card, cells[i]);
           card.dataset.foldCode = c.collapsed ? "1" : "";
           card.dataset.foldOutput = c.collapsedOutput ? "1" : "";
         }
@@ -1659,8 +1660,23 @@ $("moved-close").onclick = () => ($("moved").hidden = true);
 
 function trashButton(c: Cell): HTMLButtonElement {
   const b = iconButton("trash", "Delete this block (delete)", () => void deleteBlock(c.block));
-  b.classList.add("trash");
+  b.classList.add("trash", "delete-block");
+  markTrash(b, c);
   return b;
+}
+
+// markTrash disables the delete button on card (or the button itself)
+// while something else, such as another block's depends=, uses the
+// block, and says so in its tooltip. It stays clickable, as a disabled
+// button might not show its tooltip, and a click says the same in the
+// status line.
+function markTrash(card: HTMLElement, c: Cell) {
+  const b = card.matches("button") ? (card as HTMLButtonElement) : card.querySelector<HTMLButtonElement>(".head button.delete-block");
+  if (!b) return;
+  b.classList.toggle("off", !!c.undeletable);
+  b.setAttribute("aria-disabled", c.undeletable ? "true" : "false");
+  b.title = c.undeletable || "Delete this block (delete)";
+  b.setAttribute("aria-label", b.title);
 }
 
 // clearOutputButton clears the output on the selected card, without
@@ -1694,6 +1710,7 @@ async function deleteBlock(i: number) {
   if (running) return status("can't change the file while a block runs");
   const c = cells.find((c) => c.block === i);
   if (!c?.movable) return status("only top-level blocks can be deleted");
+  if (c.undeletable) return status(c.undeletable);
   const id = c.name ?? c.id ?? "";
   if (!(await confirmDelete(id ? "#" + id : `the block at line ${c.line}`))) return;
   await applySource();

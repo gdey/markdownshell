@@ -89,6 +89,10 @@ type Cell struct {
 	// block with its output and tape.
 	Movable  bool `json:"movable,omitempty"`
 	LastLine int  `json:"lastLine,omitempty"`
+	// Undeletable says why a top-level block can't be deleted: what else
+	// in the document uses it, such as another block's depends=. Empty
+	// when it can.
+	Undeletable string `json:"undeletable,omitempty"`
 	// Drop is set when a block or section can be moved to just before
 	// the cell, with MoveTo at From.
 	Drop bool `json:"drop,omitempty"`
