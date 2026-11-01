@@ -557,8 +557,8 @@ func TestIncludeFresh(t *testing.T) {
 	}
 
 	os.WriteFile(filepath.Join(filepath.Dir(file), "n.txt"), []byte("typed in\n"), 0o644)
-	if err := n.SetText(n.Text() + "\n```text {<include file=n.txt}\n```\n"); err != nil {
-		t.Fatal(err)
+	if ok, err := n.SetText(n.Text(), n.Text()+"\n```text {<include file=n.txt}\n```\n"); !ok || err != nil {
+		t.Fatalf("ok = %v, err = %v", ok, err)
 	}
 	found := false
 	for _, c := range n.Cells() {

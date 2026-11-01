@@ -121,6 +121,12 @@ follow [Semantic Versioning](https://semver.org/).
   shows what a block above it wrote in the same run. `mdsh-gui` also
   reads includes again after every run, and reads one as soon as it is
   typed, rather than when the file is next opened.
+- `mdsh-gui`'s source pane no longer loses what you type when the file
+  changes under it, as when a run writes output or an include fills its
+  fence: the change comes in around your typing, and your typing no
+  longer writes over the change. Undo there undoes only your own edits.
+- `mdsh-gui`'s source pane no longer runs past the window's bottom
+  edge, and the last lines can scroll up from it.
 - A block's errors name it `block` instead of the runner's temp file,
   so `/var/folders/…/mdsh-123/block.sh:2: no such file or directory`
   reads `block:2: no such file or directory`.

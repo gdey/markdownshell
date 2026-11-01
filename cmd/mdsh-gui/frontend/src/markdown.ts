@@ -1,7 +1,7 @@
 // Markdown editors, for the split view's source pane and the inline prose
 // editor, and the markdown bar over them.
 
-import { Compartment, EditorSelection, EditorState, type Extension, Prec, type StateCommand } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState, type Extension, Prec, type StateCommand, Transaction } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, MatchDecorator, ViewPlugin, type ViewUpdate, drawSelection, highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownKeymap } from "@codemirror/lang-markdown";
@@ -11,6 +11,7 @@ import type { AttrSpec, Names } from "./api.js";
 import { el, iconButton, type icons } from "./dom.js";
 import { type ExTarget, attrHelp, exTarget, forgetEx } from "./editor.js";
 import { codeLanguages } from "./highlight.js";
+import { Synced } from "./sync.js";
 import { editorLook } from "./theme.js";
 
 export interface MarkdownEditorOptions {
@@ -39,8 +40,17 @@ export interface MarkdownEditorOptions {
 export interface MarkdownEditor {
   view: EditorView;
   setVim(on: boolean): void;
-  // setText replaces the text without calling onChange.
-  setText(text: string): void;
+  // pending is whether something was typed since the text last came
+  // from Go or went to it.
+  readonly pending: boolean;
+  // base is the text Go last had, as far as the editor knows: what to
+  // hand Go with the text, so Go can tell whether it changed since.
+  readonly base: string;
+  // load brings in text, Go's text now, keeping what was typed since
+  // base, without calling onChange.
+  load(text: string): void;
+  // sent notes that Go took text, the editor's text when it was sent.
+  sent(text: string): void;
   destroy(): void;
 }
 
@@ -80,7 +90,8 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
   const vimMode = new Compartment();
   const escape = new Compartment();
   const escapeKey = (on: boolean): Extension => (on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]));
-  let quiet = false; // setText is changing the text
+  let quiet = false; // load is changing the text
+  const sync = new Synced(opts.text);
   const target: ExTarget = { view: null as unknown as EditorView, write: opts.write, close: opts.close, run: opts.run };
   const view = new EditorView({
     parent,
@@ -103,7 +114,10 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         exTarget(() => target),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
-          if (u.docChanged && !quiet) opts.onChange?.(u.state.doc.toString());
+          if (u.docChanged && !quiet) {
+            sync.typed(u.changes);
+            opts.onChange?.(u.state.doc.toString());
+          }
           if (u.selectionSet || u.docChanged) opts.onCursor?.(u.state.doc.lineAt(u.state.selection.main.head).number);
         }),
         EditorView.theme({ "&": { fontSize: "13px" }, ".cm-content": { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }),
@@ -116,19 +130,28 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
     setVim(on) {
       view.dispatch({ effects: [vimMode.reconfigure(on ? vim() : []), escape.reconfigure(escapeKey(on))] });
     },
-    setText(text) {
-      const old = view.state.doc.toString();
-      if (text === old) return;
-      // Change only the part that differs, so the cursor and the scroll
-      // position move with the text around them instead of jumping, as
-      // when a save writes output in above them.
-      let from = 0;
-      while (from < old.length && from < text.length && old[from] === text[from]) from++;
-      let end = 0;
-      while (end < old.length - from && end < text.length - from && old[old.length - 1 - end] === text[text.length - 1 - end]) end++;
+    get pending() {
+      return sync.pending;
+    },
+    get base() {
+      return sync.base;
+    },
+    load(text) {
+      // Only the parts Go changed change, moved past what was typed, so
+      // the typing stays and the cursor and the scroll position move
+      // with the text around them, as when a run writes output in above
+      // them. Go's changes aren't the user's to undo.
+      const changes = sync.incoming(text);
+      if (changes.empty) return;
       quiet = true;
-      view.dispatch({ changes: { from, to: old.length - end, insert: text.slice(from, text.length - end) } });
-      quiet = false;
+      try {
+        view.dispatch({ changes, annotations: [Transaction.addToHistory.of(false), Transaction.remote.of(true)] });
+      } finally {
+        quiet = false;
+      }
+    },
+    sent(text) {
+      sync.sent(text, view.state.doc.toString());
     },
     destroy() {
       forgetEx(view);

@@ -1,5 +1,5 @@
 import "./tab.js";
-import { EditorView } from "@codemirror/view";
+import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Doc, type File as Template, type Names, type Settings, type Start, message } from "./api.js";
@@ -765,10 +765,26 @@ async function names(): Promise<Names> {
 // The split view's source pane: the whole file in a markdown editor.
 // Typing re-renders after a short pause, and a run's output comes back
 // into it.
+//
+// Both the pane and Go change the file: the user types, and a run
+// writes output or an include fills its fence. So the pane hands Go the
+// text it started from with what was typed, and Go turns it down if
+// the file changed since; the pane then reads the file, folds Go's
+// changes in around the typing and tries again. Reading and writing
+// take turns, so a read never lands over typing that went to Go after
+// it started.
 
 let source: MarkdownEditor | null = null;
 let sourceTimer = 0;
-let sourcePending = false; // typed but not yet applied
+let sourceTurn: Promise<unknown> = Promise.resolve();
+
+// inTurn runs f once the source pane's reads and writes before it are
+// done.
+function inTurn<T>(f: () => Promise<T>): Promise<T> {
+  const p = sourceTurn.then(f, f);
+  sourceTurn = p.catch(() => {});
+  return p;
+}
 
 function openSource() {
   if (source) return;
@@ -778,9 +794,10 @@ function openSource() {
     attrs,
     names: () => known,
     lineNumbers: true,
-    extensions: [runGutter((line) => void runLine(line)), sourceFolding()],
+    // The last lines can scroll up from the window's bottom edge, and
+    // the cursor keeps clear of it.
+    extensions: [runGutter((line) => void runLine(line)), sourceFolding(), scrollPastEnd(), EditorView.scrollMargins.of(() => ({ bottom: 48 }))],
     onChange() {
-      sourcePending = true;
       clearTimeout(sourceTimer);
       sourceTimer = window.setTimeout(() => void applySource(), 500);
     },
@@ -799,53 +816,88 @@ function openSource() {
 
 function closeSource() {
   if (!source) return;
-  void applySource();
-  source.destroy();
+  clearTimeout(sourceTimer);
+  // What was typed still goes to Go, so the editor stays until it has.
+  const ed = source;
   source = null;
+  ed.view.dom.remove();
   sourceFoldsFor = "";
   $("source-bar").replaceChildren();
+  const finish = (): Promise<void> =>
+    inTurn(async () => {
+      if (running && ed.pending) return void window.setTimeout(() => void finish(), 1000);
+      await sendSource(ed).catch(fail);
+      ed.destroy();
+    });
+  void finish();
 }
 
-async function applySource() {
+// applySource hands Go what was typed in the source pane, once a run
+// is over, and draws the document again.
+function applySource(): Promise<void> {
   clearTimeout(sourceTimer);
-  if (!source || !sourcePending) return;
-  if (running) {
-    sourceTimer = window.setTimeout(() => void applySource(), 1000);
-    return;
+  return inTurn(async () => {
+    const ed = source;
+    if (!ed?.pending) return;
+    if (running) {
+      sourceTimer = window.setTimeout(() => void applySource(), 1000);
+      return;
+    }
+    try {
+      await sendSource(ed);
+      status("");
+    } catch (err) {
+      fail(err);
+      return;
+    }
+    $("dirty").hidden = false;
+    cells = (await App.Cells()) ?? [];
+    drawDoc();
+    if (source !== ed) return;
+    markRunLines();
+    markCurrent(ed.view.state.doc.lineAt(ed.view.state.selection.main.head).number);
+  });
+}
+
+// sendSource hands Go ed's text, reading Go's changes into it first
+// whenever Go has some the pane hasn't seen.
+async function sendSource(ed: MarkdownEditor) {
+  for (let tries = 0; ed.pending; tries++) {
+    const text = ed.view.state.doc.toString();
+    if (await App.SetText(ed.base, text)) return ed.sent(text);
+    if (tries === 5) throw new Error("the file keeps changing; try again");
+    ed.load(await App.Text());
   }
-  sourcePending = false;
-  try {
-    await App.SetText(source.view.state.doc.toString());
-    status("");
-  } catch (err) {
-    fail(err);
-    return;
-  }
-  $("dirty").hidden = false;
-  cells = (await App.Cells()) ?? [];
-  drawDoc();
-  markRunLines();
-  markCurrent(source.view.state.doc.lineAt(source.view.state.selection.main.head).number);
 }
 
 // sourceFoldsFor is the file whose folds the source pane opened with.
 let sourceFoldsFor = "";
 
-async function loadSource() {
-  if (!source || sourcePending || doc.file === "") return;
-  const marks = foldMarks(source.view);
+// loadSource reads Go's text into the source pane, keeping what was
+// typed and not yet sent.
+function loadSource(): Promise<void> {
+  return inTurn(loadSourceNow);
+}
+
+async function loadSourceNow() {
+  if (!source || doc.file === "") return;
+  const ed = source;
+  const marks = foldMarks(ed.view);
   try {
-    source.setText(await App.Text());
+    const text = await App.Text();
+    if (source !== ed) return;
+    ed.load(text);
   } catch (err) {
     fail(err);
   }
+  if (source !== ed) return;
   markRunLines();
   // The pane opens with the folds the file asks for, then keeps its own.
   if (sourceFoldsFor !== doc.file) {
     sourceFoldsFor = doc.file;
-    setSourceFolds(source.view, renderedFoldLines(true));
+    setSourceFolds(ed.view, renderedFoldLines(true));
   } else {
-    restoreFolds(source.view, marks);
+    restoreFolds(ed.view, marks);
   }
 }
 

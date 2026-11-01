@@ -80,8 +80,14 @@ func TestSetText(t *testing.T) {
 	}
 	// fail moves above hello, and hello is edited.
 	text := "```sh {#fail}\n(exit 3)\n```\n\n```sh {#hello}\necho bye\n```\n"
-	if err := n.SetText(text); err != nil {
-		t.Fatal(err)
+	ran := n.Text()
+	// Typed over the file as it was before the run, the text would drop
+	// the run's output, so it is turned down.
+	if ok, err := n.SetText(src, text); ok || err != nil || n.Text() != ran {
+		t.Fatalf("a stale base: ok = %v, err = %v, text %q", ok, err, n.Text())
+	}
+	if ok, err := n.SetText(ran, text); !ok || err != nil {
+		t.Fatalf("ok = %v, err = %v", ok, err)
 	}
 	cells := n.Cells()
 	if len(cells) != 2 || cells[0].ID != "fail" || !cells[0].Failed || cells[1].Ran {
@@ -103,7 +109,7 @@ func TestSetText(t *testing.T) {
 		t.Fatal(err)
 	}
 	text = n.Text()
-	if err := n.SetText("---\nmdsh: [\n---\n"); err == nil || n.Text() != text {
+	if _, err := n.SetText(text, "---\nmdsh: [\n---\n"); err == nil || n.Text() != text {
 		t.Errorf("a bad text: err = %v, text %q", err, n.Text())
 	}
 }
