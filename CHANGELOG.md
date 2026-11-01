@@ -121,6 +121,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- In `mdsh-gui`, clicking in the source pane while the rendered view
+  has the focus puts the cursor where you click. In a file just opened
+  the pane used to jump to the top of the file instead.
 - An include block reads its file again when the run reaches it, so it
   shows what a block above it wrote in the same run. `mdsh-gui` also
   reads includes again after every run, and reads one as soon as it is
