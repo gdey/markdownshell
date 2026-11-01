@@ -8,6 +8,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
+  the program that started them, such as an editor plugin, as JSON lines
+  on stdin and stdout.
 - `mdsh-gui`: alt+↑/↓ (Edit › Move Block Up/Down) moves a block, with
   its output and tape, past the cell above or below it, and alt+shift+↑/↓
   past the block above or below. It works on the selected card, the

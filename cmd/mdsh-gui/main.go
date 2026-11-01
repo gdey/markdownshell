@@ -3,9 +3,13 @@
 //
 //	mdsh-gui [flags] [file.md [args...] | folder]
 //	mdsh-gui --version
+//	mdsh-gui --serve=stdio [--source FILE] [file.md [args...] | folder]
 //
 // With no file, the window lists the markdown files under the current
 // folder to pick from, or under folder when one is given.
+//
+// With --serve=stdio it opens no window and serves the notebook on stdin
+// and stdout instead, as mdsh --serve=stdio does.
 package main
 
 import (
@@ -23,6 +27,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/gdey/markdownshell/notebook"
+	"github.com/gdey/markdownshell/serve"
 	"github.com/gdey/markdownshell/settings"
 	"github.com/gdey/markdownshell/ui"
 	"github.com/gdey/markdownshell/web"
@@ -49,6 +54,12 @@ func main() {
 		fmt.Println("mdsh-gui", version)
 		return
 	}
+	if o.stdio {
+		if err := serveStdio(o); err != nil {
+			log.Fatal("mdsh-gui: ", err)
+		}
+		return
+	}
 	if err := mdshGUI(o); err != nil {
 		log.Fatal("mdsh-gui: ", err)
 	}
@@ -57,6 +68,9 @@ func main() {
 // options are what the command line asks for.
 type options struct {
 	version bool
+	// stdio is --serve=stdio: no window, the notebook served on stdin
+	// and stdout instead.
+	stdio bool
 	// source is the files given to --source, read once, as mdsh does,
 	// so a process substitution like <(alias -L) works.
 	source string
@@ -92,6 +106,13 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.BoolVar(&o.run.StopOnError, "stop-on-error", false, "stop at the first failing block")
 	fs.BoolVar(&o.run.Step, "step", false, "ask before running each block, as if every block were marked confirm")
 	fs.BoolVar(&o.version, "version", false, "print the version and exit")
+	fs.Func("serve", "with `stdio`, open no window and serve the notebook on stdin and stdout, as mdsh --serve=stdio does, for a program that starts mdsh-gui", func(v string) error {
+		if v != serve.Stdio {
+			return fmt.Errorf("mdsh-gui can only serve on %s", serve.Stdio)
+		}
+		o.stdio = true
+		return nil
+	})
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
@@ -102,6 +123,9 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	for _, name := range []string{"only", "stop-on-error", "step"} {
+		if set[name] && o.stdio {
+			return o, fmt.Errorf("--%s can't be used with --serve", name)
+		}
 		if set[name] && len(o.args) == 0 {
 			return o, fmt.Errorf("--%s needs a file", name)
 		}

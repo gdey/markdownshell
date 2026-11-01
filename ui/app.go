@@ -76,10 +76,16 @@ const tabHeader = "x-mdsh-tab"
 func TabCalls(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if id, err := strconv.Atoi(r.Header.Get(tabHeader)); err == nil {
-			r = r.WithContext(context.WithValue(r.Context(), tabKey{}, id))
+			r = r.WithContext(WithTab(r.Context(), id))
 		}
 		next.ServeHTTP(rw, r)
 	})
+}
+
+// WithTab returns ctx for a call from tab id, as TabCalls notes it, for
+// hosts whose calls don't come over HTTP.
+func WithTab(ctx context.Context, id int) context.Context {
+	return context.WithValue(ctx, tabKey{}, id)
 }
 
 // newWindow opens a window holding t, or a new tab showing the start

@@ -85,7 +85,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mdsh [run] [flags] file.md [args...]")
-		fmt.Fprintln(stderr, "       mdsh --serve[=host:port] [file.md [args...] | folder]")
+		fmt.Fprintln(stderr, "       mdsh --serve[=host:port|=stdio] [file.md [args...] | folder]")
 		fmt.Fprintln(stderr, "       mdsh completion bash|zsh")
 		fmt.Fprintln(stderr, "       use - as the file to read markdown from stdin")
 		fs.PrintDefaults()
@@ -107,7 +107,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them")
 	var serveOn serveFlag
-	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"); anyone who can reach it with its token can run commands as you")
+	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"), or with =stdio to the program that started mdsh, as JSON lines on stdin and stdout; anyone who can reach it with its token can run commands as you")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	// Files are read as the flag is parsed, so a pipe such as
 	// <(alias -L) is read once, however many shells start.
