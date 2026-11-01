@@ -40,7 +40,7 @@ import (
 // build/appicon.svg is the app's icon, for the Settings window's About
 // tab.
 //
-//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/style.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
+//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/style.css frontend/teletype.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
 var frontend embed.FS
 
 func main() {

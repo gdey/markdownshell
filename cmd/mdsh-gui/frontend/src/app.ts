@@ -2521,7 +2521,7 @@ Events.On(
 // Settings come from the Settings window, so they aren't this window's.
 Events.On("settings", (ev: { data: Settings }) => {
   settings = ev.data;
-  applyTheme(settings.theme);
+  applyTheme(settings);
   source?.setVim(settings.vim);
   source?.setSpellCheck(!settings.noSpellCheck);
 });
@@ -2631,7 +2631,7 @@ document.addEventListener("keydown", (e) => {
 
 me = await Window.Name();
 settings = await App.Settings();
-applyTheme(settings.theme);
+applyTheme(settings);
 attrs = (await App.BlockAttrs()) ?? [];
 applyView();
 await refresh();

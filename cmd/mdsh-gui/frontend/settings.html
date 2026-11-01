@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="teletype.css">
+  <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
   <script type="module" src="bundle/settings.js"></script>
 </head>
 <body class="settings">
   <nav class="tabs" role="tablist" aria-label="Settings">
     <button role="tab" data-tab="general" aria-selected="true">General</button>
+    <button role="tab" data-tab="look-tab">Look</button>
     <button role="tab" data-tab="editing">Editing</button>
     <button role="tab" data-tab="shell">Shell</button>
     <button role="tab" data-tab="files">Files</button>
@@ -17,17 +20,6 @@
   </nav>
   <main>
     <section id="general" role="tabpanel">
-      <div class="setting">
-        <div class="text">
-          <label for="theme">Theme</label>
-          <p class="muted">The editors' colors follow it. Match the system follows the OS.</p>
-        </div>
-        <select id="theme">
-          <option value="">Match the system</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </div>
       <div class="setting">
         <div class="text">
           <label for="view">Open files in</label>
@@ -53,6 +45,102 @@
       <div id="fixed" class="setting path" hidden>
         <input id="start-folder" type="text" spellcheck="false" readonly>
         <button id="choose">Choose…</button>
+      </div>
+    </section>
+
+    <section id="look-tab" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="theme">Theme</label>
+          <p class="muted">The editors' colors follow it. Match the system follows the OS.</p>
+        </div>
+        <select id="theme">
+          <option value="">Match the system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="look">Look</label>
+          <p class="muted">Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark.</p>
+        </div>
+        <select id="look">
+          <option value="">Plain</option>
+          <option value="tty">Teletype</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="text-size">Text size</label>
+          <p class="muted">Scales all the text, code and terminals too. <span id="text-size-value"></span></p>
+        </div>
+        <input id="text-size" type="range" min="80" max="150" step="5">
+        <button id="text-size-reset">Default</button>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="ui-font">Interface font</label>
+          <p class="muted">The face for menus, prose and Settings. Fonts listed are the common ones found on this computer.</p>
+        </div>
+        <select id="ui-font"><option value="">The look's own</option></select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="code-font">Code font</label>
+          <p class="muted">The face for code, output and the terminals.</p>
+        </div>
+        <select id="code-font"><option value="">The look's own</option></select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="line-spacing">Line spacing</label>
+          <p class="muted">The space between lines of prose and code.</p>
+        </div>
+        <select id="line-spacing">
+          <option value="compact">Compact</option>
+          <option value="">Normal</option>
+          <option value="relaxed">Relaxed</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="accent">Accent color</label>
+          <p class="muted">Links, run buttons and what is selected.</p>
+        </div>
+        <input id="accent-custom" type="color" hidden>
+        <select id="accent">
+          <option value="">The look's own</option>
+          <option value="#3fb950">Green</option>
+          <option value="#d4a017">Amber</option>
+          <option value="#2f81f7">Blue</option>
+          <option value="#d1495b">Red</option>
+          <option value="#8250df">Purple</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="history-pane">History pane</label>
+          <p class="muted">Inverted is light under a dark window and dark under a light one. The look's own is always dark for Plain and the window's for Teletype.</p>
+        </div>
+        <select id="history-pane">
+          <option value="">The look's own</option>
+          <option value="match">Match the window</option>
+          <option value="invert">Inverted</option>
+          <option value="dark">Always dark</option>
+        </select>
+      </div>
+      <div id="paper" class="setting">
+        <div class="text">
+          <label>Teletype paper</label>
+          <p class="muted">What the paper is drawn with.</p>
+        </div>
+        <div class="checks">
+          <label class="check"><input id="sprockets" type="checkbox"> Sprocket strips</label>
+          <label class="check"><input id="rules" type="checkbox"> Ruled lines</label>
+          <label class="check"><input id="shadows" type="checkbox"> Shadows under cards</label>
+        </div>
       </div>
     </section>
 

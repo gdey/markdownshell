@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -412,28 +414,55 @@ func (a *App) StartScreen() (Start, error) {
 // Settings are the app-wide settings.
 func (a *App) Settings() settings.Settings { return a.settings.Get() }
 
-// SetSettings saves the settings the Settings window edits: autosave,
-// Vim mode, theme, shell, the view files open in, the start folder and
-// the templates folder. Open windows hear of it with a
-// "settings" event.
+// SetSettings saves the settings the Settings window edits (see
+// edited). Open windows hear of it with a "settings" event.
 func (a *App) SetSettings(s settings.Settings) error {
-	err := a.settings.Update(func(cur *settings.Settings) {
-		cur.Autosave, cur.Vim, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.Shell, s.StartFolder
-		cur.TemplateFolder = s.TemplateFolder
-		cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
-		cur.Theme = ""
-		if s.Theme == "light" || s.Theme == "dark" {
-			cur.Theme = s.Theme
-		}
-		cur.View = ""
-		if s.View == "rendered" || s.View == "source" || s.View == "both" {
-			cur.View = s.View
-		}
-	})
+	err := a.settings.Update(func(cur *settings.Settings) { edited(cur, s) })
 	if err == nil {
 		a.app.Event.Emit("settings", a.settings.Get())
 	}
 	return err
+}
+
+// edited copies into cur what the Settings window edits from s:
+// autosave, Vim mode, spell checking, theme, the look and its options,
+// shell, the History pane's rc file, the view files open in, the start
+// folder and the templates folder. The rest, such as Recent, stays as
+// it is. Values the window can't have sent are dropped.
+func edited(cur *settings.Settings, s settings.Settings) {
+	cur.Autosave, cur.Vim, cur.NoSpellCheck, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.NoSpellCheck, s.Shell, s.StartFolder
+	cur.TemplateFolder = s.TemplateFolder
+	cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
+	cur.Theme = ""
+	if s.Theme == "light" || s.Theme == "dark" {
+		cur.Theme = s.Theme
+	}
+	cur.Look = ""
+	if s.Look == "tty" {
+		cur.Look = s.Look
+	}
+	cur.TextSize = 0
+	if s.TextSize != 0 {
+		cur.TextSize = min(max(s.TextSize, 80), 150)
+	}
+	cur.UIFont, cur.CodeFont = fontName(s.UIFont), fontName(s.CodeFont)
+	cur.LineSpacing = ""
+	if s.LineSpacing == "compact" || s.LineSpacing == "relaxed" {
+		cur.LineSpacing = s.LineSpacing
+	}
+	cur.NoSprockets, cur.NoRules, cur.NoShadows = s.NoSprockets, s.NoRules, s.NoShadows
+	cur.Accent = ""
+	if hexColor.MatchString(s.Accent) {
+		cur.Accent = strings.ToLower(s.Accent)
+	}
+	cur.HistoryPane = ""
+	if s.HistoryPane == "match" || s.HistoryPane == "invert" || s.HistoryPane == "dark" {
+		cur.HistoryPane = s.HistoryPane
+	}
+	cur.View = ""
+	if s.View == "rendered" || s.View == "source" || s.View == "both" {
+		cur.View = s.View
+	}
 }
 
 // ZshWrapper is whether the user's .zshrc has the mdsh function that
@@ -911,4 +940,19 @@ func (a *App) detach(t *docTab, x, y int) {
 	nw := a.newWindow(t)
 	nw.win.SetPosition(max(0, x-120), max(0, y-16))
 	nw.win.Focus()
+}
+
+var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// fontName is a font family name as the page can take it in a CSS
+// variable: letters, digits, spaces, dots, hyphens and underscores,
+// trimmed; anything else gives "", the look's own font.
+func fontName(name string) string {
+	name = strings.TrimSpace(name)
+	for _, r := range name {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(" .-_", r) {
+			return ""
+		}
+	}
+	return name
 }

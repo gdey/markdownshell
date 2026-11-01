@@ -8,6 +8,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a Teletype look, beside the theme in a new Settings ›
+  Look tab: everything in a typewriter face on fan-fold paper, with
+  sprocket holes, ruled lines, hard-edged cards and keycap buttons, or
+  green phosphor when the theme is dark. The tab also sets the text
+  size, the interface and code fonts, line spacing, an accent color,
+  the paper's texture, and the History pane's colors: the window's,
+  inverted (light under a dark window, dark under a light one), or
+  always dark, as before.
+- `mdsh-gui`: turning off spell checking in Settings is now saved.
 - `mdsh-gui`: a file opens in a window the size its window was last,
   and on macOS and Windows in the same place, when it opens in a window
   of its own. Opened in a tab beside others, it leaves the window's
