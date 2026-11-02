@@ -110,7 +110,7 @@
           <label for="accent">Accent color</label>
           <p class="muted">Links, run buttons and what is selected.</p>
         </div>
-        <input id="accent-custom" type="color" hidden>
+        <input id="accent-custom" type="color" aria-label="Custom accent color" hidden>
         <select id="accent">
           <option value="">The look's own</option>
           <option value="#3fb950">Green</option>
@@ -135,10 +135,10 @@
       </div>
       <div id="paper" class="setting">
         <div class="text">
-          <label id="paper-label">Teletype paper</label>
+          <span class="label-text" id="paper-label">Teletype paper</span>
           <p class="muted">What the paper is drawn with.</p>
         </div>
-        <div class="checks">
+        <div class="checks" role="group" aria-labelledby="paper-label">
           <label id="sprockets-check" class="check"><input id="sprockets" type="checkbox"> Sprocket strips</label>
           <label class="check"><input id="rules" type="checkbox"> <span id="rules-label">Ruled lines</span></label>
           <label id="shadows-check" class="check"><input id="shadows" type="checkbox"> Shadows under cards</label>
@@ -248,7 +248,7 @@
           <h1>mdsh-gui <span id="version"></span></h1>
           <p class="muted" id="build"></p>
         </div>
-        <button id="copy" title="Copy the version, build, paths and tools, for a bug report">Copy</button>
+        <button id="copy" title="Copy the version, build, paths and tools, for a bug report" aria-label="Copy the version, build, paths and tools, for a bug report">Copy</button>
       </div>
       <h2>Paths</h2>
       <dl id="paths" class="info"></dl>
@@ -259,7 +259,7 @@
       <p id="links" class="links"></p>
     </section>
 
-    <p id="error" class="error" hidden></p>
+    <p id="error" class="error" role="alert" hidden></p>
   </main>
 </body>
 </html>

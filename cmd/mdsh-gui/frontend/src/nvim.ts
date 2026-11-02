@@ -63,6 +63,12 @@ export class NvimPane {
     this.input.className = "nvim-input";
     this.input.setAttribute("autocapitalize", "off");
     this.input.spellcheck = false;
+    // The grid is a picture: a screen reader can't read Neovim's text
+    // from it, and every key goes to Neovim.
+    this.input.setAttribute("aria-label", "Neovim source pane. Its text isn't readable by a screen reader; turn off Use Neovim in Settings › Editing for the built-in editor");
+    this.canvas.setAttribute("role", "img");
+    this.canvas.setAttribute("aria-label", "Neovim's screen");
+    parent.setAttribute("role", "application");
     parent.append(this.canvas, this.input);
     this.ctx = this.canvas.getContext("2d")!;
     this.measure();
@@ -100,6 +106,7 @@ export class NvimPane {
   destroy() {
     this.observer.disconnect();
     clearTimeout(this.resizeTimer);
+    this.parent.removeAttribute("role");
     this.canvas.remove();
     this.input.remove();
   }

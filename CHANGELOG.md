@@ -18,6 +18,17 @@ follow [Semantic Versioning](https://semver.org/).
   files and variables, ↑/↓ bring back earlier commands, and a command
   that goes on, such as an open `if`, gets another line. esc gives the
   keys back to the file, and ctrl+d closes the pane.
+- `mdsh-gui`: screen reader support. Every button, pane, tab, field
+  and dialog has a name, toggles say whether they are on, and each
+  block's card is a tab stop named for the block, its language, its
+  attributes and its state; focusing a card selects it. The outline's
+  entries say what they are and their state, folds say whether they
+  are open, the window's tabs and Settings' tabs take the arrow keys,
+  and the grips that size the panes take them too. A block's question
+  is read out and puts the focus on Run; the status line and the end
+  of a run are read out. The terminals use xterm's screen reader
+  mode. Keyboard focus shows a ring in every look, and the system's
+  reduce-motion setting turns off the sliding and smooth scrolling.
 - `mdsh -i`: `?` opens a panel of the keys, grouped, each with what it
   does. Keys that do nothing now, such as `u` with no move to undo or
   `s` on a block under no heading, are greyed with the reason. ↑/↓

@@ -226,4 +226,4 @@
 
 [data-look="tty"] #history { border-top-style: dashed; }
 [data-look="tty"] #console .console-bar { border-bottom-style: dashed; }
-[data-look="tty"] :is(input, select, textarea, button):focus-visible { outline: 2px solid var(--fg); outline-offset: -1px; }
+[data-look="tty"] :is(input, select, textarea, button, a, [tabindex]):focus-visible { outline: 2px solid var(--fg); outline-offset: -1px; }

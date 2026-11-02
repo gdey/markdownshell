@@ -130,6 +130,7 @@ function badge() {
   b.hidden = unseen === 0;
   b.textContent = unseen > 99 ? "99+" : String(unseen);
   $("console-toggle").title = "Console (cmd/ctrl+shift+Y)" + (unseen ? ` · ${unseen} new` : "");
+  $("console-toggle").setAttribute("aria-label", "Console" + (unseen ? `, ${unseen} new ${unseen === 1 ? "warning or error" : "warnings and errors"}` : ""));
 }
 
 async function load() {
@@ -141,6 +142,7 @@ async function load() {
 function setHeight(px: number) {
   height = Math.max(48, Math.min(Math.round(px), window.innerHeight - 160));
   $("console").style.height = `${height}px`;
+  $("console-grip").setAttribute("aria-valuenow", String(height));
 }
 
 function dragGrip(e: PointerEvent) {
@@ -188,6 +190,7 @@ export function showConsole(on: boolean) {
   open = on;
   $("console").hidden = !on;
   $("console-toggle").classList.toggle("on", on);
+  $("console-toggle").setAttribute("aria-expanded", String(on));
   if (on) {
     unseen = 0;
     badge();
@@ -206,6 +209,17 @@ export function initConsole(h: ConsoleHooks) {
     // No storage: the default it is.
   }
   $("console-grip").onpointerdown = dragGrip;
+  $("console-grip").onkeydown = (e) => {
+    const dir = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    setHeight(height + dir * 24);
+    try {
+      localStorage.setItem(heightKey, String(height));
+    } catch {
+      // Not remembered, then.
+    }
+  };
   $("console-log").onclick = click;
   $("console-clear").onclick = () => void App.ClearConsole().catch(() => {});
   $("console-copy").onclick = () => void copy();

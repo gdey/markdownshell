@@ -11,7 +11,17 @@ function share(f: number) {
   f = Math.min(1 - least, Math.max(least, f));
   $("source").style.flex = `${f} 1 0`;
   $("doc-scroll").style.flex = `${1 - f} 1 0`;
+  $("split-grip").setAttribute("aria-valuenow", String(Math.round(f * 100)));
   return f;
+}
+
+function keep(f: number) {
+  try {
+    localStorage.setItem(shareKey, String(f));
+  } catch {
+    // Not kept, then.
+  }
+  window.dispatchEvent(new Event("resize"));
 }
 
 // showSplitGrip shows the grip while both views are.
@@ -46,18 +56,21 @@ function drag(e: PointerEvent) {
   grip.onpointerup = grip.onpointercancel = () => {
     grip.onpointermove = grip.onpointerup = grip.onpointercancel = null;
     document.body.classList.remove("resizing-cols");
-    try {
-      localStorage.setItem(shareKey, String(f));
-    } catch {
-      // Not kept, then.
-    }
-    window.dispatchEvent(new Event("resize"));
+    keep(f);
   };
 }
 
 export function initSplitGrip() {
   const grip = $("split-grip");
   grip.onpointerdown = drag;
+  // From the keyboard, left and right move the split by a twentieth.
+  grip.onkeydown = (e) => {
+    const dir = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const width = $("source").offsetWidth + $("doc-scroll").offsetWidth;
+    keep(share($("source").offsetWidth / width + dir * 0.05));
+  };
   // A double click shares the width evenly again.
   grip.ondblclick = () => {
     share(0.5);

@@ -238,6 +238,24 @@ Each file opens in a tab of its own, with its own shells.
   images, so an SVG's scripts don't run and it loads nothing.
 - **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
   `e` edits it.
+- **Screen readers and the keyboard:** every button, pane, tab and
+  field has a name, and the toolbar's buttons say whether they are on.
+  Each block's card is a tab stop, named for the block, its language,
+  its attributes and its state (ran, failed with its exit status,
+  running, in the background, or waiting for an answer); focusing a
+  card selects it, so `enter`, `a`, `e` and `j`/`k` work from there. The
+  outline's entries say what they are and their state, the fold
+  buttons say whether they are open, and the window's tabs take the
+  arrow keys, enter to show one and delete to close it, as Settings'
+  tabs take the arrows. A question a block asks (confirm, depends=)
+  puts the focus on Run and is read out with its reason; the status
+  line, "running", errors and the end of a run are read out too. The
+  grips that size the source view, the console and the History pane
+  take the arrow keys. The terminals read out what arrives (xterm's
+  screen reader mode). The Neovim source pane is a picture to a screen
+  reader; the built-in editor is a text field. Keyboard focus shows a
+  ring in every look, and with the system's reduce-motion setting the
+  panes and folds don't slide and the views don't scroll smoothly.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
   Linux) has tabs: General for the
   view files open in (rendered, source or both; by default the view
