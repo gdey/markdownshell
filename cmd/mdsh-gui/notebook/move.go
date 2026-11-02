@@ -29,6 +29,9 @@ type Move struct {
 	// Note is a softer word, for a block that ran: it ran in the old
 	// order.
 	Note string `json:"note,omitempty"`
+	// renamed are the history blocks the move gave ids of their own, by
+	// index before the move, with their fences' new info strings.
+	renamed map[int]string
 }
 
 // ErrNoMove is returned for a move up from the top or down from the
@@ -43,10 +46,11 @@ var ErrNoMove = doc.ErrNoMove
 func (n *Notebook) MoveBlock(i, dir int, byBlock bool) (Move, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	m, err := n.plan(stepMove(i, dir, byBlock), i)
+	m, err := n.plan(stepMove(i, dir, byBlock), i, -1)
 	if err != nil {
 		return m, err
 	}
+	n.keepResults(m)
 	return m, n.change("move block", "", []byte(m.Text), nil)
 }
 
@@ -57,7 +61,7 @@ func (n *Notebook) MoveBlock(i, dir int, byBlock bool) (Move, error) {
 func (n *Notebook) PlanMove(i, dir int, byBlock bool) (Move, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	return n.plan(stepMove(i, dir, byBlock), i)
+	return n.plan(stepMove(i, dir, byBlock), i, -1)
 }
 
 // MoveTo moves what starts at from, a cell's From, to at, one of the
@@ -117,13 +121,14 @@ func (n *Notebook) MoveTo(from, at int) (Move, error) {
 			return order, line, lineNo(d.Src, lo+max(k, 0)), nil
 		}
 	}
-	m, err := n.plan(fn, i)
+	m, err := n.plan(fn, i, h)
 	if err != nil {
 		return m, err
 	}
 	if m.Text == m.Base {
 		return m, nil
 	}
+	n.keepResults(m)
 	return m, n.change(what, "", []byte(m.Text), nil)
 }
 
@@ -149,12 +154,13 @@ func stepMove(i, dir int, byBlock bool) moveFn {
 }
 
 // plan plans a move, giving blocks ids first if it needs them. block is
-// the moved block's index, or -1 for a section.
-func (n *Notebook) plan(fn moveFn, block int) (Move, error) {
+// the moved block's index, or -1 for a section, and heading the
+// section's heading's, or -1 for a block.
+func (n *Notebook) plan(fn moveFn, block, heading int) (Move, error) {
 	if n.running || len(n.bg) > 0 {
 		return Move{}, ErrBusy
 	}
-	m, order, err := n.tryMove(fn, block)
+	m, order, err := n.tryMove(fn, block, heading)
 	if err != nil && !errors.Is(err, ErrNoMove) && !errors.Is(err, doc.ErrDependsOrder) && n.unnamed() {
 		// Give blocks ids, as saving would, and try again.
 		if _, nerr := run.NameBlocks(n.d, n.results, run.Options{File: n.file}); nerr != nil {
@@ -164,7 +170,7 @@ func (n *Notebook) plan(fn moveFn, block int) (Move, error) {
 		if serr := n.sync(); serr != nil {
 			return Move{}, serr
 		}
-		m, order, err = n.tryMove(fn, block)
+		m, order, err = n.tryMove(fn, block, heading)
 	}
 	if err != nil {
 		return Move{}, err
@@ -199,18 +205,41 @@ func (n *Notebook) unnamed() bool {
 	return slices.ContainsFunc(n.d.Blocks, func(b *doc.Block) bool { return run.Runnable(b) && !b.Named() })
 }
 
-// tryMove plans a move on a copy of the document.
-func (n *Notebook) tryMove(fn moveFn, block int) (Move, []int, error) {
+// tryMove plans a move on a copy of the document. A history block that
+// moves gets an id of its own (see unhistory).
+func (n *Notebook) tryMove(fn moveFn, block, heading int) (Move, []int, error) {
 	d, err := doc.Parse(n.d.Src)
 	if err != nil {
 		return Move{}, nil, err
 	}
+	moved := []int{block}
+	if block < 0 && heading >= 0 && heading < len(d.Headings()) {
+		moved = nil
+		if span, _, err := d.Section(d.Headings()[heading].Span.Start); err == nil {
+			for i, b := range d.Blocks {
+				if b.Span.Start >= span.Start && b.Span.Start < span.End {
+					moved = append(moved, i)
+				}
+			}
+		}
+	}
+	// The ids change first, so what the move breaks is told apart from
+	// what was broken already, which order problems know by id.
+	renamed, err := unhistory(d, moved)
+	if err != nil {
+		return Move{}, nil, err
+	}
 	before := d.OrderProblems(run.Runnable)
+	renamedSrc := bytes.Clone(d.Src)
 	order, from, to, err := fn(d)
 	if err != nil {
 		return Move{}, nil, err
 	}
-	m := Move{Base: string(n.d.Src), Text: string(d.Src), Block: -1, Line: to, FromLine: from}
+	if bytes.Equal(d.Src, renamedSrc) {
+		// Dropped where it was: nothing moved, so nothing is renamed.
+		return Move{Base: string(n.d.Src), Text: string(n.d.Src), Block: block, Line: to, FromLine: from}, order, nil
+	}
+	m := Move{Base: string(n.d.Src), Text: string(d.Src), Block: -1, Line: to, FromLine: from, renamed: renamed}
 	if block >= 0 {
 		m.Block = slices.Index(order, block)
 	}
@@ -218,6 +247,44 @@ func (n *Notebook) tryMove(fn moveFn, block int) (Move, []int, error) {
 		m.Warnings = append(m.Warnings, p.Text)
 	}
 	return m, order, nil
+}
+
+// unhistory gives each of the blocks to move, by index, that the History
+// pane added, #history-N, an id of its own, block-<uuidv7>, with its
+// output's for= and what else names it following. Its number told where
+// it came in the history, which a move undoes. It returns the renamed
+// blocks' new info strings, by index.
+func unhistory(d *doc.Document, moved []int) (map[int]string, error) {
+	var renamed map[int]string
+	for _, old := range moved {
+		if old < 0 || old >= len(d.Blocks) {
+			continue
+		}
+		b := d.Blocks[old]
+		if !doc.IsHistoryID(b.ID) || b.Prefix != "" {
+			continue
+		}
+		if err := d.RenameBlock(b, doc.NewBlockID()); err != nil {
+			return nil, err
+		}
+		if renamed == nil {
+			renamed = map[int]string{}
+		}
+		renamed[old] = b.Info
+	}
+	return renamed, nil
+}
+
+// keepResults carries this session's runs of the history blocks m
+// renames over to them, with n.mu held: a document edit keeps a block's
+// run only if its fence and body stay the same, so their fences take
+// the new ids first.
+func (n *Notebook) keepResults(m Move) {
+	for i, info := range m.renamed {
+		if i >= 0 && i < len(n.d.Blocks) {
+			n.d.Blocks[i].Info = info
+		}
+	}
 }
 
 // BlockAt is the top-level block whose fence, body, output or tape is on

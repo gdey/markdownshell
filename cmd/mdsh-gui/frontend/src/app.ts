@@ -464,7 +464,7 @@ function drawBlock(c: Cell): HTMLElement {
   const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
   const block = el(
     "section",
-    { className: "block" + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
+    { className: "block" + (c.history ? " history" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
     el(
       "div",
       { className: "head" },
@@ -2128,7 +2128,9 @@ $("moved-close").onclick = () => ($("moved").hidden = true);
 // asks first, then takes the block out of the file with its output and
 // tape, as a rendered-view edit that Undo puts back. The bar says so,
 // with an Undo button of its own. Its output has a trash button too,
-// which clears just the output.
+// which clears just the output. A block the History pane added is
+// scratch work: its trash buttons always show, and it deletes without
+// asking, since the bar's Undo is there.
 
 function trashButton(c: Cell): HTMLButtonElement {
   const b = iconButton("trash", "Delete this block (delete)", () => void deleteBlock(c.block));
@@ -2177,14 +2179,15 @@ async function clearOutput(i: number) {
   status("cleared output");
 }
 
-// deleteBlock asks whether to delete block i, and does.
+// deleteBlock asks whether to delete block i, unless the History pane
+// added it, and does.
 async function deleteBlock(i: number) {
   if (running) return status("can't change the file while a block runs");
   const c = cells.find((c) => c.block === i);
   if (!c?.movable) return status("only top-level blocks can be deleted");
   if (c.undeletable) return status(c.undeletable);
   const id = c.name ?? c.id ?? "";
-  if (!(await confirmDelete(id ? "#" + id : `the block at line ${c.line}`))) return;
+  if (!c.history && !(await confirmDelete(id ? "#" + id : `the block at line ${c.line}`))) return;
   await applySource();
   const k = blocks().findIndex((b) => Number(b.dataset.block) === i);
   let d: Deleted;

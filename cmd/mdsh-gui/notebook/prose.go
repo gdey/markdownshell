@@ -132,6 +132,7 @@ func (n *Notebook) cells() []Cell {
 		if bi >= 0 {
 			if end, ok := unitEnd(d, bi, bounds); ok {
 				c.Movable, c.LastLine = true, lineNo(d.Src, max(end-1, c.From))
+				c.History = doc.IsHistoryID(d.Blocks[bi].ID)
 				c.dropLimits(d, doc.Span{Start: d.Blocks[bi].Span.Start, End: end})
 				if users := d.DeleteBlockers(d.Blocks[bi]); len(users) > 0 {
 					c.Undeletable = "Can't delete: " + strings.Join(users, ", ") + " still use it. Take those out first."

@@ -221,6 +221,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `mdsh-gui`: blocks the History pane adds (`#history-N`) are scratch
+  work, so their trash buttons, on the block and on its output, always
+  show, and deleting one doesn't ask first; the bar's Undo brings it
+  back. A history block that moves, by dragging or with alt+↑/↓, becomes
+  an ordinary block with an id of its own, `block-<uuid>`, and its
+  output's `for=` and anything else that named it follow.
+
 - `mdsh-gui`: windows open bigger: 1280×900 for a file and 720×720 for
   Settings, so the Settings tabs fit without scrolling. A window that
   wouldn't fit the screen is cut down to fit.

@@ -310,9 +310,9 @@ th { background: var(--code-bg); }
 .block { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; background: var(--bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block .head button.trash { display: none; }
-.block.selected .head button.trash { display: inline-block; }
+.block.selected .head button.trash, .block.history .head button.trash { display: inline-block; }
 .block .output-part > button.clear-output { position: absolute; top: 2px; right: 6px; display: none; }
-.block.selected .output-part > button.clear-output { display: inline-block; }
+.block.selected .output-part > button.clear-output, .block.history .output-part > button.clear-output { display: inline-block; }
 .block .part > button.trash:hover:not(:disabled) { color: var(--bad); }
 .block .head button.trash:hover:not(:disabled):not(.off) { color: var(--bad); }
 .block .head button.trash.off { opacity: 0.4; cursor: not-allowed; }

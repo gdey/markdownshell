@@ -195,6 +195,11 @@ func TestNextID(t *testing.T) {
 	if got := history.NextID(d); got != "history-8" {
 		t.Errorf("NextID = %q", got)
 	}
+	// A moved history block keeps its old file until it runs again.
+	moved, _ := doc.Parse([]byte("```sh {#history-2}\ntrue\n```\n```output {for=block-x}\n![](d.md.assets/history-9.png)\n```\n"))
+	if got := history.NextID(moved); got != "history-10" {
+		t.Errorf("NextID past a moved block's file = %q", got)
+	}
 	if got := history.Info("zsh", "history-8", true); got != "zsh {#history-8 background}" {
 		t.Errorf("Info = %q", got)
 	}

@@ -43,7 +43,42 @@ func (d *Document) NameBlocks(want func(*Block) bool, newID func() string) ([]Re
 	if len(renames) == 0 {
 		return nil, nil
 	}
+	if err := d.rename(renames, named, true); err != nil {
+		return nil, err
+	}
+	return renames, nil
+}
 
+// historyID is the id the History pane gives a command it adds.
+var historyID = regexp.MustCompile(`^history-[0-9]+$`)
+
+// IsHistoryID reports whether id is one the History pane gives the
+// blocks it adds, history-N.
+func IsHistoryID(id string) bool { return historyID.MatchString(id) }
+
+// RenameBlock gives b, a block whose id is written in its fence, the id
+// id, and carries over what names it: its saved output and output
+// copies (for=), tapes, placeholders, conditions and other blocks'
+// depends=. Links to its files under <doc>.assets/ keep the old name,
+// since the files keep it until the block runs again. Every *Block in d
+// keeps its identity, as with NameBlocks.
+func (d *Document) RenameBlock(b *Block, id string) error {
+	if !b.Named() || b.IsInclude() || b.IsTape() {
+		return errors.New("can't rename block " + d.Label(b) + ": only a block with an id of its own can be renamed")
+	}
+	if b.ID == id {
+		return nil
+	}
+	if d.Block(id) != nil {
+		return errors.New("can't rename block " + d.Label(b) + ": #" + id + " is taken")
+	}
+	return d.rename([]Rename{{b.ID, id}}, map[*Block]string{b: id}, false)
+}
+
+// rename rewrites the source for renames, where named is the blocks
+// whose fences get their new ids. links says whether links to asset
+// files follow too.
+func (d *Document) rename(renames []Rename, named map[*Block]string, links bool) error {
 	// Each region of the source that can name a block gets the
 	// rewrites that apply there.
 	type region struct {
@@ -78,20 +113,26 @@ func (d *Document) NameBlocks(want func(*Block) bool, newID func() string) ([]Re
 		re   *regexp.Regexp
 		with string
 	}
-	var refs, links []rewrite
+	var refs, assets []rewrite
 	for _, r := range renames {
 		old := regexp.QuoteMeta(r.Old)
 		refs = append(refs,
 			rewrite{regexp.MustCompile(`\{\{#` + old + `/`), "{{#" + r.New + "/"},
 			rewrite{regexp.MustCompile(`(for=)("?)` + old + `("|[\s}]|$)`), "${1}${2}" + r.New + "${3}"})
-		links = append(links, rewrite{regexp.MustCompile(`(\.assets/)` + old + `\.`), "${1}" + r.New + "."})
+		if links {
+			assets = append(assets, rewrite{regexp.MustCompile(`(\.assets/)` + old + `\.`), "${1}" + r.New + "."})
+		}
+	}
+	news := map[string]string{}
+	for _, r := range renames {
+		news[r.Old] = r.New
 	}
 
 	var src bytes.Buffer
 	pos := 0
 	for _, g := range regions {
 		if g.span.Start < pos {
-			return nil, errors.New("can't name blocks: parts of the document overlap")
+			return errors.New("can't name blocks: parts of the document overlap")
 		}
 		src.Write(d.Src[pos:g.span.Start])
 		s := string(d.Src[g.span.Start:g.span.End])
@@ -99,9 +140,12 @@ func (d *Document) NameBlocks(want func(*Block) bool, newID func() string) ([]Re
 			s = r.re.ReplaceAllString(s, r.with)
 		}
 		if g.assets {
-			for _, r := range links {
+			for _, r := range assets {
 				s = r.re.ReplaceAllString(s, r.with)
 			}
+		}
+		if g.b != nil {
+			s = renameDepends(s, news)
 		}
 		if g.id != "" {
 			s = setID(s, g.b, g.id)
@@ -113,10 +157,10 @@ func (d *Document) NameBlocks(want func(*Block) bool, newID func() string) ([]Re
 
 	nd, err := Parse(src.Bytes())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(nd.Blocks) != len(d.Blocks) {
-		return nil, errors.New("can't name blocks: naming them would change the document's blocks")
+		return errors.New("can't name blocks: naming them would change the document's blocks")
 	}
 	for i, nb := range nd.Blocks {
 		b := d.Blocks[i]
@@ -125,7 +169,7 @@ func (d *Document) NameBlocks(want func(*Block) bool, newID func() string) ([]Re
 			want = id
 		}
 		if nb.ID != want || nb.HasOutput() != b.HasOutput() {
-			return nil, errors.New("can't name blocks: block " + b.ID + " didn't keep its place or output")
+			return errors.New("can't name blocks: block " + b.ID + " didn't keep its place or output")
 		}
 	}
 	blocks := d.Blocks
@@ -134,17 +178,46 @@ func (d *Document) NameBlocks(want func(*Block) bool, newID func() string) ([]Re
 	}
 	*d = *nd
 	d.Blocks = blocks
-	return renames, nil
+	return nil
 }
 
-// setID adds #id to the info string on line, b's opening fence line.
+// dependsAttr is a depends= attribute on a fence line.
+var dependsAttr = regexp.MustCompile(`(\bdepends=)("[^"]*"|[^\s}]*)`)
+
+// renameDepends renames the ids in line's depends= that news maps.
+func renameDepends(line string, news map[string]string) string {
+	return dependsAttr.ReplaceAllStringFunc(line, func(m string) string {
+		key, val, _ := strings.Cut(m, "=")
+		q := strings.HasPrefix(val, `"`)
+		val = strings.Trim(val, `"`)
+		ids := strings.Split(val, ",")
+		for i, id := range ids {
+			t := strings.TrimSpace(id)
+			if n, ok := news[t]; ok {
+				ids[i] = strings.Replace(id, t, n, 1)
+			}
+		}
+		val = strings.Join(ids, ",")
+		if q {
+			val = `"` + val + `"`
+		}
+		return key + "=" + val
+	})
+}
+
+// setID sets #id in the info string on line, b's opening fence line:
+// in place of the id written there, or first.
 func setID(line string, b *Block, id string) string {
 	at := strings.Index(line, b.Fence) + len(b.Fence)
 	rest := line[at:]
 	end := len(strings.TrimRight(rest, "\r\n"))
 	info := strings.TrimSpace(rest[:end])
 	in := SplitInfo(info)
-	in.Tokens = append([]string{"#" + id}, in.Tokens...)
+	if k := slices.IndexFunc(in.Tokens, func(t string) bool { return tokenKey(t) == "#" }); k >= 0 {
+		in.Tokens[k] = "#" + id
+	} else {
+		in.Tokens = append([]string{"#" + id}, in.Tokens...)
+	}
 	lead := rest[:len(rest[:end])-len(strings.TrimLeft(rest[:end], " \t"))]
 	return line[:at] + lead + in.String() + rest[end:]
 }

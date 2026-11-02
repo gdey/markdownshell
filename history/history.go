@@ -179,18 +179,29 @@ func AddNote(d *doc.Document, text string, carry bool) error {
 	return nil
 }
 
-var historyID = regexp.MustCompile(`^history-([0-9]+)$`)
+var (
+	historyID    = regexp.MustCompile(`^history-([0-9]+)$`)
+	historyAsset = regexp.MustCompile(`\.assets/history-([0-9]+)\.`)
+)
 
 // NextID is the id for the next command in d: one past the highest
-// history-N there.
+// history-N there. A history block that moved has an id of its own, but
+// its output can still link to a file saved under its old one, so those
+// count too: a new block of that number would write over the file.
 func NextID(d *doc.Document) string {
 	high := 0
+	see := func(m []string) {
+		if v, err := strconv.Atoi(m[1]); err == nil && v > high {
+			high = v
+		}
+	}
 	for _, b := range d.Blocks {
 		if m := historyID.FindStringSubmatch(b.ID); m != nil {
-			if v, err := strconv.Atoi(m[1]); err == nil && v > high {
-				high = v
-			}
+			see(m)
 		}
+	}
+	for _, m := range historyAsset.FindAllStringSubmatch(string(d.Src), -1) {
+		see(m)
 	}
 	return "history-" + strconv.Itoa(high+1)
 }
