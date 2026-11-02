@@ -1,9 +1,22 @@
 name: GUI packages
 
-# Builds mdsh-gui's packages: an unsigned universal macOS app in a .dmg
-# and a .zip, and an AppImage for Linux. The release workflow calls it for
-# a tag and adds the files to the release; it also runs on changes to the
-# packaging and by hand, keeping the files as workflow artifacts.
+# Builds mdsh-gui's packages: a universal macOS app in a .dmg and a .zip,
+# and an AppImage for Linux. The release workflow calls it for a tag and
+# adds the files to the release; it also runs on changes to the packaging
+# and by hand, keeping the files as workflow artifacts.
+#
+# The macOS app is signed with a Developer ID and notarized when the
+# repository has the secrets below (docs/signing.md says how to get
+# them), and signed ad hoc otherwise, so builds work before they are set
+# and on pull requests from forks, which don't see secrets.
+#
+#   MACOS_CERTIFICATE_P12         The Developer ID Application certificate
+#                                 and its key as a .p12, base64-encoded.
+#   MACOS_CERTIFICATE_PASSWORD    The .p12's password.
+#   APP_STORE_CONNECT_KEY         An App Store Connect API key (the .p8
+#                                 file's contents), for notarytool, with
+#   APP_STORE_CONNECT_KEY_ID      its key ID and
+#   APP_STORE_CONNECT_ISSUER_ID   issuer ID.
 
 on:
   workflow_call:
@@ -23,13 +36,80 @@ jobs:
     defaults:
       run:
         working-directory: cmd/mdsh-gui
+    env:
+      # The secrets context can't be read in a step's if, so decide here.
+      # (runner.temp can't be read here, hence the fixed keychain path.)
+      SIGN: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+      NOTARIZE: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.APP_STORE_CONNECT_KEY != '' }}
+      KEYCHAIN: /tmp/mdsh-signing.keychain-db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: cmd/mdsh-gui/go.mod
           cache-dependency-path: cmd/mdsh-gui/go.sum
+      - name: Import the Developer ID certificate
+        if: env.SIGN == 'true'
+        id: cert
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          # A keychain of its own, with a throwaway password, that the
+          # last step deletes. From GitHub's guide to Apple certificates
+          # on macOS runners; set-key-partition-list lets codesign use
+          # the key without a prompt.
+          password=$(openssl rand -hex 16)
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$password" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          # Apple's intermediate, so the certificate's chain checks out
+          # even when the .p12 was exported without it.
+          curl -sSfL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -t cert -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN"
+          rm "$RUNNER_TEMP/certificate.p12"
+          # The identity's name, as codesign wants it.
+          identity=$(security find-identity -v -p codesigning "$KEYCHAIN" |
+            sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -n 1)
+          if [ -z "$identity" ]; then
+            echo "MACOS_CERTIFICATE_P12 has no Developer ID Application certificate" >&2
+            security find-identity -v -p codesigning "$KEYCHAIN" >&2
+            exit 1
+          fi
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+          echo "Signing as $identity"
+      - name: Write the App Store Connect API key
+        if: env.NOTARIZE == 'true'
+        env:
+          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+        run: |
+          printf '%s\n' "$APP_STORE_CONNECT_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
       - run: build/darwin/app.sh "${{ inputs.version || format('0.0.0-dev.{0}', github.run_number) }}" dist
+        env:
+          MDSH_SIGN_IDENTITY: ${{ steps.cert.outputs.identity }}
+          MDSH_NOTARY_KEY: ${{ env.NOTARIZE == 'true' && format('{0}/AuthKey.p8', runner.temp) || '' }}
+          MDSH_NOTARY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          MDSH_NOTARY_ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      - name: Say whether the app is signed
+        run: |
+          if [ "$NOTARIZE" = true ]; then
+            echo "::notice::mdsh.app is signed with a Developer ID and notarized"
+          elif [ "$SIGN" = true ]; then
+            echo "::warning::mdsh.app is signed with a Developer ID but not notarized: set the APP_STORE_CONNECT_* secrets (docs/signing.md)"
+          else
+            echo "::notice::mdsh.app is signed ad hoc; to sign and notarize it, set the secrets docs/signing.md lists"
+          fi
+      - name: Remove the signing keychain
+        if: always() && env.SIGN == 'true'
+        run: |
+          security delete-keychain "$KEYCHAIN" || true
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
       - uses: actions/upload-artifact@v4
         with:
           name: gui-macos

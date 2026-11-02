@@ -21,6 +21,8 @@ jobs:
     uses: ./.github/workflows/gui-packages.yml
     with:
       version: ${{ needs.version.outputs.version }}
+    # The macOS signing and notarization secrets, when they are set.
+    secrets: inherit
 
   release:
     needs: gui

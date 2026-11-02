@@ -124,6 +124,13 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The changelog open in a read-only tab beside the start screen](docs/changelog/changelog-tab.png)
 
+- The release workflow signs the macOS app with a Developer ID and
+  notarizes it when the repository has the certificate and an App
+  Store Connect API key as secrets, and keeps the ad hoc signature
+  until then. `docs/signing.md` walks through getting them: the Apple
+  Developer Program, the certificate, the key, the secrets, and what
+  `build/darwin/app.sh` does with them.
+
 - mdsh-gui can view and edit a file's front matter from the rendered
   view. The Front matter tab at the top of the page (or Edit › Front
   Matter, cmd/ctrl+shift+M) slides the page down to show a form for the
