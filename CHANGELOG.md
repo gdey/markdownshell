@@ -8,6 +8,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh -i`: a **History** pane, as in mdsh-gui: `h` opens a terminal
+  along the bottom of the screen. A command typed there runs in the
+  file's shell, on a terminal, and is added to the end of the file as a
+  `#history-N` block with its output; a full-screen one, such as `vi`,
+  is kept as a `tty` block with its recording, and a trailing `&` adds
+  a `background` block. A line starting with `#` is added as prose.
+  The prompt is the shell's own `PS1`/`PS2`, tab completes commands,
+  files and variables, ↑/↓ bring back earlier commands, and a command
+  that goes on, such as an open `if`, gets another line. esc gives the
+  keys back to the file, and ctrl+d closes the pane.
 - `mdsh -i`: `?` opens a panel of the keys, grouped, each with what it
   does. Keys that do nothing now, such as `u` with no move to undo or
   `s` on a block under no heading, are greyed with the reason. ↑/↓
