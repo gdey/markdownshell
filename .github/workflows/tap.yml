@@ -38,16 +38,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download "${{ steps.v.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern checksums.txt --dir "$RUNNER_TEMP"
+      # Not actions/checkout: it can't check out a tap with no commits yet
+      # ("couldn't find remote ref refs/heads/main"), which is what the
+      # tap is until this workflow first pushes to it.
       - name: Check out the tap
-        uses: actions/checkout@v4
-        with:
-          repository: gdey/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          gh auth setup-git
+          git clone https://github.com/gdey/homebrew-tap.git tap
+          git -C tap rev-parse -q --verify HEAD >/dev/null || git -C tap checkout -b main
       - name: Write the formula and cask
         run: .github/scripts/tap.sh "${{ steps.v.outputs.version }}" "$RUNNER_TEMP/checksums.txt" tap
       - name: Push
         working-directory: tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -57,4 +63,4 @@ jobs:
             exit 0
           fi
           git commit -m "mdsh ${{ steps.v.outputs.tag }}"
-          git push
+          git push origin HEAD
