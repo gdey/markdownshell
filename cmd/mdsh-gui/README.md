@@ -327,6 +327,12 @@ anything in `.mdsh.yaml` that was ignored, and a folder whose
 `.mdsh.yaml` doesn't parse shows as a plain folder with a ⚠ that says
 why.
 
+You don't have to write the file by hand: the ⚙ beside a folder on the
+start screen opens its settings, a form for the same keys, and saves
+`.mdsh.yaml` for you. Clearing every field removes the file; keys and
+comments the form doesn't know are kept. The gear shows only on folders
+you can write to, and not on one whose `.mdsh.yaml` doesn't parse.
+
 Run All streams each block's output in under it as it runs.
 
 ![A run in progress: the build block's output so far, with Stop in the toolbar](../../site/static/images/gui/running.png)

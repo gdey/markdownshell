@@ -222,6 +222,43 @@
       </div>
     </form>
   </dialog>
+  <dialog id="folder-dialog" aria-labelledby="folder-title" aria-describedby="folder-where">
+    <form method="dialog">
+      <h2 id="folder-title">Folder settings</h2>
+      <p id="folder-where" class="muted"></p>
+      <label>Title
+        <input id="fs-title" type="text" maxlength="300">
+      </label>
+      <label>Description
+        <input id="fs-desc" type="text" maxlength="300">
+      </label>
+      <label>Icon
+        <input id="fs-icon" type="text" list="fs-images" spellcheck="false" aria-describedby="fs-icon-hint">
+        <span id="fs-icon-hint" class="hint muted">One emoji, or an image in this folder.</span>
+      </label>
+      <div class="fs-color">
+        <label>Color
+          <input id="fs-color" type="text" spellcheck="false" placeholder="#3b82f6" aria-describedby="fs-color-hint">
+          <span id="fs-color-hint" class="hint muted">A #hex, rgb(), hsl() or CSS color name.</span>
+        </label>
+        <input id="fs-color-pick" type="color" aria-label="Pick a color" title="Pick a color">
+      </div>
+      <label>Background image
+        <input id="fs-bg" type="text" list="fs-images" spellcheck="false" aria-describedby="fs-bg-hint">
+        <span id="fs-bg-hint" class="hint muted">An image in this folder, shown behind its header.</span>
+      </label>
+      <label>Tags
+        <input id="fs-tags" type="text" spellcheck="false" placeholder="ops, prod" aria-describedby="fs-tags-hint">
+        <span id="fs-tags-hint" class="hint muted">Split by commas or spaces. Every file in the folder, and below it, gets them.</span>
+      </label>
+      <datalist id="fs-images"></datalist>
+      <p id="fs-error" class="error" role="alert" hidden></p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="fs-ok" value="ok" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="viewer" title="Click or press esc to close" aria-label="Image, full size. Click or press escape to close"><img alt=""></dialog>
 </body>
 </html>

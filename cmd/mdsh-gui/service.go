@@ -439,6 +439,9 @@ type Start struct {
 	// LastSession is the file Last Session opens, or "" if there are no
 	// sessions yet.
 	LastSession string `json:"lastSession"`
+	// Writable are the listed folders, by rel, whose .mdsh.yaml the
+	// folder settings can save.
+	Writable []string `json:"writable"`
 }
 
 // StartScreen lists the markdown files under the start folder, and the
@@ -463,8 +466,10 @@ func (a *App) StartScreen() (Start, error) {
 			c.BackgroundURL = notebook.DocURL(c.Background)
 		}
 	}
+	folders, writable := startFolders(dir, l)
 	a.mu.Lock()
 	a.startImages = images
+	a.startFolders = folders
 	a.mu.Unlock()
 	var recent []string
 	for _, f := range a.settings.Get().Recent {
@@ -474,7 +479,7 @@ func (a *App) StartScreen() (Start, error) {
 	}
 	home, _ := os.UserHomeDir()
 	last, _ := session.Last(a.sessionDir())
-	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: recent, LastSession: last}, nil
+	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: recent, LastSession: last, Writable: writable}, nil
 }
 
 // Settings are the app-wide settings.

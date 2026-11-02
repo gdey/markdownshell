@@ -7,6 +7,7 @@ import { Events, Window } from "/wails/runtime.js";
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, announce, el, iconButton, icons, keyActivates, scrollBehavior, svg } from "./dom.js";
+import { folderGear, initFolders } from "./folders.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
@@ -2626,14 +2627,14 @@ $("options").onclick = openRunOptions;
 
 // Start screen
 
-let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "" };
+let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "", writable: [] };
 
 async function drawStart() {
   try {
     startScreen = await App.StartScreen();
     $("start-dir").textContent = tilde(startScreen.dir) + (startScreen.full ? " (showing the first " + (startScreen.files ?? []).length + " files)" : "");
   } catch (err) {
-    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "" };
+    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "", writable: [] };
     $("start-dir").textContent = message(err);
   }
   const last = $<HTMLButtonElement>("last-session");
@@ -2686,6 +2687,14 @@ function tagButton(tag: string, on: boolean, count?: number): HTMLElement {
   return b;
 }
 
+// writable is true for a listed folder whose .mdsh.yaml can be saved.
+const writable = (dir: string) => (startScreen.writable ?? []).includes(dir);
+
+// folderName is the last part of a listed folder's path.
+function folderName(dir: string): string {
+  return dir === "" ? startScreen.dir.split(/[\\/]/).pop() || startScreen.dir : dir.slice(dir.lastIndexOf("/") + 1);
+}
+
 function dirOf(rel: string): string {
   const i = rel.lastIndexOf("/");
   return i < 0 ? "" : rel.slice(0, i);
@@ -2694,8 +2703,7 @@ function dirOf(rel: string): string {
 // collectionHeader shows a collection's icon, title, description and
 // tags, in its color and over its background image.
 function collectionHeader(c: Collection, dir: string, active: string[]): HTMLElement {
-  const folder = dir === "" ? startScreen.dir.split(/[\\/]/).pop() || startScreen.dir : dir.slice(dir.lastIndexOf("/") + 1);
-  const title = c.title || folder;
+  const title = c.title || folderName(dir);
   const icon = el("div", { className: "cicon" });
   if (c.iconURL) icon.append(el("img", { src: c.iconURL, alt: "" }));
   else icon.textContent = c.icon || [...title][0]?.toUpperCase() || "";
@@ -2703,6 +2711,7 @@ function collectionHeader(c: Collection, dir: string, active: string[]): HTMLEle
   if (c.description) text.append(el("div", { className: "cdesc muted" }, c.description));
   if (c.tags?.length) text.append(el("div", { className: "ctags" }, ...c.tags.map((t) => tagButton(t, active.includes(t)))));
   const head = el("div", { className: "chead" }, icon, text);
+  if (writable(dir)) head.append(folderGear(dir, title, drawStart));
   if (c.backgroundURL) {
     head.classList.add("bg");
     head.style.setProperty("--img", `url("${c.backgroundURL}")`);
@@ -2785,7 +2794,9 @@ function filterStart() {
       h.title = err;
       h.append(" ⚠");
     }
-    list.append(h, ul);
+    // A folder whose .mdsh.yaml doesn't parse is fixed by hand.
+    if (!err && writable(dir)) list.append(el("div", { className: "fhead" }, h, folderGear(dir, folderName(dir), drawStart)), ul);
+    else list.append(h, ul);
   }
   $("start-empty").hidden = groups.size > 0 || recent.length > 0;
 }
@@ -2825,6 +2836,7 @@ $("filter").onkeydown = (e) => {
   if (e.key === "Enter") document.querySelector<HTMLElement>("#start .file")?.click();
 };
 $("new-file").onclick = () => openNewFile();
+initFolders();
 
 // New file
 

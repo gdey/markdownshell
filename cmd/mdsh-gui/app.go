@@ -50,6 +50,9 @@ type App struct {
 	// startImages are the collection icons and backgrounds the start
 	// screen shows, by real path, which the window may load.
 	startImages map[string]bool
+	// startFolders are the folders the start screen lists, by rel, with
+	// their absolute paths, which the folder settings may edit.
+	startFolders map[string]string
 
 	started atomic.Bool // the app is running, so menus change on its main thread
 }
