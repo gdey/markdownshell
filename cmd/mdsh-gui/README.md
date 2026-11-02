@@ -234,7 +234,9 @@ Each file opens in a tab of its own, with its own shells.
   the other.
 - **Images:** image, screenshot and recording output shows in the
   block, and so do images in the prose, from the document's folder.
-  Click an output image to see it full size.
+  Click an output image to see it full size. Images from other sites
+  are not loaded: opening a file never reaches the network, so a note
+  with the image's alt text and host shows in its place.
 - **Diagrams:** a fenced `d2` block shows as the diagram it draws, and
   a fenced `svg` block as its picture, with a button to switch to the
   code and back. d2 diagrams are drawn by the built-in

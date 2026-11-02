@@ -9,6 +9,12 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 )
 
+// docCSP is the Content-Security-Policy sent with the files beside the
+// open documents, so an .svg or .html among them can load nothing and
+// run nothing if the window ever shows one as a page. The pages carry
+// their own policy in a meta tag.
+const docCSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+
 // assets serves the frontend, the app icon, and at notebook.DocPrefix the
 // files beside the open documents, such as the images their blocks write.
 func (a *App) assets(pages http.Handler) http.Handler {
@@ -46,6 +52,8 @@ func (a *App) serveDocFile(w http.ResponseWriter, r *http.Request, path string) 
 		return
 	}
 	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Content-Security-Policy", docCSP)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 }
 

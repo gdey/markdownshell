@@ -38,6 +38,17 @@ follow [Semantic Versioning](https://semver.org/).
   so before a file could run code the rendered view never showed. A
   hidden tape is drawn the same way, and a section that holds one opens
   unfolded even when an `mdsh:collapse` line folds it.
+- `mdsh-gui`: opening a file no longer fetches anything from the
+  network. An image linked from another site (`https:`, `//host`,
+  `file:`) is drawn as a note with its alt text and host instead of
+  being loaded, so a `{{$VAR}}` in its link can't send your environment
+  anywhere and nobody learns that the file was opened. Images beside
+  the file and `data:` images still show. Every window page also
+  carries a Content-Security-Policy that allows loads only from the app
+  itself, and files beside the document are served with one that loads
+  and runs nothing. Since `{{$VAR}}` now reads only exposed variables
+  (above), a link's target can't carry the rest of your environment to
+  a click either.
 
 ### Added
 

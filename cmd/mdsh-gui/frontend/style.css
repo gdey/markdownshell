@@ -353,6 +353,7 @@ th { background: var(--code-bg); }
 .block .output::before { content: "Output"; display: block; padding-top: 6px; font-size: calc(11px * var(--text-scale)); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .block .output pre { background: none; padding: 4px 0 10px; }
 .block .output img, .prose img { max-width: 100%; height: auto; }
+.prose em.remote-image, .block .output em.remote-image { display: inline-block; padding: 1px 6px; border: 1px dashed var(--border); border-radius: 4px; font-size: .9em; color: var(--muted); }
 .block .output img { display: block; margin: 12px 0; cursor: zoom-in; }
 /* d2 and svg fences drawn as pictures, with a button to switch to their
    code. A d2 diagram comes in a light and a dark theme. */
