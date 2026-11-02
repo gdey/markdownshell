@@ -59,7 +59,7 @@ hello from a sub-env
 | `show-stderr[=COND]` | Show stderr (by default only when the block fails) |
 | `links` | Make web addresses (`http:`, `https:`, `mailto:`) in the output clickable in mdsh-gui and `mdsh -i`; History adds it to commands typed there |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
-| `share=A,B` | Exported vars a new sub-env gets from its parent (default all; empty for none) |
+| `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |

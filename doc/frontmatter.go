@@ -33,7 +33,8 @@ type Options struct {
 	} `yaml:"terminal"`
 	Env struct {
 		// Share lists the variables passed into the top-level env from
-		// the caller, and the default for sub-envs. Nil means all.
+		// the caller, and the default for sub-envs. Nil means all. A
+		// list also passes env.Base, except in a remote document.
 		Share []string `yaml:"share"`
 		// Source lists files sourced into every shell as it starts,
 		// such as aliases and functions. A leading ~/ is the home

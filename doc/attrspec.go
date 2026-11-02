@@ -59,7 +59,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "collapse-output", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the output folded to one line, or only if the condition holds"},
 	{Name: "links", Kind: AttrFlag, Default: "off", Help: "Make web addresses in the output clickable, in mdsh-gui and mdsh -i; History adds it to the commands typed there"},
 	{Name: "env", Kind: AttrText, Default: "top-level env", Help: "Run in a named sub-env; a/b stacks b on a"},
-	{Name: "share", Kind: AttrList, Default: "front matter env.share, else all", Help: "Exported variables a new sub-env gets from its parent; empty for none"},
+	{Name: "share", Kind: AttrList, Default: "front matter env.share, else all", Help: "Exported variables a new sub-env gets from its parent, besides PATH, HOME, USER and the rest of the base set; empty for just the base set"},
 	{Name: "on_error", Kind: AttrChoice, Values: []string{"stop", "continue"}, Default: "front matter on_error", Help: "Stop the run if this block fails, or go on"},
 	{Name: "depends", Kind: AttrList, Default: "none", Help: "Blocks to run first, in order: each one that hasn't run this session is asked about"},
 	{Name: "confirm", Kind: AttrText, Bare: true, Default: "off", Help: "Ask before running, with this question if given"},

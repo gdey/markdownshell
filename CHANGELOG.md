@@ -36,6 +36,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `COLORTERM`,
+  `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TMPDIR` (and, on macOS,
+  `__CF_USER_TEXT_ENCODING`) now get past any `share` list, in the front
+  matter's `env.share` and a block's `share=`, so a filtered shell can
+  still find programs and its home folder. None of them holds a secret.
+  Drop one with `-NAME`, as in `share=GREETING,-PATH`. `share=` (empty)
+  now passes just this base set. Documents loaded from a URL, once mdsh
+  can, won't get it.
 - Commands typed in the History pane, in mdsh-gui and `mdsh -i`, are
   added with `skip`, so running the whole file doesn't run them again.
   Running one by hand still does.

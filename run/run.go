@@ -40,6 +40,11 @@ type Options struct {
 	Args []string
 	// Environ is the caller's environment. Defaults to os.Environ().
 	Environ []string
+	// Remote marks a document loaded from a URL (http, https, ftp,
+	// sftp). Its shells get only the caller's variables its env.share
+	// and share= name, without env.Base (PATH, HOME, USER, ...), and
+	// none at all when it names none. See TopEnv.
+	Remote bool
 	// Shell overrides the front matter's shell.
 	Shell string
 	// Source runs in every shell as it starts, after the files the

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -82,6 +83,49 @@ func TestShareExclusions(t *testing.T) {
 		if got := string(r[id].Stdout); got != w {
 			t.Errorf("%s stdout = %q, want %q (stderr %q, err %v)", id, got, w, r[id].Stderr, r[id].Err)
 		}
+	}
+}
+
+// TestShareBase checks that PATH, HOME, USER and the rest of env.Base
+// get past a share list in a local document, and that a document loaded
+// from a URL gets only what it names.
+func TestShareBase(t *testing.T) {
+	src := "---\nmdsh:\n  env:\n    share: [GREETING]\n---\n" +
+		"```sh {#a}\necho \"${HOME-x}-${USER-x}-${LC_ALL-x}-${GREETING-x}-${SECRET-x}\"\nexport A=1\n```\n" +
+		"```sh {#b env=sub share=A}\necho \"${HOME-x}-$A\"\n```\n" +
+		"```sh {#c env=clean share=,-HOME}\necho \"${HOME-x}-${USER-x}\"\n```\n"
+	environ := []string{"PATH=" + os.Getenv("PATH"), "HOME=/h", "USER=u", "LC_ALL=C", "GREETING=hi", "SECRET=s"}
+	for _, tt := range []struct {
+		name   string
+		remote bool
+		want   map[string]string
+	}{
+		{"local", false, map[string]string{"a": "/h-u-C-hi-x\n", "b": "/h-1\n", "c": "x-u\n"}},
+		{"remote", true, map[string]string{"a": "x-x-x-hi-x\n", "b": "x-1\n", "c": "x-x\n"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, results := runDoc(t, src, run.Options{Environ: environ, Remote: tt.remote})
+			r := byID(results)
+			for id, w := range tt.want {
+				if got := string(r[id].Stdout); got != w {
+					t.Errorf("%s stdout = %q, want %q (stderr %q, err %v)", id, got, w, r[id].Stderr, r[id].Err)
+				}
+			}
+		})
+	}
+}
+
+func TestTopEnvRemote(t *testing.T) {
+	environ := []string{"HOME=/h", "PATH=/bin", "TOKEN=t"}
+	d, err := doc.Parse([]byte("```sh\ntrue\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := run.TopEnv(d, run.Options{Environ: environ}); !slices.Equal(got, environ) {
+		t.Errorf("local, no env.share: %q, want all of %q", got, environ)
+	}
+	if got := run.TopEnv(d, run.Options{Environ: environ, Remote: true}); len(got) != 0 {
+		t.Errorf("remote, no env.share: %q, want nothing", got)
 	}
 }
 
