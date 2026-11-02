@@ -74,3 +74,24 @@ func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
 		}
 	}
 }
+
+// Selecting a card must not move its head's buttons. The mousedown on a
+// play button selects its card, as WebKit focuses the card rather than
+// the button; if selecting then laid the head out again, say by showing
+// the trash, the play button slid out from under the pointer, the
+// mouseup landed elsewhere, and the first click only selected the card.
+func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
+	layout := []string{"display", "width", "min-width", "max-width", "padding", "padding-left", "padding-right", "margin", "margin-left", "margin-right", "border", "border-width", "gap", "font-size", "flex", "order", "position"}
+	for _, file := range []string{"style.css", "blueprint.css", "teletype.css"} {
+		for sel, props := range cssProps(t, "frontend/"+file) {
+			if !strings.Contains(sel, ".selected") || !strings.Contains(sel, ".block") || !strings.Contains(sel, ".head") {
+				continue
+			}
+			for _, p := range layout {
+				if props[p] {
+					t.Errorf("%s: %q sets %s, which moves the head's buttons when a click selects the card; use visibility or colour instead", file, sel, p)
+				}
+			}
+		}
+	}
+}

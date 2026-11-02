@@ -313,8 +313,12 @@ th { background: var(--code-bg); }
 .block { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; background: var(--bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.block .head button.trash { display: none; }
-.block.selected .head button.trash, .block.history .head button.trash { display: inline-block; }
+/* The trash keeps its place while hidden: if it took space only once
+   its card was selected, the mousedown that selects the card would push
+   the play button left, out from under the pointer, and the click would
+   miss it. */
+.block .head button.trash { visibility: hidden; }
+.block.selected .head button.trash, .block.history .head button.trash { visibility: visible; }
 .block .output-part > button.clear-output { position: absolute; top: 2px; right: 6px; display: none; }
 .block.selected .output-part > button.clear-output, .block.history .output-part > button.clear-output { display: inline-block; }
 .block .part > button.trash:hover:not(:disabled) { color: var(--bad); }
