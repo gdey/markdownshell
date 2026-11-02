@@ -98,7 +98,8 @@ This page is the reference.
   mistakes and checks the prose's spelling, with Vim keys as a setting.
   An experimental Neovim pane can take its place.
 - **History** (View › History, cmd/ctrl+shift+H). A terminal along the
-  bottom, with your shell's prompt and completion. Commands are added to
+  bottom, with your shell's prompt, completion and emacs line keys
+  (ctrl+a, ctrl+w, ctrl+y, alt+b…). Commands are added to
   the file as `#history-N` blocks with their output, with `skip`, so
   Run all doesn't run them again, and `links`, so the web addresses they
   print are clickable; `#` lines become

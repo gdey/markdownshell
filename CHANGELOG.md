@@ -138,6 +138,17 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![A run waiting on swap_live: the folded Swap section has opened, swap live is ringed in the outline, and the question sits in the view](docs/changelog/confirm-centered.png)
 
+- The History pane's input, in mdsh-gui and `mdsh -i`, takes the emacs
+  line keys a shell's prompt does: ctrl+a/e, ctrl+b/f, alt+b/f, ctrl+w,
+  alt+backspace, alt+d, ctrl+u and ctrl+k, which kill text that ctrl+y
+  yanks back (kills in a row add up, as in readline), ctrl+d to delete a
+  character or, with nothing typed, close the pane, ctrl+p/n for earlier
+  and later commands, and ctrl+l to clear the pane. In mdsh-gui they
+  go through the input's undo, and option is meta on a Mac, so
+  option+b moves back a word rather than typing ∫.
+
+  ![mdsh-gui's History pane after ctrl+p recalled kubectl get pods -n staging, ctrl+w killed staging, and alt+d swapped get for describe](docs/changelog/history-readline.png)
+
 - In `mdsh-gui` on macOS, the source pane no longer jumps to the block
   at the top of the rendered view while you type or click in it. The
   panes follow only the one you last scrolled, clicked or typed in, so
