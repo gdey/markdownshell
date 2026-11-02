@@ -482,3 +482,40 @@ func TestRunTerminalJobs(t *testing.T) {
 		})
 	}
 }
+
+// TestDrainRevoked checks that drain, when the terminal is gone, as on
+// macOS once the shell that owned it exits, still waits until what was
+// read from it has gone to the attached writer.
+func TestDrainRevoked(t *testing.T) {
+	ptm, pts, err := pty.Open()
+	if err != nil {
+		t.Skip(err)
+	}
+	p := &ptyConn{ptm: ptm, pts: pts}
+	defer ptm.Close()
+	p.started("MARK")
+	var mu sync.Mutex
+	var got bytes.Buffer
+	read := make(chan struct{}, 1)
+	p.attach(writerFunc(func(b []byte) (int, error) {
+		select {
+		case read <- struct{}{}:
+		default:
+		}
+		time.Sleep(50 * time.Millisecond)
+		mu.Lock()
+		defer mu.Unlock()
+		return got.Write(b)
+	}))
+	io.WriteString(pts, "last words\n")
+	// macOS revokes the terminal only once the output has been read;
+	// closing it before then would discard the output.
+	<-read
+	pts.Close()
+	p.drain("MARK", 1)
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(got.String(), "last words") {
+		t.Errorf("got %q, want the output written before the terminal went", got.String())
+	}
+}

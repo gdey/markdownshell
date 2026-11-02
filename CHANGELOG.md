@@ -390,6 +390,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A block whose `timeout` ran out while mdsh checked its syntax was
+  reported as failing with exit status 2, as if it had a syntax error.
+  It is now reported as timed out.
+- On macOS, a terminal block that ended its shell, as with `exit`,
+  could lose the output it wrote just before.
 - `mdsh -i` no longer shows a block that ended as running while the
   run goes on, such as while a later block waits for an answer.
 - In a zsh block, a lone `}` anywhere on a line, as in `echo }`, is a

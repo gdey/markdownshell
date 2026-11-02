@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -69,5 +71,24 @@ func TestBackgroundKill(t *testing.T) {
 	}
 	if out, _ := j.Output(); string(out) != "before\n" {
 		t.Errorf("output %q", out)
+	}
+}
+
+// TestCheckTimeout checks that a syntax check cut off by ctx, as a
+// block's timeout can, is reported as ctx's error, not as a syntax
+// error.
+func TestCheckTimeout(t *testing.T) {
+	dir := t.TempDir()
+	sh := filepath.Join(dir, "sh")
+	if err := os.WriteFile(sh, []byte("#!/bin/sh\nexec sleep 5\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	var w bytes.Buffer
+	s := &Shell{path: sh}
+	ok, err := s.check(ctx, filepath.Join(dir, "block.sh"), &w)
+	if ok || !errors.Is(err, context.DeadlineExceeded) || w.Len() > 0 {
+		t.Errorf("check = %v, %v, wrote %q; want false, %v, nothing", ok, err, w.String(), context.DeadlineExceeded)
 	}
 }

@@ -152,6 +152,11 @@ func (s *Shell) check(ctx context.Context, f string, w io.Writer) (ok bool, err 
 	chk := exec.CommandContext(ctx, s.path, "-n", f)
 	chk.Stdout, chk.Stderr = &syn, &syn
 	if err := chk.Run(); err != nil {
+		// A check killed because ctx ended, as a block's timeout can
+		// while the check runs, found no error.
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {
 			msg := bytes.ReplaceAll(syn.Bytes(), []byte(f), []byte("block"))

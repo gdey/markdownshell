@@ -279,12 +279,24 @@ func (p *ptyConn) wait(n int) {
 // pseudo-terminal, as the shell would have after the block, and waits
 // for it, so what the block wrote before it ended the shell has gone to
 // the attached writer.
+//
+// On macOS the terminal is revoked when the shell, its session leader,
+// exits, after what the shell wrote has been read, so the write fails.
+// Then drain waits for reading to end, so what was read has gone to the
+// writer, but not past drainWait, in case reading never ends.
 func (p *ptyConn) drain(mark string, n int) {
-	if _, err := fmt.Fprintf(p.pts, "%s%d\n", mark, n); err != nil {
+	if _, err := fmt.Fprintf(p.pts, "%s%d\n", mark, n); err == nil {
+		p.wait(n)
 		return
 	}
-	p.wait(n)
+	select {
+	case <-p.d.eof:
+	case <-time.After(drainWait):
+	}
 }
+
+// drainWait bounds how long drain waits for reading to end.
+const drainWait = 500 * time.Millisecond
 
 func (p *ptyConn) close() {
 	p.pts.Close()
