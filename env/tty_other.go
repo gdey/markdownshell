@@ -32,4 +32,5 @@ type ptyConn struct{}
 func openPTY(*exec.Cmd) (*ptyConn, error) { return nil, errNoTTY }
 func (*ptyConn) started(string)           {}
 func (*ptyConn) wait(int)                 {}
+func (*ptyConn) drain(string, int)        {}
 func (*ptyConn) close()                   {}
