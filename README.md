@@ -625,6 +625,22 @@ Every front matter option is listed on the
 
 ## Shell details
 
+Blocks get a base set of variables from the environment mdsh was
+started in: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`,
+`COLORTERM`, `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TMPDIR` and, on macOS,
+`__CF_USER_TEXT_ENCODING`. None of them is a secret. Name more under
+`env:` in the front matter, or bring in everything with `...`, and drop
+any with `-NAME`:
+
+```yaml
+mdsh:
+  env:
+    share: [..., -GITHUB_TOKEN]
+```
+
+`mdsh -i` and mdsh-gui show a banner over a file that brings in
+everything, so you know before you run it.
+
 A block's stderr is captured separately. It is shown only when the block
 fails, unless `show-stderr` (or `show_stderr: true` under `mdsh:` in the
 front matter) says otherwise.

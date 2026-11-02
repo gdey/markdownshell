@@ -38,7 +38,7 @@ mdsh:
     cols: 100
     rows: 30
   env:
-    share: [PATH, HOME]
+    share: [GOPATH]
 ---
 
 ```sh {#setup}
@@ -115,7 +115,7 @@ Block attributes in v1:
 
 Each env is one long-lived shell process. Blocks without `env=` all run in the top-level env, so variables, functions and the working directory carry over like lines of one script. A named sub-env is a separate shell stacked on its parent, and only shared vars cross the boundary.
 
-- **Top-level env:** started once per run with the caller's environment, filtered by the front matter's `env.share` list if set.
+- **Top-level env:** started once per run with the caller's environment, filtered by the front matter's `env.share` list: the base set below and the names the list gives. Without `env.share` it gets just the base set. `share: [...]` brings in everything; `mdsh -i` and mdsh-gui show a banner over such a file ("This file brings in all your environment variables").
 - **Base set:** a `share` list (front matter or `share=`) always passes `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `COLORTERM`, `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TMPDIR` and, on macOS, `__CF_USER_TEXT_ENCODING`, unless it drops one by name (`-PATH`). They tell tools who the user is, where their files are and how to talk to the terminal; none holds a secret, and a block could learn each another way (`id`, `~`, `getpwuid`). Variables that grant access, such as `SSH_AUTH_SOCK`, `DBUS_SESSION_BUS_ADDRESS`, `XDG_RUNTIME_DIR`, `DISPLAY` and tokens, are not in it. A document loaded from a URL (`http`, `https`, `ftp`, `sftp`) gets no base set: its shells see only what it names, and nothing when it names nothing.
 - **Sub-env:** `env=build` creates it on first use and reuses it after, so two `env=build` blocks share state. `env=build/test` stacks `test` on `build`. `share=` is read only when the env is created.
 - **Down (parent to child):** at creation, the child gets the parent's *exported* vars that pass `share`. `share=...` (or `share=*`) passes all, `-NAME` removes a name (`share=...,-TOKEN`); `share=` (empty) passes only the base set.

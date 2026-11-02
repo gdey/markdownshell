@@ -140,6 +140,7 @@ header, .banner {
 }
 .banner { background: var(--warn-bg); border-bottom-color: var(--warn-border); }
 .banner span { flex: 1; }
+.banner > svg { flex: none; width: 16px; height: 16px; fill: currentColor; }
 
 #file { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #dirty { color: var(--muted); font-size: calc(20px * var(--text-scale)); line-height: 1; }

@@ -112,6 +112,12 @@ export interface Doc {
      */
     "termCols": number;
     "termRows": number;
+
+    /**
+     * EnvBanner, if set, says that the front matter brings in the whole
+     * environment the app started in (env.share with ...).
+     */
+    "envBanner": string;
 }
 
 /**

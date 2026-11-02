@@ -47,7 +47,7 @@ func byID(results []*run.Result) map[string]*run.Result {
 }
 
 func TestSharedTopLevel(t *testing.T) {
-	_, results := runDoc(t, "```sh {#a}\nX=1\nf() { echo f$X; }\ncd /\n```\n```sh {#b}\nf; pwd; echo $OUTER $1\n```\n",
+	_, results := runDoc(t, "---\nmdsh:\n  env:\n    share: [OUTER]\n---\n```sh {#a}\nX=1\nf() { echo f$X; }\ncd /\n```\n```sh {#b}\nf; pwd; echo $OUTER $1\n```\n",
 		run.Options{Args: []string{"arg"}})
 	r := byID(results)
 	if got := string(r["b"].Stdout); got != "f1\n/\nouter arg\n" {
@@ -121,8 +121,15 @@ func TestTopEnvRemote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := run.TopEnv(d, run.Options{Environ: environ}); !slices.Equal(got, environ) {
-		t.Errorf("local, no env.share: %q, want all of %q", got, environ)
+	if got, want := run.TopEnv(d, run.Options{Environ: environ}), environ[:2]; !slices.Equal(got, want) {
+		t.Errorf("local, no env.share: %q, want the base set %q", got, want)
+	}
+	full, err := doc.Parse([]byte("---\nmdsh:\n  env:\n    share: [...]\n---\n```sh\ntrue\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := run.TopEnv(full, run.Options{Environ: environ}); !slices.Equal(got, environ) {
+		t.Errorf("local, share: [...]: %q, want all of %q", got, environ)
 	}
 	if got := run.TopEnv(d, run.Options{Environ: environ, Remote: true}); len(got) != 0 {
 		t.Errorf("remote, no env.share: %q, want nothing", got)

@@ -1274,3 +1274,21 @@ func TestOSC52(t *testing.T) {
 		t.Errorf("osc52 = %q, want %q", got, want)
 	}
 }
+
+// TestFullEnvBanner checks that a file whose env.share brings in the
+// whole environment says so over the document, and one that doesn't
+// shows nothing.
+func TestFullEnvBanner(t *testing.T) {
+	m, _ := newModel(t, "---\nmdsh:\n  env:\n    share: [..., -GITHUB_TOKEN]\n---\n"+twoBlocks, Options{})
+	view := m.View()
+	if !strings.Contains(view, "This file brings in all your environment variables, except GITHUB_TOKEN") {
+		t.Errorf("no banner:\n%s", view)
+	}
+	if got := strings.Count(view, "\n") + 1; got != m.height {
+		t.Errorf("view is %d lines, want %d", got, m.height)
+	}
+	m, _ = newModel(t, twoBlocks, Options{})
+	if strings.Contains(m.View(), "environment variables") {
+		t.Errorf("banner on a file without share: [...]")
+	}
+}
