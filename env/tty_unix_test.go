@@ -306,6 +306,47 @@ func TestRunTerminal(t *testing.T) {
 	}
 }
 
+// TestRunTerminalReadsStdout: a block's standard output is its terminal
+// open for reading too, as in a real terminal, since programs such as
+// mdsh itself, through Lip Gloss, write a query to stdout and read the
+// terminal's reply back from it. With stdout open only for writing the
+// read fails, the program gives up, and the reply, coming in after the
+// terminal is back to echoing, lands in the block's output.
+func TestRunTerminalReadsStdout(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	keys := make(chan []byte, 1)
+	var (
+		mu   sync.Mutex
+		seen bytes.Buffer
+	)
+	// The terminal answers a cursor position query, as xterm.js does.
+	shown := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen.Write(p)
+		if bytes.Contains(seen.Bytes(), []byte("\x1b[6n")) {
+			seen.Reset()
+			keys <- []byte("\x1b[1;1R")
+		}
+		return len(p), nil
+	})
+	var rec bytes.Buffer
+	script := "stty -echo -icanon\nprintf '\\033[6n'\nhead -c 6 <&1 >/dev/null && echo read ok\nstty echo icanon\n"
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	status, _, err := sh.RunTerminal(ctx, script, Terminal{Keys: keys, Out: shown}, &rec)
+	if err != nil || status != 0 {
+		t.Fatalf("status %d, err %v, recorded %q", status, err, rec.String())
+	}
+	if got := rec.String(); !strings.Contains(got, "read ok") || strings.Contains(got, "1;1R") {
+		t.Errorf("recorded %q, want the reply read from stdout and not shown", got)
+	}
+}
+
 // TestRunTerminalSuspend: ctrl+z, and a program that stops itself as
 // vim does on ctrl+z, have no shell with job control to come back to, so
 // the stop signals are ignored rather than stopping the block for good.
