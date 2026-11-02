@@ -6,6 +6,26 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-02
+
+The desktop app becomes a full editor: undo and redo, blocks that move
+by drag or keyboard, `depends=` drawn as lines you can edit, three looks
+with a tab to tune them, collections and sessions on the start screen,
+pinned files, a Console, a History terminal and an experimental Neovim
+pane. `mdsh -i` matches it feature for feature where a terminal allows.
+The command line gains `mdsh ctl`, so a block can set variables for the
+blocks after it, and `--audit` for a log of what a run did. The four High
+findings of the v1.2.1 security review are fixed, and `brew install
+gdey/tap/mdsh` installs it.
+
+**Two changes reach into existing files and scripts.** On the next save,
+unnamed blocks are renamed from `block-N` to `block-<uuid>`, and every
+reference inside the file is rewritten to match; a script that calls
+`mdsh --only block-3` needs the new id or a name. And `{{$VAR}}` now reads
+a caller variable only when it is exposed with `--expose VAR` or
+`MDSH_EXPOSE`; a document that relied on `{{$USER}}` or `run={{$DEBUG}}`
+needs `--expose USER,DEBUG`. Both are described in full below.
+
 ### Security
 
 - `SECURITY.md` says how to report a vulnerability privately and which
@@ -329,6 +349,22 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Documents will have their unnamed blocks renamed from `block-N` to
+  `block-<uuid>`.** The next time mdsh saves a file (`-w`, or a save in
+  `mdsh -i` or `mdsh-gui`), every runnable block without an `#id` gets
+  one written into its fence, such as
+  `sh {#block-0192f3a4-7c1e-7b2a-9d3e-5f6a7b8c9d0e}`, a UUIDv7. Ids no
+  longer change when blocks are added or moved, so diffs stay small.
+  The same save rewrites everything that named the old `block-N`: the
+  block's saved output, output copies, tapes, placeholders and
+  conditions such as `{{#block-3/?}}`, and its image and recording
+  files in `<doc>.assets/`, which are renamed to match. `-o` leaves the
+  source file and its blocks as they are. Scripts that call
+  `mdsh --only block-3` need the new id, or better, a name for the
+  block.
+- Messages and the GUI name a block whose id mdsh made up by its line,
+  as in `block at line 12: ok`, and the image alt text is the kind of
+  output rather than the id. Shell completion lists named blocks first.
 - `mdsh-gui`: the Teletype and Blueprint looks' muted text, card
   borders and failure red are a little stronger, so they meet the
   WCAG AA contrast ratios (4.5:1 for text, 3:1 for borders).
@@ -409,25 +445,6 @@ follow [Semantic Versioning](https://semver.org/).
   the system's spell checker, leaving out code, links and HTML. A
   setting turns it off.
 
-### Changed
-
-- **Documents will have their unnamed blocks renamed from `block-N` to
-  `block-<uuid>`.** The next time mdsh saves a file (`-w`, or a save in
-  `mdsh -i` or `mdsh-gui`), every runnable block without an `#id` gets
-  one written into its fence, such as
-  `sh {#block-0192f3a4-7c1e-7b2a-9d3e-5f6a7b8c9d0e}`, a UUIDv7. Ids no
-  longer change when blocks are added or moved, so diffs stay small.
-  The same save rewrites everything that named the old `block-N`: the
-  block's saved output, output copies, tapes, placeholders and
-  conditions such as `{{#block-3/?}}`, and its image and recording
-  files in `<doc>.assets/`, which are renamed to match. `-o` leaves the
-  source file and its blocks as they are. Scripts that call
-  `mdsh --only block-3` need the new id, or better, a name for the
-  block.
-- Messages and the GUI name a block whose id mdsh made up by its line,
-  as in `block at line 12: ok`, and the image alt text is the kind of
-  output rather than the id. Shell completion lists named blocks first.
-
 ### Fixed
 
 - `mdsh-gui` on Linux: a running block's output shows in its card as it
@@ -444,7 +461,6 @@ follow [Semantic Versioning](https://semver.org/).
   `from=4`), with or without `number_on`, in one column. Before, the
   view counted 1, 2, 3, and a `number_on` include also showed the
   file's numbers written into the code beside them.
-
 - `mdsh-gui`: on macOS the app menu's About opens Settings at its About
   tab instead of the stock Cocoa About panel.
 - A block whose `timeout` ran out while mdsh checked its syntax was
@@ -785,7 +801,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/gdey/markdownshell/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/gdey/markdownshell/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gdey/markdownshell/compare/v1.0.0...v1.1.0
