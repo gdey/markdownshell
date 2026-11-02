@@ -119,6 +119,13 @@ export interface Cell {
     "outputLine"?: number;
 
     /**
+     * FirstLine is set on the cell of an include with from= past 1: the
+     * line in its file the included lines start on, where the code's line
+     * numbers count from, so they are the file's.
+     */
+    "firstLine"?: number;
+
+    /**
      * From and To are the cell's bytes in the file, output included.
      */
     "from": number;
