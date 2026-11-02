@@ -164,6 +164,17 @@ func (a *App) afterRun(t *docTab, n *notebook.Notebook) {
 	t.changed()
 }
 
+// HasOutput reports whether the file has output for ClearOutputs to
+// take out, so Clear All Outputs is only offered when it would do
+// something.
+func (a *App) HasOutput(ctx context.Context) (bool, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return false, err
+	}
+	return n.HasOutput(), nil
+}
+
 // ClearOutputs takes every block's output out of the document and
 // starts its shells again.
 func (a *App) ClearOutputs(ctx context.Context) error {

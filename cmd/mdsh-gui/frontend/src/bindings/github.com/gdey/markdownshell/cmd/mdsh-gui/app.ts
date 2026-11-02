@@ -208,6 +208,15 @@ export function FolderSettings(rel: string): $CancellablePromise<$models.FolderF
 }
 
 /**
+ * HasOutput reports whether the file has output for ClearOutputs to
+ * take out, so Clear All Outputs is only offered when it would do
+ * something.
+ */
+export function HasOutput(): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.HasOutput");
+}
+
+/**
  * HistoryComplete reports whether input is a whole command, so enter
  * runs it, rather than starting another line.
  */

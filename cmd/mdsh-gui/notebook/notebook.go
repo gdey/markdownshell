@@ -495,6 +495,15 @@ func (n *Notebook) Stop() {
 	}
 }
 
+// HasOutput reports whether ClearOutputs would take anything out of the
+// document: any run's output, a filled output copy or a stored value.
+// Once outputs are cleared it is false until a block's output comes in.
+func (n *Notebook) HasOutput() bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return !bytes.Equal(render.Clear(n.d), n.d.Src)
+}
+
 // ClearOutputs takes every run's output out of the document, as
 // render.Clear does, and starts the shells again, so the notebook is as
 // if nothing had run: no output, no statuses, no variables. Like an
