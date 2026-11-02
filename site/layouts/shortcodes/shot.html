@@ -1,0 +1,6 @@
+{{- /* {{< shot src="x.png" dark="x-dark.png" title="bar text" term=true >}}caption{{< /shot >}}
+   or {{< shot name="x" title="bar text" >}}: x in the look that matches the site's skin. */ -}}
+<figure class="shot">
+  {{ partial "shot.html" (dict "name" (.Get "name") "src" (.Get "src") "dark" (.Get "dark") "alt" (.Get "alt" | default (.Inner | plainify)) "title" (.Get "title") "term" (.Get "term")) }}
+  {{ with .Inner }}<figcaption>{{ . | markdownify }}</figcaption>{{ end }}
+</figure>

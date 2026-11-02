@@ -7,7 +7,7 @@ enableRobotsTXT = true
 disableKinds = ["taxonomy", "term"]
 
 [params]
-  description = "Run the code blocks in a markdown file, like a notebook whose file format is plain markdown."
+  description = "mdsh turns the markdown you already have into something that runs, and turns each run into a record you can send. A desktop app, a terminal UI and a CLI."
   repo = "https://github.com/gdey/markdownshell"
 
 [markup.highlight]
@@ -16,7 +16,25 @@ disableKinds = ["taxonomy", "term"]
 [markup.goldmark.renderer]
   unsafe = true
 
+# The changelog page is the repo's CHANGELOG.md, read at build time, so
+# the site never carries a second copy.
+[module]
+  [[module.mounts]]
+    source = "assets"
+    target = "assets"
+  [[module.mounts]]
+    source = "../CHANGELOG.md"
+    target = "assets/CHANGELOG.md"
+
 [menus]
+  [[menus.main]]
+    name = "Desktop app"
+    pageRef = "/app"
+    weight = 5
+  [[menus.main]]
+    name = "Examples"
+    pageRef = "/examples"
+    weight = 8
   [[menus.main]]
     name = "Docs"
     pageRef = "/docs"
@@ -25,6 +43,10 @@ disableKinds = ["taxonomy", "term"]
     name = "Use cases"
     pageRef = "/use-cases"
     weight = 15
+  [[menus.main]]
+    name = "Changelog"
+    pageRef = "/changelog"
+    weight = 18
   [[menus.main]]
     name = "GitHub"
     url = "https://github.com/gdey/markdownshell"

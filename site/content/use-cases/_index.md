@@ -13,4 +13,4 @@ Each use case below comes with a runbook from
 and the report one run of it made, as PDF, HTML and markdown. CI runs every
 runbook there on each change, so they keep working. For a tour of what
 goes into them, one feature at a time, start with the
-[examples tutorial](https://github.com/gdey/markdownshell/blob/main/examples/README.md).
+[examples tour]({{< relref "/examples" >}}).

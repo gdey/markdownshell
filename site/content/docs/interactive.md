@@ -1,83 +1,96 @@
 ---
-title: Interactive mode
-description: Open a document in a terminal UI and run its blocks as you go.
-weight: 52
+title: Terminal UI
+description: mdsh -i, the notebook in a terminal, over SSH or anywhere without a desktop.
+weight: 16
 ---
 
-`mdsh -i notes.md` opens the document full screen, with its prose styled
-and each block in a box. Pick a block and run it; its output streams in
-under it and is saved to the file as soon as it finishes.
+`mdsh -i` is the desktop app's notebook in a terminal: the same
+documents, the same engine, and the same output saved to the file. It
+is the answer to "but I'm on a bastion host": open the runbook on the
+box, step through it, and the file is the timeline when you're done.
 
 ```sh
-mdsh -i notes.md                # open it
-mdsh -i --yes notes.md          # run confirm blocks without asking
-mdsh -i --step notes.md         # ask before each block when running with a
-mdsh -i notes.md staging        # block arguments work as usual: $1 is staging
+mdsh -i                         # a start screen for this folder
+mdsh -i ~/runbooks              # ...or that one
+mdsh -i deploy.md               # open a file
+mdsh -i --yes deploy.md         # run confirm blocks without asking
+mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
 ```
+
+{{< shot src="tui-confirm.png" title="mdsh -i deploy.md" term=true >}}The deploy runbook in the terminal, asking before it ships. The blocks above ran, and their output streamed in under them.{{< /shot >}}
+
+## What it does
+
+- **A start screen** lists the markdown files under a folder, recent
+  files first; type to filter. Each file opens in a **tab** of its own
+  (`ctrl+t` for a new one, `]` and `[` to move between them).
+- **Run** a block with enter, from it to the end with `a`, or its
+  section with `s`. `confirm` blocks and the blocks `depends=` names ask
+  in the block's card. `,` sets the run options: arguments, step mode,
+  stop on error.
+- **History**, with `h`: a shell along the bottom with your shell's own
+  prompt and completion. Each command is added to the file as a block,
+  with its output; a line starting with `#` becomes prose.
+- **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
+  `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
+  `i` types a new block at a prompt.
+- **See** an outline of the file with `o`, hide code or output with `C`
+  and `O`, and show a block's image full screen with `v`. `tty` blocks
+  run in their card and stay open for reading.
+- **Reports**, with `p`: a PDF, HTML or markdown copy, as the desktop
+  app's Create Report makes.
+- **Save** with `w`, Save As with `W`. If the file changes on disk, a
+  banner says so, and `R` reloads it or `M` keeps yours.
+
+`?` lists every key, and greys out the ones that do nothing right now,
+with the reason.
+
+{{< shot src="tui-history.png" title="mdsh -i architecture.md · History" term=true >}}The History pane: `cd` and `ls` typed at the bottom became the blocks `history-1` and `history-2` above.{{< /shot >}}
 
 ## Keys
 
 | Key | Does |
 | --- | --- |
-| `j`/`k`, arrows, tab | next or previous block |
+| `j`/`k`, arrows | next or previous block |
 | `g`/`G` | first or last block |
-| space, pgup/pgdn, ctrl+u/ctrl+d | scroll |
+| space, pgup, ctrl+d/ctrl+u | scroll |
 | enter or `r` | run the block |
-| `a` | run the block and every one after it, like a normal run |
-| `i` or `:` | type a command and add it to the document as a block |
-| `e` | edit the whole block in your editor |
-| `v` | show the block's image or recording full screen; enter goes back |
-| `w` | save now |
-| ctrl+c | stop the running block; quits when nothing runs |
-| `q` | quit |
+| `a` | run from this block to the end |
+| `s` | run the section the block is in |
+| `h` | History: a shell whose commands are added to the file |
+| `i` or `:` | type a new block and run it |
+| `,` | run options |
+| ctrl+c | stop the run; quits when nothing runs |
+| ctrl+] | stop a `tty` block running in its card |
+| `e` / `E` | edit the block, or the whole file, in `$EDITOR` |
+| `J`/`K`, alt+↓/↑ | move the block down or up |
+| `u` | undo the last move |
+| `w`, ctrl+s / `W` | save / save as |
+| `R` / `M` | reload from disk / keep yours |
+| `p` | create a report |
+| `o`, `C`, `O`, `v` | outline, code, output, image |
+| `]`/`[`, ctrl+t, ctrl+w | tabs |
+| `q` | close the file, or quit |
+| `?` | every key, with what it does now |
 
 ## Running blocks
 
-Blocks keep their envs between runs, the same as in one `mdsh` run, so
-running a block again runs it in the env as the earlier runs left it, and
-replaces its output. Stopping a block with ctrl+c starts its env over with
-a fresh shell.
+Blocks keep their shells between runs, the same as in one `mdsh` run,
+so running a block again runs it in the shell as the earlier runs left
+it, and replaces its output. Stopping a block starts its shell over.
 
 A block picked by hand runs even if it is marked `skip` or its `run=`
-condition is false; `a` honors both. `confirm` blocks, and every block
-under `--step` or `step: true` when running with `a`, ask in the footer
-with the same choices as on the command line: run, skip, skip blocks
-that already have output, or stop. `--stop-on-error` works as usual.
-
-## Adding and editing blocks
-
-`i` (or `:`) opens a prompt at the bottom. Type a command and press enter:
-it is added to the end of the document as an `sh` block and runs. Esc
-cancels.
-
-`e` opens the selected block, fences and attributes included, in
-`$VISUAL`, `$EDITOR` or `vi`. The edit is saved to the file when the
-editor exits, and enter runs it. Saved output follows the block if you
-change its id.
-
-## Terminal blocks
-
-A [`tty` block]({{< relref "writing-documents" >}}) gets the whole
-terminal while it runs, and the UI comes back when you press enter after
-it ends. A taped block's run is shown the same way.
+condition is false; `a` and `s` honor both.
 
 ## Images and recordings
 
-Images and recordings show under their block as a preview in colored half
-blocks, in any terminal with 24-bit color (off with `NO_COLOR`). `v` shows
-one full size, through the kitty, iTerm2 or sixel protocol when mdsh
-recognizes the terminal (kitty, Ghostty, iTerm2, WezTerm, foot, mlterm,
-contour, or `sixel` in `TERM`), and in half blocks otherwise. SVG images
-show only as a link.
-
-## What else shows
-
-Include blocks show the file's lines, numbered when they have
-`number_on`. `out=markdown` output is drawn as markdown, and placeholders
-in the prose show their current values.
+Images and recordings show under their block as a preview in colored
+half blocks, in any terminal with 24-bit color (off with `NO_COLOR`).
+`v` shows one full size, through the kitty, iTerm2 or sixel protocol
+when mdsh recognizes the terminal, and in half blocks otherwise.
 
 ## Saving
 
-Output is saved to the file after each block, and `w` saves at any time.
-If the file changes on disk while it is open, mdsh won't save over it
-until you press `w` twice.
+With `--autosave`, output is saved after every block that runs;
+otherwise `w` saves. A read-only file is refused before any block
+runs, so nothing is lost.

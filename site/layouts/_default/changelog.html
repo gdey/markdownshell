@@ -1,0 +1,12 @@
+{{ define "main" }}
+<div class="wrap">
+  <article class="prose page">
+    <h1>{{ .Title }}</h1>
+    {{ .Content }}
+    {{ with resources.Get "CHANGELOG.md" }}
+    {{ $md := .Content | replaceRE `(?s)\A.*?\n## ` "## " | replaceRE `(?s)\A## \[Unreleased\]\s*\n(## )` "$1" }}
+    {{ $md | $.RenderString }}
+    {{ end }}
+  </article>
+</div>
+{{ end }}
