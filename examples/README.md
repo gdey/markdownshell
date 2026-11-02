@@ -47,6 +47,11 @@ picking one by hand runs it. They need `mdsh` on your `PATH`.
 command -v mdsh >/dev/null && echo "mdsh is on your PATH: $(mdsh --version)"
 ```
 
+Run `mdsh-gui` with no file from this folder and its start screen
+shows the tour as a collection, with `fifo/` and `runbooks/` as
+collections of their own. Their look comes from the `.mdsh.yaml` file
+in each folder; the ⚙ beside a folder edits it.
+
 ## 1. Hello: blocks, shells and output
 
 **[hello.md](hello.md)** is the one to start with. It shows the basics

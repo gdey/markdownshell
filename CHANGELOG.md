@@ -52,6 +52,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `examples/` and `docs/`, and the folders in them, have a `.mdsh.yaml`,
+  so mdsh-gui's start screen shows the examples tour and the design docs
+  as collections, each with a title, description, icon and color.
 - mdsh-gui: a pin on each file of the start screen pins it to a
   **Pinned** list at the top, above Recent, until it is unpinned. Pins
   are kept in the settings file with the recent files.

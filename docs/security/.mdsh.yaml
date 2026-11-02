@@ -1,0 +1,5 @@
+title: Security reviews
+description: The v1.2.1 reviews of the CLI and mdsh-gui, with their findings and fixes.
+icon: 🔒
+color: "#dc2626"
+tags: [security]
