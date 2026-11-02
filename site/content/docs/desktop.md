@@ -1,11 +1,11 @@
 ---
 title: Desktop app
 description: mdsh in a window of its own, on macOS and Linux.
-weight: 53
+weight: 15
 ---
 
 `mdsh-gui` opens markdown files in a desktop window and runs their blocks
-as you pick them, like [interactive mode]({{< relref "interactive" >}})
+as you pick them, like the [terminal UI]({{< relref "interactive" >}})
 with a mouse. It uses the same engine as `mdsh`, so a document runs the
 same way in both, and what it saves is what `mdsh -w` would write.
 
@@ -48,40 +48,95 @@ mdsh-gui ~/runbooks       # the start screen, for that folder
 mdsh-gui notes.md staging # open a file; $1 is staging
 ```
 
-![A runbook mid-run: a background block still going, and a confirm block asking before it ships the site](../../images/gui/confirm.png)
+For a tour with pictures, see [the desktop app]({{< relref "/app" >}}).
+This page is the reference.
 
-- **Start screen.** The markdown files under a folder, with recent files
-  first and each file's front matter `description` under its name. Type
-  to filter, or `#tag` to show only files with that tag. A folder with
-  a `.mdsh.yaml` (`title`, `description`, `icon`, `color`, `background`,
-  `tags`) shows as a collection with a header of its own; the ⚙ beside
-  a folder you can write to edits those keys in a form and saves the file.
-- **Tabs.** Each file opens in a tab with shells of its own. Drag a tab
-  to reorder it, onto another window to move it there, or away from the
-  tab bar for a window of its own; a block running in it carries on.
-- **Running.** Every block has run and run-from-here buttons, and Run All
-  runs the document. Run › Run Current Block (cmd/ctrl+enter) runs the
-  block the source view's cursor is in. Output streams in under the block. Run › Clear All
-  Outputs takes all output out of the document, as if nothing had run. A block marked
-  `confirm` asks in its card; a `tty` block runs in a terminal in its
-  card and is recorded, as `mdsh` records it. A `background` block runs on
-  while the next ones do, and its output shows when it ends.
-- **Editing.** The source view shows the whole file in a markdown editor
-  beside the rendered view. It completes block attributes, explains them
-  on hover and underlines mistakes, and has Vim key bindings as a
-  setting. Cmd/ctrl+enter, or `:RunBlock` in Vim mode, runs the block
-  the cursor is in.
-- **Output.** Images, screenshots and recordings show in the block.
-  Save writes the output into the file, and File › Create Report… makes
-  a PDF, HTML or markdown report, and shows the `mdsh` command that makes
-  the same one.
+{{< shot name="hero" title="deploy.md" >}}A runbook waiting at a `confirm` block, with Run, Skip and Stop in its card.{{< /shot >}}
 
-![The source view beside the rendered view](../../images/gui/source.png)
+- **Start screen.** The markdown files under a folder, with pinned
+  files, then recent ones, first, and each file's front matter
+  `description` under its name. Type to filter, or `#tag` to show only
+  files with that tag. The pin at the end of a row keeps a file at the
+  top. A folder with a `.mdsh.yaml` (`title`, `description`, `icon`,
+  `color`, `background`, `tags`) shows as a collection with a header of
+  its own; the ⚙ beside a folder you can write to edits those keys in a
+  form and saves the file.
+- **Sessions.** New Session opens the day's file, such as
+  `2026-11-02.md`, in the sessions folder (`~/.mdsh/sessions` unless
+  Settings › Files names another), made from the session template the
+  first time, with the History pane open. Last Session opens the file
+  there changed last.
+- **Tabs and windows.** Each file opens in a tab with shells of its own.
+  Drag a tab to reorder it, onto another window to move it there, or
+  away from the tab bar for a window of its own; a block running in it
+  carries on. Each file remembers its window size.
+- **Running.** Every block has run and run-from-here buttons, every
+  heading a play button for its section, and Run all runs the document.
+  Run Current Block is cmd/ctrl+enter, Run Section cmd/ctrl+shift+enter,
+  Run All cmd/ctrl+R and Stop cmd/ctrl+. . Output streams in under the
+  block, with ANSI colors. Running blocks are listed in the toolbar, and
+  a run returns focus to the block it started from. Run › Clear All
+  Outputs (cmd/ctrl+alt+K, or the eraser in the toolbar) takes all
+  output out of the document, as if nothing had run.
+- **Questions.** A `confirm` block asks in its card. A block whose
+  `depends=` names one that hasn't run asks to run it first. A `tty`
+  block runs in a terminal in its card and is recorded; a `background`
+  block runs on, with a dashed edge, while the next ones do.
+- **Dependencies.** `depends=` is drawn as colored lines in the margin,
+  from a block up to each block it names; select a block to bring its
+  lines forward, and drag a line's end to change what it depends on. A
+  name that is no block is warned about and underlined. Folded sections
+  show a ring where a line enters them, and the lines can be hidden.
+- **Editing in the notebook.** Undo and redo; move blocks with
+  alt+arrows, by dragging a card, a fence, or a section in the outline;
+  delete a block or clear its output. A move never puts a block above
+  one it depends on. Task lists, textboxes and choices write back into
+  the file. Folds you make are saved in the file.
+- **Source view** (the `<>` button or cmd/ctrl+\\). The whole file in a
+  markdown editor beside the rendered view, scrolling with it. It
+  completes block attributes, explains them on hover, underlines
+  mistakes and checks the prose's spelling, with Vim keys as a setting.
+  An experimental Neovim pane can take its place.
+- **History** (View › History, cmd/ctrl+shift+H). A terminal along the
+  bottom, with your shell's prompt and completion. Commands are added to
+  the file as `#history-N` blocks with their output; `#` lines become
+  notes. A history block deletes without asking, and becomes a plain
+  block once moved.
+- **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from
+  the app, with a count on the toolbar; a line about a place in a file
+  jumps to it.
+- **Outline** (cmd/ctrl+shift+O). Headings, blocks and controls, with a
+  play button on the selected block.
+- **Pictures.** Images, screenshots and recordings show in the block.
+  `d2` fences draw diagrams and `svg` fences pictures. Images from other
+  sites are never loaded.
+- **Reports.** Save writes the output into the file, and File › Create
+  Report… makes a PDF, HTML or markdown report, and shows the `mdsh`
+  command that makes the same one.
 
-![Two windows, after a tab was dragged out of the first](../../images/gui/windows.png)
+{{< shot name="outline" title="deploy.md · outline" >}}The outline beside the notebook.{{< /shot >}}
+
+## Settings
+
+Settings (mdsh › Settings… on macOS, Edit › Preferences… elsewhere) has
+six tabs:
+
+| Tab | Holds |
+| --- | --- |
+| General | the view a file opens in, the start folder |
+| Look | Plain, Teletype or Blueprint; light, dark or the system's; text size, fonts, line spacing, accent, the History pane's colors, and the Teletype paper's sprockets, rules and shadows |
+| Editing | autosave after each run, Vim keys, spell checking, the Neovim pane (experimental) |
+| Shell | a shell for every file, the file the History shell reads, and a switch that gives blocks your zsh aliases and functions |
+| Files | the templates folder for New File…, the sessions folder and template |
+| About | the build, the paths it uses and the tools on your `PATH`, with Copy for a bug report |
+
+{{< shot src="settings-look-paper.png" title="Settings" >}}Settings › Look, in the Teletype look.{{< /shot >}}
+
+## Keys and screen readers
 
 Keys follow `mdsh -i` where they can: `j`/`k` select a block, enter runs
-it, `a` runs from it and `e` edits it.
+it, `a` runs from it and `e` edits it. Every button, pane and tab has a
+name for a screen reader and can be reached from the keyboard.
 
 ## Build it
 

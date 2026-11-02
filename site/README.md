@@ -12,9 +12,49 @@ cd site
 hugo server                                     # http://localhost:1313
 ```
 
+Or run [`docs/site.md`](../docs/site.md) with mdsh: it checks for Hugo
+(and offers to install the workflow's version), builds the site the way
+CI does, then serves it.
+
 There is no theme to install: the layouts in `layouts/` and the CSS in
 `static/css/` are the whole design. Pages live in `content/`; docs pages
-are ordered by `weight` in their front matter.
+are ordered by `weight` in their front matter, and the landing pages
+(Desktop app, Examples, Install, Security, Roadmap) use
+`layout: landing`.
+
+## Two skins
+
+Every page is built once and painted by one of two skins: the teletype
+(`static/css/tty.css`, fan-fold paper in light mode and green phosphor
+in dark) by default, and the plain one (`static/css/site.css`, which
+also holds the layout). `<html data-theme="tty">` or `"plain"` picks
+it; the `[tty] [plain]` switch in the header saves the choice in
+`localStorage`, and a few lines in `<head>` read it before the first
+paint. The teletype palette is the app's Teletype look, from
+`cmd/mdsh-gui/frontend/teletype.css`; keep the two in step.
+
+## The changelog page
+
+`/changelog/` is the repository's `CHANGELOG.md`, mounted into the
+site's assets in `hugo.toml` and rendered by
+`layouts/_default/changelog.html`, so the site never carries a copy.
+The Website workflow runs when `CHANGELOG.md` changes, too.
+
+## Screenshots
+
+The app and terminal pictures in `static/images/app/` were taken from a
+real build of `main` for 1.3: `mdsh-gui` built on Linux (GTK 4,
+WebKitGTK 6) and run under Xvfb at 2x scale, driven with `xdotool`, on a
+copy of `examples/`, with the GTK menu bar cropped off; and `mdsh -i` in
+an xterm. Each picture has a light and, where it matters, a dark file
+(`-dark`, or `paper` and `phosphor` for the Teletype look); pages show
+them with the `shot` shortcode or partial, which puts them in a window
+frame and swaps to the dark one with the OS. Give it `name=` instead of
+`src=` and it shows the app in the look that matches the site's skin:
+`name-light` and `name-dark` (the app's Plain look) under the plain
+skin, `name-paper` and `name-phosphor` (its Teletype look) under the
+teletype one, so a new picture needs all four. Squeeze new ones with
+`pngquant --quality 75-95`.
 
 The sample reports on the Use cases pages, in `static/samples/`, and
 their previews come from the runbooks in `examples/runbooks`. Regenerate

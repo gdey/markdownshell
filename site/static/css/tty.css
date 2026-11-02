@@ -1,0 +1,145 @@
+/* The teletype skin: fan-fold paper by day, green phosphor by night.
+   It only repaints the layout in site.css, under
+   <html data-theme="tty">, with the palette of the app's Teletype look
+   (cmd/mdsh-gui/frontend/teletype.css), so the site and the app match. */
+:root[data-theme="tty"] {
+  --bg: #e6dec4;
+  --paper: #f3edd9;
+  --fg: #2a241c;
+  --muted: #6b6150;
+  --line: #cfc5a5;
+  --code-bg: #efe8d2;
+  --accent: #8a2b1f;
+  --accent-fg: #f3edd9;
+  --ink: #2a241c;
+  --ok: #3d6b35;
+  --soon: #9a5a1c;
+  --frame: #8f8774;
+  --rule: #e7e1ce;
+  --hole: #d8cfae;
+  --side: #e9e2c9;
+  --shadow: 6px 6px 0 #cfc5a5;
+  --mono: "Courier Prime", "Courier New", Courier, "Liberation Mono", "Nimbus Mono PS", monospace;
+  --body: var(--mono);
+  --radius: 0;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="tty"] {
+    --bg: #050805;
+    --paper: #0b0f0b;
+    --fg: #9cff9c;
+    --muted: #649a64;
+    --line: #2a4a2a;
+    --code-bg: #0f170f;
+    --accent: #ffb000;
+    --accent-fg: #0b0f0b;
+    --ink: #9cff9c;
+    --ok: #9cff9c;
+    --soon: #ffb000;
+    --frame: #447544;
+    --rule: #0f160f;
+    --hole: #050805;
+    --side: #0d130d;
+    --shadow: 0 0 0 1px #2a4a2a, 0 0 28px rgba(156, 255, 156, .12);
+  }
+}
+
+[data-theme="tty"] body { font-size: 16px; line-height: 1.7; }
+
+/* The sheet: paper with a rule every line, sprocket strips down both
+   edges and a perforation at the top and bottom. */
+[data-theme="tty"] .sheet {
+  position: relative;
+  max-width: 1260px;
+  margin: 24px auto;
+  padding: 0 56px;
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px);
+  box-shadow: 0 2px 18px rgba(0, 0, 0, .12);
+}
+[data-theme="tty"] .sheet::before,
+[data-theme="tty"] .sheet::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0; width: 40px;
+  background:
+    radial-gradient(circle at 20px 18px, var(--hole) 7px, transparent 7.5px) 0 0 / 40px 36px repeat-y,
+    var(--side);
+  border-right: 1px dashed var(--line);
+}
+[data-theme="tty"] .sheet::before { left: 0; }
+[data-theme="tty"] .sheet::after { right: 0; border-right: 0; border-left: 1px dashed var(--line); }
+[data-theme="tty"] .tear { height: 10px; background: radial-gradient(circle at 5px 0, var(--bg) 4px, transparent 4.5px) 0 0 / 10px 10px repeat-x; }
+[data-theme="tty"] .tear.bottom { background: radial-gradient(circle at 5px 10px, var(--bg) 4px, transparent 4.5px) 0 0 / 10px 10px repeat-x; }
+
+[data-theme="tty"] h1, [data-theme="tty"] h2, [data-theme="tty"] h3 { font-family: var(--mono); letter-spacing: 0; }
+[data-theme="tty"] .site-header, [data-theme="tty"] .band, [data-theme="tty"] .site-footer, [data-theme="tty"] .pager { border-color: var(--line); border-style: dashed; border-width: 1px 0 0; }
+[data-theme="tty"] .site-header { border-width: 0 0 1px; }
+[data-theme="tty"] .site-header nav a::before { content: "["; }
+[data-theme="tty"] .site-header nav a::after { content: "]"; }
+[data-theme="tty"] .site-header nav a { text-transform: lowercase; }
+[data-theme="tty"] .brand .prompt { color: var(--fg); }
+[data-theme="tty"] .theme-switch { border-radius: 0; border: 0; }
+[data-theme="tty"] .theme-switch button { border-radius: 0; }
+[data-theme="tty"] .theme-switch button::before { content: "["; }
+[data-theme="tty"] .theme-switch button::after { content: "]"; }
+[data-theme="tty"] .theme-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+/* The hero as a printout: the figlet-style wordmark, a stamp, keycaps. */
+[data-theme="tty"] .masthead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 0; margin: 0 0 18px; }
+[data-theme="tty"] .wordmark { display: block; width: min(300px, 62%); height: auto; color: var(--ink); }
+[data-theme="tty"] .tagline { display: none; }
+[data-theme="tty"] .stamp {
+  display: inline-block; font: 700 15px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  color: #b3392b; border: 3px double #b3392b; padding: 4px 12px; transform: rotate(-6deg);
+  margin: 0 0 0 20px; opacity: .85;
+}
+@media (prefers-color-scheme: dark) { [data-theme="tty"] .stamp { color: #ffb000; border-color: #ffb000; } }
+[data-theme="tty"] .hero h1 { font-size: clamp(28px, 4.2vw, 42px); line-height: 1.25; font-weight: 700; }
+[data-theme="tty"] .hero h1 .cursor { display: inline-block; width: .55em; height: 1em; background: var(--ink); vertical-align: -0.12em; margin-left: 4px; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { [data-theme="tty"] .hero h1 .cursor { animation: none; } }
+[data-theme="tty"] .lede { font-size: 17px; }
+[data-theme="tty"] .button {
+  border-radius: 0; background: var(--paper); color: var(--ink); border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink); text-transform: uppercase; letter-spacing: .06em; font-size: 15px;
+}
+[data-theme="tty"] .button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
+[data-theme="tty"] .button.ghost { border-style: dashed; box-shadow: none; }
+
+/* The screenshot sits on the paper, a little crooked, in its window. */
+[data-theme="tty"] .window { border-radius: 6px; }
+[data-theme="tty"] .hero .window { transform: rotate(1.2deg); }
+[data-theme="tty"] .window .bar { background: var(--side); }
+[data-theme="tty"] .window.term .bar { background: #1c2129; }
+[data-theme="tty"] pre, [data-theme="tty"] .fronts li, [data-theme="tty"] .cards a { border-style: dashed; border-color: var(--frame); }
+[data-theme="tty"] code { border-radius: 0; }
+[data-theme="tty"] .steps > li::before { border-radius: 0; }
+[data-theme="tty"] .tag { border-radius: 0; }
+[data-theme="tty"] .num, [data-theme="tty"] .tag { color: var(--accent); }
+[data-theme="tty"] .tag.soon { color: var(--soon); }
+[data-theme="tty"] .buyers li { border-top-style: dashed; }
+[data-theme="tty"] .prose th, [data-theme="tty"] .prose td { border-color: var(--frame); }
+[data-theme="tty"] .note { border-left-style: double; border-left-width: 4px; }
+[data-theme="tty"] .eot { display: block; text-transform: uppercase; letter-spacing: .1em; margin: 8px 0; }
+
+/* Code colors: ink on paper, and phosphor at night (see README). */
+[data-theme="tty"] .chroma, [data-theme="tty"] .highlight pre { color: var(--fg); }
+[data-theme="tty"] .chroma .k, [data-theme="tty"] .chroma .kd, [data-theme="tty"] .chroma .nb { color: #8a2b1f; }
+[data-theme="tty"] .chroma .s, [data-theme="tty"] .chroma .s1, [data-theme="tty"] .chroma .s2, [data-theme="tty"] .chroma .sb { color: #3d6b35; }
+[data-theme="tty"] .chroma .c, [data-theme="tty"] .chroma .c1, [data-theme="tty"] .chroma .cm { color: #8e887a; font-style: italic; }
+[data-theme="tty"] .chroma .nv, [data-theme="tty"] .chroma .mi { color: #2f4f7a; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="tty"] .chroma .k, [data-theme="tty"] .chroma .kd, [data-theme="tty"] .chroma .nb { color: #ffb000; }
+  [data-theme="tty"] .chroma .s, [data-theme="tty"] .chroma .s1, [data-theme="tty"] .chroma .s2, [data-theme="tty"] .chroma .sb { color: #c8ffc8; }
+  [data-theme="tty"] .chroma .c, [data-theme="tty"] .chroma .c1, [data-theme="tty"] .chroma .cm { color: #649a64; }
+  [data-theme="tty"] .chroma .nv, [data-theme="tty"] .chroma .mi { color: #7fd8ff; }
+}
+
+/* On a phone the paper fills the screen: no strips, no tears. */
+@media (max-width: 720px) {
+  [data-theme="tty"] .sheet { margin: 0; padding: 0; box-shadow: none; }
+  [data-theme="tty"] .sheet::before, [data-theme="tty"] .sheet::after, [data-theme="tty"] .tear { display: none; }
+  [data-theme="tty"] body { font-size: 14px; }
+  [data-theme="tty"] .hero .window { transform: none; }
+  [data-theme="tty"] .stamp { margin-left: 0; }
+}

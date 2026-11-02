@@ -1,17 +1,56 @@
 <!doctype html>
-<html lang="{{ site.LanguageCode }}">
+<html lang="{{ site.LanguageCode }}" class="no-js" data-theme="tty">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // The skin is picked before the first paint, so pages don't flash:
+    // the teletype by default, or what the switch in the header saved.
+    (function () {
+      var d = document.documentElement, t = null;
+      try { t = localStorage.getItem("mdsh-site-theme"); } catch (e) {}
+      if (t === "plain" || t === "tty") d.setAttribute("data-theme", t);
+      d.classList.remove("no-js");
+    })();
+  </script>
   <title>{{ if .IsHome }}{{ site.Title }}: markdown that runs{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
-  <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+  {{- $desc := site.Params.description }}{{ with .Description }}{{ $desc = . }}{{ end }}
+  <meta name="description" content="{{ $desc }}">
+  <meta property="og:title" content="{{ if .IsHome }}mdsh: markdown that runs{{ else }}{{ .Title }} · mdsh{{ end }}">
+  <meta property="og:description" content="{{ $desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ .Permalink }}">
+  <meta property="og:image" content="{{ "images/app/hero-paper.png" | absURL }}">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
   <link rel="stylesheet" href="{{ "css/chroma.css" | relURL }}">
+  <link rel="stylesheet" href="{{ "css/tty.css" | relURL }}">
   <link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
 </head>
 <body>
-  {{ partial "header.html" . }}
-  <main>{{ block "main" . }}{{ end }}</main>
-  {{ partial "footer.html" . }}
+  <div class="sheet">
+    <div class="tear" aria-hidden="true"></div>
+    {{ partial "header.html" . }}
+    <main>{{ block "main" . }}{{ end }}</main>
+    {{ partial "footer.html" . }}
+    <div class="tear bottom" aria-hidden="true"></div>
+  </div>
+  <script>
+    // The switch in the header: plain or teletype, kept in this browser.
+    (function () {
+      var d = document.documentElement;
+      document.querySelectorAll(".theme-switch button").forEach(function (b) {
+        var sync = function () { b.setAttribute("aria-pressed", String(d.getAttribute("data-theme") === b.value)); };
+        sync();
+        b.addEventListener("click", function () {
+          d.setAttribute("data-theme", b.value);
+          try { localStorage.setItem("mdsh-site-theme", b.value); } catch (e) {}
+          document.querySelectorAll(".theme-switch button").forEach(function (o) {
+            o.setAttribute("aria-pressed", String(o.value === b.value));
+          });
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

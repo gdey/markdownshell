@@ -1,0 +1,22 @@
+{{- /* A screenshot in a window frame. Takes a dict: src (the light
+   image, under images/app/), dark (optional dark image), alt, title
+   (the bar's text), term (true for a terminal), class.
+
+   Or name instead of src and dark: the picture in both of the app's
+   looks that match the site's skins, name-light and name-dark for the
+   plain skin, name-paper and name-phosphor (the Teletype look) for the
+   tty skin; the skin switch shows one. */ -}}
+{{- if .name -}}
+{{- $plain := merge . (dict "name" "" "src" (printf "%s-light.png" .name) "dark" (printf "%s-dark.png" .name)) -}}
+{{- $tty := merge . (dict "name" "" "src" (printf "%s-paper.png" .name) "dark" (printf "%s-phosphor.png" .name)) -}}
+<div class="only-tty">{{ partial "shot.html" $tty }}</div>
+<div class="only-plain">{{ partial "shot.html" $plain }}</div>
+{{- else -}}
+<div class="window{{ with .term }} term{{ end }}{{ with .class }} {{ . }}{{ end }}">
+  <div class="bar" aria-hidden="true"><i></i><i></i><i></i>{{ .title }}</div>
+  <picture>
+    {{- with .dark }}<source media="(prefers-color-scheme: dark)" srcset="{{ printf "images/app/%s" . | relURL }}">{{ end }}
+    <img src="{{ printf "images/app/%s" .src | relURL }}" alt="{{ .alt }}" loading="{{ .loading | default "lazy" }}">
+  </picture>
+</div>
+{{- end -}}

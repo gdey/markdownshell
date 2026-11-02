@@ -6,43 +6,13 @@ weight: 10
 
 ## Install
 
-With Homebrew, on macOS or Linux:
-
 ```sh
-brew install gdey/tap/mdsh          # the command line and mdsh -i
-brew install --cask gdey/tap/mdsh   # the desktop app, macOS only
+brew install --cask gdey/tap/mdsh   # the desktop app, macOS
+brew install gdey/tap/mdsh          # mdsh and mdsh -i, macOS and Linux
 ```
 
-On Debian, Ubuntu, Fedora and the like, each release has a `.deb` and an
-`.rpm` for `mdsh`.
-
-Or download an archive for your system from the
-[releases page](https://github.com/gdey/markdownshell/releases), unpack it,
-and put `mdsh` on your `PATH`. Builds cover Linux, macOS and Windows on
-amd64 and arm64; `checksums.txt` lists each archive's SHA-256. For example,
-on Linux amd64:
-
-```sh
-VERSION=1.0.0
-curl -LO https://github.com/gdey/markdownshell/releases/download/v$VERSION/mdsh_${VERSION}_linux_amd64.tar.gz
-tar xzf mdsh_${VERSION}_linux_amd64.tar.gz mdsh
-sudo mv mdsh /usr/local/bin/
-mdsh --version
-```
-
-On macOS, a downloaded binary may be quarantined; `xattr -d
-com.apple.quarantine mdsh` clears it. Blocks run in `/bin/sh` by default;
-on Windows, set `shell:` under `mdsh:` in the front matter to a POSIX shell
-such as Git Bash's `bash.exe`. The Windows builds are not well tested yet.
-
-For a desktop window instead of a terminal, the releases also have
-`mdsh-gui` for macOS and Linux; see [Desktop app]({{< relref "desktop" >}}).
-
-With Go 1.27 or newer you can build it instead:
-
-```sh
-go install github.com/gdey/markdownshell/cmd/mdsh@latest
-```
+Linux packages, the AppImage, archives for every platform and building
+from source are on [Install and run]({{< relref "/install" >}}).
 
 ## Your first document
 
@@ -75,10 +45,12 @@ hello from Linux
 
 Run it again and mdsh replaces that output instead of adding more.
 
-From here, the
-[examples tutorial](https://github.com/gdey/markdownshell/blob/main/examples/README.md)
-walks through what a document can do, one example at a time, and the
-pages in this section go into each part.
+Open the same file with `mdsh-gui hello.md` or `mdsh -i hello.md` and
+press play on the block, or enter.
+
+From here, the [examples tour]({{< relref "/examples" >}}) walks through
+what a document can do, one example at a time, and the pages in this
+section go into each part.
 
 ## Shell completion
 

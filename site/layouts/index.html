@@ -1,16 +1,183 @@
 {{ define "main" }}
 <section class="hero">
-  <div class="wrap">
-    <h1>Markdown that runs.</h1>
-    <p class="lede">{{ site.Params.description }}</p>
-    <pre class="install"><code>go install github.com/gdey/markdownshell/cmd/mdsh@latest</code></pre>
-    <p class="cta">
-      <a class="button" href="{{ "docs/getting-started/" | relURL }}">Get started</a>
-      <a class="button ghost" href="{{ site.Params.repo }}">View on GitHub</a>
-    </p>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="masthead">{{ partial "wordmark.svg" . | safeHTML }}<span class="stamp" aria-hidden="true">Markdown that runs</span></div>
+      <p class="tagline">Markdown that runs</p>
+      <h1>Your runbook, as an app.<span class="cursor" aria-hidden="true"></span></h1>
+      <p class="lede">mdsh turns the markdown you already have into something that runs, and turns each run into a record you can send. Open a file in the desktop app, press play on a block, and the output lands under it, <strong>in the file</strong>, where git and your team can see it.</p>
+      <p class="cta">
+        <a class="button" href="{{ "install/" | relURL }}">Get the desktop app</a>
+        <a class="button ghost" href="{{ "examples/" | relURL }}">Take the tour</a>
+      </p>
+      <p class="also">Also a CLI and a terminal UI: <code>brew install gdey/tap/mdsh</code>. Free and open source, MIT.</p>
+    </div>
+    <div>
+      <div class="only-tty">{{ partial "shot.html" (dict "src" "hero-paper.png" "dark" "hero-phosphor.png" "title" "deploy.md · waiting for you" "alt" "mdsh-gui in its Teletype look, stopped at a confirm block that asks Ship release to production? with Run, Skip and Stop" "loading" "eager") }}</div>
+      <div class="only-plain">{{ partial "shot.html" (dict "src" "hero-light.png" "dark" "hero-dark.png" "title" "deploy.md · waiting for you" "alt" "mdsh-gui stopped at a confirm block that asks Ship release to production? with Run, Skip and Stop" "loading" "eager") }}</div>
+      <p class="caption">A deploy runbook from the examples, stopped before the step that ships. The build and checks above it already ran; their output is in the file.</p>
+    </div>
   </div>
 </section>
-<div class="wrap prose">
-  {{ .Content }}
-</div>
+
+<section class="band">
+  <div class="wrap">
+    <h2>It is still just markdown.</h2>
+    <p class="sub">No new file format, no kernel, no server. The window above is this file. It renders on GitHub, diffs cleanly in review, and runs from a terminal or CI with no app at all.</p>
+    <div class="same-file">
+      <div>
+        <h3>runbooks/deploy.md, in your editor</h3>
+{{ highlight (resources.Get "home/ship.md").Content "markdown" "" }}
+      </div>
+      <div>
+        <h3>…and everywhere else</h3>
+{{ highlight `mdsh-gui deploy.md        # the desktop app
+mdsh -i deploy.md         # the same, in a terminal UI
+mdsh -w deploy.md         # run it, write the output back
+mdsh --yes deploy.md      # in CI: answer the confirms
+mdsh --pdf run.pdf deploy.md   # the run, as a PDF
+./deploy.md               # it has a shebang, so it runs` "sh" "" }}
+        <p class="caption">The prose says why, the blocks say how, and the <code>output</code> fences say what happened last time. Run it again and they are replaced, not appended, so the diff shows only what changed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>What it feels like</h2>
+    <p class="sub">A notebook, but the kernel is the shell you already use, and every cell is a step someone can read before they run it.</p>
+    <div class="wows">
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">01</span>
+          <h3>Edit on the left. Run on the right.</h3>
+          <p>The source and the rendered notebook side by side, kept in step as you scroll. Press play on a block, a heading, or Run all, and the output streams in under it.</p>
+          <p>Drag blocks to reorder them, fold sections, undo anything. Close the window and the run is in the file.</p>
+        </div>
+        {{ partial "shot.html" (dict "name" "split" "title" "deploy.md · source and rendered" "alt" "The deploy runbook with its markdown source on the left and the rendered notebook on the right") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">02</span>
+          <h3>Guard rails you can see.</h3>
+          <p><code>confirm</code> asks before the risky step. <code>depends=</code> runs what a block needs first, and the app draws it as lines in the margin. <code>timeout=</code> kills a hang, <code>run=once</code> skips a slow fetch, and <code>on_error: stop</code> ends a bad deploy.</p>
+          <p>Blocks a printout would hide are drawn anyway, badged, so a file can't run code you never saw.</p>
+        </div>
+        {{ partial "shot.html" (dict "name" "depends" "title" "guardrails.md" "alt" "A deploy block selected, with colored lines in the margin running up to the login and fetch blocks it depends on") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">03</span>
+          <h3>Your terminal session becomes a document.</h3>
+          <p>Open the History pane and work as you would in a terminal, with your shell's own prompt and completion. Every command lands in the file as a block, with its output. A line that starts with <code>#</code> becomes a note.</p>
+          <p>New Session opens a file for the day. When you're done, delete what didn't matter, write a sentence above what did, and the investigation is a runbook.</p>
+        </div>
+        {{ partial "shot.html" (dict "name" "history" "title" "2026-11-02.md · History" "alt" "The History pane at the bottom of the window, with the commands typed into it appearing above as blocks with their output") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">04</span>
+          <h3>A form, written in markdown.</h3>
+          <p><code>textbox</code> and <code>choice</code> blocks become a text field, radio buttons and checkboxes. Pick the environment, type the host, press Run section. What you picked is saved in the file and reaches the blocks as <code>$MDSH_VAR_env</code>.</p>
+          <p>The author controls the choices; the person running it never edits code.</p>
+        </div>
+        {{ partial "shot.html" (dict "name" "inputs" "title" "inputs.md" "alt" "A host name text field, staging and prod radio buttons, and disk, memory and network checkboxes, drawn from textbox and choice blocks") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">05</span>
+          <h3>Diagrams, tables and pictures, inline.</h3>
+          <p>A <code>d2</code> fence draws a diagram, an <code>svg</code> fence a picture. <code>out=markdown</code> turns a block's output into a table, <code>out=image</code> keeps the chart it printed, and <code>tty</code> blocks run on a real terminal and keep a recording.</p>
+          <p>Nothing is fetched from the network to draw them.</p>
+        </div>
+        {{ partial "shot.html" (dict "name" "diagram" "title" "architecture.md" "alt" "A d2 diagram of a build pipeline drawn in the notebook, above a table produced by a block") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">06</span>
+          <h3>One click to the report.</h3>
+          <p>Create Report makes a PDF, a standalone HTML page or a markdown copy of the run, with or without the code, and shows the <code>mdsh</code> command that makes the same one, so CI can make it next week.</p>
+          <p>The change ticket asked what you ran and what happened. This is that, with exit codes.</p>
+        </div>
+        {{ partial "shot.html" (dict "name" "report" "title" "report.md · Create report" "alt" "The Create report dialog: PDF, HTML or Markdown; show code blocks and output; output from this tab's run, a fresh run or the saved file; and the equivalent mdsh command") }}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Three looks. Light and dark.</h2>
+    <p class="sub">Plain for every day, Teletype for fan-fold paper and green phosphor, Blueprint for white lines on drafting blue. Settings › Look tunes the type, spacing and accent.</p>
+    <div class="looks">
+      <figure>{{ partial "shot.html" (dict "src" "hero-light.png" "dark" "hero-dark.png" "title" "Plain" "alt" "The Plain look") }}</figure>
+      <figure>{{ partial "shot.html" (dict "src" "hero-paper.png" "dark" "hero-phosphor.png" "title" "Teletype" "alt" "The Teletype look") }}</figure>
+      <figure>{{ partial "shot.html" (dict "src" "hero-blueprint.png" "dark" "hero-blueprint-dark.png" "title" "Blueprint" "alt" "The Blueprint look") }}</figure>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Who it's for</h2>
+    <ul class="buyers">
+      <li><strong><a href="{{ "use-cases/runbooks/" | relURL }}">The runbook is the record.</a></strong><p>Platform and SRE teams. The runbook lives in the repo, runs one confirmed step at a time, and the last run is in git. <code>--pdf</code> makes the evidence for the change ticket, <code>--audit</code> a JSON log for the SIEM.</p></li>
+      <li><strong><a href="{{ "use-cases/reports/" | relURL }}">A notebook whose kernel is your shell.</a></strong><p>Analysts whose tools are <code>psql</code>, <code>duckdb</code>, <code>jq</code> and <code>curl</code>. Type in History, keep what mattered, quote a number in the prose, refresh the whole report with one click.</p></li>
+      <li><strong><a href="{{ "use-cases/onboarding/" | relURL }}">Your notes, but they run.</a></strong><p>Solo developers and consultants. Add a shebang to <code>notes.md</code> and <code>./notes.md</code> runs it. Keep a README's sample output true. Hand a client a setup checklist that checks itself.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap cols">
+    <div>
+      <h2>Start with the examples.</h2>
+      <p class="sub">The repo's <code>examples/</code> folder is a guided tour in nine parts, from a two-block hello to whole runbooks. The app shows it as collections on its start screen, and every part has a Try it block that runs the example it describes.</p>
+      <ol class="steps">
+        <li><div>Get the code and the tour.
+{{ highlight `git clone https://github.com/gdey/markdownshell
+cd markdownshell/examples` "sh" "" }}</div></li>
+        <li><div>Open the folder in the app, or in the terminal UI.
+{{ highlight `mdsh-gui .     # or: mdsh -i` "sh" "" }}</div></li>
+        <li><div>Start with <code>README.md</code>, then <code>hello.md</code>. Pin the runbooks you come back to.</div></li>
+      </ol>
+      <p><a href="{{ "examples/" | relURL }}">Walk through the tour →</a></p>
+    </div>
+    {{ partial "shot.html" (dict "name" "start" "title" "Start" "alt" "The start screen: a filter box, New File, Open, New Session and Last Session; a pinned deploy.md, recent files, and the examples shown as a collection titled A tour of mdsh") }}
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>One file, three ways to run it.</h2>
+    <p class="sub">The desktop app, the terminal UI and the command line share one engine, so a document runs the same in all three and saves the same bytes.</p>
+    <ul class="fronts">
+      <li><span class="tag">Shipping</span><h3>Desktop app</h3><p>Tabs, the start screen with collections and pins, source beside rendered, History, Console, outline, diagrams. macOS and Linux.</p>
+{{ highlight `mdsh-gui runbooks/` "sh" "" }}</li>
+      <li><span class="tag">Shipping</span><h3>Terminal UI</h3><p>The same notebook over SSH: outline, block moves with undo, reports, tabs, and a History pane with your shell's prompt.</p>
+{{ highlight `mdsh -i deploy.md` "sh" "" }}</li>
+      <li><span class="tag">Shipping</span><h3>Command line</h3><p>Run in CI, write output back, make PDF and HTML reports, keep an audit log. One static binary.</p>
+{{ highlight `mdsh --yes -w deploy.md` "sh" "" }}</li>
+    </ul>
+    <p class="caption">Coming: blocks that run over SSH on the machine they belong to, and a notebook served to a browser. See the <a href="{{ "roadmap/" | relURL }}">roadmap</a>.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap cols">
+    <div>
+      <h2>Install</h2>
+      <p class="sub">Homebrew on macOS and Linux, packages for Debian and Fedora, or one binary from the releases page.</p>
+{{ highlight `brew install --cask gdey/tap/mdsh   # the desktop app (macOS)
+brew install gdey/tap/mdsh          # mdsh and mdsh -i` "sh" "" }}
+      <p><a class="button" href="{{ "install/" | relURL }}">All the ways to install</a></p>
+    </div>
+    <div>
+      <h2>Safe to open</h2>
+      <p>Opening a file runs nothing. A document reads only the environment variables you expose, never loads images from the network, and can't hide code from the question that asks to run it. The security reviews are public, and every High finding in them is fixed.</p>
+      <p><a href="{{ "security/" | relURL }}">How mdsh keeps a file in its lane →</a></p>
+    </div>
+  </div>
+</section>
 {{ end }}
