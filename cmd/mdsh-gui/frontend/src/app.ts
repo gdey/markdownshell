@@ -1281,6 +1281,7 @@ function openSource() {
   });
   $("source-bar").replaceChildren(markdownBar(() => source?.view ?? null));
   source.view.scrollDOM.addEventListener("scroll", () => syncScroll("source"));
+  for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) source.view.dom.addEventListener(type, leadFrom("source"), { capture: true, passive: true });
   void loadSource();
 }
 
@@ -1751,9 +1752,19 @@ function holdScroll() {
   scrollingTimer = window.setTimeout(() => (scrolling = null), 800);
 }
 
+// lead is the pane the user last scrolled, clicked or typed in. Only it
+// leads: the other pane also scrolls when the app draws it again, as
+// after typing, or when a selected card changes, and WebKit on macOS
+// tells of that, which must not move the pane the user is in.
+let lead: "source" | "doc" = "doc";
+function leadFrom(pane: "source" | "doc") {
+  return () => void (lead = pane);
+}
+
 // For Neovim, nvimTop is the source pane's top line, when it scrolled.
 function syncScroll(from: "source" | "doc", nvimTop?: number) {
   if (!(source || nvimDoc) || !view.split || (scrolling && scrolling !== from)) return;
+  if (source && from !== lead) return;
   scrolling = from;
   clearTimeout(scrollingTimer);
   scrollingTimer = window.setTimeout(() => (scrolling = null), 150);
@@ -3202,6 +3213,7 @@ $("outline-toggle").onclick = () => toggle("outline");
 $("view-split").onclick = () => toggle("split");
 $("view-rendered").onclick = () => toggle("rendered");
 $("doc-scroll").addEventListener("scroll", () => syncScroll("doc"));
+for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) $("doc-scroll").addEventListener(type, leadFrom("doc"), { capture: true, passive: true });
 // Scrolling by hand, with the wheel, a touch or the scroll bar, stops
 // following a run.
 $("doc-scroll").addEventListener("wheel", stopFollowing, { passive: true });
@@ -3220,6 +3232,8 @@ document.addEventListener("keydown", (e) => {
   if (!doc.file || e.metaKey || e.ctrlKey || e.altKey) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest?.("input, textarea, select, dialog, [contenteditable], .cm-editor, .terminal")) return;
+  // These keys move around the rendered view, so it leads the scrolling.
+  lead = "doc";
   const all = blocks();
   const current = () => Number(all[selected].dataset.block);
   switch (e.key) {
