@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- `SECURITY.md` says how to report a vulnerability privately and which
+  versions get fixes. The v1.2.1 security reviews of the CLI and
+  mdsh-gui are in `docs/security/`.
+
 ### Added
 
 - `mdsh -i`: a **History** pane, as in mdsh-gui: `h` opens a terminal
