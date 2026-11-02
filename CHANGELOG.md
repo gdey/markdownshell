@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a Blueprint look in Settings › Look: white lines on
+  blueprint blue over a drafting grid, with lettered headings and
+  outlined cards, or a deeper night blue when the theme is dark. The
+  grid can be turned off.
 - `mdsh-gui`: a Teletype look, beside the theme in a new Settings ›
   Look tab: everything in a typewriter face on fan-fold paper, with
   sprocket holes, ruled lines, hard-edged cards and keycap buttons, or

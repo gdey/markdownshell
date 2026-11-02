@@ -388,6 +388,14 @@ About tab with the version, build, paths and tools.
 
 ![Paper with the History pane inverted, so it shows as phosphor](../../site/static/images/gui/teletype-history-inverted.png)
 
+![The deploy runbook in the Blueprint look: white lines on blue paper with a drafting grid](../../site/static/images/gui/blueprint-light.png)
+
+![The Blueprint look with the dark theme, in night blue, with push asking to run](../../site/static/images/gui/blueprint-dark.png)
+
+![The Blueprint look with the History pane open under the document](../../site/static/images/gui/blueprint-history.png)
+
+![Settings › Look with Blueprint chosen: the sheet's grid can be turned off](../../site/static/images/gui/blueprint-settings-look.png)
+
 ## Install
 
 Releases have an unsigned universal macOS app (`.dmg` and `.zip`) and a

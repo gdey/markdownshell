@@ -6,6 +6,7 @@
   <title>Settings</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="teletype.css">
+  <link rel="stylesheet" href="blueprint.css">
   <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
   <script type="module" src="bundle/settings.js"></script>
 </head>
@@ -63,11 +64,12 @@
       <div class="setting">
         <div class="text">
           <label for="look">Look</label>
-          <p class="muted">Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark.</p>
+          <p class="muted">Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark. Blueprint draws in white lines on blue paper with a drafting grid, a deeper night blue when the theme is dark.</p>
         </div>
         <select id="look">
           <option value="">Plain</option>
           <option value="tty">Teletype</option>
+          <option value="blueprint">Blueprint</option>
         </select>
       </div>
       <div class="setting">
@@ -122,7 +124,7 @@
       <div class="setting">
         <div class="text">
           <label for="history-pane">History pane</label>
-          <p class="muted">Inverted is light under a dark window and dark under a light one. The look's own is always dark for Plain and the window's for Teletype.</p>
+          <p class="muted">Inverted is light under a dark window and dark under a light one. The look's own is always dark for Plain and the window's for Teletype and Blueprint.</p>
         </div>
         <select id="history-pane">
           <option value="">The look's own</option>
@@ -133,13 +135,13 @@
       </div>
       <div id="paper" class="setting">
         <div class="text">
-          <label>Teletype paper</label>
+          <label id="paper-label">Teletype paper</label>
           <p class="muted">What the paper is drawn with.</p>
         </div>
         <div class="checks">
-          <label class="check"><input id="sprockets" type="checkbox"> Sprocket strips</label>
-          <label class="check"><input id="rules" type="checkbox"> Ruled lines</label>
-          <label class="check"><input id="shadows" type="checkbox"> Shadows under cards</label>
+          <label id="sprockets-check" class="check"><input id="sprockets" type="checkbox"> Sprocket strips</label>
+          <label class="check"><input id="rules" type="checkbox"> <span id="rules-label">Ruled lines</span></label>
+          <label id="shadows-check" class="check"><input id="shadows" type="checkbox"> Shadows under cards</label>
         </div>
       </div>
     </section>

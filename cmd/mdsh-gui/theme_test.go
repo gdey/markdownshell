@@ -45,64 +45,71 @@ func cssVars(t *testing.T, file string, pick func(sel string) string) map[string
 }
 
 // palette names the palette a selector sets: "light" or "dark", for the
-// window (the root) or the History pane, with "tty " before it for the
-// Teletype look's.
+// window (the root) or the History pane, with the look's name and a
+// space before it for a look's own, such as "tty light".
 func palette(sel string) string {
-	key := ""
+	look := ""
+	if m := lookAttr.FindStringSubmatch(sel); m != nil {
+		look = m[1] + " "
+	}
 	switch {
-	case sel == ":root", sel == `:root[data-look="tty"]`:
-		key = "light"
+	case sel == ":root", sel == `:root[data-look="`+strings.TrimSpace(look)+`"]`:
+		return look + "light"
 	case strings.Contains(sel, `data-scheme="dark"`):
-		key = "dark"
+		return look + "dark"
 	case strings.Contains(sel, `data-history-scheme="light"`) && strings.HasSuffix(sel, "#history"):
-		key = "light pane"
+		return look + "light pane"
 	case strings.Contains(sel, `data-history-scheme="dark"`) && strings.HasSuffix(sel, "#history"):
-		key = "dark pane"
-	default:
-		return ""
+		return look + "dark pane"
 	}
-	if strings.Contains(sel, `data-look="tty"`) {
-		key = "tty " + key
-	}
-	return key
+	return ""
 }
 
-// The Teletype look must set every token the plain look does, in the
-// light and in the dark, so a token added to one can't be forgotten in
-// the other and show the plain color through the paper. And each
-// palette must be the same for the window as for the History pane.
-func TestTeletypeTokens(t *testing.T) {
+var lookAttr = regexp.MustCompile(`data-look="(\w+)"`)
+
+// Each look must set every token the plain look does, in the light and
+// in the dark, so a token added to one can't be forgotten in another and
+// show the plain color through. Each palette must be the same for the
+// window as for the History pane. And a look's own tokens (--tty-*,
+// --bp-*) must be set in its dark palette as well as its light one.
+func TestLookTokens(t *testing.T) {
 	plain := cssVars(t, "frontend/style.css", palette)
-	tty := cssVars(t, "frontend/teletype.css", palette)
 	if len(plain["light"]) < 40 || len(plain["dark"]) < 40 {
 		t.Fatalf("found %d light and %d dark tokens in style.css; is the parse right?", len(plain["light"]), len(plain["dark"]))
 	}
-	for _, scheme := range []string{"light", "dark"} {
-		for _, v := range slices.Sorted(maps.Keys(plain[scheme])) {
-			if !tty["tty "+scheme][v] {
-				t.Errorf("Teletype %s does not set %s", scheme, v)
-			}
-		}
-		// The pane's palette is the window's minus the faces and the
-		// text size, which the pane inherits.
-		for look, sets := range map[string]map[string]map[string]bool{"plain": plain, "Teletype": tty} {
-			prefix := ""
-			if look == "Teletype" {
-				prefix = "tty "
-			}
+	// The pane's palette is the window's minus the faces and the text
+	// size, which the pane inherits.
+	paneCovers := func(name string, sets map[string]map[string]bool, prefix string) {
+		for _, scheme := range []string{"light", "dark"} {
 			for v := range sets[prefix+scheme] {
 				if strings.HasPrefix(v, "--font-") || v == "--text-scale" || v == "--term-bg" || v == "--term-fg" {
 					continue
 				}
 				if !sets[prefix+scheme+" pane"][v] {
-					t.Errorf("%s %s does not set %s for the History pane", look, scheme, v)
+					t.Errorf("%s %s does not set %s for the History pane", name, scheme, v)
 				}
 			}
 		}
 	}
-	for v := range tty["tty light"] {
-		if strings.HasPrefix(v, "--tty-") && !tty["tty dark"][v] {
-			t.Errorf("phosphor does not set %s", v)
+	paneCovers("plain", plain, "")
+	for _, look := range []struct{ name, attr, file, own string }{
+		{"Teletype", "tty", "frontend/teletype.css", "--tty-"},
+		{"Blueprint", "blueprint", "frontend/blueprint.css", "--bp-"},
+	} {
+		sets := cssVars(t, look.file, palette)
+		prefix := look.attr + " "
+		for _, scheme := range []string{"light", "dark"} {
+			for _, v := range slices.Sorted(maps.Keys(plain[scheme])) {
+				if !sets[prefix+scheme][v] {
+					t.Errorf("%s %s does not set %s", look.name, scheme, v)
+				}
+			}
+		}
+		paneCovers(look.name, sets, prefix)
+		for v := range sets[prefix+"light"] {
+			if strings.HasPrefix(v, look.own) && !sets[prefix+"dark"][v] {
+				t.Errorf("%s dark does not set %s", look.name, v)
+			}
 		}
 	}
 }
@@ -121,6 +128,10 @@ func TestEditedSettings(t *testing.T) {
 	edited(&cur, settings.Settings{Look: "tty", TextSize: 300, UIFont: "Inter", CodeFont: `x"; } body {`, LineSpacing: "relaxed", NoRules: true, Accent: "#AABBCC", HistoryPane: "invert"})
 	if cur.TextSize != 150 || cur.UIFont != "Inter" || cur.CodeFont != "" || cur.LineSpacing != "relaxed" || !cur.NoRules || cur.Accent != "#aabbcc" || cur.HistoryPane != "invert" {
 		t.Errorf("look options = %+v", cur)
+	}
+	edited(&cur, settings.Settings{Look: "blueprint"})
+	if cur.Look != "blueprint" {
+		t.Errorf("blueprint look dropped: %q", cur.Look)
 	}
 	edited(&cur, settings.Settings{Look: "bogus", Theme: "bogus", LineSpacing: "huge", Accent: "red", HistoryPane: "sideways"})
 	if cur.Look != "" || cur.Theme != "" || cur.LineSpacing != "" || cur.Accent != "" || cur.HistoryPane != "" || cur.TextSize != 0 {

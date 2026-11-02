@@ -40,7 +40,8 @@ export interface Settings {
 
     /**
      * Look is "tty" for the Teletype look, paper in the light theme and
-     * phosphor in the dark; empty is the plain look.
+     * phosphor in the dark, or "blueprint" for white lines on blueprint
+     * blue; empty is the plain look.
      */
     "look": string;
 

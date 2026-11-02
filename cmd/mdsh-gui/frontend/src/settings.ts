@@ -123,7 +123,13 @@ function drawLook() {
   input("accent-custom").hidden = !custom;
   if (custom) input("accent-custom").value = s.accent;
   select("history-pane").value = s.historyPane;
-  $("paper").hidden = s.look !== "tty";
+  // Teletype's paper has sprockets, rules and shadows; Blueprint's
+  // sheet only its grid.
+  const tty = s.look === "tty";
+  $("paper").hidden = !tty && s.look !== "blueprint";
+  $("paper-label").textContent = tty ? "Teletype paper" : "Blueprint sheet";
+  $("sprockets-check").hidden = $("shadows-check").hidden = !tty;
+  $("rules-label").textContent = tty ? "Ruled lines" : "Grid";
   input("sprockets").checked = !s.noSprockets;
   input("rules").checked = !s.noRules;
   input("shadows").checked = !s.noShadows;
