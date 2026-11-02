@@ -292,3 +292,52 @@ func TestRestart(t *testing.T) {
 		t.Errorf("text = %s", n.Text())
 	}
 }
+
+// Turning History on while the pane asks the shell for its prompt, as it
+// does as it opens, waits for the answer rather than failing as if a
+// block were running.
+func TestSetHistoryWaitsForPrompt(t *testing.T) {
+	n, err := Open(write(t, "```sh\necho hi\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	n.mu.Lock()
+	n.running, n.asking = true, true // as Prompt leaves them while it asks
+	n.mu.Unlock()
+	done := make(chan error, 1)
+	go func() {
+		_, err := n.SetHistory(true)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("SetHistory returned %v while the prompt was asked for", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	n.mu.Lock()
+	n.running, n.asking = false, false
+	n.idle.Broadcast()
+	n.mu.Unlock()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("SetHistory: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("SetHistory still waiting after the prompt came back")
+	}
+	if !n.History() {
+		t.Error("History is off")
+	}
+	// A block running still makes it fail.
+	n.mu.Lock()
+	n.running = true
+	n.mu.Unlock()
+	if _, err := n.SetHistory(false); err != ErrBusy {
+		t.Errorf("SetHistory while a block runs = %v; want ErrBusy", err)
+	}
+	n.mu.Lock()
+	n.running = false
+	n.mu.Unlock()
+}

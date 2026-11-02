@@ -190,6 +190,11 @@ type Notebook struct {
 	// it does, and idle tells those waiting for it that it is done.
 	bg      map[*doc.Block]bool
 	reaping bool
+	// asking is set while Prompt asks the shell for its prompt, which
+	// takes a moment; idle tells those waiting for it that it is done.
+	// Turning the History pane on or running waits for it, rather than
+	// failing as a block running would.
+	asking bool
 	// history is set while the History pane is on, and noteEnd is the
 	// length of the source when the last note added there ended it, or
 	// -1.
@@ -399,6 +404,13 @@ func (n *Notebook) waitReap() {
 	}
 }
 
+// waitAsking waits, with n.mu held, while Prompt asks the shell.
+func (n *Notebook) waitAsking() {
+	for n.asking {
+		n.idle.Wait()
+	}
+}
+
 func attrsText(info string) string {
 	in := doc.SplitInfo(info)
 	in.Del("#")
@@ -448,6 +460,7 @@ func (n *Notebook) RunRange(from, to int) error {
 
 func (n *Notebook) start(f func(context.Context) error) error {
 	n.mu.Lock()
+	n.waitAsking()
 	if n.running {
 		n.mu.Unlock()
 		return ErrBusy
