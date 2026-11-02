@@ -198,6 +198,18 @@
       </div>
     </form>
   </dialog>
+  <dialog id="depends-dialog" aria-labelledby="depends-title">
+    <form method="dialog">
+      <h2 id="depends-title">Depends on</h2>
+      <p class="muted"><span id="depends-name"></span> runs after the blocks checked here, in the order checked. One that hasn't run is asked about first.</p>
+      <div id="depends-list" class="choices" role="group" aria-label="Blocks above"></div>
+      <p id="depends-empty" class="muted" hidden>No block above it can be depended on.</p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="depends-ok" value="ok" class="primary">Apply</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="clear-dialog" aria-labelledby="clear-title">
     <form method="dialog">
       <h2 id="clear-title">Clear all outputs?</h2>

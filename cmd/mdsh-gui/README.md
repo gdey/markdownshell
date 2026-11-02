@@ -251,8 +251,12 @@ Each file opens in a tab of its own, with its own shells.
   puts the focus on Run and is read out with its reason; the status
   line, "running", errors and the end of a run are read out too. The
   grips that size the source view, the console and the History pane
-  take the arrow keys. The terminals read out what arrives (xterm's
-  screen reader mode). The Neovim source pane is a picture to a screen
+  take the arrow keys, and in the outline ↑/↓ move between entries and
+  ←/→ fold and unfold a section. Edit › Depends On… (`d`) edits the
+  selected block's `depends=` as a list of the blocks above it to check,
+  the keyboard's way to the dependency lines. The terminals read out
+  what arrives (xterm's screen reader mode), and don't blink their
+  cursor under reduce-motion. The Neovim source pane is a picture to a screen
   reader; the built-in editor is a text field. Keyboard focus shows a
   ring in every look, and with the system's reduce-motion setting the
   panes and folds don't slide and the views don't scroll smoothly.
@@ -262,7 +266,7 @@ Each file opens in a tab of its own, with its own shells.
   the last tab had) and the start folder; Look for the theme (System,
   Light or Dark), the look (Plain, or Teletype: the site's typewriter
   face on fan-fold paper in the light theme and green phosphor in the
-  dark), the text size, the interface and code fonts, line spacing,
+  dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts, line spacing,
   an accent color, the History pane's colors (the window's, inverted,
   or always dark) and, for Teletype, the paper's sprocket strips,
   ruled lines and card shadows; Editing for autosave after

@@ -1767,6 +1767,14 @@ function drawOutline() {
           foldSection(e);
         };
       }
+      // From the keyboard, left folds the section and right unfolds it.
+      if (e.dataset.fold) {
+        item.onkeydown = (ev) => {
+          if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+          ev.preventDefault();
+          foldSection(e, ev.key === "ArrowLeft");
+        };
+      }
       const row = outlineRow(item, e, level);
       row.dataset.section = "";
       if (e.dataset.sectionTo) {
@@ -1779,9 +1787,23 @@ function drawOutline() {
       items.push(row);
     }
   }
+  // Drawing the outline anew would lose the focus; it comes back to the
+  // same entry.
+  const focused = nav.contains(document.activeElement) ? (document.activeElement as HTMLElement).closest<HTMLElement>(".row")?.dataset.line : undefined;
   nav.replaceChildren(...(items.length ? items : [el("p", { className: "muted" }, "No headings or blocks")]));
+  if (focused !== undefined) nav.querySelector<HTMLElement>(`.row[data-line="${focused}"] .item`)?.focus();
   markOutline();
 }
+
+// Up and down move between the outline's entries.
+$("outline").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  const items = [...$("outline").querySelectorAll<HTMLElement>(".item")];
+  const i = items.indexOf(document.activeElement as HTMLElement);
+  if (i < 0) return;
+  e.preventDefault();
+  items[Math.max(0, Math.min(items.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]?.focus();
+});
 
 // markOutline shows the play button on the selected block's or
 // heading's entry.
@@ -2030,6 +2052,7 @@ const actions: Record<string, () => Promise<void> | void> = {
   movedown: () => void moveAction(1, false),
   moveblockup: () => void moveAction(-1, true),
   moveblockdown: () => void moveAction(1, true),
+  depends: () => openDepends(),
   history: () => toggle("history"),
   console: () => toggle("console"),
 };
@@ -2480,6 +2503,75 @@ async function undoEdit(again: boolean) {
     fail(err);
   }
   await refresh();
+}
+
+// Depends on…
+//
+// Edit › Depends On… and d open a dialog for the selected block (or in
+// the source view the block the cursor is in) listing the blocks above
+// it that can be depended on, with its depends= checked, in order.
+// Checking adds to the end; Apply writes depends= as dragging a
+// dependency line does, so Undo takes it back. It is the keyboard's
+// way to the lines.
+
+async function openDepends() {
+  if (!doc.file || running) return;
+  let i = -1;
+  const at = document.activeElement as HTMLElement | null;
+  if (nvimDoc && at?.closest(".nvim-input")) {
+    const line = await nvimLine();
+    i = line ? (blockAtLine(nvimDoc.text, line)?.block ?? -1) : -1;
+  } else if (source && at?.closest(".cm-editor")) {
+    await applySource();
+    if (!source) return;
+    const cm = source.view.state;
+    i = blockAtLine(cm.doc.toString(), cm.doc.lineAt(cm.selection.main.head).number)?.block ?? -1;
+  } else if (selected >= 0) i = Number(blocks()[selected]?.dataset.block ?? -1);
+  const c = cells.find((c) => c.block === i);
+  if (!c || c.textbox || c.choice) return status("select a block that runs first");
+  const canRun = (x: Cell) => x.block >= 0 && !!x.id && !x.textbox && !x.choice;
+  const above = cells.filter((x) => canRun(x) && x.block < i);
+  const byID = new Map(above.map((x) => [x.id!, x.block]));
+  const chosen = (c.depends ?? []).map((id) => byID.get(id)).filter((b): b is number => b !== undefined);
+  $("depends-name").textContent = c.name ?? c.id ?? "This block";
+  const list = $("depends-list");
+  list.replaceChildren(
+    ...above.map((x) => {
+      const box = el("input", { type: "checkbox", checked: chosen.includes(x.block) });
+      box.dataset.block = String(x.block);
+      box.onchange = () => {
+        const k = chosen.indexOf(x.block);
+        if (box.checked && k < 0) chosen.push(x.block);
+        else if (!box.checked && k >= 0) chosen.splice(k, 1);
+        numberDepends(chosen);
+      };
+      return el("label", { className: "check" }, box, el("span", { className: "order", ariaHidden: "true" }), el("code", {}, x.name ?? x.id ?? ""));
+    }),
+  );
+  numberDepends(chosen);
+  $("depends-empty").hidden = above.length > 0;
+  $<HTMLButtonElement>("depends-ok").disabled = above.length === 0;
+  const dialog = $<HTMLDialogElement>("depends-dialog");
+  dialog.returnValue = "";
+  dialog.showModal();
+  (list.querySelector<HTMLElement>("input") ?? $("depends-ok")).focus();
+  dialog.onclose = () => {
+    if (dialog.returnValue !== "ok") return;
+    const before = (c.depends ?? []).join(",");
+    if (chosen.map((b) => cells.find((x) => x.block === b)?.id ?? "").join(",") === before) return;
+    void setDepends(i, chosen, chosen.length ? "now depends on " + chosen.map((b) => cells.find((x) => x.block === b)?.name ?? "").join(", ") : "depends on nothing now");
+  };
+}
+
+// numberDepends shows each checked block's place in depends=, and says
+// it in the checkbox's name.
+function numberDepends(chosen: number[]) {
+  for (const label of $("depends-list").querySelectorAll<HTMLElement>("label")) {
+    const box = label.querySelector<HTMLInputElement>("input")!;
+    const k = chosen.indexOf(Number(box.dataset.block));
+    label.querySelector(".order")!.textContent = k >= 0 ? String(k + 1) + "." : "";
+    box.setAttribute("aria-label", (label.querySelector("code")?.textContent ?? "") + (k >= 0 ? `, ${k + 1} of ${chosen.length}` : ""));
+  }
 }
 
 // Run options
@@ -3023,6 +3115,9 @@ document.addEventListener("keydown", (e) => {
         const c = cells.find((c) => c.block === current());
         if (c) void editBlock(all[selected], c);
       }
+      break;
+    case "d":
+      void openDepends();
       break;
     default:
       return;
