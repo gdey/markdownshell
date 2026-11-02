@@ -77,3 +77,5 @@ events as the CLI and TUI. Not designed yet.
 
 - Should vars ever flow up from a sub-env (`export=`)? Dropped for v1.
 - Other block languages (bash, python) through the same runner interface.
+- Running blocks on a remote host over SSH: see [docs/ssh/design.md](ssh/design.md)
+  (design, Nov 1, 2026; not built).
