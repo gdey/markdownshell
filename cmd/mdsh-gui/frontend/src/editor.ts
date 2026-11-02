@@ -78,7 +78,7 @@ export function attrHelp(attrs: AttrSpec[], names: () => Names): Extension {
   return [
     autocompletion({ override: [attrCompletions(attrs, names)], activateOnTyping: true }),
     hoverTooltip(attrHover(attrs)),
-    linter(checkInfo, { delay: 300 }),
+    linter((view) => checkInfo(view.state), { delay: 300 }),
   ];
 }
 
@@ -124,18 +124,19 @@ function checkDepends(blocks: SourceBlock[], from: number, info: string, out: Di
   }
 }
 
-// checkInfo checks the attributes of every fence with some.
-async function checkInfo(view: EditorView): Promise<Diagnostic[]> {
+// checkInfo checks the attributes of every fence with some, as mdsh's
+// language server (the lsp package) does for the Neovim source pane.
+async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
   const out: Diagnostic[] = [];
-  const doc = view.state.doc;
+  const doc = state.doc;
   // The blocks are only needed, and parsed, if a depends= is there.
-  const blocks = doc.toString().includes("depends=") ? await sourceBlocks(view.state) : null;
+  const blocks = doc.toString().includes("depends=") ? await sourceBlocks(state) : null;
   const fences = new Set(blocks?.map((b) => b.line));
   const vars = new Map<string, number>(); // var= names, and the line binding each
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
     if (!line.text.includes("{")) continue;
-    const r = infoRange(view.state, line.from);
+    const r = infoRange(state, line.from);
     if (!r || !r.text.trim()) continue;
     const problems = (await App.CheckInfo(r.text)) ?? [];
     for (const p of problems) {
@@ -174,6 +175,8 @@ function tokenAt(state: EditorState, pos: number): { start: number; text: string
 // on a textbox or a choice.
 const inputAttrs = new Set(["#", "show"]);
 
+// attrCompletions completes a fence's attributes and their values, as
+// mdsh's language server does for the Neovim source pane.
 function attrCompletions(attrs: AttrSpec[], names: () => Names) {
   return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
     const tok = tokenAt(ctx.state, ctx.pos);
@@ -273,31 +276,39 @@ async function dependsCompletions(ctx: CompletionContext, from: number, value: s
   return { from: start, options, validFor: /^[\w-]*$/ };
 }
 
+// attrHelpAt is the attribute at pos in a fence's info string, with its
+// spec and where it is, or null.
+function attrHelpAt(attrs: AttrSpec[], state: EditorState, pos: number): { key: string; spec: AttrSpec; from: number; to: number } | null {
+  const r = infoRange(state, pos);
+  if (!r || pos < r.from || pos > r.from + r.text.length) return null;
+  const re = /[#<\w-]+(=("[^"]*"|\S*))?/g;
+  for (let m; (m = re.exec(r.text)); ) {
+    const from = r.from + m.index;
+    const to = from + m[0].length;
+    if (pos < from || pos > to) continue;
+    const key = m[0].startsWith("#") ? "#" : m[0].split("=")[0];
+    const spec = attrs.find((a) => a.name === key);
+    return spec ? { key, spec, from, to } : null;
+  }
+  return null;
+}
+
 function attrHover(attrs: AttrSpec[]) {
   return (view: EditorView, pos: number): Tooltip | null => {
-    const r = infoRange(view.state, pos);
-    if (!r || pos < r.from || pos > r.from + r.text.length) return null;
-    const re = /[#<\w-]+(=("[^"]*"|\S*))?/g;
-    for (let m; (m = re.exec(r.text)); ) {
-      const from = r.from + m.index;
-      const to = from + m[0].length;
-      if (pos < from || pos > to) continue;
-      const key = m[0].startsWith("#") ? "#" : m[0].split("=")[0];
-      const spec = attrs.find((a) => a.name === key);
-      if (!spec) return null;
-      return {
-        pos: from,
-        end: to,
-        above: true,
-        create: () => {
-          const dom = document.createElement("div");
-          dom.className = "attr-help";
-          dom.append(Object.assign(document.createElement("b"), { textContent: key === "#" ? "#id" : key }), " " + spec.help);
-          if (spec.default) dom.append(Object.assign(document.createElement("div"), { className: "muted", textContent: "Default: " + spec.default }));
-          return { dom };
-        },
-      };
-    }
-    return null;
+    const h = attrHelpAt(attrs, view.state, pos);
+    if (!h) return null;
+    const { key, spec } = h;
+    return {
+      pos: h.from,
+      end: h.to,
+      above: true,
+      create: () => {
+        const dom = document.createElement("div");
+        dom.className = "attr-help";
+        dom.append(Object.assign(document.createElement("b"), { textContent: key === "#" ? "#id" : key }), " " + spec.help);
+        if (spec.default) dom.append(Object.assign(document.createElement("div"), { className: "muted", textContent: "Default: " + spec.default }));
+        return { dom };
+      },
+    };
   };
 }

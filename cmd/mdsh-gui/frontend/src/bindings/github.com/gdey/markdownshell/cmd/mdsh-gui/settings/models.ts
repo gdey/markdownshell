@@ -34,6 +34,28 @@ export interface Settings {
     "noSpellCheck": boolean;
 
     /**
+     * Neovim makes the source pane an embedded Neovim, when Vim is on
+     * and a new enough nvim is found. Experimental.
+     */
+    "neovim": boolean;
+
+    /**
+     * NeovimPath is the nvim to run; empty finds one.
+     */
+    "neovimPath": string;
+
+    /**
+     * NeovimClean starts Neovim without the user's config.
+     */
+    "neovimClean": boolean;
+
+    /**
+     * NeovimOwnColors keeps the colorscheme from the user's Neovim
+     * config, rather than the app's theme, which is the default.
+     */
+    "neovimOwnColors": boolean;
+
+    /**
      * Theme is "light" or "dark"; empty follows the system.
      */
     "theme": string;

@@ -1,5 +1,6 @@
 import "./tab.js";
 import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
+import { type StateCommand, Text } from "@codemirror/state";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Events, Window } from "/wails/runtime.js";
 
@@ -8,13 +9,15 @@ import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, el, iconButton, icons, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
-import { type MarkdownEditor, insertAction, markdownBar, markdownEditor } from "./markdown.js";
+import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { consoleFile, initConsole, showConsole } from "./console.js";
 import { fitHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
+import { NvimPane, nvimColors } from "./nvim.js";
+import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
-import { diff } from "./sync.js";
+import { Synced, diff } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 
@@ -773,11 +776,12 @@ async function foldsToSource() {
   if (!view.split) toggle("split", true);
   await loadSource();
   if (source) setSourceFolds(source.view, renderedFoldLines(false));
+  if (nvimDoc) await nvimCall("set_folds", renderedFoldLines(false)).catch(fail);
 }
 
-function foldsToRendered() {
-  if (!source) return status("open the source view to copy its folds");
-  const lines = new Set(sourceFolds(source.view));
+async function foldsToRendered() {
+  const lines = new Set(nvimDoc ? ((await nvimCall<number[]>("folds").catch(fail)) ?? []) : source ? sourceFolds(source.view) : []);
+  if (!source && !nvimDoc) return status("open the source view to copy its folds");
   const list: Fold[] = [];
   for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
     const c = cells.find((c) => String(c.line) === e.dataset.line);
@@ -1062,6 +1066,14 @@ async function showInSource(card: HTMLElement, line: number, open: boolean) {
     toggle("split", true);
     await loadSource();
   }
+  if (nvimDoc && nvim) {
+    const pane = $("source-editor").getBoundingClientRect();
+    const rows = view.rendered ? Math.round((card.getBoundingClientRect().top - pane.top) / nvim.rowHeight) : 2;
+    holdScroll();
+    await nvimCall("jump", line, rows, open, 0).catch(fail);
+    if (open) nvim.focus();
+    return;
+  }
   if (!source) return;
   const cm = source.view;
   const pos = cm.state.doc.line(Math.max(1, Math.min(line, cm.state.doc.lines))).from;
@@ -1086,6 +1098,7 @@ async function goToLine(line: number) {
 // editBlock puts the cursor on the first line of block c's code.
 async function editBlock(card: HTMLElement, c: Cell) {
   await showInSource(card, c.line, true);
+  if (nvimDoc) return void (await nvimCall("jump", c.line + 1, c.line + 1 - Math.max(1, c.line - 2), true, -1).catch(fail));
   if (!source) return;
   const cm = source.view;
   const n = c.line + 1;
@@ -1125,6 +1138,7 @@ function inTurn<T>(f: () => Promise<T>): Promise<T> {
 }
 
 function openSource() {
+  if (useNvim()) return void startNvim();
   if (source) return;
   source = markdownEditor($("source-editor"), {
     text: "",
@@ -1154,6 +1168,7 @@ function openSource() {
 }
 
 function closeSource() {
+  stopNvim();
   if (!source) return;
   clearTimeout(sourceTimer);
   // What was typed still goes to Go, so the editor stays until it has.
@@ -1176,6 +1191,7 @@ function closeSource() {
 function applySource(): Promise<void> {
   clearTimeout(sourceTimer);
   return inTurn(async () => {
+    if (nvimDoc) return applyNvim(nvimDoc);
     const ed = source;
     if (!ed?.pending) return;
     if (running) {
@@ -1219,6 +1235,19 @@ function loadSource(): Promise<void> {
 }
 
 async function loadSourceNow() {
+  if (useNvim() && view.split) {
+    if (!nvimDoc) {
+      if (!nvim) void startNvim();
+      return;
+    }
+    try {
+      await mergeNvim(nvimDoc, await App.Text());
+    } catch (err) {
+      fail(err);
+    }
+    markRunLines();
+    return;
+  }
   if (!source || doc.file === "") return;
   const ed = source;
   const marks = foldMarks(ed.view);
@@ -1240,12 +1269,269 @@ async function loadSourceNow() {
   }
 }
 
+// With Vim on and the Neovim setting, the source pane is an embedded
+// Neovim instead (nvim.ts). If it can't start, the pane falls back to
+// CodeMirror until the settings change.
+
+let nvim: NvimPane | null = null;
+let nvimFailed = false;
+
+// NvimDoc is the text a Neovim edits: sync keeps it in step with Go's,
+// as the CodeMirror pane does, and text is Neovim's text as it last sent
+// it or was sent it.
+type NvimDoc = { sync: Synced; text: string };
+let nvimDoc: NvimDoc | null = null;
+
+function useNvim() {
+  return settings.vim && settings.neovim && !nvimFailed;
+}
+
+async function startNvim() {
+  if (nvim || doc.file === "") return;
+  const pane = new NvimPane($("source-editor"), nvimKey);
+  nvim = pane;
+  $("source-editor").classList.add("nvim");
+  try {
+    const text = await pane.start();
+    if (nvim !== pane) return;
+    nvimDoc = { sync: new Synced(text), text };
+    await nvimReady();
+  } catch (err) {
+    stopNvim();
+    nvimFailed = true;
+    status("Neovim: " + message(err) + "; using the built-in Vim");
+    if (view.split) openSource();
+  }
+}
+
+function stopNvim() {
+  if (!nvim) return;
+  dropNvim();
+  void App.NvimStop();
+}
+
+// dropNvim takes the pane down. What was typed still goes to Go.
+function dropNvim() {
+  nvim?.destroy();
+  nvim = null;
+  sourceFoldsFor = "";
+  $("source-editor").classList.remove("nvim");
+  const d = nvimDoc;
+  nvimDoc = null;
+  if (!d) return;
+  const finish = (): Promise<void> =>
+    inTurn(async () => {
+      if (running && d.sync.pending) return void window.setTimeout(() => void finish(), 1000);
+      await sendNvim(d).catch(fail);
+    });
+  void finish();
+}
+
+// applyNvim is applySource for Neovim.
+async function applyNvim(d: NvimDoc) {
+  if (!d.sync.pending) return;
+  if (running) {
+    sourceTimer = window.setTimeout(() => void applySource(), 1000);
+    return;
+  }
+  try {
+    await sendNvim(d);
+    status("");
+  } catch (err) {
+    fail(err);
+    return;
+  }
+  $("dirty").hidden = false;
+  cells = (await App.Cells()) ?? [];
+  drawDoc();
+  markRunLines();
+}
+
+// sendNvim hands Go Neovim's text, merging Go's changes into it first
+// whenever Go has some Neovim hasn't seen.
+async function sendNvim(d: NvimDoc) {
+  for (let tries = 0; d.sync.pending; tries++) {
+    const text = d.text;
+    if (await App.SetText(d.sync.base, text)) return d.sync.sent(text, d.text);
+    if (tries === 5) throw new Error("the file keeps changing; try again");
+    await mergeNvim(d, await App.Text());
+  }
+}
+
+// mergeNvim brings d up to theirs, Go's text, keeping what was typed,
+// and gives Neovim the result as edits to the lines Go changed, so keys
+// typed elsewhere in the moment since Neovim last sent its text stay.
+async function mergeNvim(d: NvimDoc, theirs: string) {
+  const changes = d.sync.incoming(theirs);
+  if (changes.empty) return;
+  const before = d.text;
+  d.text = changes.apply(Text.of(before.split("\n"))).toString();
+  if (nvimDoc !== d) return;
+  const edits = lineEdits(before, d.text);
+  await (edits ? App.NvimApply(d.text, edits) : App.NvimSetText(d.text));
+}
+
+// typedNvim notes text Neovim sent.
+function typedNvim(text: string): boolean {
+  const d = nvimDoc;
+  if (!d) return false;
+  if (text === d.text) return true;
+  d.sync.typed(diff(d.text, text));
+  d.text = text;
+  return true;
+}
+
+// nvimCall calls fn in Neovim's mdsh.lua.
+async function nvimCall<T = unknown>(fn: string, ...args: unknown[]): Promise<T | null> {
+  if (!nvimDoc) return null;
+  return JSON.parse(await App.NvimCall(fn, JSON.stringify(args))) as T;
+}
+
+// NvimState is Neovim's text now, its mode and where the cursor is: the
+// line from 1 and the column in bytes, and in visual mode the selection's
+// other end.
+type NvimState = { text: string; mode: string; line?: number; col?: number; vline?: number; vcol?: number };
+
+// nvimState is Neovim's state, its text noted as typed.
+async function nvimState(): Promise<NvimState | null> {
+  try {
+    const st = await nvimCall<NvimState>("state");
+    if (st) typedNvim(st.text);
+    return st;
+  } catch (err) {
+    fail(err);
+    return null;
+  }
+}
+
+// nvimLine is the line Neovim's cursor is on, once what was typed is
+// applied, or 0.
+async function nvimLine(): Promise<number> {
+  const st = await nvimState();
+  await applySource();
+  return st?.line ?? 0;
+}
+
+// nvimReady gives a Neovim that just started the settings and the
+// file's folds and run buttons. Its language server does the rest.
+async function nvimReady() {
+  await nvimSettings();
+  markRunLines();
+  if (sourceFoldsFor !== doc.file) {
+    sourceFoldsFor = doc.file;
+    await nvimCall("set_folds", renderedFoldLines(true)).catch(fail);
+  }
+}
+
+// nvimSettings gives Neovim the spell check setting and the theme's
+// colors, which it uses unless the user keeps their own.
+async function nvimSettings() {
+  await nvimCall("set_spell", !settings.noSpellCheck).catch(() => {});
+  await nvimCall("set_colors", nvimColors(), !settings.neovimOwnColors).catch(() => {});
+}
+// A system theme change changes the page's colors when the Theme setting
+// follows the system.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => void nvimSettings());
+
+// insertNvim runs a markdown command, such as the Insert menu's, on
+// Neovim's text at its cursor or selection, and gives Neovim the result
+// and the selection the command made.
+async function insertNvim(cmd: StateCommand) {
+  const st = await nvimState();
+  if (!st || !nvimDoc || st.line === undefined) return;
+  const doc0 = Text.of(st.text.split("\n"));
+  const head = offsetOf(doc0, st.line, st.col ?? 0);
+  let anchor = st.vline !== undefined ? offsetOf(doc0, st.vline, st.vcol ?? 0) : head;
+  let to = head;
+  // Visual mode takes in the character under the cursor.
+  if (anchor !== head) {
+    const [lo, hi] = anchor < head ? [anchor, head] : [head, anchor];
+    anchor = lo;
+    to = Math.min(hi + 1, doc0.length);
+  }
+  let state = stateOf(st.text, anchor, to);
+  cmd({ state, dispatch: (tr) => (state = tr.state) });
+  const after = state.doc.toString();
+  if (after === st.text) return;
+  const d = nvimDoc;
+  const before = d.text;
+  typedNvim(after);
+  const edits = lineEdits(before, after);
+  try {
+    await (edits ? App.NvimApply(after, edits) : App.NvimSetText(after));
+    const sel = state.selection.main;
+    const a = posOf(state.doc, sel.from);
+    const b = posOf(state.doc, sel.to);
+    await nvimCall("select", a.line, a.col, b.line, b.col);
+  } catch (err) {
+    fail(err);
+  }
+  nvim?.focus();
+  void applySource();
+}
+
+// nvimKey takes the app's own keys from Neovim: cmd/ctrl+enter runs the
+// block the cursor is in, and with shift its section, as in the built-in
+// editor. The menu then doesn't run it a second time.
+function nvimKey(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.altKey) return false;
+  void (e.shiftKey ? runCurrentSection() : runCurrent());
+  return true;
+}
+
+// nvimEvent is something Neovim's buffer reports.
+async function nvimEvent(name: string, data: any) {
+  switch (name) {
+    case "cursor":
+      return markCurrent(data.line);
+    case "scroll":
+      return syncScroll("source", data.line);
+    case "run":
+      if (data.what === "block") return runCurrent();
+      if (data.what === "section") return runCurrentSection();
+      await nvimState();
+      return runLine(data.line);
+  }
+}
+
+Events.On("nvim-redraw", mine<unknown[][]>((ev) => nvim?.redraw(ev)));
+Events.On(
+  "nvim-text",
+  mine<string>((text) => {
+    if (typedNvim(text)) void applySource();
+  }),
+);
+Events.On(
+  "nvim-event",
+  mine<{ name: string; data: string }>((ev) => {
+    if (nvimDoc) void nvimEvent(ev.name, JSON.parse(ev.data)).catch(fail);
+  }),
+);
+// :w in Neovim.
+Events.On(
+  "nvim-write",
+  mine<string>(async (text) => {
+    if (!typedNvim(text)) return;
+    await actions.save();
+  }),
+);
+Events.On(
+  "nvim-exit",
+  mine<string>((err) => {
+    if (!nvim) return;
+    dropNvim();
+    status(err ? "Neovim quit: " + err : "Neovim quit");
+    if (view.split) toggle("split", false);
+  }),
+);
+
 // markRunLines puts a run button on each runnable block's first line,
 // and on each heading whose section has one.
 function markRunLines() {
   const lines = cells.filter((c) => c.block >= 0).map((c) => c.line);
   const sections = cells.filter((c) => c.heading && c.sectionTo).map((c) => c.line);
   source?.view.dispatch({ effects: setRunLines.of({ blocks: lines, sections }) });
+  if (nvimDoc) void nvimCall("set_runs", lines, sections).catch(() => {});
 }
 
 // runLine runs the block whose fence opens on line of the source pane,
@@ -1262,6 +1548,10 @@ async function runLine(line: number) {
 // without the source pane the selected heading's or block's.
 async function runCurrentSection() {
   if (running || !doc.file) return;
+  if (nvimDoc) {
+    const line = await nvimLine();
+    return runSection(line ? sectionCell(line) : sectionCell());
+  }
   if (!source) return runSection(sectionCell());
   await applySource();
   if (!source) return;
@@ -1275,6 +1565,13 @@ async function runCurrentSection() {
 // card's play button does.
 async function runCurrent() {
   if (running || !doc.file) return;
+  if (nvimDoc) {
+    const line = await nvimLine();
+    const c = nvimDoc && line ? blockAtLine(nvimDoc.text, line) : undefined;
+    if (c) await start("RunBlock", c.block);
+    else status("the cursor isn't in a block that runs");
+    return;
+  }
   if (!source) {
     const all = blocks();
     if (selected >= 0 && selected < all.length) await start("RunBlock", Number(all[selected].dataset.block));
@@ -1337,12 +1634,23 @@ function holdScroll() {
   scrollingTimer = window.setTimeout(() => (scrolling = null), 800);
 }
 
-function syncScroll(from: "source" | "doc") {
-  if (!source || !view.split || (scrolling && scrolling !== from)) return;
+// For Neovim, nvimTop is the source pane's top line, when it scrolled.
+function syncScroll(from: "source" | "doc", nvimTop?: number) {
+  if (!(source || nvimDoc) || !view.split || (scrolling && scrolling !== from)) return;
   scrolling = from;
   clearTimeout(scrollingTimer);
   scrollingTimer = window.setTimeout(() => (scrolling = null), 150);
   const pane = $("doc-scroll");
+  if (!source) {
+    if (from === "source") {
+      const cell = nvimTop ? cellAt(nvimTop) : null;
+      if (cell) pane.scrollTop = cell.offsetTop - 8;
+      return;
+    }
+    const cell = [...document.querySelectorAll<HTMLElement>("#doc > [data-line]")].find((e) => e.offsetTop + e.offsetHeight > pane.scrollTop);
+    if (cell) void nvimCall("jump", Number(cell.dataset.line), 0, false, 0).catch(() => {});
+    return;
+  }
   const cm = source.view;
   if (from === "source") {
     const line = cm.state.doc.lineAt(cm.lineBlockAtHeight(cm.scrollDOM.scrollTop).from).number;
@@ -1502,6 +1810,7 @@ function jumpTo(target: HTMLElement) {
   const heading = target.closest<HTMLElement>("#doc > .heading-cell");
   if (heading) selectSection(heading);
   const cell = target.closest<HTMLElement>("[data-line]");
+  if (nvimDoc && cell) void nvimCall("jump", Number(cell.dataset.line), 0, true, 0).catch(fail);
   if (source && cell) {
     const cm = source.view;
     const line = cm.state.doc.line(Math.min(Number(cell.dataset.line), cm.state.doc.lines));
@@ -1601,7 +1910,10 @@ const actions: Record<string, () => Promise<void> | void> = {
   newfile: () => openNewFile(),
   async save() {
     try {
+      await nvimState();
+      await applySource();
       await App.Save();
+      if (nvimDoc) await App.NvimSaved();
       status("saved");
     } catch (err) {
       fail(err);
@@ -1680,6 +1992,7 @@ function moveAction(dir: number, byBlock: boolean, key = false): boolean {
   if (!key && Date.now() - keyMoved < 300) return true;
   if (!doc.file) return false;
   const at = document.activeElement as HTMLElement | null;
+  if (at?.closest(".nvim-input")) return false; // Neovim has its own keys
   const cm = at?.closest<HTMLElement>(".cm-editor");
   if (cm) {
     if (!source || source.view.dom !== cm) return false;
@@ -2072,11 +2385,15 @@ async function moveTo(from: number, at: number) {
 }
 
 // undoEdit is Edit › Undo, or Redo. Where the focus is decides what it
-// takes back: the source view keeps its own history, a text field its
-// own, and everything else is the rendered view's, whose edits (tasks,
+// takes back: the source view keeps its own history (Neovim's too), a
+// text field its own, and everything else is the rendered view's, whose edits (tasks,
 // textboxes and choices) Go keeps.
 async function undoEdit(again: boolean) {
   const at = document.activeElement as HTMLElement | null;
+  if (nvim && at?.closest(".nvim-input")) {
+    await App.NvimInput(again ? "<Cmd>redo<CR>" : "<Cmd>undo<CR>").catch(fail);
+    return;
+  }
   const cm = at?.closest<HTMLElement>(".cm-editor");
   if (cm) {
     const view = EditorView.findFromDOM(cm);
@@ -2514,7 +2831,11 @@ Events.On(
   "menu",
   mine<string>((action) => {
     const insert = action.match(/^insert:(.+)$/);
-    if (insert) return void (source && insertAction(source.view, insert[1]));
+    if (insert) {
+      const cmd = nvimDoc ? insertCommand(insert[1]) : null;
+      if (cmd) return void insertNvim(cmd);
+      return void (source && insertAction(source.view, insert[1]));
+    }
     void actions[action]?.();
   }),
 );
@@ -2524,6 +2845,8 @@ Events.On("settings", (ev: { data: Settings }) => {
   applyTheme(settings.theme);
   source?.setVim(settings.vim);
   source?.setSpellCheck(!settings.noSpellCheck);
+  void nvimSettings();
+  nvimFailed = false;
 });
 
 $("run-all").onclick = () => void actions.runall();

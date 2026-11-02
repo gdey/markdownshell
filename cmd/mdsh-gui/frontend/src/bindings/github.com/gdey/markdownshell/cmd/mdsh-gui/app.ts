@@ -16,6 +16,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "/wails
 import * as notebook$0 from "./notebook/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as nvim$0 from "./nvim/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as settings$0 from "./settings/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -249,6 +252,13 @@ export function Names(): $CancellablePromise<notebook$0.Names> {
 }
 
 /**
+ * Neovim says which nvim the source pane would run.
+ */
+export function Neovim(): $CancellablePromise<$models.NeovimInfo> {
+    return $Call.ByName("main.App.Neovim");
+}
+
+/**
  * NewFile asks where to make a new markdown file and opens it: in this
  * tab if it shows the start screen, else in a new tab. The file is a
  * copy of template, or a heading if template is "".
@@ -270,6 +280,85 @@ export function NewTab(): $CancellablePromise<void> {
  */
 export function NewWindow(): $CancellablePromise<void> {
     return $Call.ByName("main.App.NewWindow");
+}
+
+/**
+ * NvimApply gives Neovim text, Go's text merged with what was typed, as
+ * edits to the text Neovim last had, so typing elsewhere in the moment
+ * since isn't lost. If an edit's lines changed, the whole text is set.
+ */
+export function NvimApply(text: string, edits: nvim$0.Edit[] | null): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimApply", text, edits);
+}
+
+/**
+ * NvimCall calls fn in mdsh.lua with args, a JSON array, and returns its
+ * result as JSON: the cursor, setting the run buttons or folds, and so on.
+ */
+export function NvimCall(fn: string, args: string): $CancellablePromise<string> {
+    return $Call.ByName("main.App.NvimCall", fn, args);
+}
+
+/**
+ * NvimInput types keys, in Neovim's notation.
+ */
+export function NvimInput(keys: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimInput", keys);
+}
+
+/**
+ * NvimMouse passes on a mouse event at a grid cell.
+ */
+export function NvimMouse(button: string, action: string, mod: string, row: number, col: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimMouse", button, action, mod, row, col);
+}
+
+/**
+ * NvimPaste pastes text.
+ */
+export function NvimPaste(text: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimPaste", text);
+}
+
+/**
+ * NvimResize resizes the grid. Before Neovim runs there is nothing to
+ * resize: NvimStart takes the size.
+ */
+export function NvimResize(cols: number, rows: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimResize", cols, rows);
+}
+
+/**
+ * NvimSaved marks Neovim's buffer unchanged after a save.
+ */
+export function NvimSaved(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimSaved");
+}
+
+/**
+ * NvimSetText replaces Neovim's text, as after a run writes output and
+ * the page merged it with what was typed. Before Neovim runs there is
+ * nothing to do: NvimStart takes the text.
+ */
+export function NvimSetText(text: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimSetText", text);
+}
+
+/**
+ * NvimStart starts the tab's Neovim with a grid of cols by rows, editing
+ * the file's text, with 'background' set to "light" or "dark" to match
+ * the page. It returns the text Neovim started with, the base for
+ * SetText. A running one is left as it is.
+ */
+export function NvimStart(cols: number, rows: number, background: string): $CancellablePromise<string> {
+    return $Call.ByName("main.App.NvimStart", cols, rows, background);
+}
+
+/**
+ * NvimStop quits the tab's Neovim, as the source pane closes.
+ */
+export function NvimStop(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NvimStop");
 }
 
 /**
@@ -441,9 +530,9 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
 
 /**
  * SetSettings saves the settings the Settings window edits: autosave,
- * Vim mode, theme, shell, the view files open in, the start folder and
- * the templates folder. Open windows hear of it with a
- * "settings" event.
+ * Vim mode, spell checking, Neovim, theme, shell, the view files open
+ * in, the start folder and the templates folder. Open windows hear of
+ * it with a "settings" event.
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetSettings", s);

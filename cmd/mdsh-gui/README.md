@@ -119,7 +119,23 @@ Each file opens in a tab of its own, with its own shells.
   assets folder; for `out=image:`, the assets folder's),
   explains an attribute on hover and underlines mistakes. Vim key bindings are a
   setting; with them, `:w` saves and `:RunBlock` runs the block at the
-  cursor, as cmd/ctrl+enter does.
+  cursor, as cmd/ctrl+enter does. With them on, an experimental setting
+  makes the source pane a real Neovim (0.10 or newer, with your own
+  config unless you turn it off). It works as the built-in editor does:
+  `:w` saves, `:RunBlock` and `:RunSection` run what the cursor is in,
+  as cmd/ctrl+enter and cmd/ctrl+shift+enter do, and the ▶ in the sign
+  column runs a block or section. The pane attaches mdsh's language
+  server (`mdsh lsp`, run as `mdsh-gui --lsp`): typing in a fence's
+  `{…}` offers the same completions, there or through a completion
+  plugin such as nvim-cmp, `K` explains the attribute under the cursor,
+  and mistakes show as diagnostics. Spelling follows the setting, with
+  Neovim's `spell`. Headings, fences and output fold (`zc`, `zo`), as
+  the file's folds say when it opens; the cursor's cell is marked and
+  the panes scroll together; and the outline and a card's edit button
+  move the cursor. The Insert menu puts blocks in at the cursor; the
+  markdown bar is left out, as Vim has its own keys for that. It takes
+  the app's colors and follows the Theme; a setting keeps the
+  colorscheme from your config instead.
 - **Checkboxes, textboxes and choices:** task list items (`- [ ] label`)
   in the rendered view check and uncheck in the file when clicked, and
   so do table cells that start with `[ ]` or `- [ ]` (GitHub shows
@@ -409,6 +425,12 @@ frontend calls, regenerate the bindings and the bundle (no npm needed):
 ```sh
 go generate
 ```
+
+The Neovim source pane is `nvim --embed` with the `ext_linegrid` UI:
+`nvim/` runs it and keeps its buffer in step with the notebook, and
+`frontend/src/nvim.ts` draws the grid on a canvas. Its tests run a real
+Neovim, from `$MDSH_TEST_NVIM` or found as the app would, and skip
+without one.
 
 The code editor is CodeMirror 6 with Vim bindings, vendored as one
 bundle in `frontend/vendor/codemirror.js`. `go run ./internal/vendorjs`
