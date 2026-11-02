@@ -98,6 +98,7 @@ github.com/gdey/markdownshell/tape
 github.com/gdey/markdownshell/termrec
 github.com/gdey/markdownshell/termsafe
 github.com/gdey/markdownshell/textimg
+github.com/gdey/markdownshell/ui
 github.com/gdey/markdownshell/web
 github.com/gdey/markdownshell/weblink
 github.com/gdey/markdownshell/writable

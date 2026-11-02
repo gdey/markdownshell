@@ -2,7 +2,7 @@ import { App, type Settings, message } from "./api.js";
 import { $, el } from "./dom.js";
 import { applyTheme } from "./theme.js";
 import { Events } from "/wails/runtime.js";
-import type { About, CLI, Tool } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/models.js";
+import type { About, CLI, Tool } from "./bindings/github.com/gdey/markdownshell/ui/models.js";
 
 let s: Settings = await App.Settings();
 let zsh = await App.ZshWrapperState().catch(() => null);
