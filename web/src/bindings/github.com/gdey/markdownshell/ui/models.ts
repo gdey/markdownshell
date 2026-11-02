@@ -3,13 +3,13 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as collection$0 from "../../collection/models.js";
+import * as collection$0 from "../collection/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as library$0 from "../../library/models.js";
+import * as library$0 from "../library/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as notebook$0 from "../../notebook/models.js";
+import * as notebook$0 from "../notebook/models.js";
 
 /**
  * About is what the Settings window's About tab shows.
@@ -233,7 +233,7 @@ export interface Tabs {
 }
 
 /**
- * Tool is a program mdsh-gui uses, and whether it was found on PATH.
+ * Tool is a program the notebook uses, and whether it was found on PATH.
  */
 export interface Tool {
     "name": string;

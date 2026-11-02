@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"net/http"
@@ -15,14 +15,10 @@ import (
 // their own policy in a meta tag.
 const docCSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
 
-// assets serves the frontend, the app icon, and at notebook.DocPrefix the
+// assets serves the frontend, and at notebook.DocPrefix the
 // files beside the open documents, such as the images their blocks write.
 func (a *App) assets(pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/appicon.svg" {
-			http.ServeFileFS(w, r, appicon, "build/appicon.svg")
-			return
-		}
 		if path, ok := strings.CutPrefix(r.URL.Path, notebook.DocPrefix+"/"); ok {
 			a.serveDocFile(w, r, filepath.FromSlash("/"+path))
 			return

@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"bytes"
@@ -14,8 +14,8 @@ import (
 
 func TestConsoleHandler(t *testing.T) {
 	var out bytes.Buffer
-	c := newConsole()
-	log := slog.New(newConsoleHandler(slog.NewTextHandler(&out, &slog.HandlerOptions{Level: slog.LevelWarn}), c))
+	c := NewConsole()
+	log := slog.New(NewConsoleHandler(slog.NewTextHandler(&out, &slog.HandlerOptions{Level: slog.LevelWarn}), c))
 
 	log.Debug("too quiet")
 	log.Info("[AssetFileServerFS] Handling request", "url", "/style.css")
@@ -46,8 +46,8 @@ func TestConsoleHandler(t *testing.T) {
 // A "file" and a "line" say where an entry is about, rather than
 // being part of its text.
 func TestConsoleWhere(t *testing.T) {
-	c := newConsole()
-	log := slog.New(newConsoleHandler(slog.NewTextHandler(io.Discard, nil), c))
+	c := NewConsole()
+	log := slog.New(NewConsoleHandler(slog.NewTextHandler(io.Discard, nil), c))
 
 	log.Warn("block a: depends= names unknown block", "file", "/x/a.md", "line", 3, "id", "a")
 	log.With("file", "/x/b.md").Warn("near", "line", uint(7))
@@ -74,7 +74,7 @@ func TestConsoleWhere(t *testing.T) {
 }
 
 func TestConsoleKeepsTheLast(t *testing.T) {
-	c := newConsole()
+	c := NewConsole()
 	for i := range consoleMax + 5 {
 		c.add(ConsoleEntry{Time: time.Now(), Level: "info", Message: fmt.Sprint(i)})
 	}
@@ -92,15 +92,15 @@ func TestConsoleKeepsTheLast(t *testing.T) {
 }
 
 func TestConsoleSend(t *testing.T) {
-	c := newConsole()
+	c := NewConsole()
 	ctx, cancel := context.WithCancel(context.Background())
 	got := make(chan ConsoleEntry, 1)
 	done := make(chan struct{})
 	go func() {
-		c.send(ctx, func(e ConsoleEntry) { got <- e })
+		c.Send(ctx, func(e ConsoleEntry) { got <- e })
 		close(done)
 	}()
-	slog.New(newConsoleHandler(slog.DiscardHandler, c)).Error("boom", "err", errors.New("bad depends"))
+	slog.New(NewConsoleHandler(slog.DiscardHandler, c)).Error("boom", "err", errors.New("bad depends"))
 	select {
 	case e := <-got:
 		if e.Message != `boom err="bad depends"` || e.Level != "error" {

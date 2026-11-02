@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 // The console keeps what the app logs, errors from calls the frontend
 // makes included, for View › Console to show. Everything logged through
-// the Wails logger or slog's default logger at info or above lands here,
+// the host's logger or slog's default logger at info or above lands here,
 // as well as wherever it went before (the terminal, in a dev build).
 //
 // To report something to the console, log it with slog:
@@ -36,8 +36,8 @@ type ConsoleEntry struct {
 // consoleMax is how many entries the console keeps; older ones go.
 const consoleMax = 1000
 
-// console is the log the Console pane shows.
-type console struct {
+// Console is the log the Console pane shows.
+type Console struct {
 	mu      sync.Mutex
 	entries []ConsoleEntry
 	seq     int
@@ -47,12 +47,14 @@ type console struct {
 	out chan ConsoleEntry
 }
 
-func newConsole() *console {
-	return &console{out: make(chan ConsoleEntry, 256)}
+// NewConsole makes an empty console. Log to it through a handler from
+// NewConsoleHandler, and have Send take what it gets to the windows.
+func NewConsole() *Console {
+	return &Console{out: make(chan ConsoleEntry, 256)}
 }
 
 // add adds e, numbering it.
-func (c *console) add(e ConsoleEntry) ConsoleEntry {
+func (c *Console) add(e ConsoleEntry) ConsoleEntry {
 	c.mu.Lock()
 	c.seq++
 	e.Seq = c.seq
@@ -70,21 +72,21 @@ func (c *console) add(e ConsoleEntry) ConsoleEntry {
 }
 
 // list returns the entries kept.
-func (c *console) list() []ConsoleEntry {
+func (c *Console) list() []ConsoleEntry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]ConsoleEntry(nil), c.entries...)
 }
 
 // clear forgets the entries. Seq keeps counting.
-func (c *console) clear() {
+func (c *Console) clear() {
 	c.mu.Lock()
 	c.entries = nil
 	c.mu.Unlock()
 }
 
-// send calls emit for each new entry, until the app ends.
-func (c *console) send(ctx context.Context, emit func(ConsoleEntry)) {
+// Send calls emit for each new entry, until the app ends.
+func (c *Console) Send(ctx context.Context, emit func(ConsoleEntry)) {
 	for {
 		select {
 		case e := <-c.out:
@@ -111,7 +113,7 @@ func levelName(l slog.Level) string {
 // to a console, and hands every record to next as well.
 type consoleHandler struct {
 	next   slog.Handler
-	c      *console
+	c      *Console
 	prefix string // the attributes and groups from WithAttrs and WithGroup, formatted
 	group  string // the open group, as "a.b." for keys
 	where  where  // the file and line from WithAttrs
@@ -149,7 +151,9 @@ func (w *where) take(group string, a slog.Attr) bool {
 	return false
 }
 
-func newConsoleHandler(next slog.Handler, c *console) *consoleHandler {
+// NewConsoleHandler is a handler that adds what is logged at info or
+// above to c and passes everything on to next.
+func NewConsoleHandler(next slog.Handler, c *Console) slog.Handler {
 	return &consoleHandler{next: next, c: c}
 }
 
@@ -250,5 +254,5 @@ func (a *App) Console() []ConsoleEntry {
 // ClearConsole empties the console, in every window.
 func (a *App) ClearConsole() {
 	a.console.clear()
-	a.app.Event.Emit("console-cleared")
+	a.host.EmitAll("console-cleared", nil)
 }

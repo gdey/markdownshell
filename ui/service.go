@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"context"
@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/library"
@@ -385,13 +383,13 @@ func (a *App) saveAs(t *docTab, n *notebook.Notebook, message string) (bool, err
 	if w == nil {
 		return false, errNoFile
 	}
-	file, err := a.app.Dialog.SaveFile().
-		SetMessage(message).
-		SetDirectory(filepath.Dir(n.File())).
-		SetFilename(filepath.Base(n.File())).
-		AddFilter("Markdown", "*.md;*.markdown").
-		AttachToWindow(w.win).
-		PromptForSingleSelection()
+	file, err := a.host.SaveFile(w.win, SaveFile{
+		Message: message,
+		Dir:     filepath.Dir(n.File()),
+		Name:    filepath.Base(n.File()),
+		Filter:  "Markdown",
+		Pattern: "*.md;*.markdown",
+	})
 	if err != nil || file == "" {
 		return false, err
 	}
@@ -567,7 +565,7 @@ func (a *App) Settings() settings.Settings { return a.settings.Get() }
 func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) { edited(cur, s) })
 	if err == nil {
-		a.app.Event.Emit("settings", a.settings.Get())
+		a.host.EmitAll("settings", a.settings.Get())
 	}
 	return err
 }
@@ -654,16 +652,7 @@ func (a *App) ChooseFolder(ctx context.Context, title, dir string) (string, erro
 	if dir == "" {
 		dir = a.startDir()
 	}
-	d := a.app.Dialog.OpenFile().
-		CanChooseDirectories(true).
-		CanChooseFiles(false).
-		CanCreateDirectories(true).
-		SetTitle(title).
-		SetDirectory(dir)
-	if w, ok := ctx.Value(application.WindowKey).(application.Window); ok {
-		d.AttachToWindow(w)
-	}
-	return d.PromptForSingleSelection()
+	return a.host.ChooseFolder(ctx, title, dir)
 }
 
 // ChooseFile asks for a markdown file, with title, starting in dir or
@@ -672,15 +661,7 @@ func (a *App) ChooseFile(ctx context.Context, title, dir string) (string, error)
 	if dir == "" {
 		dir = a.startDir()
 	}
-	d := a.app.Dialog.OpenFile().
-		CanChooseFiles(true).
-		SetTitle(title).
-		SetDirectory(dir).
-		AddFilter("Markdown", "*.md;*.markdown")
-	if w, ok := ctx.Value(application.WindowKey).(application.Window); ok {
-		d.AttachToWindow(w)
-	}
-	return d.PromptForSingleSelection()
+	return a.host.ChooseFile(ctx, title, dir)
 }
 
 // NewWindow opens a window with the start screen.
@@ -904,7 +885,7 @@ func (a *App) SetView(ctx context.Context, v View) {
 	t.view = v
 	t.mu.Unlock()
 	if a.currentTab() == t {
-		a.showView(v)
+		a.host.ShowView(v)
 	}
 }
 
@@ -942,13 +923,13 @@ func (a *App) ChooseReport(ctx context.Context, format report.Format, dest strin
 		return "", errNoFile
 	}
 	name := map[report.Format]string{report.PDF: "PDF", report.HTML: "HTML", report.Markdown: "Markdown"}[format]
-	return a.app.Dialog.SaveFile().
-		SetMessage("Save the report").
-		SetDirectory(filepath.Dir(dest)).
-		SetFilename(filepath.Base(dest)).
-		AddFilter(name, "*"+format.Ext()).
-		AttachToWindow(w.win).
-		PromptForSingleSelection()
+	return a.host.SaveFile(w.win, SaveFile{
+		Message: "Save the report",
+		Dir:     filepath.Dir(dest),
+		Name:    filepath.Base(dest),
+		Filter:  name,
+		Pattern: "*" + format.Ext(),
+	})
 }
 
 // ReportCommand is the mdsh command that makes the report r describes.
@@ -972,7 +953,7 @@ func (a *App) CreateReport(ctx context.Context, r notebook.Report) error {
 
 // Reveal shows file in the file manager.
 func (a *App) Reveal(file string) error {
-	return a.app.Env.OpenFileManager(file, true)
+	return a.host.Reveal(file)
 }
 
 // Type sends keys typed in the terminal pane to the tty block running in
@@ -1041,7 +1022,7 @@ func (a *App) DragTab(id int) error {
 	a.mu.Lock()
 	a.dragging = t
 	a.mu.Unlock()
-	a.app.Event.Emit("tab-drag", true)
+	a.host.EmitAll("tab-drag", true)
 	return nil
 }
 
@@ -1056,7 +1037,7 @@ func (a *App) DropTab(ctx context.Context, i int) error {
 	t := a.dragging
 	a.dragging = nil
 	a.mu.Unlock()
-	a.app.Event.Emit("tab-drag", false)
+	a.host.EmitAll("tab-drag", false)
 	if t != nil {
 		a.moveTab(t, w, i)
 		w.win.Focus()
@@ -1078,7 +1059,7 @@ func (a *App) EndDrag(id int, outside bool, x, y int) error {
 	w := a.tabWindow[t]
 	alone := w != nil && len(w.tabs) == 1
 	a.mu.Unlock()
-	a.app.Event.Emit("tab-drag", false)
+	a.host.EmitAll("tab-drag", false)
 	if dropped || !outside || alone {
 		return nil
 	}
@@ -1096,7 +1077,7 @@ func (a *App) DetachTab(x, y int) error {
 	w := a.tabWindow[t]
 	alone := w == nil || len(w.tabs) == 1
 	a.mu.Unlock()
-	a.app.Event.Emit("tab-drag", false)
+	a.host.EmitAll("tab-drag", false)
 	if t != nil && !alone {
 		a.detach(t, x, y)
 	}
@@ -1106,7 +1087,7 @@ func (a *App) DetachTab(x, y int) error {
 // detach moves t to a new window with its tab bar at x, y.
 func (a *App) detach(t *docTab, x, y int) {
 	nw := a.newWindow(t)
-	nw.win.SetPosition(max(0, x-120), max(0, y-16))
+	nw.win.MoveTo(max(0, x-120), max(0, y-16))
 	nw.win.Focus()
 }
 

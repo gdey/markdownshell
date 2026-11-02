@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"context"
@@ -13,11 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
-	"time"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/run"
@@ -25,27 +20,27 @@ import (
 )
 
 // App is the service the frontend calls. A call from a tab's page acts on
-// that tab; one from a window's tab bar, on that window.
+// that tab; one from a window's tab bar, on that window. Its exported
+// methods are all calls the frontend makes; the Host drives it through
+// its Control.
 type App struct {
-	app      *application.App
+	host     Host
 	settings *settings.Store
-	cwd      string // the folder mdsh-gui started in
+	cwd      string // the folder the program started in
 	dir      string // the folder given on the command line, if any
 	source   string // the files given to --source, read at startup
-	console  *console
-
-	menu       *application.Menu
-	viewItems  struct{ split, rendered, outline, history, console, code, output *application.MenuItem }
-	recentMenu *application.Menu
+	console  *Console
+	build    Build // the program's, for the About tab
+	// lsp is the command that runs the language server for a file, for
+	// the Neovim source pane, or nil for none.
+	lsp func(file string) []string
 
 	mu        sync.Mutex
 	windows   map[uint]*docWindow
 	tabs      map[int]*docTab
 	tabWindow map[*docTab]*docWindow
-	named     int // windows made so far, for unique names
 	lastTab   int // the last tab id handed out
 	dragging  *docTab
-	prefs     *application.WebviewWindow
 	quitting  bool
 	// startImages are the collection icons and backgrounds the start
 	// screen shows, by real path, which the window may load.
@@ -53,8 +48,24 @@ type App struct {
 	// startFolders are the folders the start screen lists, by rel, with
 	// their absolute paths, which the folder settings may edit.
 	startFolders map[string]string
+}
 
-	started atomic.Bool // the app is running, so menus change on its main thread
+// New makes an App showing its windows with host and keeping its
+// settings in store. cwd is the folder the program started in and dir
+// the folder named on the command line, if any. source is what the
+// files given to --source hold, for every shell to source.
+func New(host Host, store *settings.Store, cwd, dir, source string) *App {
+	return &App{
+		host:      host,
+		settings:  store,
+		cwd:       cwd,
+		dir:       dir,
+		source:    source,
+		windows:   map[uint]*docWindow{},
+		tabs:      map[int]*docTab{},
+		tabWindow: map[*docTab]*docWindow{},
+		console:   NewConsole(),
+	}
 }
 
 // runOptions are the options a file opens with: the shell and History
@@ -73,8 +84,9 @@ type tabKey struct{}
 
 const tabHeader = "x-mdsh-tab"
 
-// tabCalls notes the tab each call from a tab's page came from.
-func tabCalls(next http.Handler) http.Handler {
+// TabCalls notes the tab each call from a tab's page came from, for the
+// calls that act on a tab.
+func TabCalls(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if id, err := strconv.Atoi(r.Header.Get(tabHeader)); err == nil {
 			r = r.WithContext(context.WithValue(r.Context(), tabKey{}, id))
@@ -86,43 +98,15 @@ func tabCalls(next http.Handler) http.Handler {
 // newWindow opens a window holding t, or a new tab showing the start
 // screen if t is nil.
 func (a *App) newWindow(t *docTab) *docWindow {
-	a.mu.Lock()
-	a.named++
-	name := fmt.Sprintf("doc-%d", a.named)
-	a.mu.Unlock()
 	file := ""
 	if t != nil {
 		file = t.file()
 	}
-	areas := a.workAreas()
-	p, move := a.placeFor(file, areas)
-	opts := application.WebviewWindowOptions{
-		Name:           name,
-		Title:          "mdsh",
-		Width:          p.Width,
-		Height:         p.Height,
-		MinWidth:       480,
-		MinHeight:      360,
-		URL:            "/window.html",
-		EnableFileDrop: true,
-	}
-	if move && keepPlace && len(areas) > 0 {
-		opts.InitialPosition = application.WindowXY
-		opts.X, opts.Y = p.X, p.Y
-	}
-	opts.Linux.Menu = a.menu
 	w := &docWindow{app: a}
-	w.win = a.app.Window.NewWithOptions(opts)
-	switch {
-	case move:
-		a.settle(w.win, p)
-	case len(areas) == 0:
-		a.shrinkToFit(w.win)
-	}
+	w.win = a.host.NewWindow(file)
 	a.mu.Lock()
 	a.windows[w.win.ID()] = w
 	a.mu.Unlock()
-	w.hook()
 	if t == nil {
 		t = a.newTab()
 	}
@@ -208,7 +192,7 @@ func (a *App) showTabView(t *docTab) {
 	t.mu.Lock()
 	v := t.view
 	t.mu.Unlock()
-	a.showView(v)
+	a.host.ShowView(v)
 }
 
 // closeTab closes t, asking first if it has unsaved output. Its window
@@ -260,13 +244,13 @@ func (a *App) removeWindow(w *docWindow) {
 
 // window is the window a frontend call came from.
 func (a *App) window(ctx context.Context) (*docWindow, error) {
-	win, ok := ctx.Value(application.WindowKey).(application.Window)
+	id, ok := a.host.WindowOf(ctx)
 	if !ok {
 		return nil, errors.New("the call came from no window")
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	w := a.windows[win.ID()]
+	w := a.windows[id]
 	if w == nil {
 		return nil, errors.New("the call came from a window with no document")
 	}
@@ -310,11 +294,11 @@ func (a *App) notebook(ctx context.Context) (*docTab, *notebook.Notebook, error)
 
 // current is the document window in front, for menu commands, or nil.
 func (a *App) current() *docWindow {
-	win := a.app.Window.Current()
+	id, ok := a.host.Current()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if win != nil {
-		if w := a.windows[win.ID()]; w != nil {
+	if ok {
+		if w := a.windows[id]; w != nil {
 			return w
 		}
 	}
@@ -387,7 +371,7 @@ func (a *App) openIn(w *docWindow, file string) error {
 			alone := len(w.tabs) == 1
 			a.mu.Unlock()
 			if alone {
-				a.resizeTo(w.win, abs)
+				w.win.Fit(abs)
 			}
 			return nil
 		}
@@ -414,18 +398,9 @@ func (a *App) openIn(w *docWindow, file string) error {
 // opened records file in Open Recent.
 func (a *App) opened(file string) {
 	if err := a.settings.Update(func(s *settings.Settings) { s.Opened(file) }); err != nil {
-		a.app.Logger.Warn("saving settings", "err", err)
+		slog.Warn("saving settings", "err", err)
 	}
-	a.fillRecent()
-}
-
-func (a *App) showError(win application.Window, err error) {
-	slog.Error(err.Error())
-	d := a.app.Dialog.Error().SetTitle("mdsh").SetMessage(err.Error())
-	if win != nil {
-		d.AttachToWindow(win)
-	}
-	d.Show()
+	a.host.RecentChanged()
 }
 
 // shouldQuit asks before quitting with unsaved output in any window.
@@ -442,50 +417,42 @@ func (a *App) shouldQuit() bool {
 	if quitting || len(dirty) == 0 {
 		return true
 	}
-	go func() {
-		d := a.app.Dialog.Question().
-			SetTitle("Unsaved output").
-			SetMessage("These files have output that isn't saved: " + strings.Join(dirty, ", ") + ". Quit anyway?")
-		quit := d.AddButton("Quit")
-		quit.OnClick(func() {
-			a.mu.Lock()
-			a.quitting = true
-			a.mu.Unlock()
-			a.app.Quit()
-		})
-		d.SetCancelButton(d.AddButton("Cancel"))
-		d.Show()
-	}()
+	go a.host.Ask(nil, Question{
+		Title:   "Unsaved output",
+		Message: "These files have output that isn't saved: " + strings.Join(dirty, ", ") + ". Quit anyway?",
+		Buttons: []Button{
+			{Label: "Quit", Do: func() {
+				a.mu.Lock()
+				a.quitting = true
+				a.mu.Unlock()
+				a.host.Quit()
+			}},
+			{Label: "Cancel", Cancel: true},
+		},
+	})
 	return false
 }
 
 // openDialog asks for markdown files, starting in the start folder.
-func (a *App) openDialog(win application.Window) ([]string, error) {
-	d := a.app.Dialog.OpenFile().
-		SetTitle("Open a markdown file").
-		AddFilter("Markdown", "*.md;*.markdown").
-		SetDirectory(a.startDir())
-	if win != nil {
-		d.AttachToWindow(win)
-	}
-	return d.PromptForMultipleSelection()
+func (a *App) openDialog(win Window) ([]string, error) {
+	return a.host.OpenFiles(win, a.startDir())
 }
 
 // openFromMenu runs File › Open… for the window in front.
 func (a *App) openFromMenu() {
 	w := a.current()
-	var win application.Window
+	var win Window
 	if w != nil {
 		win = w.win
 	}
 	files, err := a.openDialog(win)
 	if err != nil {
-		a.showError(win, err)
+		a.host.ShowError(win, err)
 		return
 	}
 	for _, f := range files {
 		if err := a.openIn(w, f); err != nil {
-			a.showError(win, err)
+			a.host.ShowError(win, err)
 		}
 	}
 }
@@ -500,63 +467,4 @@ func (a *App) startDir() string {
 		docs = filepath.Join(home, "Documents")
 	}
 	return a.settings.Get().StartDir(a.cwd, home, docs)
-}
-
-// openSettings shows the settings window, making it the first time.
-func (a *App) openSettings() { a.openSettingsTab("") }
-
-// openSettingsTab shows the settings window at one of its tabs, such
-// as "about", or at the tab it was on (General when new) for "".
-func (a *App) openSettingsTab(tab string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.prefs != nil {
-		if tab != "" {
-			a.prefs.EmitEvent("settings-tab", tab)
-		}
-		a.prefs.Show()
-		a.prefs.Focus()
-		return
-	}
-	width, height := a.settingsSize()
-	opts := application.WebviewWindowOptions{
-		Name:      "settings",
-		Title:     "Settings",
-		Width:     width,
-		Height:    height,
-		MinWidth:  560,
-		MinHeight: 440,
-		URL:       settingsURL(tab),
-	}
-	win := a.app.Window.NewWithOptions(opts)
-	a.prefs = win
-	if a.settings.Get().SettingsWindow != nil {
-		resize(win, width, height)
-	}
-	var timer *time.Timer
-	win.OnWindowEvent(events.Common.WindowDidResize, func(*application.WindowEvent) {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		if timer != nil {
-			timer.Stop()
-		}
-		timer = time.AfterFunc(placeDelay, func() { a.saveSettingsSize(win) })
-	})
-	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
-		a.mu.Lock()
-		if timer != nil {
-			timer.Stop()
-		}
-		a.prefs = nil
-		a.mu.Unlock()
-		a.saveSettingsSize(win)
-	})
-}
-
-// settingsURL is the settings page, opening at tab when it isn't "".
-func settingsURL(tab string) string {
-	if tab == "" {
-		return "/settings.html"
-	}
-	return "/settings.html#" + tab
 }

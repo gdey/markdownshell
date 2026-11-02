@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"os"
@@ -43,14 +43,14 @@ func cssProps(t *testing.T, file string) map[string]map[string]bool {
 // landmark, has to undo it, or it shrinks to the rule's padding: the
 // window's #frames did, and every tab's page with it.
 func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
-	props := cssProps(t, "../../web/style.css")
+	props := cssProps(t, "../web/style.css")
 	for _, p := range []string{"max-width", "margin", "padding"} {
 		if !props["main"][p] {
 			t.Fatalf("style.css main rule does not set %s; is the parse right?", p)
 		}
 	}
 	for _, page := range []string{"index.html", "window.html", "settings.html"} {
-		src, err := os.ReadFile("../../web/" + page)
+		src, err := os.ReadFile("../web/" + page)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +83,7 @@ func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
 func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
 	layout := []string{"display", "width", "min-width", "max-width", "padding", "padding-left", "padding-right", "margin", "margin-left", "margin-right", "border", "border-width", "gap", "font-size", "flex", "order", "position"}
 	for _, file := range []string{"style.css", "blueprint.css", "teletype.css"} {
-		for sel, props := range cssProps(t, "../../web/"+file) {
+		for sel, props := range cssProps(t, "../web/"+file) {
 			if !strings.Contains(sel, ".selected") || !strings.Contains(sel, ".block") || !strings.Contains(sel, ".head") {
 				continue
 			}

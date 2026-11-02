@@ -1,11 +1,10 @@
-package main
+package ui
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/gdey/markdownshell/nvim"
@@ -59,10 +58,10 @@ func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) 
 	if err != nil {
 		return "", err
 	}
-	// The language server is this program, run with --lsp.
+	// The language server is the one the host names, if any.
 	var lspCmd []string
-	if exe, err := os.Executable(); err == nil {
-		lspCmd = []string{exe, "--lsp", n.File()}
+	if a.lsp != nil {
+		lspCmd = a.lsp(n.File())
 	}
 	var e *nvim.Editor
 	e, err = nvim.Start(nvim.Options{
@@ -233,16 +232,17 @@ func (t *docTab) stopNvim() {
 // page that catches up on a run.
 func (t *docTab) emitNow(name string, data any) {
 	if w := t.window(); w != nil {
-		w.win.EmitEvent(name, tabEvent{t.id, data})
+		w.win.Emit(name, tabEvent{t.id, data})
 	}
 }
 
-// nvimEdit does the Neovim pane's right-click Cut, Copy or Paste in the
-// current tab. They act on Neovim's selection: the page, which only
-// draws Neovim's grid, has none for the usual edit commands. Paste in
-// visual mode replaces the selection, as Neovim's own paste does.
-func (a *App) nvimEdit(op string) {
-	t := a.currentTab()
+// NvimEdit does the Neovim pane's right-click Cut, Copy or Paste in the
+// current tab, with the clipboard's get and set. They act on Neovim's
+// selection: the page, which only draws Neovim's grid, has none for the
+// usual edit commands. Paste in visual mode replaces the selection, as
+// Neovim's own paste does.
+func (c Control) NvimEdit(op string, get func() (string, bool), set func(string) bool) {
+	t := c.a.currentTab()
 	if t == nil {
 		return
 	}
@@ -252,7 +252,7 @@ func (a *App) nvimEdit(op string) {
 	if e == nil {
 		return
 	}
-	if err := nvimEdit(e, op, a.app.Clipboard.Text, a.app.Clipboard.SetText); err != nil {
+	if err := nvimEdit(e, op, get, set); err != nil {
 		slog.Error("Neovim "+op+": "+err.Error(), "file", t.file())
 	}
 }
