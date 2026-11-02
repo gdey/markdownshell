@@ -19,6 +19,7 @@
   --link: #ffd75e;
   --ok: #8ff0b4;
   --bad: #ffc9c0;
+  --bad-fg: #1d5ba3;
   --control: #e2c6ff;
   --warn-bg: #4f5a3a;
   --warn-border: #ffd75e;
@@ -73,6 +74,7 @@
   --link: #ffd75e;
   --ok: #7ee2a8;
   --bad: #ff8a80;
+  --bad-fg: #0b1e3b;
   --control: #c9a8ff;
   --warn-bg: #2e2f1c;
   --warn-border: #c9a63a;

@@ -303,6 +303,11 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh-gui`: the Teletype and Blueprint looks' muted text, card
   borders and failure red are a little stronger, so they meet the
   WCAG AA contrast ratios (4.5:1 for text, 3:1 for borders).
+- `mdsh-gui`: in the dark theme, text on the accent buttons (Run all,
+  Save, Apply) and on the red Delete button is dark instead of white,
+  so it reads at the WCAG AA ratio; white on the dark blue and red was
+  under 4.5:1. A custom accent gets black or white text by its
+  luminance, so the Green and Amber presets get black text too.
 - `mdsh-gui`: blocks the History pane adds (`#history-N`) are scratch
   work, so their trash buttons, on the block and on its output, always
   show, and deleting one doesn't ask first; the bar's Undo brings it
