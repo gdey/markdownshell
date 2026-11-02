@@ -6,7 +6,7 @@ import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
-import { $, announce, el, iconButton, icons, keyActivates, scrollBehavior, svg } from "./dom.js";
+import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBehavior, setOutput, svg } from "./dom.js";
 import { folderGear, initFolders } from "./folders.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
@@ -505,6 +505,7 @@ function drawBlock(c: Cell): HTMLElement {
   );
   if (c.movable) block.querySelector(".output-part")!.append(clearOutputButton(c));
   colorOutput(block.querySelector(".output")!);
+  markOutput(block.querySelector<HTMLElement>(".output")!);
   block.dataset.foldCode = c.collapsed ? "1" : "";
   block.dataset.foldOutput = c.collapsedOutput ? "1" : "";
   // The card is a tab stop, named for the block and its state, so the
@@ -2960,7 +2961,7 @@ function onBlock(e: BlockEvent) {
   if (e.kind === "terminal-end" && historyEnd(e.block)) return;
   const block = document.getElementById("block-" + e.block);
   if (!block) return;
-  const out = block.querySelector(".output")!;
+  const out = block.querySelector<HTMLElement>(".output")!;
   switch (e.kind) {
     case "background":
       // The block runs on while others do; done comes when it ends.
@@ -2968,13 +2969,13 @@ function onBlock(e: BlockEvent) {
       block.classList.remove("ran", "failed");
       block.classList.add("background");
       block.querySelector(".exit")!.textContent = backgroundNote;
-      out.replaceChildren();
+      setOutput(out);
       break;
     case "started":
       for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
       block.classList.add("now");
       block.querySelector<HTMLElement>(".ask")!.hidden = true;
-      out.replaceChildren(el("pre", { className: "live" }));
+      setOutput(out, el("pre", { className: "live" }));
       follow(block);
       break;
     case "stdout":

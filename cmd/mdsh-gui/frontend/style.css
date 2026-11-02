@@ -275,7 +275,7 @@ button.fold svg, #outline .mark.fold svg { width: 12px; height: 12px; fill: curr
 .block .code-part > .fold-summary { background: var(--code-bg); }
 .block .part.folded > button.fold { top: 6px; }
 .block .output-part { border-top: 1px solid var(--border); }
-.block .output-part:has(> .output:empty) { display: none; }
+.block .output-part.empty { display: none; }
 #outline .mark.fold { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .heading-cell { position: relative; }
 /* In the margin, where the lines run, the page's color under the

@@ -430,6 +430,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `mdsh-gui` on Linux: a running block's output shows in its card as it
+  comes in. Before, WebKitGTK kept the card's output area hidden until
+  the run ended or stopped at a question, then showed it all at once.
 - `mdsh-gui`: one click on a block's play button runs it, even when the
   block is not selected. Before, the click selected the block, which
   showed its delete button and slid the play button out from under the
