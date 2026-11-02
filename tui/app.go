@@ -285,6 +285,7 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.quit(t)
 	}
 	if t.doc != nil {
+		t.doc.tabs = len(a.tabs)
 		_, cmd := t.doc.Update(msg)
 		return a, a.wrap(t, cmd)
 	}

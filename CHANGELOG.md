@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh -i`: `?` opens a panel of the keys, grouped, each with what it
+  does. Keys that do nothing now, such as `u` with no move to undo or
+  `s` on a block under no heading, are greyed with the reason. ↑/↓
+  pick one and enter does it; esc closes the panel.
 - `mdsh-gui`: a Blueprint look in Settings › Look: white lines on
   blueprint blue over a drafting grid, with lettered headings and
   outlined cards, or a deeper night blue when the theme is dark. The

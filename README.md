@@ -262,6 +262,7 @@ its output.
 | ctrl+t | open a new tab with the list of files; picking a file already open in a tab goes to that tab |
 | `]` / `[` | the next or previous tab. The tab bar marks a file with • when its output isn't saved, … while a block runs and ? while one waits for an answer. Blocks go on running in the tabs behind |
 | ctrl+w | close the tab (esc on the list of files closes its tab). Quitting stops at a tab with output not saved first |
+| `?` | the keys, each with what it does. Keys that do nothing now, such as `u` with no move to undo, are greyed with the reason. ↑/↓ pick one and enter does it; esc closes |
 
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` honors both. `confirm` blocks, and every block
