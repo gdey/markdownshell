@@ -199,6 +199,11 @@ export async function showHistory(on: boolean, docHas: boolean) {
   input().focus();
 }
 
+// focusHistory puts the keyboard in the pane's input, if it is open.
+export function focusHistory() {
+  if (!$("history").hidden && !$("history").classList.contains("closed")) input().focus();
+}
+
 // updatePrompt asks the shell for its prompts, PS1 and PS2, and shows
 // PS1 before the input: all its lines but the last above it. A shell
 // with none gets a $. While a block runs the prompt stays as it was.

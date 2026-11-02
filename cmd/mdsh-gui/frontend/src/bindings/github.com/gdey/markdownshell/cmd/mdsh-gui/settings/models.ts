@@ -137,6 +137,18 @@ export interface Settings {
     "templateFolder": string;
 
     /**
+     * SessionFolder is where New Session makes a file for the day and
+     * Last Session finds the latest. Empty is ~/.mdsh/sessions.
+     */
+    "sessionFolder": string;
+
+    /**
+     * SessionTemplate is a markdown file a new session starts as a copy
+     * of. Empty starts it with a heading for the date.
+     */
+    "sessionTemplate": string;
+
+    /**
      * LastFolder is the folder of the file opened last.
      */
     "lastFolder": string;

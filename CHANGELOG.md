@@ -25,6 +25,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui: **New Session** and **Last Session** on the start screen.
+  New Session opens a file named for the day, such as `2026-11-02.md`,
+  in a sessions folder (`~/.mdsh/sessions` by default), making it from
+  a session template the first time; Last Session opens the session
+  changed last. Both open with the History pane open and focused. The
+  folder and template are in Settings › Files.
 - `mdsh -i`: a **History** pane, as in mdsh-gui: `h` opens a terminal
   along the bottom of the screen. A command typed there runs in the
   file's shell, on a terminal, and is added to the end of the file as a

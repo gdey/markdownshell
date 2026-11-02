@@ -27,10 +27,13 @@ type docTab struct {
 	closing bool               // the user chose to close it
 	warned  bool               // file-changed was sent for the file on disk
 	fresh   bool               // a file opened and its page hasn't asked about it
-	view    View               // what the tab shows, for the View menu
-	running bool               // a run started from the tab hasn't returned
-	live    []liveEvent        // what the running run has sent so far
-	nvim    *nvim.Editor       // the source pane's Neovim, if running
+	// openHistory is set when a session opened in the tab and its page
+	// hasn't asked about it.
+	openHistory bool
+	view        View         // what the tab shows, for the View menu
+	running     bool         // a run started from the tab hasn't returned
+	live        []liveEvent  // what the running run has sent so far
+	nvim        *nvim.Editor // the source pane's Neovim, if running
 }
 
 // liveEvent is an event sent while a run is going, kept so a tab drawn

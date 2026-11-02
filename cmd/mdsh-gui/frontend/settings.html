@@ -239,6 +239,28 @@
         <button id="choose-templates">Choose…</button>
         <button id="clear-templates">Clear</button>
       </div>
+      <div class="setting">
+        <div class="text">
+          <label for="session-folder">Sessions folder</label>
+          <p class="muted">New Session on the start screen opens the day's file here, such as 2026-11-02.md, making it the first time. Last Session opens the file here changed last. Both open with History.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="session-folder" type="text" spellcheck="false" readonly placeholder="~/.mdsh/sessions (default)">
+        <button id="choose-sessions">Choose…</button>
+        <button id="reset-sessions">Default</button>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="session-template">Session template</label>
+          <p class="muted">A new session starts as a copy of this markdown file.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="session-template" type="text" spellcheck="false" readonly placeholder="None: a session starts with the date as its heading">
+        <button id="choose-session-template">Choose…</button>
+        <button id="clear-session-template">Clear</button>
+      </div>
     </section>
 
     <section id="about" role="tabpanel" hidden>

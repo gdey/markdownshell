@@ -95,6 +95,12 @@ type Settings struct {
 	// TemplateFolder holds the markdown files New File… offers to start
 	// from. Empty offers only a blank file.
 	TemplateFolder string `json:"templateFolder"`
+	// SessionFolder is where New Session makes a file for the day and
+	// Last Session finds the latest. Empty is ~/.mdsh/sessions.
+	SessionFolder string `json:"sessionFolder"`
+	// SessionTemplate is a markdown file a new session starts as a copy
+	// of. Empty starts it with a heading for the date.
+	SessionTemplate string `json:"sessionTemplate"`
 	// LastFolder is the folder of the file opened last.
 	LastFolder string `json:"lastFolder"`
 	// Recent are the files opened last, newest first.
