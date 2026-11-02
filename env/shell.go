@@ -225,6 +225,13 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		// suspend. With job control (set -m), ctrl+z stops the command
 		// and the shell carries on, keeping it as a job for fg or bg.
 		//
+		// The block gets the terminal open once, for reading and
+		// writing, on all three descriptors, as a login terminal is.
+		// Programs that query the terminal, such as mdsh itself through
+		// Lip Gloss, read the reply from stdout; on a write-only stdout
+		// the read fails, and the reply, coming in once the terminal
+		// echoes again, shows up in the block's output.
+		//
 		// A marker on the terminal too tells when all the block wrote
 		// there has been read.
 		s.ttyRun++
@@ -232,7 +239,7 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		if jobs && s.jobControl() {
 			before, after = s.jobsOn(), "set +m\ntrap - TSTP TTIN TTOU\n"
 		}
-		cmd = fmt.Sprintf("trap : INT\n%s. %s </dev/tty >/dev/tty 2>/dev/tty\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\n%sprintf '%%s0\\n' '%s' >&2\n", before, quote(f), s.mark, s.mark, s.ttyRun, after, s.mark)
+		cmd = fmt.Sprintf("trap : INT\n%s. %s 0<>/dev/tty 1>&0 2>&0\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\n%sprintf '%%s0\\n' '%s' >&2\n", before, quote(f), s.mark, s.mark, s.ttyRun, after, s.mark)
 	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited
