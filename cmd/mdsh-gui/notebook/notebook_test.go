@@ -185,13 +185,15 @@ func TestSections(t *testing.T) {
 		}
 		return strings.Join(s, " ")
 	}
-	if got, want := ids(), "os"; got != want {
+	// A section that is off leaves its prose out, but its blocks are
+	// drawn, marked hidden, because Run all still runs them.
+	if got, want := ids(), "os linux plan9"; got != want {
 		t.Errorf("before running: cells %q, want %q", got, want)
 	}
 	if err := n.RunBlock(0); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := ids(), "os h2 plan9"; got != want {
+	if got, want := ids(), "os linux h2 plan9"; got != want {
 		t.Errorf("after running: cells %q, want %q", got, want)
 	}
 }

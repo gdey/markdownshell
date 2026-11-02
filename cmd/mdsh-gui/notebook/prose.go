@@ -41,10 +41,28 @@ func (n *Notebook) cells() []Cell {
 		l.prose(pos, b.Span.Start)
 		pos = b.Output.End
 		code, out := pieces[3*i+1], pieces[3*i+2]
-		if len(code) == 0 {
-			continue
-		}
 		span := doc.Span{Start: b.Span.Start, End: b.Output.End}
+		// Printing leaves out a block whose show= is false or whose
+		// mdsh:if section is off, but Run all still runs it, so a block
+		// that runs, or a tape that types into one, is drawn anyway,
+		// marked hidden. Anything else that printing leaves out does
+		// nothing and isn't drawn.
+		var hidden string
+		if len(code) == 0 {
+			switch {
+			case !run.Runnable(b) && !b.IsTape():
+				continue
+			case inCut(b.Span.Start, l.cuts):
+				hidden = "Left out when printed: it is in an mdsh:if section that is off. Run all runs it unless its run= says otherwise."
+			default:
+				hidden = "Left out when printed: its show= condition is false. Run all runs it unless its run= says otherwise."
+			}
+			if b.IsTape() {
+				hidden = strings.Replace(hidden, "Run all runs it unless its run= says otherwise.", "It still types into its block when that runs.", 1)
+				l.cells = append(l.cells, Cell{Block: -1, Hidden: hidden, HTML: n.html(d.Src[b.Span.Start:b.Span.End]), From: span.Start, To: span.End})
+				continue
+			}
+		}
 		if b.IsTextbox() {
 			t := b.Textbox()
 			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Placeholder: t.Placeholder, Problem: b.VarTaken}, From: span.Start, To: span.End})
@@ -66,7 +84,8 @@ func (n *Notebook) cells() []Cell {
 			outLine = lineNo(d.Src, b.Span.End+leadingBlank(d.Src[b.Span.End:b.Output.End]))
 		}
 		l.cells = append(l.cells, Cell{
-			Collapsed:       holds(b, "collapse", after),
+			Collapsed:       hidden == "" && holds(b, "collapse", after),
+			Hidden:          hidden,
 			CollapsedOutput: holds(b, "collapse-output", after),
 			OutputLine:      outLine,
 			Block:           i,
@@ -100,6 +119,7 @@ func (n *Notebook) cells() []Cell {
 		}
 	}
 	sections(d, l.cells)
+	unfoldHidden(l.cells)
 	pos, line := 0, 1
 	bounds := d.Boundaries()
 	for i := range l.cells {
@@ -141,6 +161,27 @@ func (n *Notebook) cells() []Cell {
 		}
 	}
 	return l.cells
+}
+
+// unfoldHidden opens a heading folded by an mdsh:collapse line when its
+// section holds a hidden block, as a hidden block's own collapse is
+// ignored, so every block Run all runs is on screen when the file opens.
+func unfoldHidden(cells []Cell) {
+	for i := range cells {
+		h := &cells[i]
+		if h.Heading == 0 || !h.Collapsed {
+			continue
+		}
+		for _, c := range cells[i+1:] {
+			if c.Heading > 0 && c.Heading <= h.Heading {
+				break
+			}
+			if c.Hidden != "" {
+				h.Collapsed = false
+				break
+			}
+		}
+	}
 }
 
 // dropLimits sets c's DropAfter and DropBefore from span's
@@ -337,6 +378,11 @@ func cuts(d *doc.Document, results []*run.Result, lookup doc.Lookup) []doc.Span 
 		cuts = append(cuts, f.Span)
 	}
 	return cuts
+}
+
+// inCut reports whether pos is in one of cuts.
+func inCut(pos int, cuts []doc.Span) bool {
+	return slices.ContainsFunc(cuts, func(c doc.Span) bool { return pos >= c.Start && pos < c.End })
 }
 
 // keep is span less the cuts.

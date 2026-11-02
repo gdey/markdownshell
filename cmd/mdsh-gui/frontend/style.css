@@ -329,6 +329,10 @@ th { background: var(--code-bg); }
 .block .head .id:empty { display: none; }
 .block .head .lang { padding: 0 6px; border-radius: 10px; font-size: calc(11px * var(--text-scale)); line-height: 18px; color: var(--muted); background: var(--code-bg); border: 1px solid var(--border); }
 .block .head .attrs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: calc(12px * var(--text-scale)); }
+.hidden-badge { padding: 0 8px; border: 1px solid var(--warn-border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; background: var(--warn-bg); margin-right: 8px; white-space: nowrap; cursor: help; }
+.prose.hidden-block .hidden-badge { display: inline-block; margin-bottom: 4px; }
+.block.hidden-block { border-style: dashed; border-color: var(--warn-border); }
+.prose.hidden-block { border-left: 2px dashed var(--warn-border); padding-left: 10px; }
 .block .exit { padding: 0 8px; border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 18px; color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); margin-right: 8px; }
 .block .exit:empty { display: none; }
 .block .exit.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }

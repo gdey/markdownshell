@@ -89,6 +89,10 @@ type Cell struct {
 	// block with its output and tape.
 	Movable  bool `json:"movable,omitempty"`
 	LastLine int  `json:"lastLine,omitempty"`
+	// Hidden says why a block, or a tape, that printing leaves out is
+	// drawn anyway: show= is false or its mdsh:if section is off, but
+	// Run all still runs it. Its code is never drawn folded.
+	Hidden string `json:"hidden,omitempty"`
 	// Undeletable says why a top-level block can't be deleted: what else
 	// in the document uses it, such as another block's depends=. Empty
 	// when it can.

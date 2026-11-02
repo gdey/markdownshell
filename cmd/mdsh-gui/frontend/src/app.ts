@@ -244,7 +244,8 @@ function drawCell(c: Cell): HTMLElement {
 // follows.
 function drawProse(c: Cell): HTMLElement {
   // goldmark's HTML, with raw HTML in the markdown left out.
-  const s = el("section", { className: "prose", innerHTML: c.html ?? "", title: "Click to show it in the source" });
+  const s = el("section", { className: "prose" + (c.hidden ? " hidden-block" : ""), innerHTML: c.html ?? "", title: "Click to show it in the source" });
+  if (c.hidden) s.prepend(hiddenBadge(c.hidden));
   highlightProse(s);
   enableDiagrams(s);
   s.onclick = (e) => {
@@ -470,17 +471,24 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   return true;
 }
 
+// hiddenBadge marks a block that printing leaves out but Run all still
+// runs, so a document can't run code its reader never saw.
+function hiddenBadge(why: string): HTMLElement {
+  return el("span", { className: "hidden-badge", title: why }, "hidden when printed");
+}
+
 function drawBlock(c: Cell): HTMLElement {
   // The outline names a block by the .name's first child.
   const name = el("span", { className: "name" }, el("span", { className: "id" }, c.name ?? c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
   const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
   const block = el(
     "section",
-    { className: "block" + (c.history ? " history" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
+    { className: "block" + (c.history ? " history" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
     el(
       "div",
       { className: "head" },
       name,
+      c.hidden ? hiddenBadge(c.hidden) : "",
       exit,
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
       iconButton("play", "Run this block (enter)", () => start("RunBlock", c.block)),

@@ -32,6 +32,12 @@ follow [Semantic Versioning](https://semver.org/).
   block that `show=` or an off `mdsh:if` section left out of it, and
   `mdsh -i` shows a block's code while asking even with Code switched
   off. (v1.2.1 review, finding 1.)
+- `mdsh-gui`: a block hidden by `show=` or by an `mdsh:if` section that
+  is off is drawn, with a dashed edge and a "hidden when printed" badge,
+  instead of being left out. Run all and Run from here run those blocks,
+  so before a file could run code the rendered view never showed. A
+  hidden tape is drawn the same way, and a section that holds one opens
+  unfolded even when an `mdsh:collapse` line folds it.
 
 ### Added
 
