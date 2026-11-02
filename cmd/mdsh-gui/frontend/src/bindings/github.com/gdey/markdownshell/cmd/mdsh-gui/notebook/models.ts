@@ -77,6 +77,12 @@ export interface Cell {
     "outputTasks"?: number[] | null;
 
     /**
+     * Links is true when the block has the links attribute, so the web
+     * addresses in Output are made clickable.
+     */
+    "links"?: boolean;
+
+    /**
      * Ran is true when the block ran this session; Status and Failed say
      * how it went.
      */

@@ -18,6 +18,7 @@ import (
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
+	"github.com/gdey/markdownshell/weblink"
 )
 
 var (
@@ -266,7 +267,7 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 				parts = append(parts, s)
 			}
 		} else if s := strings.TrimRight(clean(string(r.Stdout)), "\n"); s != "" {
-			parts = append(parts, s)
+			parts = append(parts, links(r.Block, s))
 		}
 		if s := strings.TrimRight(clean(string(r.Stderr)), "\n"); s != "" {
 			parts = append(parts, stderrStyle.Render(s))
@@ -290,7 +291,7 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		if run.OutKind(b) == "markdown" {
 			return savedStyle.Render("saved output:") + "\n" + m.markdown(out)
 		}
-		return wrap.Render(savedStyle.Render("saved output:\n" + clean(out)))
+		return wrap.Render(savedStyle.Render("saved output:\n" + links(b, clean(out))))
 	}
 	return ""
 }
@@ -343,6 +344,16 @@ func (m *Model) preview(link string, cols int) string {
 
 // The largest preview, in cells.
 const previewCols, previewRows = 64, 16
+
+// links makes the web addresses in s, block b's output, OSC 8 links,
+// which a terminal that knows them lets you click, if b has the links
+// attribute.
+func links(b *doc.Block, s string) string {
+	if !b.Attrs.Has(weblink.Attr) {
+		return s
+	}
+	return weblink.OSC8(s)
+}
 
 // saved is output saved in the file without its output fences and
 // region markers.

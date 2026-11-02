@@ -74,6 +74,7 @@ Block attributes in v1:
 | `show-stderr[=COND]` | Show stderr | front matter `show_stderr`, else only when the block fails |
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line if COND holds | expanded |
 | `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line if COND holds | expanded |
+| `links` | Make web addresses (`http:`, `https:` and `mailto:` only) in the block's output clickable: links in mdsh-gui, OSC 8 hyperlinks in `mdsh -i`. Commands typed in History get it | off |
 | `env=<name>` | Run in a named sub-env; `a/b` stacks `b` on `a` | top-level env |
 | `share=A,B` | Exported vars a new sub-env gets from its parent; empty for none | front matter `env.share`, else all |
 | `on_error=stop` | Stop the run if this block fails (`continue` overrides front matter) | front matter `on_error` |

@@ -8,6 +8,7 @@ import { Terminal } from "@xterm/xterm";
 import { App, message } from "./api.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
+import { terminalLinks } from "./links.js";
 import { typeKeys, wanted } from "./terminal.js";
 import { codeFont, textSize } from "./theme.js";
 
@@ -85,6 +86,8 @@ function ensureTerm(): Terminal {
   // screenReaderMode has xterm read out what arrives.
   term = new Terminal({ cols: cols(), rows, fontSize: textSize(13), fontFamily: codeFont(), theme: colors(), scrollback: 5000, disableStdin: true, convertEol: true, cursorInactiveStyle: "none", screenReaderMode: true });
   term.open($("history-term"));
+  // What commands typed here print comes with links, as their blocks do.
+  terminalLinks(term, (msg) => say(`\x1b[31m${msg}\x1b[0m`));
   term.onData((keys) => {
     if (block >= 0) typeKeys(keys);
   });

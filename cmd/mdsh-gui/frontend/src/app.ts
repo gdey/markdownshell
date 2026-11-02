@@ -10,6 +10,7 @@ import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBeh
 import { folderGear, initFolders } from "./folders.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
+import { linkify } from "./links.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { consoleFile, initConsole, showConsole } from "./console.js";
 import { fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
@@ -505,6 +506,7 @@ function drawBlock(c: Cell): HTMLElement {
   );
   if (c.movable) block.querySelector(".output-part")!.append(clearOutputButton(c));
   colorOutput(block.querySelector(".output")!);
+  if (c.links) linkify(block.querySelector<HTMLElement>(".output")!);
   markOutput(block.querySelector<HTMLElement>(".output")!);
   block.dataset.foldCode = c.collapsed ? "1" : "";
   block.dataset.foldOutput = c.collapsedOutput ? "1" : "";
