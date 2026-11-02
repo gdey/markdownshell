@@ -430,6 +430,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `mdsh-gui`: one click on a block's play button runs it, even when the
+  block is not selected. Before, the click selected the block, which
+  showed its delete button and slid the play button out from under the
+  pointer, so it took a second click to run.
 - `mdsh-gui`: an include's line numbers are the file's (4, 5, 6 for
   `from=4`), with or without `number_on`, in one column. Before, the
   view counted 1, 2, 3, and a `number_on` include also showed the
