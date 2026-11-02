@@ -503,10 +503,17 @@ func (a *App) startDir() string {
 }
 
 // openSettings shows the settings window, making it the first time.
-func (a *App) openSettings() {
+func (a *App) openSettings() { a.openSettingsTab("") }
+
+// openSettingsTab shows the settings window at one of its tabs, such
+// as "about", or at the tab it was on (General when new) for "".
+func (a *App) openSettingsTab(tab string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.prefs != nil {
+		if tab != "" {
+			a.prefs.EmitEvent("settings-tab", tab)
+		}
 		a.prefs.Show()
 		a.prefs.Focus()
 		return
@@ -519,7 +526,7 @@ func (a *App) openSettings() {
 		Height:    height,
 		MinWidth:  560,
 		MinHeight: 440,
-		URL:       "/settings.html",
+		URL:       settingsURL(tab),
 	}
 	win := a.app.Window.NewWithOptions(opts)
 	a.prefs = win
@@ -544,4 +551,12 @@ func (a *App) openSettings() {
 		a.mu.Unlock()
 		a.saveSettingsSize(win)
 	})
+}
+
+// settingsURL is the settings page, opening at tab when it isn't "".
+func settingsURL(tab string) string {
+	if tab == "" {
+		return "/settings.html"
+	}
+	return "/settings.html#" + tab
 }

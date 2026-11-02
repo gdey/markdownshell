@@ -95,16 +95,7 @@ func (a *App) buildMenu() *application.Menu {
 	send := a.send
 	m := application.NewMenu()
 	if mac {
-		app := m.AddSubmenu("mdsh")
-		app.AddRole(application.About)
-		app.AddSeparator()
-		app.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { a.openSettings() })
-		app.AddSeparator()
-		app.AddRole(application.Hide)
-		app.AddRole(application.HideOthers)
-		app.AddRole(application.ShowAll)
-		app.AddSeparator()
-		app.AddRole(application.Quit)
+		a.addAppMenu(m)
 	}
 
 	file := m.AddSubmenu("File")
@@ -286,4 +277,20 @@ func (a *App) recentItems() {
 	if a.menu != nil {
 		a.menu.Update()
 	}
+}
+
+// addAppMenu adds macOS's app menu: About, Settings, Hide and Quit.
+func (a *App) addAppMenu(m *application.Menu) {
+	app := m.AddSubmenu("mdsh")
+	// About opens the Settings window's About tab, which says much
+	// more than the stock Cocoa panel the About role shows.
+	app.Add("About mdsh").OnClick(func(*application.Context) { a.openSettingsTab("about") })
+	app.AddSeparator()
+	app.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { a.openSettings() })
+	app.AddSeparator()
+	app.AddRole(application.Hide)
+	app.AddRole(application.HideOthers)
+	app.AddRole(application.ShowAll)
+	app.AddSeparator()
+	app.AddRole(application.Quit)
 }

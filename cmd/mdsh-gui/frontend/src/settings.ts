@@ -1,6 +1,7 @@
 import { App, type Settings, message } from "./api.js";
 import { $, el } from "./dom.js";
 import { applyTheme } from "./theme.js";
+import { Events } from "/wails/runtime.js";
 import type { About, Tool } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/models.js";
 
 let s: Settings = await App.Settings();
@@ -35,7 +36,14 @@ tabs.forEach((t, i) => {
     showTab(to.dataset.tab!, true);
   };
 });
-showTab("general");
+// The window opens at the tab its address names, such as #about from
+// the app menu's About item, and switches when asked while open.
+const named = (name: string) => tabs.some((t) => t.dataset.tab === name);
+const first = location.hash.slice(1);
+showTab(named(first) ? first : "general");
+Events.On("settings-tab", (ev: { data: string }) => {
+  if (named(ev.data)) showTab(ev.data);
+});
 
 function draw() {
   input("autosave").checked = s.autosave;

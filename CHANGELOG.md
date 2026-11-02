@@ -407,6 +407,8 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `mdsh-gui`: on macOS the app menu's About opens Settings at its About
+  tab instead of the stock Cocoa About panel.
 - A block whose `timeout` ran out while mdsh checked its syntax was
   reported as failing with exit status 2, as if it had a syntax error.
   It is now reported as timed out.
