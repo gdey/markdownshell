@@ -184,8 +184,8 @@ Events.On("tabs", (ev: { sender?: string; data: Tabs }) => {
   if (ev.sender !== me) return;
   show(ev.data);
 });
-Events.On("settings", (ev: { data: Settings }) => applyTheme(ev.data.theme));
+Events.On("settings", (ev: { data: Settings }) => applyTheme(ev.data));
 
 me = await Window.Name();
-applyTheme((await App.Settings()).theme);
+applyTheme(await App.Settings());
 show(await App.Tabs());

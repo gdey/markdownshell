@@ -9,14 +9,13 @@ import { App, message } from "./api.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
 import { typeKeys, wanted } from "./terminal.js";
+import { codeFont, textSize } from "./theme.js";
 
 // rows is how many lines the transcript shows, which dragging the pane's
 // top edge changes, from one to most of the window. Commands run at this
 // height. The front matter can set the width.
 let rows = 12;
 const rowsKey = "mdsh.historyRows";
-const fontSize = 13;
-const fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 let term: Terminal | null = null;
 let block = -1; // the command running in the pane, or -1
@@ -47,11 +46,21 @@ let hooks: HistoryHooks;
 
 const input = () => $<HTMLTextAreaElement>("history-input");
 
+// colors are the pane's own, which can be the window's, the opposite
+// or always dark (Settings › Look › History pane).
 function colors(): Record<string, string> {
-  const css = getComputedStyle(document.documentElement);
+  const css = getComputedStyle($("history"));
   const v = (name: string, or: string) => css.getPropertyValue(name).trim() || or;
-  return { background: v("--term-bg", "#1e1e1e"), foreground: v("--term-fg", "#d4d4d4"), cursor: v("--term-fg", "#d4d4d4") };
+  return { background: v("--bg", "#0d1117"), foreground: v("--fg", "#e6edf3"), cursor: v("--fg", "#e6edf3") };
 }
+
+// The look changed: the transcript takes the pane's new colors and font.
+window.addEventListener("mdsh-look", () => {
+  if (!term) return;
+  term.options.theme = colors();
+  term.options.fontFamily = codeFont();
+  term.options.fontSize = textSize(13);
+});
 
 // cols is the front matter's width, or how many cells fit across the
 // pane.
@@ -60,7 +69,7 @@ function cols(): number {
   const host = $("history-term");
   const ctx = document.createElement("canvas").getContext("2d");
   if (!ctx || !host.clientWidth) return 80;
-  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.font = `${textSize(13)}px ${codeFont()}`;
   const cell = ctx.measureText("W").width || 8;
   return Math.max(20, Math.floor((host.clientWidth - 2 * 8 - cell) / cell));
 }
@@ -73,7 +82,7 @@ function ensureTerm(): Terminal {
   } catch {
     // No storage: the default it is.
   }
-  term = new Terminal({ cols: cols(), rows, fontSize, fontFamily, theme: colors(), scrollback: 5000, disableStdin: true, convertEol: true, cursorInactiveStyle: "none" });
+  term = new Terminal({ cols: cols(), rows, fontSize: textSize(13), fontFamily: codeFont(), theme: colors(), scrollback: 5000, disableStdin: true, convertEol: true, cursorInactiveStyle: "none" });
   term.open($("history-term"));
   term.onData((keys) => {
     if (block >= 0) typeKeys(keys);
@@ -98,7 +107,7 @@ export function fitHistory() {
 function cellHeight(): number {
   const screen = term?.element?.querySelector<HTMLElement>(".xterm-screen");
   if (term && screen?.clientHeight) return screen.clientHeight / term.rows;
-  return Math.ceil(fontSize * 1.2);
+  return Math.ceil(textSize(13) * 1.2);
 }
 
 // maxRows is the most lines the transcript can have and leave some of

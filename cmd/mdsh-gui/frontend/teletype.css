@@ -1,0 +1,229 @@
+/* The Teletype look (Settings › Look): the site's fan-fold
+   paper in the light theme and green phosphor in the dark. It sets the
+   same tokens style.css does, plus a few of its own (--tty-*), and adds
+   texture rules. Apart from the larger text (--text-scale), a look
+   changes paint, not layout: nothing here moves or resizes a pane, and
+   the dependency lines and drags measure the page as it is drawn.
+   theme_test.go checks that every token the plain look defines is
+   defined here too. */
+
+:root[data-look="tty"],
+:root[data-look="tty"][data-history-scheme="light"] #history {
+  --bg: #f3edd9;
+  --fg: #2a241c;
+  --muted: #6b6150;
+  --border: #bfb8a6;
+  --code-bg: #efe8d2;
+  --hover: #e9e2c9;
+  --accent: #2a241c;
+  --accent-fg: #f3edd9;
+  --link: #8a2b1f;
+  --ok: #3d6b35;
+  --bad: #a3271b;
+  --control: #6b4c8a;
+  --warn-bg: #ede0b0;
+  --warn-border: #a8862e;
+  --selection: rgb(42 36 28 / 0.16);
+  --active-line: rgb(42 36 28 / 0.05);
+  --dep-1: #8a63a8; --dep-2: #a33a5e; --dep-3: #2f6f6a; --dep-4: #9a5a1c; --dep-more: #8e887a;
+  --syn-keyword: #8a2b1f;
+  --syn-string: #3d6b35;
+  --syn-number: #2f4f7a;
+  --syn-comment: #8e887a;
+  --syn-variable: #6b4a1c;
+  --syn-function: #4f3a6e;
+  --syn-type: #2f6f6a;
+  --syn-punct: #4a4234;
+  --syn-heading: #2a241c;
+  --syn-link: #8a2b1f;
+  --syn-meta: #2a241c;
+  --ansi-0: #2a241c; --ansi-1: #a3271b; --ansi-2: #3d6b35; --ansi-3: #7a5a12;
+  --ansi-4: #2f4f7a; --ansi-5: #6b4c8a; --ansi-6: #2f6f6a; --ansi-7: #8e887a;
+  --ansi-8: #6b6150; --ansi-9: #c0392b; --ansi-10: #4f8a45; --ansi-11: #9a7420;
+  --ansi-12: #3e6aa0; --ansi-13: #8a63a8; --ansi-14: #3f8a83; --ansi-15: #bfb8a6;
+  --term-bg: #efe8d2;
+  --term-fg: #2a241c;
+  /* The paper's own: the side strip, the rule every line, the sprocket
+     holes, and the offset shadow under cards. */
+  --tty-side: #e9e2c9;
+  --tty-rule: #e7e1ce;
+  --tty-hole: #d8cfae;
+  --tty-shadow: #cfc5a5;
+  color-scheme: light;
+}
+
+/* One typewriter face for everything, as on the site. A typewriter
+   face reads small, so the text is set larger. */
+:root[data-look="tty"] {
+  --font-ui: "Courier Prime", "Courier New", Courier, "Liberation Mono", "Nimbus Mono PS", monospace;
+  --font-code: "Courier Prime", "Courier New", Courier, "Liberation Mono", "Nimbus Mono PS", monospace;
+  --text-scale: 1.15;
+}
+
+/* Phosphor, when the theme is dark, for the window or the History
+   pane (see style.css). */
+:root[data-look="tty"][data-scheme="dark"],
+:root[data-look="tty"][data-history-scheme="dark"] #history {
+  --bg: #0b0f0b;
+  --fg: #9cff9c;
+  --muted: #538753;
+  --border: #304e30;
+  --code-bg: #0f170f;
+  --hover: #142014;
+  --accent: #9cff9c;
+  --accent-fg: #0b0f0b;
+  --link: #ffb000;
+  --ok: #9cff9c;
+  --control: #ffb000;
+  --bad: #ff6b4a;
+  --warn-bg: #2a2208;
+  --warn-border: #b88a00;
+  --selection: rgb(156 255 156 / 0.22);
+  --active-line: rgb(156 255 156 / 0.06);
+  --dep-1: #5198b6; --dep-2: #c77dba; --dep-3: #ffb000; --dep-4: #e07050; --dep-more: #538753;
+  --syn-keyword: #ffb000;
+  --syn-string: #c8ffc8;
+  --syn-number: #7fd4ff;
+  --syn-comment: #538753;
+  --syn-variable: #d6ff9c;
+  --syn-function: #9cffd8;
+  --syn-type: #6cff9c;
+  --syn-punct: #7fbf7f;
+  --syn-heading: #9cff9c;
+  --syn-link: #ffb000;
+  --syn-meta: #9cff9c;
+  --ansi-0: #1f3020; --ansi-1: #ff6b4a; --ansi-2: #6cff6c; --ansi-3: #ffb000;
+  --ansi-4: #5198b6; --ansi-5: #c77dba; --ansi-6: #5fd7c7; --ansi-7: #9cff9c;
+  --ansi-8: #538753; --ansi-9: #ff8f73; --ansi-10: #b0ffb0; --ansi-11: #ffd060;
+  --ansi-12: #7fc4e0; --ansi-13: #e0a0d8; --ansi-14: #8ff0e0; --ansi-15: #e0ffe0;
+  --term-bg: #0b0f0b;
+  --term-fg: #9cff9c;
+  --tty-side: #0f150f;
+  --tty-rule: #131d13;
+  --tty-hole: #162016;
+  --tty-shadow: #1f3020;
+  color-scheme: dark;
+}
+
+/* Square corners everywhere: a teletype has no rounded anything. */
+[data-look="tty"] *, [data-look="tty"] *::before, [data-look="tty"] *::after { border-radius: 0 !important; }
+
+/* The window's chrome: the tab bar and the outline are the paper's
+   margin, the toolbar is ruled off with a dashed line. */
+[data-look="tty"] #tabbar { background: var(--tty-side); }
+[data-look="tty"] .tab.active { font-weight: 700; }
+[data-look="tty"] header { border-bottom-style: dashed; }
+[data-look="tty"] #outline { background: var(--tty-side); }
+[data-look="tty"] #outline .item.heading { font-weight: 700; }
+[data-look="tty"] #source { border-right-style: dashed; }
+[data-look="tty"] button.chip { border-style: dashed; }
+
+/* Buttons are keys. Run All is a keycap with a hard shadow, which sinks
+   into it when pressed. */
+[data-look="tty"] :is(button.primary, button.danger, .block .ask button) {
+  background: var(--bg);
+  color: var(--fg);
+  border-color: var(--fg);
+  box-shadow: 2px 2px 0 var(--fg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+[data-look="tty"] :is(button.primary, button.danger, .block .ask button):active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+[data-look="tty"] :is(button.primary, button.danger, .block .ask button):hover:not(:disabled) { background: var(--hover); }
+[data-look="tty"] :is(button.primary.stop, button.danger) { color: var(--bad); border-color: var(--bad); box-shadow: 2px 2px 0 var(--bad); }
+[data-look="tty"] #console-toggle .badge { background: var(--fg); color: var(--bg); }
+
+/* The rendered view is the roll of paper: a rule every line and a strip
+   of sprocket holes down each edge, all painted behind the cards and
+   scrolling with them. Settings › Look can take off the holes or the
+   rules (data-no-sprockets, data-no-rules on the root). */
+[data-look="tty"] #doc-scroll {
+  background:
+    radial-gradient(circle at 12px 50%, var(--tty-hole) 0 5px, transparent 5.5px) left 0 top 12px / 24px 39px repeat-y local,
+    radial-gradient(circle at 12px 50%, var(--tty-hole) 0 5px, transparent 5.5px) right 0 top 12px / 24px 39px repeat-y local,
+    linear-gradient(to right, transparent 24px, var(--border) 24px 25px, transparent 25px) 0 0 / 100% 100% no-repeat local,
+    linear-gradient(to left, transparent 24px, var(--border) 24px 25px, transparent 25px) 0 0 / 100% 100% no-repeat local,
+    linear-gradient(to bottom, transparent 38px, var(--tty-rule) 38px) 0 0 / 100% 39px repeat local,
+    var(--bg);
+}
+[data-look="tty"][data-no-sprockets] #doc-scroll {
+  background:
+    linear-gradient(to bottom, transparent 38px, var(--tty-rule) 38px) 0 0 / 100% 39px repeat local,
+    var(--bg);
+}
+[data-look="tty"][data-no-rules] #doc-scroll {
+  background:
+    radial-gradient(circle at 12px 50%, var(--tty-hole) 0 5px, transparent 5.5px) left 0 top 12px / 24px 39px repeat-y local,
+    radial-gradient(circle at 12px 50%, var(--tty-hole) 0 5px, transparent 5.5px) right 0 top 12px / 24px 39px repeat-y local,
+    linear-gradient(to right, transparent 24px, var(--border) 24px 25px, transparent 25px) 0 0 / 100% 100% no-repeat local,
+    linear-gradient(to left, transparent 24px, var(--border) 24px 25px, transparent 25px) 0 0 / 100% 100% no-repeat local,
+    var(--bg);
+}
+[data-look="tty"][data-no-sprockets][data-no-rules] #doc-scroll { background: var(--bg); }
+/* Headings keep their #s. */
+[data-look="tty"] #doc > .heading-cell :is(h1, h2, h3, h4, h5, h6)::before { color: var(--muted); }
+[data-look="tty"] #doc > .heading-cell h1::before { content: "# "; }
+[data-look="tty"] #doc > .heading-cell h2::before { content: "## "; }
+[data-look="tty"] #doc > .heading-cell h3::before { content: "### "; }
+[data-look="tty"] #doc > .heading-cell h4::before { content: "#### "; }
+[data-look="tty"] #doc > .heading-cell h5::before { content: "##### "; }
+[data-look="tty"] #doc > .heading-cell h6::before { content: "###### "; }
+[data-look="tty"] .heading-cell > button.fold { background: none; }
+[data-look="tty"] pre { background: var(--code-bg); }
+[data-look="tty"] hr { border: 0; border-top: 1px dashed var(--muted); }
+[data-look="tty"] blockquote { border-left: 2px solid var(--muted); }
+
+/* Block cards: a hard edge in ink and an offset shadow, the selected
+   card's shadow in ink rather than an outline. Parts are torn off with
+   dashed lines. */
+[data-look="tty"] .block { border-color: var(--fg); box-shadow: 4px 4px 0 var(--tty-shadow); }
+[data-look="tty"] .block.selected { outline: none; box-shadow: 5px 5px 0 var(--fg); }
+[data-look="tty"] .block.ran { border-left-color: var(--ok); }
+[data-look="tty"] :is(.block pre.code, .block .output-part, .block .ask) { border-top-style: dashed; }
+[data-look="tty"] .block .head .lang { padding: 0; border: 0; background: none; font-size: calc(13px * var(--text-scale)); }
+[data-look="tty"] .block .head .lang::before, [data-look="tty"] .block .head .attrs::before { content: "["; }
+[data-look="tty"] .block .head .lang::after, [data-look="tty"] .block .head .attrs::after { content: "]"; }
+[data-look="tty"] .block .head .attrs { font-size: calc(13px * var(--text-scale)); }
+[data-look="tty"] .block .exit, [data-look="tty"] .block .exit.bad { background: none; font-weight: 700; font-size: calc(13px * var(--text-scale)); padding: 0 4px; }
+[data-look="tty"] .block .output::before { content: "-- output --"; text-transform: none; letter-spacing: 0; }
+[data-look="tty"] .block pre.numbered .line::before { border-right-style: dashed; }
+/* The confirm prompt waits at a block cursor. */
+[data-look="tty"] .block .ask { background: var(--code-bg); }
+[data-look="tty"] .block .ask .question::after {
+  content: "";
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--fg);
+}
+[data-look="tty"] .block .output .terminal { border: 1px dashed var(--border); }
+[data-look="tty"] #doc > .block.dep-target { outline-color: var(--fg); }
+
+/* Inputs: typed onto the paper. */
+[data-look="tty"] :is(.textbox, .choice-select, input[type="text"], select) { border-color: var(--fg); }
+[data-look="tty"] .textbox:focus { outline-color: var(--fg); }
+
+/* Menus and dialogs sit on the paper with the same hard shadow. */
+[data-look="tty"] :is(dialog, .md-menu) { border-color: var(--fg); box-shadow: 6px 6px 0 var(--tty-shadow); }
+/* Settings › Look can take the offset shadows off cards and menus; the
+   selected card keeps its ink one. */
+[data-look="tty"][data-no-shadows] :is(.block:not(.selected), .coll, dialog, .md-menu) { box-shadow: none; }
+
+/* The start screen and Settings: the same paper, ruled with dashes. */
+[data-look="tty"] #start h1::before { content: "# "; color: var(--muted); }
+[data-look="tty"] ul.files { border-color: var(--fg); }
+[data-look="tty"] ul.files li + li { border-top-style: dashed; }
+[data-look="tty"] .coll { border-color: var(--fg); box-shadow: 4px 4px 0 var(--tty-shadow); }
+[data-look="tty"] button.tag { border-style: dashed; }
+[data-look="tty"] button.tag.on { border-style: solid; }
+[data-look="tty"] .tabs { background: var(--tty-side); }
+[data-look="tty"] .tabs button[aria-selected="true"] { font-weight: 700; border-bottom-color: var(--fg); }
+[data-look="tty"] .setting { border-bottom-style: dashed; }
+[data-look="tty"] dl.info :is(dt, dd) { border-top-style: dashed; }
+
+[data-look="tty"] #history { border-top-style: dashed; }
+[data-look="tty"] #console .console-bar { border-bottom-style: dashed; }
+[data-look="tty"] :is(input, select, textarea, button):focus-visible { outline: 2px solid var(--fg); outline-offset: -1px; }

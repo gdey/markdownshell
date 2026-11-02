@@ -45,6 +45,31 @@ type Settings struct {
 	NoSpellCheck bool `json:"noSpellCheck"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
+	// Look is "tty" for the Teletype look, paper in the light theme and
+	// phosphor in the dark; empty is the plain look.
+	Look string `json:"look"`
+	// TextSize is the text's size in percent, 80 to 150; 0 is the
+	// look's own (100 for plain, 115 for Teletype).
+	TextSize int `json:"textSize"`
+	// UIFont and CodeFont are font families for the interface and for
+	// code; empty is the look's own.
+	UIFont   string `json:"uiFont"`
+	CodeFont string `json:"codeFont"`
+	// LineSpacing is "compact" or "relaxed"; empty is normal.
+	LineSpacing string `json:"lineSpacing"`
+	// NoSprockets, NoRules and NoShadows take the Teletype paper's
+	// sprocket strips, its line rules and the shadows under cards off.
+	NoSprockets bool `json:"noSprockets"`
+	NoRules     bool `json:"noRules"`
+	NoShadows   bool `json:"noShadows"`
+	// Accent is a #rrggbb color for links, run buttons and selection;
+	// empty is the look's own.
+	Accent string `json:"accent"`
+	// HistoryPane is the History pane's colors: "match" the window,
+	// "invert" them (light under a dark window, dark under a light one)
+	// or "dark" always. Empty is the look's own: dark for plain, match
+	// for Teletype.
+	HistoryPane string `json:"historyPane"`
 	// Shell, if set, overrides the front matter's shell for every file.
 	Shell string `json:"shell"`
 	// HistoryRC is a file, such as ~/.zshrc, the shells read while the

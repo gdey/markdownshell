@@ -223,9 +223,15 @@ Each file opens in a tab of its own, with its own shells.
 - **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
   `e` edits it.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
-  Linux) has tabs: General for the theme (System, Light or Dark), the
+  Linux) has tabs: General for the
   view files open in (rendered, source or both; by default the view
-  the last tab had) and the start folder; Editing for autosave after
+  the last tab had) and the start folder; Look for the theme (System,
+  Light or Dark), the look (Plain, or Teletype: the site's typewriter
+  face on fan-fold paper in the light theme and green phosphor in the
+  dark), the text size, the interface and code fonts, line spacing,
+  an accent color, the History pane's colors (the window's, inverted,
+  or always dark) and, for Teletype, the paper's sprocket strips,
+  ruled lines and card shadows; Editing for autosave after
   each run, Vim mode and spell checking of the prose in the
   source view (on by default; not code, links or HTML); Shell for a shell for every file and the file
   the History pane's shell reads; and Files for the templates folder
@@ -362,13 +368,25 @@ Tabs drag between windows, or out into a window of their own.
 
 ![Two windows: deploy.md and disk.md in one, and onboarding.md, dragged out, in another](../../site/static/images/gui/windows.png)
 
-Settings has tabs for the theme, the view files open in and the start
-folder; autosave and Vim mode; the shell; the templates folder; and an
+Settings has tabs for the view files open in and the start folder;
+the theme, the look and its options; autosave and Vim mode; the shell; the templates folder; and an
 About tab with the version, build, paths and tools.
 
 ![The settings window](../../site/static/images/gui/settings.png)
 
 ![The deploy runbook in the dark theme](../../site/static/images/gui/dark.png)
+
+![The deploy runbook in the Teletype look, on paper, with push asking to run](../../site/static/images/gui/teletype-paper.png)
+
+![The same window in the Teletype look with the dark theme, as green phosphor](../../site/static/images/gui/teletype-phosphor.png)
+
+![The Teletype look with the source view open beside the rendered view](../../site/static/images/gui/teletype-source-paper.png)
+
+![The Teletype look in phosphor with the History pane open, its commands added to the file as blocks](../../site/static/images/gui/teletype-history-phosphor.png)
+
+![Settings › Look: theme, look, text size, fonts, line spacing, accent, History pane and the paper's texture](../../site/static/images/gui/teletype-settings-look.png)
+
+![Paper with the History pane inverted, so it shows as phosphor](../../site/static/images/gui/teletype-history-inverted.png)
 
 ## Install
 
