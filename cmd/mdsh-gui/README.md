@@ -336,6 +336,13 @@ until it ends. A `confirm` block asks in its card before it runs, and
 so does a block that a block you run names in `depends=` and that hasn't
 run yet.
 
+Every block that Run all runs is drawn, even one that printing leaves
+out because its `show=` is false or its `<!-- mdsh:if -->` section is
+off. Such a block, and a tape hidden the same way, has a dashed edge and
+a "hidden when printed" badge, and a section that holds one opens
+unfolded even if the file folds it, so a file can't run code you never
+saw.
+
 ![A background block still running, and a confirm block asking "Ship the site to production?" with Run, Skip and Stop](../../site/static/images/gui/confirm.png)
 
 A block's `depends=` is drawn as lines in the page margin, from the block

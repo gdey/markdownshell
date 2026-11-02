@@ -77,7 +77,7 @@ func TestSetText(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if err := n.RunFrom(0); err != nil {
+	if err := n.RunRange(0, 4); err != nil {
 		t.Fatal(err)
 	}
 	// fail moves above hello, and hello is edited.
@@ -201,4 +201,83 @@ func TestCellsSections(t *testing.T) {
 	if want := []string{"a", "hidden"}; !slices.Equal(ran, want) {
 		t.Errorf("ran %v, want %v", ran, want)
 	}
+}
+
+// Every block Run all runs is drawn, even one printing leaves out, so a
+// document can't run code its reader never saw (GUI security review
+// v1.2.1, finding 2).
+func TestHiddenBlocksDrawn(t *testing.T) {
+	file := write(t, "# Setup\n\n```sh {#hello}\necho hello\n```\n\n"+
+		"```sh {#evil show=false collapse}\necho evil\n```\n\n"+
+		"<!-- mdsh:if false -->\n## Off\n\n```sh {#evil2}\necho evil2\n```\n\n```text\nnot code\n```\n<!-- mdsh:end -->\n\n"+
+		"```sh {#term tty}\nbash\n```\n\n```tape {for=term show=false}\nType \"echo typed\" Enter\n```\n\n"+
+		"```text {show=false}\nnot code either\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	got := map[string]Cell{}
+	var tape *Cell
+	for _, c := range n.Cells() {
+		if c.ID != "" {
+			got[c.ID] = c
+		}
+		if strings.Contains(c.HTML, "not code") || strings.Contains(c.HTML, "Off") {
+			t.Errorf("drawn: %q", c.HTML)
+		}
+		if strings.Contains(c.HTML, "echo typed") {
+			tape = &c
+		}
+	}
+	if c := got["hello"]; c.Hidden != "" {
+		t.Errorf("hello hidden: %q", c.Hidden)
+	}
+	if c, ok := got["evil"]; !ok || !strings.Contains(c.Hidden, "show=") || c.Collapsed || c.Body != "echo evil\n" {
+		t.Errorf("evil: %+v", c)
+	}
+	if c, ok := got["evil2"]; !ok || !strings.Contains(c.Hidden, "mdsh:if") {
+		t.Errorf("evil2: %+v", c)
+	}
+	if tape == nil || !strings.Contains(tape.Hidden, "types into") {
+		t.Errorf("tape: %+v", tape)
+	}
+	// What is drawn is what runs.
+	if err := n.RunRange(0, 4); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"hello", "evil", "evil2"} {
+		if !got[id].Ran && !ranCell(n.Cells(), id) {
+			t.Errorf("%s didn't run", id)
+		}
+	}
+}
+
+// A section the file folds opens unfolded when it holds a hidden block.
+func TestHiddenBlockUnfoldsSection(t *testing.T) {
+	file := write(t, "# Appendix\n<!-- mdsh:collapse -->\n\n```sh {#evil show=false}\necho evil\n```\n\n"+
+		"# Notes\n<!-- mdsh:collapse -->\n\n```sh {#ok}\necho ok\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var folded []string
+	for _, c := range n.Cells() {
+		if c.Heading > 0 && c.Collapsed {
+			folded = append(folded, strings.TrimSpace(c.HTML))
+		}
+	}
+	if len(folded) != 1 || !strings.Contains(folded[0], "Notes") {
+		t.Errorf("folded headings: %q, want only Notes", folded)
+	}
+}
+
+func ranCell(cells []Cell, id string) bool {
+	for _, c := range cells {
+		if c.ID == id {
+			return c.Ran
+		}
+	}
+	return false
 }
