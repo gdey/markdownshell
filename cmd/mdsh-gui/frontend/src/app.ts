@@ -11,7 +11,7 @@ import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } f
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { consoleFile, initConsole, showConsole } from "./console.js";
-import { fitHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
+import { fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
 import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
@@ -22,7 +22,7 @@ import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSiz
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0 };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0 };
 let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
@@ -74,6 +74,8 @@ function fail(err: unknown) {
 // refresh reads the document's state and draws whichever screen fits.
 async function refresh() {
   doc = await App.Doc();
+  // A session opens with the History pane open, to type in.
+  if (doc.openHistory) view = { ...view, history: true };
   wantTerminalSize(doc.termCols, doc.termRows);
   fitHistory();
   const open = doc.file !== "";
@@ -96,6 +98,7 @@ async function refresh() {
   if (doc.running && !ranHere) await catchUp();
   known = await names();
   await loadSource();
+  if (doc.openHistory) focusHistory();
 }
 
 // catchUp shows a run that started before this page did, as when its
@@ -2054,6 +2057,11 @@ const actions: Record<string, () => Promise<void> | void> = {
   moveblockdown: () => void moveAction(1, true),
   depends: () => openDepends(),
   history: () => toggle("history"),
+  // A session already open in this tab: show History and type there.
+  "history-open"() {
+    toggle("history", true);
+    focusHistory();
+  },
   console: () => toggle("console"),
 };
 
@@ -2610,16 +2618,19 @@ $("options").onclick = openRunOptions;
 
 // Start screen
 
-let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [] };
+let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "" };
 
 async function drawStart() {
   try {
     startScreen = await App.StartScreen();
     $("start-dir").textContent = tilde(startScreen.dir) + (startScreen.full ? " (showing the first " + (startScreen.files ?? []).length + " files)" : "");
   } catch (err) {
-    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [] };
+    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "" };
     $("start-dir").textContent = message(err);
   }
+  const last = $<HTMLButtonElement>("last-session");
+  last.disabled = !startScreen.lastSession;
+  last.title = startScreen.lastSession ? "Open " + tilde(startScreen.lastSession) : "No sessions yet: New Session makes one";
   filterStart();
   $("filter").focus();
 }
@@ -2837,6 +2848,8 @@ async function openNewFile() {
 }
 $<HTMLDialogElement>("new-file-dialog").onclose = () => ($("new-file-error").hidden = true);
 $("open-other").onclick = () => App.Open().catch(fail);
+$("new-session").onclick = () => App.NewSession().catch(fail);
+$("last-session").onclick = () => App.LastSession().catch(fail);
 
 // Events from Go
 

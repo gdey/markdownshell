@@ -84,6 +84,13 @@ export interface Doc {
      * the view the settings open files in.
      */
     "fresh": boolean;
+
+    /**
+     * OpenHistory is set the first time Doc is asked for after a
+     * session opens in the tab, so the page opens the History pane and
+     * focuses it.
+     */
+    "openHistory": boolean;
     "run": notebook$0.RunOptions;
 
     /**
@@ -169,6 +176,12 @@ export interface Start {
      */
     "full": boolean;
     "recent": string[] | null;
+
+    /**
+     * LastSession is the file Last Session opens, or "" if there are no
+     * sessions yet.
+     */
+    "lastSession": string;
 }
 
 /**

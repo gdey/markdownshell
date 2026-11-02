@@ -9,11 +9,13 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/session"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/zshrc"
 	"github.com/gdey/markdownshell/doc"
@@ -33,8 +35,12 @@ type Doc struct {
 	// Fresh is set the first time Doc is asked for after a file opens
 	// in the tab, but not after it is reloaded, so the page can show
 	// the view the settings open files in.
-	Fresh bool                `json:"fresh"`
-	Run   notebook.RunOptions `json:"run"`
+	Fresh bool `json:"fresh"`
+	// OpenHistory is set the first time Doc is asked for after a
+	// session opens in the tab, so the page opens the History pane and
+	// focuses it.
+	OpenHistory bool                `json:"openHistory"`
+	Run         notebook.RunOptions `json:"run"`
 	// Args is Run.Args as one line, quoted as a shell would need.
 	Args string `json:"args"`
 	// History is set while the History pane is on for the file.
@@ -56,12 +62,12 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 		return Doc{}, nil
 	}
 	t.mu.Lock()
-	running, fresh := t.running, t.fresh
-	t.fresh = false
+	running, fresh, history := t.running, t.fresh, t.openHistory
+	t.fresh, t.openHistory = false, false
 	t.mu.Unlock()
 	ro := n.RunOptions()
 	cols, rows := n.TerminalSize()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -231,6 +237,62 @@ func (a *App) Templates() ([]library.File, error) {
 	return l.Files, err
 }
 
+// NewSession opens the day's session, from the start screen: a file
+// named for the date in the sessions folder, made from the session
+// template if it isn't there yet. It opens with the History pane open
+// and focused.
+func (a *App) NewSession(ctx context.Context) error {
+	s := a.settings.Get()
+	file, _, err := session.Today(a.sessionDir(), s.SessionTemplate, time.Now())
+	if err != nil {
+		return fmt.Errorf("new session: %w", err)
+	}
+	return a.openSession(ctx, file)
+}
+
+// LastSession opens the file in the sessions folder changed last, as
+// NewSession opens a session.
+func (a *App) LastSession(ctx context.Context) error {
+	file, err := session.Last(a.sessionDir())
+	if err != nil {
+		return fmt.Errorf("last session: %w", err)
+	}
+	if file == "" {
+		return errors.New("no sessions yet: New Session makes one")
+	}
+	return a.openSession(ctx, file)
+}
+
+// sessionDir is the sessions folder the settings name.
+func (a *App) sessionDir() string {
+	home, _ := os.UserHomeDir()
+	return session.Dir(a.settings.Get().SessionFolder, home)
+}
+
+// openSession opens file as openIn does, and has its tab open the
+// History pane and focus it: a tab opening the file asks Doc, which
+// says so once, and a tab that has it open already is told.
+func (a *App) openSession(ctx context.Context, file string) error {
+	w, err := a.window(ctx)
+	if err != nil {
+		return err
+	}
+	if t := a.openTab(file); t != nil {
+		a.focusTab(t)
+		t.emit("menu", "history-open")
+		return nil
+	}
+	if err := a.openIn(w, file); err != nil {
+		return err
+	}
+	if t := a.openTab(file); t != nil {
+		t.mu.Lock()
+		t.openHistory = true
+		t.mu.Unlock()
+	}
+	return nil
+}
+
 // OpenPath opens file, from the start screen.
 func (a *App) OpenPath(ctx context.Context, file string) error {
 	t, err := a.tab(ctx)
@@ -374,6 +436,9 @@ type Start struct {
 	Collections []library.Collection `json:"collections"`
 	Full        bool                 `json:"full"` // more files than listed
 	Recent      []string             `json:"recent"`
+	// LastSession is the file Last Session opens, or "" if there are no
+	// sessions yet.
+	LastSession string `json:"lastSession"`
 }
 
 // StartScreen lists the markdown files under the start folder, and the
@@ -408,7 +473,8 @@ func (a *App) StartScreen() (Start, error) {
 		}
 	}
 	home, _ := os.UserHomeDir()
-	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: recent}, nil
+	last, _ := session.Last(a.sessionDir())
+	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: recent, LastSession: last}, nil
 }
 
 // Settings are the app-wide settings.
@@ -427,11 +493,12 @@ func (a *App) SetSettings(s settings.Settings) error {
 // edited copies into cur what the Settings window edits from s:
 // autosave, Vim mode, spell checking, theme, the look and its options,
 // shell, the History pane's rc file, the view files open in, the start
-// folder and the templates folder. The rest, such as Recent, stays as
+// folder, the templates folder, and the sessions folder and template. The rest, such as Recent, stays as
 // it is. Values the window can't have sent are dropped.
 func edited(cur *settings.Settings, s settings.Settings) {
 	cur.Autosave, cur.Vim, cur.NoSpellCheck, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.NoSpellCheck, s.Shell, s.StartFolder
 	cur.TemplateFolder = s.TemplateFolder
+	cur.SessionFolder, cur.SessionTemplate = strings.TrimSpace(s.SessionFolder), strings.TrimSpace(s.SessionTemplate)
 	cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
 	cur.Neovim, cur.NeovimPath, cur.NeovimClean = s.Neovim, strings.TrimSpace(s.NeovimPath), s.NeovimClean
 	cur.NeovimOwnColors = s.NeovimOwnColors
@@ -511,6 +578,23 @@ func (a *App) ChooseFolder(ctx context.Context, title, dir string) (string, erro
 		CanCreateDirectories(true).
 		SetTitle(title).
 		SetDirectory(dir)
+	if w, ok := ctx.Value(application.WindowKey).(application.Window); ok {
+		d.AttachToWindow(w)
+	}
+	return d.PromptForSingleSelection()
+}
+
+// ChooseFile asks for a markdown file, with title, starting in dir or
+// the start folder, and returns it, or "" if none was picked.
+func (a *App) ChooseFile(ctx context.Context, title, dir string) (string, error) {
+	if dir == "" {
+		dir = a.startDir()
+	}
+	d := a.app.Dialog.OpenFile().
+		CanChooseFiles(true).
+		SetTitle(title).
+		SetDirectory(dir).
+		AddFilter("Markdown", "*.md;*.markdown")
 	if w, ok := ctx.Value(application.WindowKey).(application.Window); ok {
 		d.AttachToWindow(w)
 	}

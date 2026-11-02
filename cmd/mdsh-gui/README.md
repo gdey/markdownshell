@@ -42,6 +42,12 @@ Each file opens in a tab of its own, with its own shells.
   beside others leaves the window as it is. The Settings window keeps
   its size too. These are kept in the settings file, not in the
   markdown.
+- **Sessions:** New Session on the start screen opens the day's file,
+  such as `2026-11-02.md`, in the sessions folder (`~/.mdsh/sessions`
+  unless Settings › Files names another), making it the first time as
+  a copy of the session template, or with the date as its heading.
+  Last Session opens the file in that folder changed last. Either one
+  opens with the History pane open and the keyboard in it.
 - **File:** New File… (cmd/ctrl+N, or New File… on the start screen)
   offers the templates in the templates folder from Settings, if one
   is set, then asks where to save the file and opens it. Without a

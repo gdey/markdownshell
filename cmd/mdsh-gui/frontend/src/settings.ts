@@ -57,6 +57,10 @@ function draw() {
   input("start-folder").value = s.startFolder;
   input("template-folder").value = s.templateFolder;
   $("clear-templates").hidden = !s.templateFolder;
+  input("session-folder").value = s.sessionFolder;
+  $("reset-sessions").hidden = !s.sessionFolder;
+  input("session-template").value = s.sessionTemplate;
+  $("clear-session-template").hidden = !s.sessionTemplate;
   $("fixed").hidden = !s.startFolder && select("start-mode").value !== "fixed";
   input("zsh-wrapper").checked = !!zsh?.on;
   input("zsh-wrapper").disabled = !zsh;
@@ -228,6 +232,32 @@ $("clear-templates").onclick = async () => {
   await save();
   draw();
 };
+$("choose-sessions").onclick = async () => {
+  const dir = await App.ChooseFolder("Choose the sessions folder", s.sessionFolder);
+  if (dir) {
+    s.sessionFolder = dir;
+    await save();
+  }
+  draw();
+};
+$("reset-sessions").onclick = async () => {
+  s.sessionFolder = "";
+  await save();
+  draw();
+};
+$("choose-session-template").onclick = async () => {
+  const file = await App.ChooseFile("Choose the session template", s.sessionTemplate.replace(/[\\/][^\\/]*$/, ""));
+  if (file) {
+    s.sessionTemplate = file;
+    await save();
+  }
+  draw();
+};
+$("clear-session-template").onclick = async () => {
+  s.sessionTemplate = "";
+  await save();
+  draw();
+};
 input("zsh-wrapper").onchange = async () => {
   try {
     zsh = await App.SetZshWrapper(input("zsh-wrapper").checked);
@@ -270,6 +300,7 @@ async function drawAbout() {
   if (a.zshrc) row(paths, "Shell startup", tilde(a.zshrc, a.home), show(a.zshrc));
   row(paths, "Start folder", s.startFolder ? tilde(s.startFolder, a.home) : "The last folder used", ...(s.startFolder ? [show(s.startFolder)] : []));
   row(paths, "Templates", s.templateFolder ? tilde(s.templateFolder, a.home) : "None", ...(s.templateFolder ? [show(s.templateFolder)] : []));
+  row(paths, "Sessions", s.sessionFolder ? tilde(s.sessionFolder, a.home) : "~/.mdsh/sessions");
 
   const tools = $("tools");
   for (const t of a.tools ?? []) {

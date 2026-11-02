@@ -129,6 +129,10 @@ func TestEditedSettings(t *testing.T) {
 	if cur.TextSize != 150 || cur.UIFont != "Inter" || cur.CodeFont != "" || cur.LineSpacing != "relaxed" || !cur.NoRules || cur.Accent != "#aabbcc" || cur.HistoryPane != "invert" {
 		t.Errorf("look options = %+v", cur)
 	}
+	edited(&cur, settings.Settings{SessionFolder: " ~/notes ", SessionTemplate: "/t/session.md"})
+	if cur.SessionFolder != "~/notes" || cur.SessionTemplate != "/t/session.md" {
+		t.Errorf("session settings = %q, %q", cur.SessionFolder, cur.SessionTemplate)
+	}
 	edited(&cur, settings.Settings{Look: "blueprint"})
 	if cur.Look != "blueprint" {
 		t.Errorf("blueprint look dropped: %q", cur.Look)

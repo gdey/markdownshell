@@ -79,6 +79,14 @@ export function CheckInfo(info: string): $CancellablePromise<notebook$0.Problem[
 }
 
 /**
+ * ChooseFile asks for a markdown file, with title, starting in dir or
+ * the start folder, and returns it, or "" if none was picked.
+ */
+export function ChooseFile(title: string, dir: string): $CancellablePromise<string> {
+    return $Call.ByName("main.App.ChooseFile", title, dir);
+}
+
+/**
  * ChooseFolder asks for a folder, with title, starting in dir or the
  * start folder, and returns it, or "" if none was picked.
  */
@@ -221,6 +229,14 @@ export function HistoryPrompt(): $CancellablePromise<notebook$0.Prompt> {
 }
 
 /**
+ * LastSession opens the file in the sessions folder changed last, as
+ * NewSession opens a session.
+ */
+export function LastSession(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.LastSession");
+}
+
+/**
  * Live is what the run going on in the tab has sent so far, for a page
  * that starts partway through it.
  */
@@ -265,6 +281,16 @@ export function Neovim(): $CancellablePromise<$models.NeovimInfo> {
  */
 export function NewFile(template: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.NewFile", template);
+}
+
+/**
+ * NewSession opens the day's session, from the start screen: a file
+ * named for the date in the sessions folder, made from the session
+ * template if it isn't there yet. It opens with the History pane open
+ * and focused.
+ */
+export function NewSession(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.NewSession");
 }
 
 /**
