@@ -135,10 +135,14 @@ The two images it produced:
 
 ![screenshot](examples/hello.md.assets/screenshot.png)
 
-More complete runbooks live in [examples/runbooks](examples/runbooks): cutting
-a release, a system report, Linux and macOS host triage, and a test
-coverage report for mdsh itself. `go test ./cmd/mdsh` runs each of them; a
-name ending in `_linux.md` or `_darwin.md` runs only on that OS.
+[examples/README.md](examples/README.md) is a guided tour of the rest:
+quoting files, guard rails for runbooks, inputs, terminal recordings,
+background blocks, reports and interactive sessions, ending with the
+complete runbooks in [examples/runbooks](examples/runbooks): deploying a
+site, cutting a release, a system report, Linux and macOS host triage,
+and a test coverage report for mdsh itself. `go test ./cmd/mdsh` runs
+each runbook; a name ending in `_linux.md` or `_darwin.md` runs only on
+that OS.
 
 ## Install
 
