@@ -648,7 +648,10 @@ body.shell { overflow: hidden; }
 }
 .tab.drop-before::before { left: -2px; }
 .tab.drop-after::after { right: -2px; }
-#frames { flex: 1; position: relative; min-height: 0; }
+/* #frames is a <main>, for screen readers, so it undoes the document's
+   main rule: centred at 860px, it would shrink to its padding and the
+   tab's page with it. */
+#frames { flex: 1; position: relative; min-height: 0; max-width: none; width: auto; margin: 0; padding: 0; }
 #frames iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 #frames iframe[hidden] { display: none; }
 #drop-here {
