@@ -579,3 +579,82 @@ func TestCallerEnvStaysOut(t *testing.T) {
 		t.Errorf("MDSH_EXPOSE: rc = %d, stdout %q", rc, out.String())
 	}
 }
+
+// TestConfirmShowsControlChars checks that escape sequences in a block's
+// code are shown at the question instead of acted on, so a line that
+// would erase itself on the terminal can't hide code that runs.
+func TestConfirmShowsControlChars(t *testing.T) {
+	b := &doc.Block{ID: "x\x1b[2K", Body: "echo visible\ntouch /tmp/PWNED #\r\x1b[2K\n", Attrs: doc.Attrs{"confirm": "Ok?\x1b[1A"}}
+	for _, quiet := range []bool{false, true} {
+		var out bytes.Buffer
+		p := newPrompter(strings.NewReader("s\n"), &out)
+		p.quiet = quiet
+		p.confirm(b)
+		got := out.String()
+		if strings.ContainsAny(got, "\x1b\r") {
+			t.Errorf("quiet %v: raw control characters reach the terminal: %q", quiet, got)
+		}
+		for _, want := range []string{"touch /tmp/PWNED #^M^[[2K", "control characters", "Ok?^[[1A", "block x^[[2K"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("quiet %v: prompt %q lacks %q", quiet, got, want)
+			}
+		}
+	}
+	var out bytes.Buffer
+	newPrompter(strings.NewReader("s\n"), &out).depend(b, &doc.Block{ID: "y"})
+	if strings.ContainsAny(out.String(), "\x1b\r") || !strings.Contains(out.String(), "^M^[[2K") {
+		t.Errorf("depend prompt = %q", out.String())
+	}
+}
+
+// TestConfirmShowsHiddenCode checks that a quiet question, asked after
+// the streamed document, still shows code the document left out.
+func TestConfirmShowsHiddenCode(t *testing.T) {
+	b := &doc.Block{ID: "evil", Body: "touch /tmp/PWNED\n"}
+	var out bytes.Buffer
+	p := newPrompter(strings.NewReader("s\n"), &out)
+	p.quiet = true
+	p.shown = func(*doc.Block) bool { return false }
+	p.confirm(b)
+	if !strings.Contains(out.String(), "touch /tmp/PWNED") {
+		t.Errorf("hidden code not shown: %q", out.String())
+	}
+	out.Reset()
+	p.shown = func(*doc.Block) bool { return true }
+	p.confirm(b)
+	if strings.Contains(out.String(), "touch /tmp/PWNED") {
+		t.Errorf("printed code shown twice: %q", out.String())
+	}
+}
+
+// TestStreamCodeShown checks which blocks the streamed document shows.
+func TestStreamCodeShown(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a}\necho a\n```\n\n```sh {#b show=false}\necho b\n```\n\n<!-- mdsh:if false -->\n```sh {#c}\necho c\n```\n<!-- mdsh:end -->\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newStreamer(d, &bytes.Buffer{}, false, render.Options{Terminal: true})
+	for i, want := range []bool{true, false, false} {
+		if got := s.codeShown(d.Blocks[i]); got != want {
+			t.Errorf("block %s: shown %v, want %v", d.Blocks[i].ID, got, want)
+		}
+	}
+}
+
+// TestPrintEscapesCode checks that printing the document to the
+// terminal shows control characters in code, and -w keeps them.
+func TestPrintEscapesCode(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	src := "```sh\necho a #\r\x1b[2K\n```\n"
+	os.WriteFile(f, []byte(src), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"-n", "--no-color", f}, nil, &out, &errb); rc != 0 || strings.Contains(out.String(), "\x1b") || !strings.Contains(out.String(), "echo a #^M^[[2K") {
+		t.Errorf("-n: rc = %d, stdout %q, stderr %s", rc, out.String(), errb.String())
+	}
+	if rc := mdsh([]string{"-w", f}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("-w: rc = %d, stderr %s", rc, errb.String())
+	}
+	if got, _ := os.ReadFile(f); !strings.Contains(string(got), "echo a #\r\x1b[2K\n") {
+		t.Errorf("-w changed the code: %q", got)
+	}
+}

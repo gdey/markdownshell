@@ -199,3 +199,17 @@ func TestEmptyCopy(t *testing.T) {
 		t.Errorf("print:\ngot  %q\nwant %q", got, want)
 	}
 }
+
+func TestTerminalEscapesCode(t *testing.T) {
+	src := "```sh\necho a\x1b[2K\n```\n\ntext\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(Markdown(d, nil, Options{Terminal: true})), "```sh\necho a^[[2K\n```\n\ntext\n"; got != want {
+		t.Errorf("terminal:\ngot  %q\nwant %q", got, want)
+	}
+	if got := string(Markdown(d, nil, Options{Terminal: true, WriteBack: true})); got != src {
+		t.Errorf("write-back changed the code: %q", got)
+	}
+}

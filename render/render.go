@@ -10,6 +10,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termsafe"
 )
 
 // Options control what Markdown prints.
@@ -31,6 +32,10 @@ type Options struct {
 	// placeholders keep their stored values and conditions read empty.
 	// Write-back never stores a caller value.
 	Env []string
+	// Terminal renders for showing on a terminal: control characters in
+	// code blocks are shown as ^[ and the like (see termsafe.Visible),
+	// so the code on the screen is the code that runs.
+	Terminal bool
 }
 
 // Markdown renders d with results spliced in after their blocks. Blocks
@@ -121,7 +126,11 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 		showCode := !(opts.HideCode && run.Runnable(b)) && shown(b, "show")
 		showOutput := !opts.HideOutput && shown(b, "show-output")
 		if showCode {
-			buf.Write(src[b.Span.Start:b.Span.End])
+			code := src[b.Span.Start:b.Span.End]
+			if opts.Terminal && !opts.WriteBack {
+				code = []byte(termsafe.Visible(string(code)))
+			}
+			buf.Write(code)
 		}
 		buf = &bufs[3*i+2]
 		if !showOutput {
