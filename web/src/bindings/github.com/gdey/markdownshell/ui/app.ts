@@ -21,6 +21,9 @@ import * as collection$0 from "../collection/models.js";
 import * as doc$0 from "../doc/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as history$0 from "../history/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as library$0 from "../library/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -230,7 +233,7 @@ export function HistoryComplete(input: string): $CancellablePromise<boolean> {
  * HistoryCompletions completes the word at the end of before, what is
  * typed in the History pane up to the cursor, for Tab.
  */
-export function HistoryCompletions(before: string): $CancellablePromise<notebook$0.Completion> {
+export function HistoryCompletions(before: string): $CancellablePromise<history$0.Completion> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryCompletions", before);
 }
 
@@ -246,7 +249,7 @@ export function HistoryEnter(input: string): $CancellablePromise<void> {
  * HistoryPrompt is the shell's PS1 and PS2, expanded, for the History
  * pane's prompt.
  */
-export function HistoryPrompt(): $CancellablePromise<notebook$0.Prompt> {
+export function HistoryPrompt(): $CancellablePromise<history$0.Prompt> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryPrompt");
 }
 

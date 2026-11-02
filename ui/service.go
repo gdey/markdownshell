@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/history"
 	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/report"
@@ -466,20 +467,20 @@ func (a *App) HistoryComplete(ctx context.Context, input string) bool {
 
 // HistoryCompletions completes the word at the end of before, what is
 // typed in the History pane up to the cursor, for Tab.
-func (a *App) HistoryCompletions(ctx context.Context, before string) (notebook.Completion, error) {
+func (a *App) HistoryCompletions(ctx context.Context, before string) (history.Completion, error) {
 	_, n, err := a.notebook(ctx)
 	if err != nil {
-		return notebook.Completion{}, err
+		return history.Completion{}, err
 	}
 	return n.Completions(before)
 }
 
 // HistoryPrompt is the shell's PS1 and PS2, expanded, for the History
 // pane's prompt.
-func (a *App) HistoryPrompt(ctx context.Context) (notebook.Prompt, error) {
+func (a *App) HistoryPrompt(ctx context.Context) (history.Prompt, error) {
 	_, n, err := a.notebook(ctx)
 	if err != nil {
-		return notebook.Prompt{}, err
+		return history.Prompt{}, err
 	}
 	return n.Prompt()
 }

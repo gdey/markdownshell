@@ -1,6 +1,8 @@
 package notebook
 
 import (
+	"github.com/gdey/markdownshell/history"
+
 	"errors"
 	"fmt"
 	"strings"
@@ -290,7 +292,7 @@ func TestMoveHistory(t *testing.T) {
 	}
 	// Its old file is still linked, so the next history block doesn't
 	// take its number.
-	if id := n.nextHistoryID(); id != "history-3" {
+	if id := history.NextID(n.d); id != "history-3" {
 		t.Errorf("next history id = %s, want history-3", id)
 	}
 	// Undo puts the old id back.

@@ -259,16 +259,6 @@ func TestHistoryBackground(t *testing.T) {
 	}
 }
 
-func TestBackgrounded(t *testing.T) {
-	for in, want := range map[string]bool{
-		"sleep 1 &": true, "a && b": false, "echo \\&": false, "cmd >&": false, "a |&": false, "x&": true, "echo hi": false,
-	} {
-		if _, got := backgrounded(in); got != want {
-			t.Errorf("backgrounded(%q) = %v", in, got)
-		}
-	}
-}
-
 func TestRestart(t *testing.T) {
 	src := "```sh\nX=set; PS1='$X> '\n```\n"
 	n, err := Open(write(t, src), Options{})

@@ -1,17 +1,12 @@
 package notebook
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
-	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/history"
 	"github.com/gdey/markdownshell/run"
 )
@@ -45,7 +40,7 @@ func (n *Notebook) SetHistory(on bool) (restarted bool, err error) {
 		if rc := n.opts.Run.HistoryRC; rc != "" {
 			n.running = true
 			n.mu.Unlock()
-			_, err := n.sess.Ask(context.Background(), rcScript(rc))
+			_, err := n.sess.Ask(context.Background(), history.RCScript(rc))
 			n.mu.Lock()
 			n.running = false
 			return false, err
@@ -95,63 +90,16 @@ func (n *Notebook) source(ro RunOptions) string {
 	if !n.history || ro.HistoryRC == "" {
 		return ro.Source
 	}
-	return ro.Source + "\n" + rcScript(ro.HistoryRC)
-}
-
-// rcScript reads the file at path, if there is one, in the shell, as an
-// interactive shell reads its rc file. A leading ~/ is the home folder.
-// What it prints is dropped, along with any errors, since an rc file
-// often does things only an interactive shell can.
-func rcScript(path string) string {
-	p := quote(path)
-	if rest, ok := strings.CutPrefix(path, "~/"); ok {
-		p = `"$HOME"/` + quote(rest)
-	}
-	return "if [ -r " + p + " ]; then . " + p + " </dev/null >/dev/null 2>&1; fi\n"
-}
-
-// Prompt is the shell's prompts, PS1 and PS2, expanded as the shell
-// would show them, with their colors as ANSI escapes. Empty means the
-// shell has none.
-type Prompt struct {
-	PS1 string `json:"ps1"`
-	PS2 string `json:"ps2"`
-}
-
-// promptMark divides PS1 from PS2 in what promptScript prints.
-const promptMark = "\n--mdsh-ps2--\n"
-
-// promptScript prints PS1 and PS2, expanded. zsh runs its precmd hooks
-// first, as many prompt themes need, and expands % escapes, and $(…)
-// too with promptsubst; bash expands its \ escapes; other shells, as
-// dash does, expand the variables in them.
-func promptScript(zsh bool) string {
-	if zsh {
-		return `(for f in precmd $precmd_functions; do (( $+functions[$f] )) && $f >/dev/null 2>&1 </dev/null; done
-p1=$PS1 p2=$PS2
-if [[ -o promptsubst ]]; then p1=${(e)p1} p2=${(e)p2}; fi 2>/dev/null
-print -rn -- "${(%)p1}"$'` + strings.ReplaceAll(promptMark, "\n", `\n`) + `'"${(%)p2}")`
-	}
-	// ${PS1@P} needs bash 4.4; macOS's sh is bash 3.2, where it is an
-	// error that ends the subshell, so older shells expand only the
-	// variables, each in a subshell of its own in case that fails too.
-	return `(p1=${PS1-} p2=${PS2-}
-case ${BASH_VERSION-} in
-''|[123].*|4.[0-3]*)
-	x=$(eval "printf '%s' \"$p1\"" 2>/dev/null) && p1=$x
-	x=$(eval "printf '%s' \"$p2\"" 2>/dev/null) && p2=$x ;;
-*) eval 'p1=${PS1@P} p2=${PS2@P}' ;;
-esac
-printf '%s\n%s\n%s' "$p1" '--mdsh-ps2--' "$p2")`
+	return ro.Source + "\n" + history.RCScript(ro.HistoryRC)
 }
 
 // Prompt asks the shell blocks run in for its prompts, so the History
 // pane can show them. It returns ErrBusy while a block runs.
-func (n *Notebook) Prompt() (Prompt, error) {
+func (n *Notebook) Prompt() (history.Prompt, error) {
 	n.mu.Lock()
 	if n.running {
 		n.mu.Unlock()
-		return Prompt{}, ErrBusy
+		return history.Prompt{}, ErrBusy
 	}
 	n.waitReap()
 	n.running, n.asking = true, true
@@ -163,14 +111,7 @@ func (n *Notebook) Prompt() (Prompt, error) {
 		n.idle.Broadcast()
 		n.mu.Unlock()
 	}()
-	out, err := sess.Ask(context.Background(), promptScript(zsh))
-	if err != nil {
-		return Prompt{}, err
-	}
-	ps1, ps2, _ := strings.Cut(out, promptMark)
-	// bash's \[ and \] mark where escapes start and end.
-	clean := strings.NewReplacer("\x01", "", "\x02", "")
-	return Prompt{PS1: clean.Replace(ps1), PS2: clean.Replace(ps2)}, nil
+	return history.AskPrompt(context.Background(), sess, zsh)
 }
 
 // History reports whether the History pane is on.
@@ -194,7 +135,7 @@ func (n *Notebook) Enter(input string) error {
 	if strings.TrimSpace(input) == "" {
 		return nil
 	}
-	if text, ok := note(input); ok {
+	if text, ok := history.Note(input); ok {
 		return n.addNote(text)
 	}
 	n.mu.Lock()
@@ -203,13 +144,10 @@ func (n *Notebook) Enter(input string) error {
 	if !on {
 		return ErrHistoryOff
 	}
-	body, bg := backgrounded(input)
+	body, bg := history.Background(input)
 	return n.start(func(ctx context.Context) error {
 		n.mu.Lock()
-		info := fmt.Sprintf("%s {#%s}", n.lang(), n.nextHistoryID())
-		if bg {
-			info = strings.TrimSuffix(info, "}") + " background}"
-		}
+		info := history.Info(n.lang(), history.NextID(n.d), bg)
 		b, err := n.d.AppendBlock(info, body)
 		if err == nil {
 			err = n.sync()
@@ -251,35 +189,6 @@ func (n *Notebook) Enter(input string) error {
 	})
 }
 
-// backgrounded reports whether input ends in a lone &, as a command
-// run in the background does, and returns it without the &.
-func backgrounded(input string) (string, bool) {
-	s := strings.TrimRight(input, " \t\n")
-	if !strings.HasSuffix(s, "&") || strings.HasSuffix(s, "&&") || escaped(s, len(s)-1) {
-		return input, false
-	}
-	// >& and <& redirect; |& pipes stderr too.
-	if prev := strings.TrimSuffix(s, "&"); strings.HasSuffix(prev, ">") || strings.HasSuffix(prev, "<") || strings.HasSuffix(prev, "|") {
-		return input, false
-	}
-	return strings.TrimRight(strings.TrimSuffix(s, "&"), " \t"), true
-}
-
-// note returns the text of input if it is a note: every line starts
-// with #, which is taken off along with a space after it.
-func note(input string) (string, bool) {
-	lines := strings.Split(input, "\n")
-	for i, l := range lines {
-		l = strings.TrimLeft(l, " \t")
-		if !strings.HasPrefix(l, "#") {
-			return "", false
-		}
-		l = strings.TrimPrefix(l[1:], " ")
-		lines[i] = l
-	}
-	return strings.Join(lines, "\n"), true
-}
-
 func (n *Notebook) addNote(text string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -289,40 +198,10 @@ func (n *Notebook) addNote(text string) error {
 	if strings.TrimSpace(text) == "" {
 		return nil
 	}
-	src := n.d.Src
-	var out []byte
-	if n.noteEnd == len(src) {
-		// The note before this one ends the document: carry on its
-		// paragraph.
-		out = append(append([]byte(nil), src...), text+"\n"...)
-	} else {
-		out = append(bytes.TrimRight(src, "\n"), "\n\n"+text+"\n"...)
-		if len(bytes.TrimSpace(src)) == 0 {
-			out = []byte(text + "\n")
-		}
-	}
-	// The note must be prose: the blocks stay as they are.
-	type same struct {
-		info, body string
-		span       doc.Span
-	}
-	var before []same
-	for _, b := range n.d.Blocks {
-		before = append(before, same{b.Info, b.Body, b.Span})
-	}
-	old := n.d.Src
-	if err := n.d.SetSource(out); err != nil {
+	// The note before this one ending the document carries on its
+	// paragraph.
+	if err := history.AddNote(n.d, text, n.noteEnd == len(n.d.Src)); err != nil {
 		return err
-	}
-	changed := len(n.d.Blocks) != len(before)
-	for i, b := range n.d.Blocks {
-		changed = changed || same{b.Info, b.Body, b.Span} != before[i]
-	}
-	if changed {
-		if err := n.d.SetSource(old); err != nil {
-			return err
-		}
-		return errors.New("the note would change the document's blocks; is a fence left open?")
 	}
 	if err := n.sync(); err != nil {
 		return err
@@ -332,88 +211,40 @@ func (n *Notebook) addNote(text string) error {
 	return nil
 }
 
-// nextHistoryID is the id for the next command, with n.mu held.
-func (n *Notebook) nextHistoryID() string { return history.NextID(n.d) }
-
 // shell is the shell blocks run in, with n.mu held.
-func (n *Notebook) shell() string {
-	if n.opts.Run.Shell != "" {
-		return n.opts.Run.Shell
-	}
-	if sh := run.Shell(n.d); sh != "" {
-		return sh
-	}
-	return "/bin/sh"
-}
+func (n *Notebook) shell() string { return history.Shell(n.d, n.opts.Run.Shell) }
 
-// lang is the language commands are added as: zsh if the blocks run in
-// zsh, else sh.
-func (n *Notebook) lang() string {
-	if filepath.Base(n.shell()) == "zsh" {
-		return "zsh"
-	}
-	return "sh"
-}
-
-// incomplete matches what sh, bash and zsh say about input that ends
-// partway through a command.
-var incomplete = regexp.MustCompile("end of file|EOF|[Uu]nterminated|unmatched|near `\\\\n'")
+// lang is the language commands are added as, with n.mu held.
+func (n *Notebook) lang() string { return history.Lang(n.shell()) }
 
 // Complete reports whether input is a whole command, or a note, so
 // pressing enter in the History pane runs it rather than starting
-// another line. Input ending in \, |, && or ||, or inside a quote, an
-// if, a loop or a here-document, isn't.
+// another line. See history.Whole.
 func (n *Notebook) Complete(input string) bool {
-	input = strings.TrimRight(input, "\n")
-	if _, ok := note(input); ok || strings.TrimSpace(input) == "" {
-		return true
-	}
-	end := strings.TrimRight(input, " \t")
-	trailing := len(end) - len(strings.TrimRight(end, `\`))
-	if trailing%2 == 1 {
-		return false
-	}
-	for _, op := range []string{"|", "&&", "||"} {
-		if strings.HasSuffix(end, op) && !strings.HasSuffix(end, `\`+op) {
-			return false
-		}
-	}
-	if openHeredoc(input) {
-		return false
-	}
 	n.mu.Lock()
 	sh := n.shell()
 	n.mu.Unlock()
-	cmd := exec.Command(sh, "-n")
-	cmd.Stdin = strings.NewReader(input + "\n")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		return true
-	}
-	var ee *exec.ExitError
-	return !errors.As(err, &ee) || !incomplete.Match(out)
+	return history.Whole(sh, input)
 }
 
-var heredoc = regexp.MustCompile(`<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?`)
-
-// openHeredoc reports whether input starts a here-document it doesn't
-// end.
-func openHeredoc(input string) bool {
-	lines := strings.Split(input, "\n")
-	for i := 0; i < len(lines); i++ {
-		for _, m := range heredoc.FindAllStringSubmatch(lines[i], -1) {
-			word, found := m[1], false
-			for i+1 < len(lines) {
-				i++
-				if strings.TrimLeft(lines[i], "\t") == word {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return true
-			}
-		}
+// Completions completes the word at the end of before, what is typed
+// in the History pane up to the cursor, asking the document's shell, so
+// it sees the directory and variables blocks left there. See
+// history.Complete. It returns ErrBusy while a block runs.
+func (n *Notebook) Completions(before string) (history.Completion, error) {
+	n.mu.Lock()
+	if n.running {
+		n.mu.Unlock()
+		return history.Completion{}, ErrBusy
 	}
-	return false
+	n.waitReap()
+	n.running = true
+	sess, zsh := n.sess, n.lang() == "zsh"
+	n.mu.Unlock()
+	defer func() {
+		n.mu.Lock()
+		n.running = false
+		n.mu.Unlock()
+	}()
+	return history.Complete(context.Background(), sess, before, zsh), nil
 }
