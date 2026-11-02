@@ -12,9 +12,13 @@ over like lines of one script.
   it after, so two `env=build` blocks share state. `env=build/test` stacks
   `test` on `build`.
 - **What crosses over.** When a sub-env is created it gets the parent's
-  *exported* variables that pass `share=`. `share=...` (or `share=*`)
-  passes all, `share=...,-TOKEN` passes all but `TOKEN`, and `share=`
-  (empty) starts clean. Variables only flow down.
+  *exported* variables that pass `share=`, along with the base set
+  (`PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, `LC_*`,
+  `TMPDIR` and a few more; see [`env.share`]({{< relref "front-matter#envshare" >}})),
+  so tools still work. `share=...` (or `share=*`) passes all,
+  `share=...,-TOKEN` passes all but `TOKEN`, `share=` (empty) passes just
+  the base set, and `share=-PATH` drops a base variable too. Variables
+  only flow down.
 - **Never shared.** Unexported variables, functions, aliases and the
   working directory. Every env starts in the document's directory. Files
   named by `--source` and `env.source` are sourced into every env, though;

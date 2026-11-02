@@ -67,7 +67,7 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 		selected: selected,
 		stack: env.NewStack(env.Config{
 			Path: shell,
-			Env:  env.Environ(env.Filter(env.Vars(opts.Environ), d.Options.Env.Share)),
+			Env:  TopEnv(d, opts),
 			Dir:  opts.Dir,
 			Args: opts.Args,
 			TTY:  hasTTY(d) || opts.PTY,
@@ -75,6 +75,7 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 		}),
 		tty: hasTTY(d) || opts.PTY,
 	}
+	s.stack.Strict = opts.Remote
 	if opts.Audit != nil {
 		s.stack.OnStart = s.logEnv
 	}
@@ -561,4 +562,21 @@ func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	runBlock(ctx, s.stack, s.d, b, pre, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
 	revoke()
 	s.emit(Event{Kind: Done, Block: b, Result: r})
+}
+
+// TopEnv is the environment of d's top-level shell: opts.Environ as the
+// front matter's env.share filters it. A local document gets env.Base
+// and the names its env.share gives, or everything when the list has
+// "..." (doc.Options.FullEnv). A remote document (opts.Remote) gets only
+// the names it gives: no base set, and nothing when it names nothing.
+func TopEnv(d *doc.Document, opts Options) []string {
+	vars := env.Vars(opts.Environ)
+	share := d.Options.Env.Share
+	if share == nil {
+		share = []string{}
+	}
+	if opts.Remote {
+		return env.Environ(env.FilterStrict(vars, share))
+	}
+	return env.Environ(env.Filter(vars, share))
 }

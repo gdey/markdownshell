@@ -3,6 +3,7 @@ package env
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -25,6 +26,10 @@ type Stack struct {
 	// share it was made with (nil for the top level, whose Config.Env
 	// is already filtered) and the names of the variables it was given.
 	OnStart func(e *Env, share, names []string)
+	// Strict makes share lists pass only what they name, without the
+	// Base set. It is for documents loaded from a URL, which must not get
+	// even PATH or HOME unless they ask (see FilterStrict).
+	Strict bool
 }
 
 // NewStack returns a stack whose top-level env starts with cfg.
@@ -70,7 +75,11 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 		return nil, fmt.Errorf("env %q: %w", name, err)
 	}
 	cfg := s.cfg
-	cfg.Env = Environ(Filter(vars, share))
+	filter := Filter
+	if s.Strict {
+		filter = FilterStrict
+	}
+	cfg.Env = Environ(filter(vars, share))
 	sh, err := Start(cfg)
 	if err != nil {
 		return nil, err
@@ -101,11 +110,52 @@ func (s *Stack) Close() {
 	}
 }
 
-// Filter keeps the variables named in share. Nil share keeps all of them.
-// "..." (or "*") in share keeps all, and a name prefixed with "-" is
-// dropped even if "..." or the plain name also appears, so
-// [..., -USER] keeps everything but USER.
+// Base lists the variables every share list passes, unless it drops
+// them by name (-PATH), so a block whose env is filtered can still find
+// programs, its home folder and the temp folder, and print text in the
+// user's language. None of them holds a secret: they say who the user
+// is, where their files are and how to talk to the terminal, all of
+// which a block can learn another way (id, ~, getpwuid). Names starting
+// with BasePrefix (LC_ALL, LC_CTYPE, ...) are base too.
+//
+// Left out on purpose: anything that grants access rather than
+// describing the user, such as SSH_AUTH_SOCK, DBUS_SESSION_BUS_ADDRESS,
+// XDG_RUNTIME_DIR, DISPLAY and tokens. Those stay behind share.
+var Base = []string{
+	"PATH", "HOME", "USER", "LOGNAME", "SHELL",
+	"TERM", "COLORTERM",
+	"LANG", "LANGUAGE", "TZ", "TMPDIR",
+	// macOS: the text encoding Core Foundation tools read; without it
+	// some print mojibake for non-ASCII text.
+	"__CF_USER_TEXT_ENCODING",
+}
+
+// BasePrefix marks the locale variables that are base along with Base.
+const BasePrefix = "LC_"
+
+// IsBase reports whether name is in the base set.
+func IsBase(name string) bool {
+	return strings.HasPrefix(name, BasePrefix) || slices.Contains(Base, name)
+}
+
+// Filter keeps the variables named in share, and the Base set. Nil share
+// keeps all of them. "..." (or "*") in share keeps all, and a name
+// prefixed with "-" is dropped even if "..." or the plain name also
+// appears, so [..., -USER] keeps everything but USER. A base variable
+// is dropped the same way: [-PATH] keeps the base set but PATH.
 func Filter(vars map[string]string, share []string) map[string]string {
+	return filter(vars, share, true)
+}
+
+// FilterStrict is Filter without the Base set: share keeps exactly the
+// names it lists. Documents loaded from a URL (http, https, ftp, sftp)
+// use it, so a script fetched from the internet sees none of the caller's
+// environment it didn't name, PATH and HOME included.
+func FilterStrict(vars map[string]string, share []string) map[string]string {
+	return filter(vars, share, false)
+}
+
+func filter(vars map[string]string, share []string, base bool) map[string]string {
 	if share == nil {
 		return vars
 	}
@@ -124,7 +174,7 @@ func Filter(vars map[string]string, share []string) map[string]string {
 	}
 	out := map[string]string{}
 	for k, v := range vars {
-		if (all || keep[k]) && !drop[k] {
+		if (all || keep[k] || base && IsBase(k)) && !drop[k] {
 			out[k] = v
 		}
 	}

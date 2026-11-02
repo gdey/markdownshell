@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gdey/markdownshell/env"
 )
 
 // TestMain lets the test binary stand in for mdsh, so blocks that call
@@ -133,7 +135,15 @@ func TestAudit(t *testing.T) {
 		ev := e["event"].(string)
 		switch ev {
 		case "env.start":
-			ev += ":" + fmt.Sprint(e["shared"])
+			// The base set (SHELL, LANG, ...) passes too, as much of it
+			// as the test's environment has; list only the rest.
+			var shared []string
+			for _, name := range e["shared"].([]any) {
+				if n := name.(string); n == "HOME" || n == "PATH" || !env.IsBase(n) {
+					shared = append(shared, n)
+				}
+			}
+			ev += ":" + fmt.Sprint(shared)
 		case "ctl":
 			ev += ":" + fmt.Sprint(e["code"])
 		case "var":

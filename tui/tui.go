@@ -20,6 +20,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/doc"
@@ -1282,6 +1283,9 @@ func (m *Model) vpHeight() int {
 	if m.changed {
 		h--
 	}
+	if m.envBanner() != "" {
+		h--
+	}
 	return max(h, 1)
 }
 
@@ -1304,6 +1308,11 @@ func (m *Model) View() string {
 		view += "\n" + m.histView()
 	}
 	view += "\n" + m.footer()
+	if b := m.envBanner(); b != "" {
+		// One line, cut short to fit: the names it leaves out are in the
+		// front matter.
+		view = envBannerStyle.Width(m.width).Render(ansi.Truncate(b, m.width-2, "…")) + "\n" + view
+	}
 	if m.changed {
 		view = bannerStyle.Width(m.width).Render("The file changed on disk.  R reload it · M keep yours") + "\n" + view
 	}
@@ -1376,4 +1385,14 @@ func (m *Model) quitWord(key string) string {
 		return "close"
 	}
 	return "quit"
+}
+
+// envBanner is the line shown over the document when its front matter
+// brings in the whole environment mdsh started in (env.share with ...),
+// or "" when it doesn't.
+func (m *Model) envBanner() string {
+	if m.d == nil {
+		return ""
+	}
+	return m.d.Options.FullEnvBanner()
 }

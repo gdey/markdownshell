@@ -40,7 +40,7 @@ closing line, the `---` is just a thematic break.
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
 | `terminal.cols`, `terminal.rows` | cells | fit the window, 24 | In mdsh-gui, the size of the terminal `tty` blocks run on |
-| `env.share` | list of variable names, `...`, `-NAME` | all | Variables passed from mdsh's environment into the shell, and the default `share=` for sub-envs |
+| `env.share` | list of variable names, `...`, `-NAME` | the base set | Variables passed from mdsh's environment into the shell, besides the base set (`PATH`, `HOME`, `USER`, ...), and the default `share=` for sub-envs |
 | `env.source` | list of file paths | none | Files sourced into every shell before its first block, such as aliases and functions |
 
 ### `shell`
@@ -104,12 +104,21 @@ this.
 ### `env.share`
 
 Which variables from the environment mdsh was started in reach the
-top-level shell. Leave it out to pass everything. A list passes only those
-names, `[]` passes nothing (not even `PATH`), and `...` (or `*`) in the
-list passes everything. A name with a leading `-` is left out even when
-`...` or the plain name is also in the list, so `[..., -USER]` passes
-everything except `USER`. Removals only subtract: `[-USER]` on its own
-passes nothing, so add `...` when you mean "all but".
+top-level shell. Leave it out to pass just the base set. A list passes
+those names and the base set, the variables programs need to work and that
+hold no secrets: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `COLORTERM`, `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TMPDIR` and, on macOS, `__CF_USER_TEXT_ENCODING`. `[]` passes just the base set, and `...` (or
+`*`) in the list passes everything. A name with a leading `-` is left
+out even when `...`, the plain name or the base set would pass it, so
+`[..., -USER]` passes everything except `USER`, and `[-PATH]` passes the
+base set without `PATH`. Removals only subtract: `[-GITHUB_TOKEN]` on its
+own passes just the base set, so add `...` when you mean "all but".
+
+`[...]` is how a file asks for your whole environment. `mdsh -i` and
+mdsh-gui show a banner over such a file, "This file brings in all your
+environment variables", naming anything it leaves out with `-NAME`.
+
+A document loaded from a URL gets no base set: its shells see only the
+variables it names, not even `PATH`.
 
 The same list is the default `share=` for sub-envs: a block that creates a
 sub-env without its own `share=` gets only these exported variables from
@@ -118,7 +127,7 @@ its parent. See [Environments]({{< relref "environments" >}}).
 ```yaml
 mdsh:
   env:
-    share: [PATH, HOME, USER]
+    share: [GOPATH, AWS_PROFILE]
 ```
 
 ```yaml

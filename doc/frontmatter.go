@@ -3,6 +3,7 @@ package doc
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,13 +34,50 @@ type Options struct {
 	} `yaml:"terminal"`
 	Env struct {
 		// Share lists the variables passed into the top-level env from
-		// the caller, and the default for sub-envs. Nil means all.
+		// the caller, besides env.Base (except in a remote document),
+		// and the default for sub-envs. Nil passes only env.Base; "..."
+		// passes everything (see FullEnv).
 		Share []string `yaml:"share"`
 		// Source lists files sourced into every shell as it starts,
 		// such as aliases and functions. A leading ~/ is the home
 		// directory; other relative paths are relative to the document.
 		Source []string `yaml:"source"`
 	} `yaml:"env"`
+}
+
+// FullEnv reports whether env.share brings in the whole environment mdsh
+// was started in, as "..." or "*" in the list does, and the names the
+// list still leaves out with -NAME. Without it, blocks get only the base
+// set (PATH, HOME, USER, ...) and the names the list gives; front ends
+// show a banner on a file that brings in everything.
+func (o Options) FullEnv() (full bool, except []string) {
+	for _, k := range o.Env.Share {
+		switch {
+		case k == "..." || k == "*":
+			full = true
+		case strings.HasPrefix(k, "-"):
+			except = append(except, k[1:])
+		}
+	}
+	if !full {
+		return false, nil
+	}
+	return true, except
+}
+
+// FullEnvBanner is the line front ends show over a file whose
+// env.share brings in the whole environment, naming what it leaves out,
+// or "" when it doesn't.
+func (o Options) FullEnvBanner() string {
+	full, except := o.FullEnv()
+	if !full {
+		return ""
+	}
+	text := "This file brings in all your environment variables"
+	if len(except) > 0 {
+		text += ", except " + strings.Join(except, ", ")
+	}
+	return text
 }
 
 // Interpolating reports whether placeholders are filled in.

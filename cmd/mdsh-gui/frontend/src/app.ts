@@ -25,7 +25,7 @@ import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSiz
 import { applyTheme } from "./theme.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0 };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "" };
 let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
@@ -87,6 +87,8 @@ async function refresh() {
   $("workspace").hidden = !open;
   $("start").hidden = open;
   syncHistory();
+  $("fullenv-text").textContent = doc.envBanner;
+  $("fullenv").hidden = !open || doc.envBanner === "";
   if (!open) {
     $("changed").hidden = true;
     return drawStart();

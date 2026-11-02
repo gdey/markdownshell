@@ -35,7 +35,10 @@ var (
 	stderrStyle = lipgloss.NewStyle().Foreground(failCol)
 	savedStyle  = lipgloss.NewStyle().Foreground(dimCol)
 	tagStyle    = lipgloss.NewStyle().Foreground(dimCol)
-	bannerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(runningCol).Padding(0, 1)
+	// envBannerStyle marks a file that brings in the whole environment:
+	// worth knowing, not an error.
+	envBannerStyle = lipgloss.NewStyle().Foreground(runningCol).Reverse(true).Padding(0, 1)
+	bannerStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(runningCol).Padding(0, 1)
 )
 
 // refresh redraws the document into the viewport, noting where each

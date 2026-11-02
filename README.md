@@ -349,7 +349,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
 | `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
-| `share=A,B` | Exported vars a new sub-env gets from its parent (default all; empty for none) |
+| `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
@@ -624,6 +624,22 @@ Every front matter option is listed on the
 [Front matter](https://gdey.github.io/markdownshell/docs/front-matter/) page.
 
 ## Shell details
+
+Blocks get a base set of variables from the environment mdsh was
+started in: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`,
+`COLORTERM`, `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TMPDIR` and, on macOS,
+`__CF_USER_TEXT_ENCODING`. None of them is a secret. Name more under
+`env:` in the front matter, or bring in everything with `...`, and drop
+any with `-NAME`:
+
+```yaml
+mdsh:
+  env:
+    share: [..., -GITHUB_TOKEN]
+```
+
+`mdsh -i` and mdsh-gui show a banner over a file that brings in
+everything, so you know before you run it.
 
 A block's stderr is captured separately. It is shown only when the block
 fails, unless `show-stderr` (or `show_stderr: true` under `mdsh:` in the

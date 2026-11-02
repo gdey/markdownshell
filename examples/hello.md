@@ -32,7 +32,7 @@ printf '%s' "$NAME" | wc -c | tr -d ' '
 ```
 
 A sub-env is a separate shell that only receives the exported variables
-named in `share=`. `GREETING` comes through. `NAME` doesn't, because it
+named in `share=`, plus a base set like `PATH` and `HOME` so tools work. `GREETING` comes through. `NAME` doesn't, because it
 was never exported, so `${NAME:-unset}` falls back to `unset`.
 
 ```sh {#isolated env=sub share=GREETING}

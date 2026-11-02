@@ -50,6 +50,9 @@ type Doc struct {
 	// for, 0 where it doesn't.
 	TermCols int `json:"termCols"`
 	TermRows int `json:"termRows"`
+	// EnvBanner, if set, says that the front matter brings in the whole
+	// environment the app started in (env.share with ...).
+	EnvBanner string `json:"envBanner"`
 }
 
 // Doc describes the open file. File is "" while the start screen shows.
@@ -68,7 +71,7 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	t.mu.Unlock()
 	ro := n.RunOptions()
 	cols, rows := n.TerminalSize()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows, EnvBanner: n.EnvBanner()}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
