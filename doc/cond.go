@@ -27,6 +27,12 @@ const (
 // Fact reports whether r is a block fact rather than a variable.
 func (r Ref) Fact() bool { return strings.HasSuffix(r.Var, "?") }
 
+// Caller reports whether r is {{$VAR}} for a variable in mdsh's own
+// environment: not a block's variable, a block fact or an input's var=.
+func (r Ref) Caller() bool {
+	return r.BlockID == "" && !r.Fact() && !strings.HasPrefix(r.Var, VarPrefix)
+}
+
 // IsStatus reports whether r is an exit status, under either name.
 func (r Ref) IsStatus() bool { return r.Var == Status || r.Var == StatusAs }
 

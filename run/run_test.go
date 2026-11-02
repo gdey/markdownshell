@@ -549,7 +549,7 @@ func TestTapePlaceholders(t *testing.T) {
 		"```sh {#a tty}\nread -r u; read -r p; read -r lit\n```\n\n```tape {for=a}\nSet TypingSpeed 1ms\nType \"{{$WHO}}\"\nEnter\nType \"{{#secret/env(PW)}}\"\nEnter\nType '{{$WHO}}'\nEnter\n```\n\n" +
 		"```sh {#b tty}\nread -r p2\n```\n\n```tape {for=b <include file=in.tape}\n```\n\n" +
 		"```sh {#check}\nprintf '%s|%s|%s|%s' \"$u\" \"$p\" \"$lit\" \"$p2\"\n```\n"
-	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md"), Environ: []string{"PATH=" + os.Getenv("PATH"), "WHO=ada"}})
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md"), Environ: []string{"PATH=" + os.Getenv("PATH"), "WHO=ada", "MDSH_EXPOSE=WHO"}})
 	r := byID(results)
 	for _, id := range []string{"a", "b"} {
 		if r[id].Err != nil {

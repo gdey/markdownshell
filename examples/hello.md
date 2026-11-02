@@ -92,7 +92,7 @@ printf '%-10s %s\n' GREETING "$GREETING" NAME "$NAME"
 
 Some parts are only for debugging. Everything between the
 `mdsh:if` and `mdsh:end` comments below is printed only when `DEBUG` is
-set (try `DEBUG=1 ./hello.md`), and `run={{$DEBUG}}` keeps the block
+set and exposed (try `DEBUG=1 MDSH_EXPOSE=DEBUG ./hello.md`), and `run={{$DEBUG}}` keeps the block
 from running otherwise. Its stderr is shown too, because of
 `show-stderr`; normally stderr only appears when a block fails.
 
@@ -112,4 +112,4 @@ running in sh
 Prose can quote what a block left behind: `setup` set the greeting to
 **{{#setup/env(GREETING):"hello"}}** and greeted **{{#setup/env(NAME):"world"}}**.
 It can also quote the environment mdsh was started in: this ran as
-**{{$USER:"j"}}**.
+**{{$USER}}** (the value isn't saved in the file).

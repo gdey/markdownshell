@@ -80,7 +80,7 @@ Enter
 ## Typing a secret
 
 Double-quoted `Type` strings can hold placeholders: `{{$VAR}}` from
-mdsh's environment, or `{{#block/env(VAR)}}` from an earlier block. They
+mdsh's environment (once `--expose VAR` or `$MDSH_EXPOSE` names it), or `{{#block/env(VAR)}}` from an earlier block. They
 are filled in as the tape plays, so the document keeps the placeholder,
 never the value. In single quotes or backticks, text is typed as it is. The
 recording only holds what the screen shows, and this prompt turns echo
@@ -113,7 +113,7 @@ Enter
 This block has no tape, so someone has to type. It runs only when
 `LIVE` is set, because without a terminal it would fail:
 
-    LIVE=1 mdsh terminal.md
+    LIVE=1 mdsh --expose LIVE terminal.md
 
 ```sh {#live tty run={{$LIVE}}}
 printf 'Type anything, then press enter (ctrl+c works too): '

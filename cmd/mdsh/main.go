@@ -146,6 +146,15 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		sources.WriteString("\n")
 		return nil
 	})
+	var expose []string
+	fs.Func("expose", "let {{$VAR}} placeholders and conditions read this variable from the environment, adding to $MDSH_EXPOSE (repeatable, or comma-separated)", func(v string) error {
+		for _, name := range strings.Split(v, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				expose = append(expose, name)
+			}
+		}
+		return nil
+	})
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -177,7 +186,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		if fs.NArg() > 1 {
 			args = fs.Args()[1:]
 		}
-		return interactiveCmd(fs.Arg(0), args, sources.String(), *stop, *step, *yes, *autosave, stdin, stdout)
+		return interactiveCmd(fs.Arg(0), args, sources.String(), expose, *stop, *step, *yes, *autosave, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -279,7 +288,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 		return writeFile(reportFile, out, 0o644)
 	}
-	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: run.WithMode(os.Environ(), mode)}
+	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose)}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are
@@ -578,7 +587,7 @@ func (s *streamer) finish(results []*run.Result) error {
 // TUI starts with a list of the markdown files under it to pick from.
 // Output is saved when asked, or with autosave after every block that
 // runs.
-func interactiveCmd(file string, args []string, source string, stop, step, yes, autosave bool, stdin io.Reader, stdout io.Writer) error {
+func interactiveCmd(file string, args []string, source string, expose []string, stop, step, yes, autosave bool, stdin io.Reader, stdout io.Writer) error {
 	if file == "-" {
 		return errors.New("-i needs a file, not stdin")
 	}
@@ -626,7 +635,7 @@ func interactiveCmd(file string, args []string, source string, stop, step, yes, 
 				File:        abs,
 				LinkDir:     filepath.Dir(abs),
 				Args:        args,
-				Environ:     run.WithMode(os.Environ(), run.ModeInteractive),
+				Environ:     run.WithExpose(run.WithMode(os.Environ(), run.ModeInteractive), expose),
 				Source:      source,
 				StopOnError: stop,
 				Step:        step,

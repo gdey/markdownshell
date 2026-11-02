@@ -106,7 +106,7 @@ printf '%-10s %s\n' GREETING "$GREETING" NAME "$NAME"
 
 Some parts are only for debugging. Everything between the
 `mdsh:if` and `mdsh:end` comments below is printed only when `DEBUG` is
-set (try `DEBUG=1 ./hello.md`), and `run={{$DEBUG}}` keeps the block
+set and exposed (try `DEBUG=1 MDSH_EXPOSE=DEBUG ./hello.md`), and `run={{$DEBUG}}` keeps the block
 from running otherwise. Its stderr is shown too, because of
 `show-stderr`; normally stderr only appears when a block fails.
 
@@ -126,7 +126,7 @@ running in sh
 Prose can quote what a block left behind: `setup` set the greeting to
 **{{#setup/env(GREETING):"hello"}}** and greeted **{{#setup/env(NAME):"world"}}**.
 It can also quote the environment mdsh was started in: this ran as
-**{{$USER:"j"}}**.
+**{{$USER}}** (the value isn't saved in the file).
 ````
 
 The two images it produced:
@@ -493,7 +493,8 @@ count, `Ctrl+X` and `Alt+X`, `Sleep`, `Wait /regex/` and
 `Set TypingSpeed`, `WaitTimeout` and `WaitPattern`, and skips the rest of
 VHS's commands. Double-quoted `Type` strings can hold placeholders,
 `{{$VAR}}` or `{{#block/env(VAR)}}`, filled in as the tape plays, for
-passwords and tokens that shouldn't be written into the document. Single
+passwords and tokens that shouldn't be written into the document
+(`--expose VAR` or `$MDSH_EXPOSE` must name a `{{$VAR}}` first). Single
 quotes or backticks type the text as it is. A taped block runs on an 80x24 terminal so its recording
 is the same everywhere. Start with a `Wait` or `Sleep`, since keys go out
 as soon as the block starts. [examples/terminal.md](examples/terminal.md) shows each of
@@ -509,7 +510,7 @@ compared with `==` or `!=`, or negated with `!`:
 
 | Condition | True when |
 | --- | --- |
-| `{{$DEBUG}}` | `DEBUG` in mdsh's environment is set and not `0`, `false`, `no` or `off` |
+| `{{$DEBUG}}` | `DEBUG` in mdsh's environment is exposed, set and not `0`, `false`, `no` or `off` |
 | `!{{$QUIET}}` | the opposite |
 | `{{#detect/env(OS)}}==Linux` | block `detect` left `OS` set to `Linux` |
 | `{{$?}}==0` | the last block that ran exited 0 (see below) |
@@ -584,7 +585,12 @@ output are plain code. See
 
 `{{#setup/env(NAME)}}` in the prose stands for the value `NAME` had right
 after block `setup` ran (exported or not), and `{{$NAME}}` for `NAME` in
-the environment mdsh was started in. `{{#setup/?}}`, `{{$?}}`, `err?` and
+the environment mdsh was started in, if you exposed it: `--expose NAME`,
+or `MDSH_EXPOSE=NAME,OTHER` in the environment (mdsh's own `MDSH_`
+variables need nothing). A document you didn't write can't read your
+`$GITHUB_TOKEN` this way, whatever its front matter says; an unexposed
+`{{$NAME}}` prints as written and reads as unset in conditions, and the
+value is never saved in the file. `{{#setup/?}}`, `{{$?}}`, `err?` and
 `ran?` stand for exit statuses and whether a block ran, as in conditions. Printed output shows the value;
 `-w` stores it in the file as `{{#setup/env(NAME):"world"}}`, so the
 markdown reads well without running it and keeps the last value when the

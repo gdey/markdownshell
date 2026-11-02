@@ -25,8 +25,11 @@ type Options struct {
 	// Otherwise the #! line and section markers are dropped, placeholders
 	// print as values, and conditions decide what shows.
 	WriteBack bool
-	// Env is the caller's environment, for {{$VAR}}. Nil means unknown:
+	// Env is the caller's environment, for {{$VAR}}: only $MDSH_EXPOSE's
+	// names and mdsh's own MDSH_ variables are read (see run.CallerVars);
+	// other caller placeholders print as written. Nil means unknown:
 	// placeholders keep their stored values and conditions read empty.
+	// Write-back never stores a caller value.
 	Env []string
 }
 
@@ -46,6 +49,10 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 	buf := &bufs[0]
 	src := d.Src
 	lookup := run.NewLookup(d, results, opts.Env)
+	var caller map[string]string
+	if opts.Env != nil {
+		caller = run.CallerVars(d, opts.Env)
+	}
 
 	// cuts are the parts of the source that printing leaves out.
 	var cuts []doc.Span
@@ -66,7 +73,7 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 	}
 	prose := func(from, to int) {
 		for _, k := range keep(from, to, cuts) {
-			writeProse(buf, d, k.Start, k.End, results, lookup, opts)
+			writeProse(buf, d, k.Start, k.End, results, lookup, caller, opts)
 		}
 	}
 	// Display conditions are checked after the block, so {{$?}} is its
@@ -217,7 +224,7 @@ func lineEnd(src []byte, pos int) int {
 // copies inside it. A placeholder takes its value from lookup, else keeps
 // its stored value. {{$?}} is the status of the last block above it that
 // ran.
-func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run.Result, lookup doc.Lookup, opts Options) {
+func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run.Result, lookup doc.Lookup, caller map[string]string, opts Options) {
 	p, c := 0, 0
 	for {
 		for p < len(d.Placeholders) && d.Placeholders[p].Span.Start < from {
@@ -241,9 +248,18 @@ func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run
 			if !ok {
 				v = ph.Value
 			}
-			if opts.WriteBack {
+			switch {
+			case ph.Caller() && opts.WriteBack:
+				// The caller's environment is never stored in the
+				// file, and a value stored by an older mdsh is dropped.
+				buf.WriteString(ph.Ref.String())
+			case opts.WriteBack:
 				buf.WriteString(ph.Source(v))
-			} else {
+			case ph.Caller() && caller != nil && !hasKey(caller, ph.Var):
+				// Not exposed (see run.CallerVars): shown as written,
+				// so the reader can tell why it has no value.
+				buf.WriteString(ph.Ref.String())
+			default:
 				buf.WriteString(v)
 			}
 			from = ph.Span.End
@@ -518,4 +534,9 @@ func attrValue(s string) string {
 		return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`
 	}
 	return s
+}
+
+func hasKey(m map[string]string, k string) bool {
+	_, ok := m[k]
+	return ok
 }
