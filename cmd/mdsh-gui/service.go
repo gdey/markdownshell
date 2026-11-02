@@ -438,7 +438,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 		cur.Theme = s.Theme
 	}
 	cur.Look = ""
-	if s.Look == "tty" {
+	if s.Look == "tty" || s.Look == "blueprint" {
 		cur.Look = s.Look
 	}
 	cur.TextSize = 0

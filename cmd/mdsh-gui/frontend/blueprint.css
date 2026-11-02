@@ -1,0 +1,184 @@
+/* The Blueprint look (Settings › Look): white lines on blueprint blue
+   with a drafting grid behind the document, in the light theme, and a
+   deeper night blue with pale cyan lines in the dark. Both are blue
+   paper; the light one is the brighter. It sets the same tokens
+   style.css does, plus a few of its own (--bp-*), and adds texture
+   rules. Like Teletype it changes paint, not layout. theme_test.go
+   checks that every token the plain look defines is defined here too. */
+
+:root[data-look="blueprint"],
+:root[data-look="blueprint"][data-history-scheme="light"] #history {
+  --bg: #1d5ba3;
+  --fg: #f4f8ff;
+  --muted: #b9d0ee;
+  --border: #7ea6d6;
+  --code-bg: #184d8c;
+  --hover: #2466b2;
+  --accent: #f4f8ff;
+  --accent-fg: #1d5ba3;
+  --link: #ffd75e;
+  --ok: #8ff0b4;
+  --bad: #ffa59c;
+  --control: #e2c6ff;
+  --warn-bg: #4f5a3a;
+  --warn-border: #ffd75e;
+  --selection: rgb(255 255 255 / 0.28);
+  --active-line: rgb(255 255 255 / 0.07);
+  --dep-1: #ffd75e; --dep-2: #ff9ec4; --dep-3: #8ff0d8; --dep-4: #ffb37a; --dep-more: #a9c3e6;
+  --syn-keyword: #ffd75e;
+  --syn-string: #b8f5c9;
+  --syn-number: #ffc49b;
+  --syn-comment: #a9c3e6;
+  --syn-variable: #e6f0ff;
+  --syn-function: #a8e6ff;
+  --syn-type: #d6c8ff;
+  --syn-punct: #d4e3f7;
+  --syn-heading: #ffffff;
+  --syn-link: #ffd75e;
+  --syn-meta: #ffffff;
+  --ansi-0: #10386a; --ansi-1: #ff8a80; --ansi-2: #8ff0b4; --ansi-3: #ffd75e;
+  --ansi-4: #a8d4ff; --ansi-5: #e2c6ff; --ansi-6: #8ff0d8; --ansi-7: #dce8f8;
+  --ansi-8: #a9c3e6; --ansi-9: #ffb3ab; --ansi-10: #c0f8d4; --ansi-11: #ffe79e;
+  --ansi-12: #cfe6ff; --ansi-13: #f0deff; --ansi-14: #c2f8ec; --ansi-15: #ffffff;
+  --term-bg: #184d8c;
+  --term-fg: #f4f8ff;
+  /* The paper's own: the drafting grid's fine and heavy lines, and the
+     margin the tab bar and outline sit in. */
+  --bp-minor: rgb(255 255 255 / 0.09);
+  --bp-major: rgb(255 255 255 / 0.2);
+  --bp-side: #1a5596;
+  color-scheme: dark;
+}
+
+/* Drafting lettering: a plain, narrow sans for the interface and
+   headings, the code in the plain look's monospace. */
+:root[data-look="blueprint"] {
+  --font-ui: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", "Liberation Sans Narrow", "DejaVu Sans Condensed", "Helvetica Neue", Arial, sans-serif;
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --text-scale: 1;
+}
+
+/* Night blue, when the theme is dark, for the window or the History
+   pane (see style.css). */
+:root[data-look="blueprint"][data-scheme="dark"],
+:root[data-look="blueprint"][data-history-scheme="dark"] #history {
+  --bg: #0b1e3b;
+  --fg: #d6e8ff;
+  --muted: #7d9cc4;
+  --border: #2f5282;
+  --code-bg: #0e2547;
+  --hover: #12305a;
+  --accent: #8fd3ff;
+  --accent-fg: #0b1e3b;
+  --link: #ffd75e;
+  --ok: #7ee2a8;
+  --bad: #ff8a80;
+  --control: #c9a8ff;
+  --warn-bg: #2e2f1c;
+  --warn-border: #c9a63a;
+  --selection: rgb(143 211 255 / 0.25);
+  --active-line: rgb(143 211 255 / 0.06);
+  --dep-1: #ffd75e; --dep-2: #ff8fb8; --dep-3: #6fe0c8; --dep-4: #ffa66b; --dep-more: #7d9cc4;
+  --syn-keyword: #ffd75e;
+  --syn-string: #9fe8b6;
+  --syn-number: #ffb98a;
+  --syn-comment: #6d8cb4;
+  --syn-variable: #d6e8ff;
+  --syn-function: #8fd3ff;
+  --syn-type: #c2b0ff;
+  --syn-punct: #a9c3e6;
+  --syn-heading: #ffffff;
+  --syn-link: #ffd75e;
+  --syn-meta: #d6e8ff;
+  --ansi-0: #16335e; --ansi-1: #ff8a80; --ansi-2: #7ee2a8; --ansi-3: #ffd75e;
+  --ansi-4: #8fd3ff; --ansi-5: #c9a8ff; --ansi-6: #6fe0c8; --ansi-7: #d6e8ff;
+  --ansi-8: #7d9cc4; --ansi-9: #ffb3ab; --ansi-10: #b0f2c8; --ansi-11: #ffe79e;
+  --ansi-12: #bfe6ff; --ansi-13: #e2d0ff; --ansi-14: #a8f2e2; --ansi-15: #ffffff;
+  --term-bg: #0e2547;
+  --term-fg: #d6e8ff;
+  --bp-minor: rgb(143 211 255 / 0.07);
+  --bp-major: rgb(143 211 255 / 0.16);
+  --bp-side: #0d2242;
+  color-scheme: dark;
+}
+
+/* Square corners: drawn with a straightedge. */
+[data-look="blueprint"] *, [data-look="blueprint"] *::before, [data-look="blueprint"] *::after { border-radius: 0 !important; }
+
+/* The chrome is the sheet's margin. */
+[data-look="blueprint"] #tabbar, [data-look="blueprint"] #outline, [data-look="blueprint"] .tabs { background: var(--bp-side); }
+[data-look="blueprint"] .tab.active { font-weight: 700; }
+[data-look="blueprint"] #outline .item.heading { text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* The rendered view is the sheet: a fine grid every 20px and a heavy one
+   every 100px, painted behind the cards and scrolling with them. The
+   tiles are small so WebKit draws the lines sharp on long pages.
+   Settings › Look can take the grid off (data-no-rules). */
+[data-look="blueprint"] #doc-scroll {
+  background:
+    linear-gradient(to bottom, var(--bp-major) 1px, transparent 1px) 0 0 / 100px 100px repeat local,
+    linear-gradient(to right, var(--bp-major) 1px, transparent 1px) 0 0 / 100px 100px repeat local,
+    linear-gradient(to bottom, var(--bp-minor) 1px, transparent 1px) 0 0 / 20px 20px repeat local,
+    linear-gradient(to right, var(--bp-minor) 1px, transparent 1px) 0 0 / 20px 20px repeat local,
+    var(--bg);
+}
+[data-look="blueprint"][data-no-rules] #doc-scroll { background: var(--bg); }
+
+/* Headings are lettered: capitals, spaced, over a rule with ticks at
+   each end like a dimension line. */
+[data-look="blueprint"] #doc > .heading-cell :is(h1, h2, h3) {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--fg);
+  padding-bottom: 4px;
+  line-height: 1.2;
+  background:
+    linear-gradient(var(--fg), var(--fg)) left bottom / 1px 9px no-repeat,
+    linear-gradient(var(--fg), var(--fg)) right bottom / 1px 9px no-repeat;
+}
+[data-look="blueprint"] #doc > .heading-cell :is(h4, h5, h6) { text-transform: uppercase; letter-spacing: 0.06em; }
+[data-look="blueprint"] .heading-cell > button.fold { background: none; }
+[data-look="blueprint"] hr { border: 0; border-top: 1px dashed var(--fg); }
+[data-look="blueprint"] blockquote { border-left: 1px solid var(--fg); }
+
+/* Block cards are boxes drawn on the sheet: a thin line, no fill, so the
+   grid shows through, and dashed lines between their parts. The
+   selected card is drawn in a heavier dashed line. */
+[data-look="blueprint"] .block { background: transparent; border-color: var(--fg); box-shadow: none; }
+[data-look="blueprint"] .block.selected { outline: 2px dashed var(--accent); outline-offset: 3px; }
+[data-look="blueprint"] .block.ran { border-left-color: var(--ok); }
+[data-look="blueprint"] :is(.block pre.code, .block .output-part, .block .ask) { border-top-style: dashed; }
+[data-look="blueprint"] .block .head .lang { background: none; border-color: var(--fg); text-transform: uppercase; letter-spacing: 0.06em; }
+[data-look="blueprint"] .block .exit, [data-look="blueprint"] .block .exit.bad { background: none; border: 1px solid currentColor; }
+[data-look="blueprint"] .block pre.numbered .line::before { border-right-style: dashed; }
+/* The confirm prompt is a note on the sheet, boxed in the accent. */
+[data-look="blueprint"] .block .ask { background: var(--code-bg); border-top: 1px dashed var(--accent); }
+[data-look="blueprint"] .block .output .terminal { border: 1px dashed var(--border); }
+[data-look="blueprint"] #doc > .block.dep-target { outline-color: var(--fg); }
+
+/* Buttons are outlined and lettered; Run All and the confirm buttons
+   are drawn in the accent, filled. */
+[data-look="blueprint"] button { text-transform: uppercase; letter-spacing: 0.05em; }
+[data-look="blueprint"] :is(button.primary, .block .ask button) { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 700; }
+[data-look="blueprint"] :is(button.primary.stop, button.danger) { background: transparent; color: var(--bad); border-color: var(--bad); }
+[data-look="blueprint"] button.chip, [data-look="blueprint"] button.tag { border-style: dashed; }
+[data-look="blueprint"] button.tag.on { border-style: solid; }
+[data-look="blueprint"] #console-toggle .badge { background: var(--fg); color: var(--bg); }
+
+/* Inputs, menus and dialogs: thin white lines. */
+[data-look="blueprint"] :is(.textbox, .choice-select, input[type="text"], select) { border-color: var(--fg); background-color: var(--code-bg); color: var(--fg); }
+[data-look="blueprint"] :is(dialog, .md-menu) { border-color: var(--fg); box-shadow: none; }
+[data-look="blueprint"] :is(input, select, textarea, button):focus-visible { outline: 1px dashed var(--fg); outline-offset: 2px; }
+
+/* The start screen and Settings. */
+[data-look="blueprint"] #start h1 { text-transform: uppercase; letter-spacing: 0.08em; }
+[data-look="blueprint"] ul.files { border-color: var(--fg); }
+[data-look="blueprint"] ul.files li + li { border-top-style: dashed; }
+[data-look="blueprint"] .coll { border-color: var(--fg); box-shadow: none; }
+[data-look="blueprint"] .tabs button[aria-selected="true"] { font-weight: 700; border-bottom-color: var(--fg); }
+[data-look="blueprint"] .setting { border-bottom-style: dashed; }
+[data-look="blueprint"] dl.info :is(dt, dd) { border-top-style: dashed; }
+[data-look="blueprint"] header { border-bottom-style: dashed; }
+[data-look="blueprint"] #source { border-right-style: dashed; }
+[data-look="blueprint"] #history { border-top-style: dashed; }
+[data-look="blueprint"] #console .console-bar { border-bottom-style: dashed; }
