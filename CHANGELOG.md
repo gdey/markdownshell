@@ -32,6 +32,13 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
 
+### Fixed
+
+- In `mdsh-gui` on macOS, the source pane no longer jumps to the block
+  at the top of the rendered view while you type or click in it. The
+  panes follow only the one you last scrolled, clicked or typed in, so
+  the rendered view redrawing after an edit can't move the source.
+
 ## [1.3.0] - 2026-11-02
 
 The desktop app becomes a full editor: undo and redo, blocks that move
