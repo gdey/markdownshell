@@ -432,6 +432,10 @@ follow [Semantic Versioning](https://semver.org/).
   which then goes on in the copy. Cancelling it doesn't run, and the
   next run goes ahead without saving. Writing is tried rather than mode
   bits read, so ownership and read-only folders count.
+- `mdsh-gui`: in the Neovim source pane, a right-click no longer leaves
+  Neovim waiting for a mouse release that the menu took, which garbled
+  the pane and left it stuck. The menu's Cut, Copy and Paste now act on
+  Neovim's selection.
 - `mdsh -i` no longer shows a block that ended as running while the
   run goes on, such as while a later block waits for an answer.
 - In a zsh block, a lone `}` anywhere on a line, as in `echo }`, is a

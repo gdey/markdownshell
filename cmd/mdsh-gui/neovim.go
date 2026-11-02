@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -233,4 +235,49 @@ func (t *docTab) emitNow(name string, data any) {
 	if w := t.window(); w != nil {
 		w.win.EmitEvent(name, tabEvent{t.id, data})
 	}
+}
+
+// nvimEdit does the Neovim pane's right-click Cut, Copy or Paste in the
+// current tab. They act on Neovim's selection: the page, which only
+// draws Neovim's grid, has none for the usual edit commands. Paste in
+// visual mode replaces the selection, as Neovim's own paste does.
+func (a *App) nvimEdit(op string) {
+	t := a.currentTab()
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	e := t.nvim
+	t.mu.Unlock()
+	if e == nil {
+		return
+	}
+	if err := nvimEdit(e, op, a.app.Clipboard.Text, a.app.Clipboard.SetText); err != nil {
+		slog.Error("Neovim "+op+": "+err.Error(), "file", t.file())
+	}
+}
+
+// nvimEdit does op, cut, copy or paste, in e with the clipboard's get
+// and set.
+func nvimEdit(e *nvim.Editor, op string, get func() (string, bool), set func(string) bool) error {
+	if op == "paste" {
+		text, ok := get()
+		if !ok || text == "" {
+			return nil
+		}
+		return e.Paste(text)
+	}
+	args, _ := json.Marshal([]bool{op == "cut"})
+	out, err := e.Call("selection", string(args))
+	if err != nil {
+		return err
+	}
+	var text *string
+	if err := json.Unmarshal([]byte(out), &text); err != nil {
+		return err
+	}
+	if text != nil && *text != "" && !set(*text) {
+		return errors.New("couldn't set the clipboard")
+	}
+	return nil
 }

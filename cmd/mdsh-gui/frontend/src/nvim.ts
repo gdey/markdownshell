@@ -317,23 +317,35 @@ export class NvimPane {
     };
     const buttons = ["left", "middle", "right"];
     let down = "";
+    let at = { row: 0, col: 0 }; // where the mouse was last, while down
     this.canvas.addEventListener("mousedown", (e) => {
       e.preventDefault();
       this.focus();
+      // The right button opens the app's menu, which takes the release:
+      // Neovim, given the press, would wait for it with the button held.
+      // The menu acts on Neovim's selection, so the press isn't needed.
+      if (e.button === 2) return;
       down = buttons[e.button] ?? "";
       if (!down) return;
-      const { row, col } = cellAt(e);
+      const { row, col } = (at = cellAt(e));
       void App.NvimMouse(down, "press", mouseMods(e), row, col).catch(() => {});
     });
     window.addEventListener("mousemove", (e) => {
       if (!down) return;
-      const { row, col } = cellAt(e);
+      const { row, col } = (at = cellAt(e));
       void App.NvimMouse(down, "drag", mouseMods(e), row, col).catch(() => {});
     });
     window.addEventListener("mouseup", (e) => {
       if (!down) return;
       const { row, col } = cellAt(e);
       void App.NvimMouse(down, "release", mouseMods(e), row, col).catch(() => {});
+      down = "";
+    });
+    // A press whose release never comes, as when the window loses the
+    // mouse mid-drag, is let go where it was.
+    window.addEventListener("blur", () => {
+      if (!down) return;
+      void App.NvimMouse(down, "release", "", at.row, at.col).catch(() => {});
       down = "";
     });
     this.canvas.addEventListener(
