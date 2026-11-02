@@ -11,6 +11,17 @@ follow [Semantic Versioning](https://semver.org/).
 - `SECURITY.md` says how to report a vulnerability privately and which
   versions get fixes. The v1.2.1 security reviews of the CLI and
   mdsh-gui are in `docs/security/`.
+- `{{$VAR}}` placeholders, conditions and tapes read a variable from
+  the caller's environment only when the person running mdsh exposes it,
+  with `--expose VAR` or `MDSH_EXPOSE=VAR,OTHER`, and the front matter's
+  `env.share` (if any) passes it; mdsh's own `MDSH_` variables need
+  nothing. An unexposed `{{$VAR}}` prints as written and reads as unset.
+  Write-back (`-w`, `-o`, `mdsh -i` and mdsh-gui saving) never stores a
+  caller value, `{{$VAR:"value"}}`, and drops one an older mdsh stored.
+  Before, `mdsh -n --html` or `mdsh -w` on a document someone sent could
+  put `$GITHUB_TOKEN` in a file without running anything. **Breaking:**
+  a document that used `{{$USER}}` or `run={{$DEBUG}}` now needs
+  `--expose USER,DEBUG`. (v1.2.1 review, finding 2.)
 
 ### Added
 

@@ -12,8 +12,7 @@ import (
 //
 //	{{#setup/env(GREETING)}}
 //	{{#setup/env(GREETING):"hello"}}
-//	{{$USER}}
-//	{{$USER:"j"}}
+//	{{$USER}}              never saved with a value: see render.Options
 //	{{$?}}                 the most recent block's exit status
 //	{{#build/?:"0"}}       block build's exit status
 //

@@ -216,7 +216,8 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 }
 
 // NewLookup resolves refs for conditions and placeholders: {{$VAR}} from
-// environ (unless environ is nil), {{$MDSH_VAR_name}} from the textbox or
+// environ (unless environ is nil) as the front matter's env.share filters
+// it for blocks (see CallerVars), {{$MDSH_VAR_name}} from the textbox or
 // choice in d that binds it with var=, {{#block/env(VAR)}}, {{#block/?}} and
 // {{#block/ran?}} from the block's result, and otherwise from a value a
 // placeholder stored in the file. It reads results as they are when it
@@ -225,7 +226,7 @@ func Run(ctx context.Context, d *doc.Document, opts Options) ([]*Result, error) 
 func NewLookup(d *doc.Document, results []*Result, environ []string) doc.Lookup {
 	var caller map[string]string
 	if environ != nil {
-		caller = env.Vars(environ)
+		caller = CallerVars(d, environ)
 	}
 	stored := map[doc.Ref]string{}
 	for _, p := range d.Placeholders {
@@ -259,6 +260,56 @@ func NewLookup(d *doc.Document, results []*Result, environ []string) doc.Lookup 
 		return v, ok
 	}
 }
+
+// ExposeVar lists, comma-separated, the caller's variables that {{$VAR}}
+// may read. mdsh --expose adds to it.
+const ExposeVar = "MDSH_EXPOSE"
+
+// CallerVars is what {{$VAR}} reads from environ: mdsh's own MDSH_
+// variables, and the caller's variables that the person running mdsh
+// named in $MDSH_EXPOSE, if d's front matter shares them with its blocks
+// (env.share). Others read as unset. The list has to come from the
+// person, not the document: a document someone sent could name
+// $GITHUB_TOKEN in its own front matter as easily as in a placeholder.
+func CallerVars(d *doc.Document, environ []string) map[string]string {
+	all := env.Vars(environ)
+	exposed := map[string]string{}
+	for _, name := range strings.Split(all[ExposeVar], ",") {
+		if v, ok := all[strings.TrimSpace(name)]; ok {
+			exposed[strings.TrimSpace(name)] = v
+		}
+	}
+	vars := env.Filter(exposed, d.Options.Env.Share)
+	for k, v := range all {
+		if IsOwnVar(k) {
+			vars[k] = v
+		}
+	}
+	return vars
+}
+
+// WithExpose returns environ with names added to $MDSH_EXPOSE.
+func WithExpose(environ []string, names []string) []string {
+	if len(names) == 0 {
+		return environ
+	}
+	list := names
+	out := make([]string, 0, len(environ)+1)
+	for _, kv := range environ {
+		if v, ok := strings.CutPrefix(kv, ExposeVar+"="); ok {
+			if v != "" {
+				list = append(strings.Split(v, ","), names...)
+			}
+			continue
+		}
+		out = append(out, kv)
+	}
+	return append(out, ExposeVar+"="+strings.Join(list, ","))
+}
+
+// IsOwnVar reports whether name is one of mdsh's own variables, such as
+// MDSH_MODE, rather than one from the caller's environment.
+func IsOwnVar(name string) bool { return strings.HasPrefix(name, "MDSH_") }
 
 // fact returns r's value for a block fact such as {{#block/?}}.
 func (r *Result) fact(ref doc.Ref) (string, bool) {

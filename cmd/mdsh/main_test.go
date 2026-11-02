@@ -520,3 +520,62 @@ func TestWriteCopies(t *testing.T) {
 		t.Errorf("file:\ngot  %q\nwant %q", got, want)
 	}
 }
+
+// TestCallerEnvStaysOut runs the v1.2.1 review's repro for finding 2:
+// {{$VAR}} reads only variables the person running mdsh exposed, as
+// env.share passes them, and -w never stores them.
+func TestCallerEnvStaysOut(t *testing.T) {
+	t.Setenv("SECRET_TOKEN", "s3cr3t")
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "s.md")
+	os.WriteFile(shared, []byte("---\nmdsh:\n  env:\n    share: [PATH]\n---\nToken: {{$SECRET_TOKEN}}\n\n```sh\necho \"[$SECRET_TOKEN]\"\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"--no-color", shared}, nil, &out, &errb); rc != 0 || strings.Contains(out.String(), "s3cr3t") {
+		t.Errorf("print with share: rc = %d, stdout %q, stderr %s", rc, out.String(), errb.String())
+	}
+
+	f := filepath.Join(dir, "n.md")
+	os.WriteFile(f, []byte("Token: {{$SECRET_TOKEN}}\n"), 0o644)
+	for _, args := range [][]string{{"-n", "--html", "-"}, {"-n", "--html", filepath.Join(dir, "r.html")}} {
+		out.Reset()
+		if rc := mdsh(append(args, f), nil, &out, &errb); rc != 0 {
+			t.Fatalf("%v: rc = %d, stderr %s", args, rc, errb.String())
+		}
+		got := out.String()
+		if p := args[len(args)-1]; p != "-" {
+			b, _ := os.ReadFile(p)
+			got = string(b)
+		}
+		if strings.Contains(got, "s3cr3t") {
+			t.Errorf("%v: the report holds the token", args)
+		}
+	}
+	out.Reset()
+	if rc := mdsh([]string{"-n", "--expose", "SECRET_TOKEN", "--html", "-", f}, nil, &out, &errb); rc != 0 || !strings.Contains(out.String(), "s3cr3t") {
+		t.Errorf("--expose: rc = %d, stdout %q", rc, out.String())
+	}
+	o := filepath.Join(dir, "o.md")
+	for _, args := range [][]string{{"-w", "--expose", "SECRET_TOKEN", f}, {"-o", o, f}} {
+		if rc := mdsh(args, nil, &out, &errb); rc != 0 {
+			t.Fatalf("%v: rc = %d, stderr %s", args, rc, errb.String())
+		}
+	}
+	for _, p := range []string{f, o} {
+		if b, _ := os.ReadFile(p); string(b) != "Token: {{$SECRET_TOKEN}}\n" {
+			t.Errorf("%s: %q", p, b)
+		}
+	}
+	// Printing reads only what the person exposed, whatever the
+	// document's front matter asks for.
+	all := filepath.Join(dir, "all.md")
+	os.WriteFile(all, []byte("---\nmdsh:\n  env:\n    share: [\"...\"]\n---\nToken: {{$SECRET_TOKEN}}\n"), 0o644)
+	out.Reset()
+	if rc := mdsh([]string{"-n", "--no-color", all}, nil, &out, &errb); rc != 0 || !strings.Contains(out.String(), "Token: {{$SECRET_TOKEN}}") {
+		t.Errorf("print: rc = %d, stdout %q", rc, out.String())
+	}
+	t.Setenv("MDSH_EXPOSE", "SECRET_TOKEN")
+	out.Reset()
+	if rc := mdsh([]string{"-n", "--no-color", all}, nil, &out, &errb); rc != 0 || !strings.Contains(out.String(), "Token: s3cr3t") {
+		t.Errorf("MDSH_EXPOSE: rc = %d, stdout %q", rc, out.String())
+	}
+}

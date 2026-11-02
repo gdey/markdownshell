@@ -1,10 +1,13 @@
 package run_test
 
 import (
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 )
@@ -22,7 +25,7 @@ func TestRunCondition(t *testing.T) {
 		"":  {"dbg": false, "lin": true, "mac": false},
 		"1": {"dbg": true, "lin": true, "mac": false},
 	} {
-		_, results := runDoc(t, src, run.Options{Environ: environ("DEBUG=" + debug)})
+		_, results := runDoc(t, src, run.Options{Environ: environ("DEBUG="+debug, "MDSH_EXPOSE=DEBUG")})
 		r := byID(results)
 		for id, ran := range want {
 			if r[id].Ran != ran {
@@ -36,13 +39,13 @@ func TestShowConditions(t *testing.T) {
 	src := "intro\n\n```sh {#a show={{$DEBUG}}}\necho a\n```\n\n```sh {#b show-output=!{{$QUIET}}}\necho b\n```\n\nend\n"
 	d, results := runDoc(t, src, run.Options{})
 
-	got := string(render.Markdown(d, results, render.Options{Env: environ("QUIET=1")}))
+	got := string(render.Markdown(d, results, render.Options{Env: environ("QUIET=1", "MDSH_EXPOSE=QUIET")}))
 	want := "intro\n\n```output {for=a exit=0}\na\n```\n\n```sh {#b show-output=!{{$QUIET}}}\necho b\n```\n\nend\n"
 	if got != want {
 		t.Errorf("printed:\ngot  %q\nwant %q", got, want)
 	}
 
-	saved := string(render.Markdown(d, results, render.Options{WriteBack: true, Env: environ("QUIET=1")}))
+	saved := string(render.Markdown(d, results, render.Options{WriteBack: true, Env: environ("QUIET=1", "MDSH_EXPOSE=QUIET")}))
 	for _, w := range []string{"echo a\n```", "```output {for=b exit=0}\nb\n```"} {
 		if !strings.Contains(saved, w) {
 			t.Errorf("write-back dropped %q:\n%s", w, saved)
@@ -58,7 +61,7 @@ func TestSections(t *testing.T) {
 	if off != "top\n\n\nend\n" {
 		t.Errorf("DEBUG unset: %q", off)
 	}
-	on := string(render.Markdown(d, results, render.Options{Env: environ("DEBUG=1")}))
+	on := string(render.Markdown(d, results, render.Options{Env: environ("DEBUG=1", "MDSH_EXPOSE=DEBUG")}))
 	if !strings.Contains(on, "Debug notes.") || !strings.Contains(on, "echo dbg") || strings.Contains(on, "very") || strings.Contains(on, "mdsh:if") {
 		t.Errorf("DEBUG=1: %q", on)
 	}
@@ -86,15 +89,67 @@ func TestStderrVisibility(t *testing.T) {
 }
 
 func TestCallerPlaceholders(t *testing.T) {
-	d, results := runDoc(t, "```sh\ntrue\n```\n\nby {{$WHO:\"old\"}}\n", run.Options{})
-	if got := string(render.Markdown(d, results, render.Options{Env: environ("WHO=j")})); !strings.Contains(got, "by j\n") {
+	d, results := runDoc(t, "```sh\ntrue\n```\n\nby {{$WHO:\"old\"}} in {{$MDSH_MODE}}, {{$SECRET}}\n", run.Options{})
+	env := environ("WHO=j", "SECRET=s3cr3t", "MDSH_MODE=report", "MDSH_EXPOSE=WHO")
+	// Only exposed variables and mdsh's own are read; others print as
+	// written.
+	if got := string(render.Markdown(d, results, render.Options{Env: env})); !strings.Contains(got, "by j in report, {{$SECRET}}\n") {
 		t.Errorf("printed: %q", got)
 	}
-	if got := string(render.Markdown(d, results, render.Options{WriteBack: true, Env: environ("WHO=j")})); !strings.Contains(got, `by {{$WHO:"j"}}`) {
+	// Write-back never stores the caller's value, and drops an old one.
+	if got := string(render.Markdown(d, results, render.Options{WriteBack: true, Env: env})); !strings.Contains(got, "by {{$WHO}} in {{$MDSH_MODE}}, {{$SECRET}}\n") {
 		t.Errorf("saved: %q", got)
 	}
-	if got := string(render.Markdown(d, results, render.Options{})); !strings.Contains(got, "by old\n") {
+	if got := string(render.Markdown(d, results, render.Options{})); !strings.Contains(got, "by old in") {
 		t.Errorf("no env: %q", got)
+	}
+}
+
+// TestCallerVars checks what {{$VAR}} may read from the caller's
+// environment (v1.2.1 review, finding 2): names the person exposed, as
+// env.share passes them, and mdsh's own; never what the document asks
+// for itself.
+func TestCallerVars(t *testing.T) {
+	env := environ("SECRET_TOKEN=s3cr3t", "WHO=j", "MDSH_MODE=running")
+	for _, tc := range []struct {
+		front  string
+		expose []string
+		want   map[string]string
+	}{
+		{"", nil, map[string]string{"MDSH_MODE": "running"}},
+		{"---\nmdsh:\n  env:\n    share: [\"...\"]\n---\n", nil, map[string]string{"MDSH_MODE": "running"}},
+		{"", []string{"WHO"}, map[string]string{"MDSH_MODE": "running", "MDSH_EXPOSE": "WHO", "WHO": "j"}},
+		{"---\nmdsh:\n  env:\n    share: [PATH]\n---\n", []string{"WHO", "PATH"}, map[string]string{"MDSH_MODE": "running", "MDSH_EXPOSE": "WHO,PATH", "PATH": os.Getenv("PATH")}},
+	} {
+		d, err := doc.Parse([]byte(tc.front + "x\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := run.CallerVars(d, run.WithExpose(env, tc.expose))
+		if !maps.Equal(got, tc.want) {
+			t.Errorf("%q, expose %v: got %v, want %v", tc.front, tc.expose, got, tc.want)
+		}
+	}
+	if got := run.WithExpose([]string{"MDSH_EXPOSE=A", "X=1"}, []string{"B"}); !slices.Equal(got, []string{"X=1", "MDSH_EXPOSE=A,B"}) {
+		t.Errorf("WithExpose = %v", got)
+	}
+}
+
+// TestCallerPlaceholdersShare checks that conditions and the lookup
+// tapes use don't read an unexposed variable.
+func TestCallerPlaceholdersShare(t *testing.T) {
+	src := "Token: [{{$SECRET_TOKEN}}]\n\n<!-- mdsh:if {{$SECRET_TOKEN}} -->\nleaked\n<!-- mdsh:end -->\n"
+	env := environ("SECRET_TOKEN=s3cr3t")
+	d, results := runDoc(t, src, run.Options{Environ: env})
+	got := string(render.Markdown(d, results, render.Options{Env: env}))
+	if strings.Contains(got, "s3cr3t") || strings.Contains(got, "leaked") || !strings.Contains(got, "Token: [{{$SECRET_TOKEN}}]") {
+		t.Errorf("printed:\n%s", got)
+	}
+	if v, _ := run.NewLookup(d, results, env)(doc.Ref{Var: "SECRET_TOKEN"}); v != "" {
+		t.Errorf("lookup = %q", v)
+	}
+	if v, _ := run.NewLookup(d, results, run.WithExpose(env, []string{"SECRET_TOKEN"}))(doc.Ref{Var: "SECRET_TOKEN"}); v != "s3cr3t" {
+		t.Errorf("exposed lookup = %q", v)
 	}
 }
 
