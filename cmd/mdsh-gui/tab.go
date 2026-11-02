@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/writable"
 )
 
 // watchEvery is how often a tab checks its file for changes on disk.
@@ -34,6 +36,24 @@ type docTab struct {
 	running     bool         // a run started from the tab hasn't returned
 	live        []liveEvent  // what the running run has sent so far
 	nvim        *nvim.Editor // the source pane's Neovim, if running
+	roRun       string       // the read-only file to run without saving
+}
+
+// askReadOnly reports whether a run of file should first ask for a copy
+// to save to: file is read-only and the user hasn't chosen to run it
+// without saving.
+func (t *docTab) askReadOnly(file string) bool {
+	t.mu.Lock()
+	skip := t.roRun == file
+	t.mu.Unlock()
+	return !skip && errors.Is(checkWritable(file), writable.ErrReadOnly)
+}
+
+// runReadOnly notes that runs of file go ahead without asking.
+func (t *docTab) runReadOnly(file string) {
+	t.mu.Lock()
+	t.roRun = file
+	t.mu.Unlock()
 }
 
 // liveEvent is an event sent while a run is going, kept so a tab drawn

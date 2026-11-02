@@ -138,6 +138,38 @@ func TestWriteShowsFailure(t *testing.T) {
 	}
 }
 
+// TestWriteReadOnly checks that -w refuses a file it can't save before
+// running anything, and that -o still works.
+func TestWriteReadOnly(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can write anything")
+	}
+	dir := t.TempDir()
+	f, mark := filepath.Join(dir, "d.md"), filepath.Join(dir, "ran")
+	src := "```sh {#a}\necho hi; touch " + mark + "\n```\n"
+	os.WriteFile(f, []byte(src), 0o444)
+	var errb bytes.Buffer
+	if rc := mdsh([]string{"-w", f}, nil, &bytes.Buffer{}, &errb); rc == 0 {
+		t.Fatal("rc = 0, want failure")
+	}
+	if s := errb.String(); !strings.Contains(s, "read-only") || !strings.Contains(s, "-o") {
+		t.Errorf("stderr = %q", s)
+	}
+	if _, err := os.Stat(mark); err == nil {
+		t.Error("the block ran")
+	}
+	if got, _ := os.ReadFile(f); string(got) != src {
+		t.Errorf("the file changed:\n%s", got)
+	}
+	out := filepath.Join(dir, "out.md")
+	if rc := mdsh([]string{"-o", out, f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
+		t.Fatalf("-o failed: %s", errb.String())
+	}
+	if got, _ := os.ReadFile(out); !strings.Contains(string(got), "for=a") {
+		t.Errorf("-o didn't save the output:\n%s", got)
+	}
+}
+
 // TestWriteNamesBlocks checks that -w writes an id into each unnamed
 // block and -o leaves the source as it is.
 func TestWriteNamesBlocks(t *testing.T) {

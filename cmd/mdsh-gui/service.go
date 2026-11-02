@@ -22,6 +22,7 @@ import (
 	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/writable"
 )
 
 // This file holds the methods the frontend calls.
@@ -97,6 +98,9 @@ func (a *App) RunBlock(ctx context.Context, i int) error {
 	if err != nil {
 		return err
 	}
+	if err := a.beforeRun(t, n); err != nil {
+		return err
+	}
 	err = t.run(func() error { return n.RunBlock(i) })
 	a.afterRun(t, n)
 	return err
@@ -106,6 +110,9 @@ func (a *App) RunBlock(ctx context.Context, i int) error {
 func (a *App) RunFrom(ctx context.Context, i int) error {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
+		return err
+	}
+	if err := a.beforeRun(t, n); err != nil {
 		return err
 	}
 	err = t.run(func() error { return n.RunFrom(i) })
@@ -120,9 +127,29 @@ func (a *App) RunSection(ctx context.Context, from, to int) error {
 	if err != nil {
 		return err
 	}
+	if err := a.beforeRun(t, n); err != nil {
+		return err
+	}
 	err = t.run(func() error { return n.RunRange(from, to) })
 	a.afterRun(t, n)
 	return err
+}
+
+// beforeRun, with autosave on and a read-only file, asks where to save a
+// copy before the run, which then goes on in the copy. Cancelling stops
+// this run; the next one goes ahead without asking, and without saving.
+func (a *App) beforeRun(t *docTab, n *notebook.Notebook) error {
+	file := n.File()
+	if !a.settings.Get().Autosave || !t.askReadOnly(file) {
+		return nil
+	}
+	name := filepath.Base(file)
+	ok, err := a.saveAs(t, n, name+" is read-only. Save a copy to run it with autosave")
+	if err != nil || ok {
+		return err
+	}
+	t.runReadOnly(file)
+	return fmt.Errorf("not run: %s is read-only; run again to run without saving", name)
 }
 
 // afterRun marks the title and saves if autosave is on. It doesn't
@@ -312,6 +339,14 @@ func (a *App) Save(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if errors.Is(checkWritable(n.File()), writable.ErrReadOnly) {
+		name := filepath.Base(n.File())
+		ok, err := a.saveAs(t, n, name+" is read-only. Save a copy with its output")
+		if err == nil && !ok {
+			err = fmt.Errorf("not saved: %s is read-only", name)
+		}
+		return err
+	}
 	if err := n.Save(); err != nil {
 		return err
 	}
@@ -326,12 +361,21 @@ func (a *App) SaveAs(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	return a.saveAs(t, n, "Save a copy with its output")
+}
+
+// checkWritable reports whether a file can be saved; tests replace it.
+var checkWritable = writable.Check
+
+// saveAs asks, with message, where to save n with its output, and saves
+// it there. It returns false if the user cancels.
+func (a *App) saveAs(t *docTab, n *notebook.Notebook, message string) (bool, error) {
 	w := t.window()
 	if w == nil {
 		return false, errNoFile
 	}
 	file, err := a.app.Dialog.SaveFile().
-		SetMessage("Save a copy with its output").
+		SetMessage(message).
 		SetDirectory(filepath.Dir(n.File())).
 		SetFilename(filepath.Base(n.File())).
 		AddFilter("Markdown", "*.md;*.markdown").
@@ -391,6 +435,9 @@ func (a *App) SetHistory(ctx context.Context, on bool) (bool, error) {
 func (a *App) HistoryEnter(ctx context.Context, input string) error {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
+		return err
+	}
+	if err := a.beforeRun(t, n); err != nil {
 		return err
 	}
 	err = t.run(func() error { return n.Enter(input) })
