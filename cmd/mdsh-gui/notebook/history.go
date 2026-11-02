@@ -32,6 +32,7 @@ var ErrHistoryOff = errors.New("the History pane is off")
 func (n *Notebook) SetHistory(on bool) (restarted bool, err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	n.waitAsking()
 	if n.running {
 		return false, ErrBusy
 	}
@@ -153,12 +154,13 @@ func (n *Notebook) Prompt() (Prompt, error) {
 		return Prompt{}, ErrBusy
 	}
 	n.waitReap()
-	n.running = true
+	n.running, n.asking = true, true
 	sess, zsh := n.sess, n.lang() == "zsh"
 	n.mu.Unlock()
 	defer func() {
 		n.mu.Lock()
-		n.running = false
+		n.running, n.asking = false, false
+		n.idle.Broadcast()
 		n.mu.Unlock()
 	}()
 	out, err := sess.Ask(context.Background(), promptScript(zsh))

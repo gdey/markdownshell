@@ -171,9 +171,11 @@ function slide(open: boolean) {
 }
 
 // showBar shows the History bar along the bottom while a file is open.
-export function showBar(on: boolean) {
+// It asks the shell for its prompt unless told not to, as when
+// showHistory is about to start the shells again and ask itself.
+export function showBar(on: boolean, prompt = true) {
   $("history").hidden = !on;
-  if (on) void updatePrompt();
+  if (on && prompt) void updatePrompt();
 }
 
 // showHistory opens or closes the pane. Opening may start the shells

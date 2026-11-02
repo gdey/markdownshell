@@ -1978,7 +1978,9 @@ function syncHistory() {
     showBar(false);
     return;
   }
-  if ($("history").hidden) showBar(true);
+  // Turning History on starts the shells again and then asks for the
+  // prompt, so the bar doesn't ask the shells that are going away.
+  if ($("history").hidden) showBar(true, !view.history || doc.history);
   if (view.history === doc.history && $("history").classList.contains("closed") === !view.history) return;
   const had = doc.history;
   doc.history = view.history;
