@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- Nothing a document holds may load from the network; see csp_test.go. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OKxuUMfPrzQq3XhEnBLzaiAjTx/xY9aFq+d83FQkwSw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'self'; base-uri 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings</title>
   <link rel="stylesheet" href="style.css">

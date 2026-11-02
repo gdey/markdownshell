@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
@@ -56,6 +57,12 @@ func TestDocFiles(t *testing.T) {
 		if got := get(path); got != want {
 			t.Errorf("GET %s = %d, want %d", path, got, want)
 		}
+	}
+	// A file beside the document can't run or load anything as a page.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", notebook.DocURL(filepath.Join(dir, "img", "a.svg")), nil))
+	if csp := rec.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "default-src 'none'") || !strings.Contains(csp, "sandbox") {
+		t.Errorf("doc file CSP %q", csp)
 	}
 }
 
