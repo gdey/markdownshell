@@ -92,7 +92,10 @@ export function applyTheme(s: LookSettings) {
   const accent = /^#[0-9a-f]{6}$/i.test(s.accent) ? s.accent : "";
   prop("--accent", accent);
   prop("--link", accent);
-  prop("--accent-fg", accent ? (luminance(accent) > 0.45 ? "#000000" : "#ffffff") : "");
+  // Text on the accent is black or white, whichever reads better: at
+  // a luminance of 0.179 both are 4.5:1, the WCAG AA ratio, so above
+  // it black does and below it white does.
+  prop("--accent-fg", accent ? (luminance(accent) > 0.179 ? "#000000" : "#ffffff") : "");
   window.dispatchEvent(new Event("mdsh-look"));
 }
 
