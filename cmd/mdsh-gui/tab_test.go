@@ -11,6 +11,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/writable"
 )
 
 func tabsOf(w *docWindow) []int {
@@ -155,5 +156,29 @@ func TestTabFresh(t *testing.T) {
 		if d.Fresh != step.fresh {
 			t.Errorf("after opening %q: fresh %v, want %v", filepath.Base(step.file), d.Fresh, step.fresh)
 		}
+	}
+}
+
+// TestAskReadOnly checks that a run asks about a read-only file until
+// the user chooses to run it without saving.
+func TestAskReadOnly(t *testing.T) {
+	old := checkWritable
+	t.Cleanup(func() { checkWritable = old })
+	checkWritable = func(f string) error {
+		if f == "ro.md" {
+			return &writable.Error{File: f, Err: os.ErrPermission}
+		}
+		return nil
+	}
+	tab := &docTab{}
+	if tab.askReadOnly("ok.md") {
+		t.Error("asked about a writable file")
+	}
+	if !tab.askReadOnly("ro.md") {
+		t.Error("didn't ask about a read-only file")
+	}
+	tab.runReadOnly("ro.md")
+	if tab.askReadOnly("ro.md") {
+		t.Error("asked again after the user chose to run without saving")
 	}
 }

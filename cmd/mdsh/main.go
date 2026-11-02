@@ -36,6 +36,7 @@ import (
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
 	"github.com/gdey/markdownshell/tui"
+	"github.com/gdey/markdownshell/writable"
 )
 
 func main() {
@@ -213,6 +214,15 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	}
 	if target == "-" && *write {
 		return errors.New("-w needs a file, not stdin; use -o to name one")
+	}
+	// Find out now, not after every block has run, that the output
+	// can't be saved.
+	if *write {
+		if err := writable.Check(target); errors.Is(err, writable.ErrReadOnly) && *outFile == "" {
+			return fmt.Errorf("%s is read-only, so -w can't save the output; pass -o FILE to save it to another file", target)
+		} else if err != nil {
+			return fmt.Errorf("-o: %w", err)
+		}
 	}
 
 	var src []byte

@@ -226,6 +226,11 @@ Printed markdown is styled when stdout is a terminal; `--color=never`,
 and each block in a box. Pick a block and run it; its output streams in
 under it. A • in the status line marks output that isn't saved; `w`
 saves it, and `--autosave` saves after every block that runs.
+If the file is read-only, `w` opens save as instead; with `--autosave`,
+save as opens before the first run, and `esc` there lets the next run
+go ahead without saving. mdsh-gui does the same with its Save dialog.
+`mdsh -w` on a read-only file stops before running anything; `-o` saves
+the output to another file.
 
 Without a file, or with a folder, `mdsh -i` starts on a list of the
 markdown files under the folder, as `mdsh-gui` does: the files opened

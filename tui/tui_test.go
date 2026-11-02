@@ -18,6 +18,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/writable"
 )
 
 // newModel writes src to a file and opens it in a model 80x40 big.
@@ -514,6 +515,79 @@ func TestSaveAs(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.naming || !strings.Contains(read(t, file), "for=one") {
 		t.Error("enter again didn't overwrite")
+	}
+}
+
+// readOnly is an Options.Writable that says file is read-only.
+func readOnly(file string) func(string) error {
+	return func(f string) error {
+		if f == file {
+			return &writable.Error{File: f, Err: os.ErrPermission}
+		}
+		return nil
+	}
+}
+
+// TestReadOnlySave checks that w on a read-only file opens save as
+// rather than writing it.
+func TestReadOnlySave(t *testing.T) {
+	var file string
+	m, file := newModel(t, twoBlocks, Options{Writable: func(f string) error { return readOnly(file)(f) }})
+	press(m, "enter")
+	pump(t, m)
+	press(m, "w")
+	if !m.naming || strings.Contains(read(t, file), "for=one") {
+		t.Fatalf("w on a read-only file: naming %v, status %q", m.naming, m.status)
+	}
+	if !strings.Contains(m.status, "read-only") {
+		t.Errorf("status = %q", m.status)
+	}
+	other := filepath.Join(filepath.Dir(file), "copy.md")
+	m.saveAs.SetValue(other)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !strings.Contains(read(t, other), "for=one") || strings.Contains(read(t, file), "for=one") {
+		t.Error("save as didn't save the copy alone")
+	}
+}
+
+// TestReadOnlyAutoSave checks that with autosave a run of a read-only
+// file asks for another file first, runs once saved there, and runs
+// without saving after save as is cancelled.
+func TestReadOnlyAutoSave(t *testing.T) {
+	var file string
+	m, file := newModel(t, twoBlocks, Options{AutoSave: true, Writable: func(f string) error { return readOnly(file)(f) }})
+	press(m, "enter")
+	if !m.naming || m.running {
+		t.Fatalf("run of a read-only file: naming %v, running %v", m.naming, m.running)
+	}
+	press(m, "esc")
+	if m.running || !strings.Contains(m.status, "not run") {
+		t.Fatalf("esc: running %v, status %q", m.running, m.status)
+	}
+	press(m, "enter")
+	if m.naming || !m.running {
+		t.Fatalf("second run asked again: naming %v, running %v", m.naming, m.running)
+	}
+	pump(t, m)
+	if strings.Contains(read(t, file), "for=one") {
+		t.Error("saved to the read-only file")
+	}
+
+	// A fresh model, this time saving as another file.
+	m, file = newModel(t, twoBlocks, Options{AutoSave: true, Writable: func(f string) error { return readOnly(file)(f) }})
+	press(m, "j", "enter")
+	other := filepath.Join(filepath.Dir(file), "copy.md")
+	m.saveAs.SetValue(other)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.running {
+		t.Fatal("the run didn't start after save as")
+	}
+	pump(t, m)
+	if got := read(t, other); !strings.Contains(got, "for=two") {
+		t.Errorf("output not autosaved to the copy:\n%s", got)
+	}
+	if strings.Contains(read(t, file), "for=two") {
+		t.Error("saved to the read-only file")
 	}
 }
 

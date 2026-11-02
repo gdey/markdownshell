@@ -27,6 +27,7 @@ import (
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
+	"github.com/gdey/markdownshell/writable"
 )
 
 // Options configure the TUI.
@@ -44,6 +45,10 @@ type Options struct {
 	// AutoSave saves after every block that runs. Otherwise output is
 	// saved when w or ctrl+s is pressed.
 	AutoSave bool
+	// Writable reports whether a file can be saved, with an error
+	// wrapping writable.ErrReadOnly if it can't. If nil, writable.Check
+	// is used.
+	Writable func(file string) error
 	// Images turns on image previews, drawn with colored half blocks.
 	Images bool
 	// Protocol is how v shows an image at full size. With termimg.None
@@ -112,6 +117,12 @@ type Model struct {
 	saveAs    textinput.Model
 	naming    bool
 	overwrite string // the existing file enter again overwrites
+	// afterSaveAs runs once save as saves, as the run that asked for it
+	// with a read-only file and autosave on.
+	afterSaveAs func()
+	// roRun is the read-only file the user chose to run without
+	// saving, by cancelling save as; the next run doesn't ask again.
+	roRun string
 
 	// shown is how the file is shown: the outline, code and output.
 	shown View
@@ -644,17 +655,17 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case "w", "ctrl+s":
+		if m.readOnly() && m.opts.Save != nil && !m.running {
+			m.status = filepath.Base(m.opts.Run.File) + " is read-only; save as another file"
+			return m, m.askSaveAs(nil)
+		}
 		m.save(forceArm)
 	case "W":
 		if m.running {
 			m.status = "a block is running; ctrl+c stops it"
 			break
 		}
-		m.naming, m.overwrite = true, ""
-		m.saveAs.SetValue(m.opts.Run.File)
-		m.saveAs.CursorEnd()
-		m.refresh()
-		return m, m.saveAs.Focus()
+		return m, m.askSaveAs(nil)
 	case "R":
 		switch {
 		case m.running:
@@ -700,6 +711,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.input.Focus()
 	}
 	m.refresh()
+	if m.naming {
+		// A run opened save as.
+		return m, textinput.Blink
+	}
 	return m, nil
 }
 
@@ -999,7 +1014,7 @@ func (m *Model) start(all bool) {
 		m.status = "a block is running; ctrl+c stops it"
 		return
 	}
-	if len(m.nav) == 0 {
+	if len(m.nav) == 0 || m.askBeforeRun(func() { m.start(all) }) {
 		return
 	}
 	i := m.cur()
@@ -1027,7 +1042,7 @@ func (m *Model) startSection() {
 		return
 	}
 	i := m.cur()
-	if i < 0 {
+	if i < 0 || m.askBeforeRun(m.startSection) {
 		return
 	}
 	h, ok := doc.SectionAt(m.d.Headings(), m.d.Blocks[i].Span.Start)
@@ -1048,6 +1063,10 @@ func (m *Model) startSection() {
 // to the file since it was opened unless force is set.
 func (m *Model) save(force bool) {
 	if m.opts.Save == nil {
+		return
+	}
+	if m.readOnly() {
+		m.status = filepath.Base(m.opts.Run.File) + " is read-only; not saved, W saves as another file"
 		return
 	}
 	if m.diskChanged() && !force {
@@ -1106,6 +1125,10 @@ func (m *Model) named(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEsc, tea.KeyCtrlC:
 		m.naming = false
 		m.saveAs.Blur()
+		if m.afterSaveAs != nil {
+			m.afterSaveAs, m.roRun = nil, m.opts.Run.File
+			m.status = "not run; " + filepath.Base(m.opts.Run.File) + " is read-only, so run again to run without saving"
+		}
 		m.refresh()
 		return nil
 	case tea.KeyEnter:
@@ -1132,8 +1155,12 @@ func (m *Model) named(k tea.KeyMsg) tea.Cmd {
 
 // saveTo saves to file and follows it. In another folder, blocks run
 // there, so the file is opened again with fresh shells, as mdsh-gui does.
+// A run waiting on save as starts once saved, unless the file is opened
+// again: then it is left for the user to start.
 func (m *Model) saveTo(file string) tea.Cmd {
 	defer m.refresh()
+	then := m.afterSaveAs
+	m.afterSaveAs = nil
 	if err := m.write(file); err != nil {
 		m.status = "save: " + err.Error()
 		return nil
@@ -1144,7 +1171,41 @@ func (m *Model) saveTo(file string) tea.Cmd {
 	if moved {
 		return func() tea.Msg { return openMsg{file: file} }
 	}
+	if then != nil {
+		then()
+	}
 	return func() tea.Msg { return savedAsMsg{file: file} }
+}
+
+// askSaveAs opens the save as prompt with the file's name in it. then,
+// if set, runs once it saves.
+func (m *Model) askSaveAs(then func()) tea.Cmd {
+	m.naming, m.overwrite, m.afterSaveAs = true, "", then
+	m.saveAs.SetValue(m.opts.Run.File)
+	m.saveAs.CursorEnd()
+	m.refresh()
+	return m.saveAs.Focus()
+}
+
+// readOnly reports whether the file can't be saved.
+func (m *Model) readOnly() bool {
+	check := m.opts.Writable
+	if check == nil {
+		check = writable.Check
+	}
+	return errors.Is(check(m.opts.Run.File), writable.ErrReadOnly)
+}
+
+// askBeforeRun opens save as before a run when autosave would save to a
+// read-only file, and reports whether it did; run starts once saved.
+// Cancelling it means the next run goes ahead without saving.
+func (m *Model) askBeforeRun(run func()) bool {
+	if !m.opts.AutoSave || m.opts.Save == nil || m.roRun == m.opts.Run.File || !m.readOnly() {
+		return false
+	}
+	m.status = filepath.Base(m.opts.Run.File) + " is read-only; save as another file to run with autosave, esc to not run"
+	m.askSaveAs(run)
+	return true
 }
 
 // hasOutput reports whether block i has output saved, or ran this session.

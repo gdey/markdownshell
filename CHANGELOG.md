@@ -425,6 +425,13 @@ follow [Semantic Versioning](https://semver.org/).
   It is now reported as timed out.
 - On macOS, a terminal block that ended its shell, as with `exit`,
   could lose the output it wrote just before.
+- A read-only file, or one in a read-only folder, is no longer
+  overwritten or found out only after the run. `mdsh -w` stops before
+  running anything and says to pass `-o`. In `mdsh -i` and mdsh-gui,
+  saving opens save as; with autosave on, save as opens before the run,
+  which then goes on in the copy. Cancelling it doesn't run, and the
+  next run goes ahead without saving. Writing is tried rather than mode
+  bits read, so ownership and read-only folders count.
 - `mdsh -i` no longer shows a block that ended as running while the
   run goes on, such as while a later block waits for an answer.
 - In a zsh block, a lone `}` anywhere on a line, as in `echo }`, is a

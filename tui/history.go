@@ -311,6 +311,9 @@ func (m *Model) addNote(text string) {
 // runs it on the terminal the pane shows, or, ending in a lone &, in the
 // background.
 func (m *Model) runTyped(text string) {
+	if m.askBeforeRun(func() { m.runTyped(text) }) {
+		return
+	}
 	body, bg := history.Background(text)
 	info := history.Info(history.Lang(m.shellPath()), history.NextID(m.d), bg)
 	b, err := m.d.AppendBlock(info, body)
