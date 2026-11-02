@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/settings"
 )
 
 var (
@@ -75,7 +75,7 @@ var lookAttr = regexp.MustCompile(`data-look="(\w+)"`)
 // window as for the History pane. And a look's own tokens (--tty-*,
 // --bp-*, --gum-*, --witch-*) must be set in its dark palette as well as its light one.
 func TestLookTokens(t *testing.T) {
-	plain := cssVars(t, "frontend/style.css", palette)
+	plain := cssVars(t, "../../web/style.css", palette)
 	if len(plain["light"]) < 40 || len(plain["dark"]) < 40 {
 		t.Fatalf("found %d light and %d dark tokens in style.css; is the parse right?", len(plain["light"]), len(plain["dark"]))
 	}
@@ -95,10 +95,10 @@ func TestLookTokens(t *testing.T) {
 	}
 	paneCovers("plain", plain, "")
 	for _, look := range []struct{ name, attr, file, own string }{
-		{"Teletype", "tty", "frontend/teletype.css", "--tty-"},
-		{"Blueprint", "blueprint", "frontend/blueprint.css", "--bp-"},
-		{"Bubble Gum", "gum", "frontend/bubblegum.css", "--gum-"},
-		{"Witchcraft", "witch", "frontend/witchcraft.css", "--witch-"},
+		{"Teletype", "tty", "../../web/teletype.css", "--tty-"},
+		{"Blueprint", "blueprint", "../../web/blueprint.css", "--bp-"},
+		{"Bubble Gum", "gum", "../../web/bubblegum.css", "--gum-"},
+		{"Witchcraft", "witch", "../../web/witchcraft.css", "--witch-"},
 	} {
 		sets := cssVars(t, look.file, palette)
 		prefix := look.attr + " "
@@ -216,9 +216,9 @@ func TestLookContrast(t *testing.T) {
 	text := [][2]string{{"--fg", "--bg"}, {"--muted", "--bg"}, {"--fg", "--code-bg"}, {"--muted", "--code-bg"}, {"--accent-fg", "--accent"}, {"--bad-fg", "--bad"}, {"--link", "--bg"}}
 	edge := [][2]string{{"--accent", "--bg"}}
 	for _, look := range []struct{ name, file, prefix string }{
-		{"plain", "frontend/style.css", ""},
-		{"Bubble Gum", "frontend/bubblegum.css", "gum "},
-		{"Witchcraft", "frontend/witchcraft.css", "witch "},
+		{"plain", "../../web/style.css", ""},
+		{"Bubble Gum", "../../web/bubblegum.css", "gum "},
+		{"Witchcraft", "../../web/witchcraft.css", "witch "},
 	} {
 		sets := cssValues(t, look.file)
 		for _, scheme := range []string{"light", "dark"} {

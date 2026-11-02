@@ -1,0 +1,590 @@
+package notebook
+
+import (
+	"bytes"
+	"fmt"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
+
+	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/render"
+	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/weblink"
+)
+
+// Cells lays the document out for drawing: one cell per top-level
+// markdown block of prose, such as a paragraph, heading, list or table,
+// and one per fenced block. Blocks mdsh can't run are drawn as prose, as
+// mdsh -i does. What printing leaves out, such as the front matter and
+// mdsh:if sections that are off, is left out here too.
+func (n *Notebook) Cells() []Cell {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.cells()
+}
+
+// cells is Cells for a caller that holds n.mu.
+func (n *Notebook) cells() []Cell {
+	d := n.d
+	l := layout{
+		n:      n,
+		lookup: run.NewLookup(d, n.results, environ()),
+		refs:   linkRefs(d.Src),
+		tasks:  n.taskMarks(),
+	}
+	l.cuts = cuts(d, n.results, l.lookup)
+	// The view numbers the lines of code itself, so an include's
+	// numbers start at its cell's FirstLine, not text in the code.
+	pieces := render.Pieces(d, n.results, render.Options{Env: environ(), PlainIncludes: true})
+	pos := max(d.FrontMatter.End, len(d.Shebang))
+	stale := run.Stale(d, n.results)
+	secrets := n.sess.SecretVars()
+	for i, b := range d.Blocks {
+		l.prose(pos, b.Span.Start)
+		pos = b.Output.End
+		code, out := pieces[3*i+1], pieces[3*i+2]
+		span := doc.Span{Start: b.Span.Start, End: b.Output.End}
+		// Printing leaves out a block whose show= is false or whose
+		// mdsh:if section is off, but Run all still runs it, so a block
+		// that runs, or a tape that types into one, is drawn anyway,
+		// marked hidden. Anything else that printing leaves out does
+		// nothing and isn't drawn.
+		var hidden string
+		if len(code) == 0 {
+			switch {
+			case !run.Runnable(b) && !b.IsTape():
+				continue
+			case inCut(b.Span.Start, l.cuts):
+				hidden = "Left out when printed: it is in an mdsh:if section that is off. Run all runs it unless its run= says otherwise."
+			default:
+				hidden = "Left out when printed: its show= condition is false. Run all runs it unless its run= says otherwise."
+			}
+			if b.IsTape() {
+				hidden = strings.Replace(hidden, "Run all runs it unless its run= says otherwise.", "It still types into its block when that runs.", 1)
+				l.cells = append(l.cells, Cell{Block: -1, Hidden: hidden, HTML: n.html(d.Src[b.Span.Start:b.Span.End]), From: span.Start, To: span.End})
+				continue
+			}
+		}
+		if b.IsTextbox() {
+			t := b.Textbox()
+			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Fit: t.Fit, Placeholder: t.Placeholder, Problem: b.VarTaken, NoSave: b.NoSave()}, From: span.Start, To: span.End})
+			continue
+		}
+		if b.IsChoice() {
+			c := b.Choice()
+			l.cells = append(l.cells, Cell{Block: -1, Choice: &ChoiceCell{Block: i, ID: b.ID, Mode: c.Mode, Options: c.Options, Placeholder: c.Placeholder, Problem: b.VarTaken, NoSave: b.NoSave()}, From: span.Start, To: span.End})
+			continue
+		}
+		if !run.Runnable(b) {
+			c := Cell{Block: -1, HTML: n.html(append(append([]byte(nil), code...), out...)), From: span.Start, To: span.End}
+			if inc, err := b.Include(); err == nil && b.IsInclude() && inc.From > 1 {
+				c.FirstLine = inc.From
+			}
+			l.cells = append(l.cells, c)
+			continue
+		}
+		r := n.results[i]
+		after := run.LookupAt(l.lookup, d, n.results, b.Output.End)
+		outLine := 0
+		if b.Output.End > b.Span.End {
+			outLine = l.lineNo(b.Span.End + leadingBlank(d.Src[b.Span.End:b.Output.End]))
+		}
+		l.cells = append(l.cells, Cell{
+			Collapsed:       hidden == "" && holds(b, "collapse", after),
+			Hidden:          hidden,
+			CollapsedOutput: holds(b, "collapse-output", after),
+			OutputLine:      outLine,
+			Block:           i,
+			ID:              b.ID,
+			Name:            l.name(b),
+			Lang:            b.Lang,
+			Body:            b.Body,
+			Attrs:           attrsText(b.Info),
+			Depends:         b.Depends(),
+			Output:          n.html(out),
+			OutputTasks:     tasksIn(l.tasks, b.Output),
+			Links:           b.Attrs.Has(weblink.Attr),
+			Secret:          b.Attrs.Has(secretAttr) || namesAny(b.Body, secrets),
+			SecretCode:      b.Attrs.Has(secretAttr),
+			Ran:             r.Ran,
+			Status:          r.Status,
+			Failed:          r.Failed(),
+			Stale:           stale[i],
+			NoSave:          b.NoSave(),
+			Running:         n.bg[b],
+			Ms:              r.Duration.Milliseconds(),
+			TimedOut:        r.TimedOut,
+			Timeout:         timeoutMs(b),
+			From:            span.Start,
+			To:              span.End,
+		})
+	}
+	l.prose(pos, len(d.Src))
+	// An mdsh:collapse line folds the section of the heading above it.
+	for _, f := range d.Folds {
+		if !f.Cond.Eval(run.LookupAt(l.lookup, d, n.results, f.Span.Start)) {
+			continue
+		}
+		for i := len(l.cells) - 1; i >= 0; i-- {
+			if c := &l.cells[i]; c.Heading > 0 && c.From <= f.Span.Start {
+				c.Collapsed = true
+				break
+			}
+		}
+	}
+	sections(d, l.cells)
+	unfoldHidden(l.cells)
+	// Each question below is about the whole document, so they all go
+	// to one index: asking d for each cell made laying out a long
+	// document take time in the square of its length.
+	x := d.NewIndex()
+	pos, line := 0, 1
+	for i := range l.cells {
+		c := &l.cells[i]
+		line += bytes.Count(d.Src[pos:c.From], []byte("\n"))
+		pos = c.From
+		c.Line = line
+		c.Drop = x.IsBoundary(c.From)
+		c.DropAfter, c.DropBefore = -1, -1
+		if c.Heading > 0 && c.Drop {
+			if span, _, err := x.Section(c.From); err == nil {
+				c.dropLimits(x, span)
+			}
+		}
+		bi := c.Block
+		if c.Textbox != nil {
+			bi = c.Textbox.Block
+		} else if c.Choice != nil {
+			bi = c.Choice.Block
+		} else if bi < 0 && c.Heading == 0 {
+			// A fence that doesn't run, drawn as it reads, moves too.
+			// A tape moves with its block, not on its own.
+			bi = blockAt(d, c.From)
+			if bi > 0 {
+				if end, ok := unitEnd(d, bi-1, x); ok && end > c.From {
+					bi = -1
+				}
+			}
+		}
+		if bi >= 0 {
+			if end, ok := unitEnd(d, bi, x); ok {
+				last := max(end-1, c.From)
+				c.Movable, c.LastLine = true, line+bytes.Count(d.Src[c.From:last], []byte("\n"))
+				c.History = doc.IsHistoryID(d.Blocks[bi].ID)
+				c.dropLimits(x, doc.Span{Start: d.Blocks[bi].Span.Start, End: end})
+				if users := x.DeleteBlockers(d.Blocks[bi]); len(users) > 0 {
+					c.Undeletable = "Can't delete: " + strings.Join(users, ", ") + " still use it. Take those out first."
+				}
+			}
+		}
+	}
+	return l.cells
+}
+
+// blockAt is the index of the block that starts at pos, or -1.
+func blockAt(d *doc.Document, pos int) int {
+	i := sort.Search(len(d.Blocks), func(i int) bool { return d.Blocks[i].Span.Start >= pos })
+	if i < len(d.Blocks) && d.Blocks[i].Span.Start == pos {
+		return i
+	}
+	return -1
+}
+
+// unfoldHidden opens a heading folded by an mdsh:collapse line when its
+// section holds a hidden block, as a hidden block's own collapse is
+// ignored, so every block Run all runs is on screen when the file opens.
+func unfoldHidden(cells []Cell) {
+	for i := range cells {
+		h := &cells[i]
+		if h.Heading == 0 || !h.Collapsed {
+			continue
+		}
+		for _, c := range cells[i+1:] {
+			if c.Heading > 0 && c.Heading <= h.Heading {
+				break
+			}
+			if c.Hidden != "" {
+				h.Collapsed = false
+				break
+			}
+		}
+	}
+}
+
+// dropLimits sets c's DropAfter and DropBefore from span's
+// doc.Document.DependsLimits.
+func (c *Cell) dropLimits(x *doc.Index, span doc.Span) {
+	l := x.DependsLimits(span)
+	c.DropAfter = l.After
+	if l.BeforeDep != nil {
+		c.DropBefore = l.Before
+	}
+}
+
+// sections sets the heading cells' SectionFrom and SectionTo. A section
+// runs to the next heading drawn of the same or a higher level, as it
+// folds; headings mdsh:if leaves out don't end one.
+func sections(d *doc.Document, cells []Cell) {
+	var hs []doc.Heading
+	var at []int
+	for i, c := range cells {
+		if c.Heading > 0 {
+			hs = append(hs, doc.Heading{Level: c.Heading, Span: doc.Span{Start: c.From}})
+			at = append(at, i)
+		}
+	}
+	doc.CloseSections(hs, len(d.Src))
+	for k, h := range hs {
+		from, to := d.BlocksIn(h.Span)
+		if slices.ContainsFunc(d.Blocks[from:to], run.Runnable) {
+			cells[at[k]].SectionFrom, cells[at[k]].SectionTo = from, to
+		}
+	}
+}
+
+// unitEnd is where the unit that moves with block i ends, as
+// doc.Document.Unit has it, given the document's boundaries, and false
+// for a block that can't move. It saves Unit's parse for every block.
+func unitEnd(d *doc.Document, i int, x *doc.Index) (int, bool) {
+	b := d.Blocks[i]
+	if b.Prefix != "" || !x.IsBoundary(b.Span.Start) {
+		return 0, false
+	}
+	end := b.Output.End
+	if i+1 < len(d.Blocks) {
+		t := d.Blocks[i+1]
+		if t.IsTape() && t.Attrs["for"] == b.ID && len(bytes.TrimSpace(d.Src[end:t.Span.Start])) == 0 {
+			end = t.Output.End
+		}
+	}
+	return end, true
+}
+
+// layout is the state Cells keeps while it lays out the prose.
+type layout struct {
+	n      *Notebook
+	lookup doc.Lookup
+	cuts   []doc.Span
+	refs   []byte
+	tasks  []int // taskMarks
+	cells  []Cell
+	// at and line are where lineNo last counted to and its line there.
+	at, line int
+}
+
+// lineNo is lineNo(src, pos) for the document. The blocks are laid out
+// in order, so it counts on from where it last got to rather than from
+// the top each time, which in a long document took longer than the rest
+// of the layout.
+func (l *layout) lineNo(pos int) int {
+	src := l.n.d.Src
+	if pos < l.at || l.line == 0 {
+		l.at, l.line = 0, 1
+	}
+	l.line += bytes.Count(src[l.at:pos], []byte("\n"))
+	l.at = pos
+	return l.line
+}
+
+// name is how the view names b: as doc.Document.Label does, without
+// "at ".
+func (l *layout) name(b *doc.Block) string {
+	if b.Named() && !doc.GeneratedID(b.ID) {
+		return b.ID
+	}
+	return fmt.Sprintf("line %d", l.lineNo(b.Span.Start))
+}
+
+// prose adds a cell for each top-level markdown block in src[from:to].
+// Each covers its block's lines up to the next block, less the blank
+// lines between them, so the lines goldmark gives no node of their own,
+// such as a setext heading's underline or a thematic break, belong to
+// the block above.
+func (l *layout) prose(from, to int) {
+	src := l.n.d.Src
+	if from >= to {
+		return
+	}
+	starts := []int{from + leadingBlank(src[from:to])}
+	headings := map[int]int{} // start: level
+	root := l.n.md.Parser().Parse(text.NewReader(src[from:to]))
+	for c := root.FirstChild(); c != nil; c = c.NextSibling() {
+		if s, ok := firstLine(c, src[from:to]); ok {
+			start := from + lineStart(src[from:to], s)
+			starts = append(starts, start)
+			if h, ok := c.(*ast.Heading); ok {
+				headings[start] = h.Level
+			}
+		}
+	}
+	slices.Sort(starts)
+	starts = slices.Compact(starts)
+	for i, s := range starts {
+		e := to
+		if i+1 < len(starts) {
+			e = starts[i+1]
+		}
+		e = s + trimBlankLines(src[s:e])
+		if e > s {
+			l.part(doc.Span{Start: s, End: e}, headings[s])
+		}
+	}
+}
+
+// part adds the prose at span, leaving out what is cut. heading is its
+// level if it is a heading.
+func (l *layout) part(span doc.Span, heading int) {
+	d := l.n.d
+	var md bytes.Buffer
+	var tasks []int
+	kept := keep(span, l.cuts)
+	for _, k := range kept {
+		tasks = append(tasks, tasksIn(l.tasks, k)...)
+		from := k.Start
+		for _, p := range d.Placeholders {
+			if p.Span.Start < from || p.Span.End > k.End {
+				continue
+			}
+			md.Write(d.Src[from:p.Span.Start])
+			v, ok := run.LookupAt(l.lookup, d, l.n.results, p.Span.Start)(p.Ref)
+			if !ok {
+				v = p.Value
+			}
+			md.WriteString(v)
+			from = p.Span.End
+		}
+		md.Write(d.Src[from:k.End])
+	}
+	if len(bytes.TrimSpace(md.Bytes())) == 0 {
+		return
+	}
+	if len(l.refs) > 0 {
+		md.WriteString("\n\n")
+		md.Write(l.refs)
+	}
+	l.cells = append(l.cells, Cell{Block: -1, HTML: l.n.html(md.Bytes()), Tasks: tasks, Heading: heading, From: span.Start, To: span.End})
+}
+
+// holds reports whether b's attr is set and its condition holds.
+func holds(b *doc.Block, attr string, lookup doc.Lookup) bool {
+	c, ok := b.Cond(attr)
+	return ok && c.Eval(lookup)
+}
+
+// lineNo is the line pos is on, counting from 1.
+func lineNo(src []byte, pos int) int {
+	return bytes.Count(src[:pos], []byte("\n")) + 1
+}
+
+// firstLine is where the first line of source under node starts, as an
+// offset in src, what was parsed. A fence's lines are its body, so its
+// opening line is found from its info string or the line above the body.
+func firstLine(node ast.Node, src []byte) (int, bool) {
+	first, ok := -1, false
+	ast.Walk(node, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering || c.Type() != ast.TypeBlock {
+			return ast.WalkContinue, nil
+		}
+		lines := c.Lines()
+		if f, isFence := c.(*ast.FencedCodeBlock); isFence {
+			switch {
+			case f.Info != nil:
+				first, ok = f.Info.Segment.Start, true
+			case lines.Len() > 0:
+				first, ok = lineStart(src, lines.At(0).Start-1), true
+			default:
+				return ast.WalkContinue, nil
+			}
+			return ast.WalkStop, nil
+		}
+		if lines.Len() > 0 {
+			first, ok = lines.At(0).Start, true
+			return ast.WalkStop, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	return first, ok
+}
+
+// linkRefs are src's link reference definitions, so prose drawn one
+// block at a time still resolves [text][ref] links.
+func linkRefs(src []byte) []byte {
+	return bytes.Join(linkRef.FindAll(src, -1), []byte("\n"))
+}
+
+var linkRef = regexp.MustCompile(`(?m)^ {0,3}\[[^\]\n]+\]:[ \t]*\S.*$`)
+
+// cuts are the parts of d printing leaves out: the lines of mdsh:if
+// sections, the whole of those that are off, and mdsh:collapse lines. Cells start after the
+// shebang and front matter.
+func cuts(d *doc.Document, results []*run.Result, lookup doc.Lookup) []doc.Span {
+	var cuts []doc.Span
+	for _, s := range d.Sections {
+		if s.Cond.Eval(run.LookupAt(lookup, d, results, s.If.Start)) {
+			cuts = append(cuts, s.If, s.End)
+		} else {
+			cuts = append(cuts, doc.Span{Start: s.If.Start, End: s.End.End})
+		}
+	}
+	for _, f := range d.Folds {
+		cuts = append(cuts, f.Span)
+	}
+	return cuts
+}
+
+// inCut reports whether pos is in one of cuts.
+func inCut(pos int, cuts []doc.Span) bool {
+	return slices.ContainsFunc(cuts, func(c doc.Span) bool { return pos >= c.Start && pos < c.End })
+}
+
+// keep is span less the cuts.
+func keep(span doc.Span, cuts []doc.Span) []doc.Span {
+	kept := []doc.Span{span}
+	for _, c := range cuts {
+		var next []doc.Span
+		for _, k := range kept {
+			if c.End <= k.Start || c.Start >= k.End {
+				next = append(next, k)
+				continue
+			}
+			if c.Start > k.Start {
+				next = append(next, doc.Span{Start: k.Start, End: c.Start})
+			}
+			if c.End < k.End {
+				next = append(next, doc.Span{Start: c.End, End: k.End})
+			}
+		}
+		kept = next
+	}
+	return kept
+}
+
+// lineStart is the start of the line holding pos.
+func lineStart(src []byte, pos int) int {
+	return bytes.LastIndexByte(src[:pos], '\n') + 1
+}
+
+// leadingBlank is the length of the blank lines at the start of src.
+func leadingBlank(src []byte) int {
+	n := 0
+	for n < len(src) {
+		end := bytes.IndexByte(src[n:], '\n')
+		if end < 0 || len(bytes.TrimSpace(src[n:n+end])) > 0 {
+			break
+		}
+		n += end + 1
+	}
+	return n
+}
+
+// trimBlankLines is the length of src less the blank lines at its end,
+// keeping the last line's newline.
+func trimBlankLines(src []byte) int {
+	end := len(src)
+	for end > 0 {
+		s := end
+		if src[s-1] == '\n' {
+			s--
+		}
+		start := bytes.LastIndexByte(src[:s], '\n') + 1
+		if len(bytes.TrimSpace(src[start:end])) > 0 {
+			break
+		}
+		end = start
+	}
+	return end
+}
+
+// Text is the whole file as the split view shows it.
+func (n *Notebook) Text() string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return string(n.d.Src)
+}
+
+// SetText replaces the whole file with text, as typed in the split
+// view, if the file is still base, the text the typing started from,
+// and reports whether it did. When something else changed the file
+// since, such as a run's output or an include filling its fence, it is
+// left alone, so the editor can fold the change into what was typed and
+// try again instead of throwing the change away. Blocks whose code
+// didn't change keep their output.
+func (n *Notebook) SetText(base, text string) (bool, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return false, ErrBusy
+	}
+	if string(n.d.Src) != base {
+		return false, nil
+	}
+	return true, n.setSource([]byte(text))
+}
+
+func (n *Notebook) setSource(src []byte) error {
+	if bytes.Equal(src, n.d.Src) {
+		return nil
+	}
+	if err := n.d.SetSource(src); err != nil {
+		return err
+	}
+	n.dirty = true
+	return n.sync()
+}
+
+// tasksIn are the numbers of the tasks whose marks are in span.
+func tasksIn(marks []int, span doc.Span) []int {
+	var tasks []int
+	for t, p := range marks {
+		if p >= span.Start && p < span.End {
+			tasks = append(tasks, t)
+		}
+	}
+	return tasks
+}
+
+// timeoutMs is b's timeout= in milliseconds, or 0 when it has none or
+// it doesn't parse.
+func timeoutMs(b *doc.Block) int64 {
+	t, ok := b.Attrs["timeout"]
+	if !ok {
+		return 0
+	}
+	d, err := time.ParseDuration(t)
+	if err != nil || d <= 0 {
+		return 0
+	}
+	return d.Milliseconds()
+}
+
+// secretAttr marks a block whose code and output hold a secret.
+const secretAttr = "secret"
+
+// namesAny reports whether code names any of the variables in names, as
+// a whole word: $NAME, ${NAME} and {{$NAME}} all do.
+func namesAny(code string, names []string) bool {
+	word := func(c byte) bool {
+		return c == '_' || '0' <= c && c <= '9' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+	}
+	for _, name := range names {
+		for i := 0; ; {
+			j := strings.Index(code[i:], name)
+			if j < 0 {
+				break
+			}
+			j += i
+			end := j + len(name)
+			if (j == 0 || !word(code[j-1])) && (end == len(code) || !word(code[end])) {
+				return true
+			}
+			i = j + 1
+		}
+	}
+	return false
+}

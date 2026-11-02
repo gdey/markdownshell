@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Nothing a document holds may load from the network; see csp_test.go. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OKxuUMfPrzQq3XhEnBLzaiAjTx/xY9aFq+d83FQkwSw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'self'; base-uri 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mdsh</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="teletype.css">
+  <link rel="stylesheet" href="blueprint.css">
+  <link rel="stylesheet" href="bubblegum.css">
+  <link rel="stylesheet" href="witchcraft.css">
+  <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <script type="module" src="bundle/window.js"></script>
+</head>
+<body class="shell" data-file-drop-target>
+  <nav id="tabbar" aria-label="Tabs">
+    <div id="tabs" role="tablist" aria-label="Open tabs"></div>
+    <button id="new-tab" class="icon" title="New tab" data-key="Mod-T" aria-label="New tab">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.3 2.5h1.4v4.8h4.8v1.4H8.7v4.8H7.3V8.7H2.5V7.3h4.8z"/></svg>
+    </button>
+  </nav>
+  <main id="frames">
+    <div id="drop-here" hidden>Drop the tab here</div>
+  </main>
+</body>
+</html>

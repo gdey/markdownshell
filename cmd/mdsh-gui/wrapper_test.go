@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/shellrc"
+	"github.com/gdey/markdownshell/shellrc"
 )
 
 // The setting writes the .zshrc, and the .bashrc only when there is one.

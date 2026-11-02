@@ -43,14 +43,14 @@ func cssProps(t *testing.T, file string) map[string]map[string]bool {
 // landmark, has to undo it, or it shrinks to the rule's padding: the
 // window's #frames did, and every tab's page with it.
 func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
-	props := cssProps(t, "frontend/style.css")
+	props := cssProps(t, "../../web/style.css")
 	for _, p := range []string{"max-width", "margin", "padding"} {
 		if !props["main"][p] {
 			t.Fatalf("style.css main rule does not set %s; is the parse right?", p)
 		}
 	}
 	for _, page := range []string{"index.html", "window.html", "settings.html"} {
-		src, err := os.ReadFile("frontend/" + page)
+		src, err := os.ReadFile("../../web/" + page)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +83,7 @@ func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
 func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
 	layout := []string{"display", "width", "min-width", "max-width", "padding", "padding-left", "padding-right", "margin", "margin-left", "margin-right", "border", "border-width", "gap", "font-size", "flex", "order", "position"}
 	for _, file := range []string{"style.css", "blueprint.css", "bubblegum.css", "teletype.css", "witchcraft.css"} {
-		for sel, props := range cssProps(t, "frontend/"+file) {
+		for sel, props := range cssProps(t, "../../web/"+file) {
 			if !strings.Contains(sel, ".selected") || !strings.Contains(sel, ".block") || !strings.Contains(sel, ".head") {
 				continue
 			}
@@ -103,17 +103,17 @@ func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
 // carries an empty class instead, which setOutput keeps up to date.
 func TestOutputPartHidesByClassNotHasEmpty(t *testing.T) {
 	for _, file := range []string{"style.css", "blueprint.css", "bubblegum.css", "teletype.css", "witchcraft.css"} {
-		for sel := range cssProps(t, "frontend/"+file) {
+		for sel := range cssProps(t, "../../web/"+file) {
 			if strings.Contains(sel, ":has(") && strings.Contains(sel, ":empty") {
 				t.Errorf("%s: %q tests :empty inside :has(), which WebKit doesn't update as content comes in; toggle a class instead", file, sel)
 			}
 		}
 	}
-	if !cssProps(t, "frontend/style.css")[".block .output-part.empty"]["display"] {
+	if !cssProps(t, "../../web/style.css")[".block .output-part.empty"]["display"] {
 		t.Error("style.css: .block .output-part.empty doesn't hide the empty output part")
 	}
 	for _, file := range []string{"app.ts", "terminal.ts"} {
-		src, err := os.ReadFile("frontend/src/" + file)
+		src, err := os.ReadFile("../../web/src/" + file)
 		if err != nil {
 			t.Fatal(err)
 		}

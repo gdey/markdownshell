@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/settings"
 	"github.com/gdey/markdownshell/writable"
 )
 

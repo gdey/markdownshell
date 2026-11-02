@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/settings"
 )
 
 // Pins persist in the settings file, and the start screen lists the

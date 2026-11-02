@@ -46,6 +46,11 @@ jobs:
       - name: Install zsh
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y zsh
+      - name: Install the oldest Neovim the source pane supports
+        if: runner.os == 'Linux'
+        run: |
+          curl -sSL https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-linux64.tar.gz | tar xz -C "$RUNNER_TEMP"
+          echo "MDSH_TEST_NVIM=$RUNNER_TEMP/nvim-linux64/bin/nvim" >> "$GITHUB_ENV"
       - run: go vet ./...
       - run: go test -race ./...
 
@@ -72,23 +77,18 @@ jobs:
       - name: Install GTK and WebKitGTK
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
-      - name: Install the oldest Neovim the source pane supports
-        if: runner.os == 'Linux'
-        run: |
-          curl -sSL https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-linux64.tar.gz | tar xz -C "$RUNNER_TEMP"
-          echo "MDSH_TEST_NVIM=$RUNNER_TEMP/nvim-linux64/bin/nvim" >> "$GITHUB_ENV"
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build .
       - name: Check the vendored JavaScript matches its lock
         if: runner.os == 'Linux'
-        run: go run ./internal/vendorjs && git diff --exit-code -- frontend/vendor
+        run: go run ./internal/vendorjs && git diff --exit-code -- ../../web/vendor
       - name: Check the bindings and bundle are generated
         if: runner.os == 'Linux'
-        run: go generate && git diff --exit-code -- frontend
+        run: go generate && git diff --exit-code -- ../../web
       - name: Type-check the frontend
         if: runner.os == 'Linux'
-        run: npx --yes --package typescript@5.9.3 tsc -p frontend
+        run: npx --yes --package typescript@5.9.3 tsc -p ../../web
       # Typing in the source view of a long document must redraw only the
       # cards whose markdown changed, and draw them as a fresh draw would.
       # These are counts, not times, so a slow runner doesn't fail them.

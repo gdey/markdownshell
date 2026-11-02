@@ -17,7 +17,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -27,22 +26,23 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/lsp"
+	"github.com/gdey/markdownshell/notebook"
+	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/web"
 )
 
-// The frontend is TypeScript in frontend/src, bundled into frontend/bundle.
-// The bindings in frontend/src/bindings are generated from App.
+// The frontend is the web package: TypeScript in web/src, bundled into
+// web/bundle. The bindings in web/src/bindings are generated from App.
 //
-//go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
+//go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d ../../web/src/bindings
 //go:generate go run ./internal/build
 
 // build/appicon.svg is the app's icon, for the Settings window's About
 // tab.
 //
-//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/style.css frontend/teletype.css frontend/blueprint.css frontend/bubblegum.css frontend/witchcraft.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
-var frontend embed.FS
+//go:embed build/appicon.svg
+var appicon embed.FS
 
 func main() {
 	// --lsp serves the language server on stdin and stdout, for the
@@ -135,10 +135,6 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 
 func mdshGUI(o options) error {
 	args := o.args
-	assets, err := fs.Sub(frontend, "frontend")
-	if err != nil {
-		return err
-	}
 	path, err := settings.DefaultPath()
 	if err != nil {
 		return err
@@ -175,7 +171,7 @@ func mdshGUI(o options) error {
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(assets)), Middleware: tabCalls},
+		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(web.FS)), Middleware: tabCalls},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
