@@ -1,0 +1,17 @@
+# Funding links shown by the "Sponsor" button on the repository page.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+github: [gdey]
+
+# Other supported platforms, uncomment to add:
+# patreon: # Patreon username
+# open_collective: # Open Collective username
+# ko_fi: # Ko-fi username
+# tidelift: # Tidelift package name, e.g. npm/babel
+# community_bridge: # LFX Mentorship project name
+# liberapay: # Liberapay username
+# issuehunt: # IssueHunt username
+# lfx_crowdfunding: # LFX Crowdfunding project name
+# polar: # Polar username
+# buy_me_a_coffee: # Buy Me a Coffee username
+# thanks_dev: # thanks.dev username, e.g. u/gh/gdey
+# custom: # Up to 4 URLs, e.g. ["https://example.com/donate"]
