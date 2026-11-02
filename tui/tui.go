@@ -617,6 +617,11 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, nil
 	}
+	if m.hist.sel != nil {
+		cmd := m.selKey(k)
+		m.refresh()
+		return m, cmd
+	}
 	if m.hist.focus {
 		cmd := m.histKey(k)
 		m.refresh()
@@ -738,6 +743,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.toggle(&m.shown.HideOutput)
 	case "?":
 		m.openHelp()
+	case "V":
+		if why := m.selectHistory(); why != "" {
+			m.status = why
+		}
 	case "h":
 		cmd := m.openHistory()
 		m.refresh()
@@ -1397,8 +1406,10 @@ func (m *Model) footer() string {
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", termsafe.Visible(m.d.Label(m.prompt.of)), termsafe.Visible(m.d.Label(m.prompt.block))))
 	case m.prompt != nil:
 		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
+	case m.hist.sel != nil:
+		help = helpStyle.Render("↑/↓ j/k move the end · g/G first/last · o other end · y enter copy · esc cancel")
 	case m.hist.focus:
-		help = helpStyle.Render("enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
+		help = helpStyle.Render("shift+↑ select lines · enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
 	case m.running:
 		help = helpStyle.Render("? keys · j/k move · ctrl+c stop")
 	case m.notice != "":

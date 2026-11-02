@@ -70,7 +70,7 @@ var inserts = []struct{ label, name string }{
 
 // buildSourceMenu makes the source view's right-click menus, the
 // built-in editor's and the Neovim pane's: the edit commands, and
-// Insert.
+// Insert. It makes the History transcript's too.
 func (a *App) buildSourceMenu() {
 	m := application.NewContextMenu("source")
 	m.AddRole(application.Cut)
@@ -90,6 +90,13 @@ func (a *App) buildSourceMenu() {
 	n.AddSeparator()
 	a.addInsertMenu(n)
 	n.Update()
+
+	// The History transcript is xterm's, drawn without a page selection
+	// for the Copy role to act on, so its menu asks the frontend.
+	h := application.NewContextMenu("history")
+	h.Add("Copy").OnClick(a.send("historycopy"))
+	h.Add("Select All").OnClick(a.send("historyselectall"))
+	h.Update()
 }
 
 // buildCastMenu makes a recording player's right-click menu, in place

@@ -11,8 +11,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// copiedMsg says how putting a block's code on the clipboard went.
+// copiedMsg says how putting a block's code, or lines of History, on
+// the clipboard went.
 type copiedMsg struct {
+	// label names the block; it is "" for History's lines.
 	label string
 	lines int
 	err   error
@@ -46,6 +48,10 @@ func (m *Model) copied(msg copiedMsg) {
 	unit := "lines"
 	if msg.lines == 1 {
 		unit = "line"
+	}
+	if msg.label == "" {
+		m.status = "copied " + strconv.Itoa(msg.lines) + " " + unit + " from History"
+		return
 	}
 	m.status = "copied " + msg.label + ", " + strconv.Itoa(msg.lines) + " " + unit
 }

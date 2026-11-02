@@ -131,6 +131,10 @@ Each file opens in a tab of its own, with its own shells.
   with what blocks set. The prompt is the shell's own `PS1`, expanded
   as the shell would (zsh's `%` escapes and `precmd` hooks, bash's `\`
   escapes), with `PS2` on continuation lines, or `$` if it has none.
+  Drag over the transcript to select lines and press cmd+c (ctrl+c on
+  Linux and Windows), or right-click for Copy and Select All: they are
+  copied as text, without colors. With lines selected, ctrl+c copies
+  them rather than reaching a command that runs in the pane.
   The shells aren't interactive, so they don't read your rc file
   themselves: name it, such as `~/.zshrc`, in Settings › File the
   History pane's shell reads, and the shells read it when History is

@@ -49,6 +49,8 @@ type hist struct {
 	// kill adds to it, as in readline.
 	killed  string
 	killing bool
+	// sel, when set, is the lines selected in log, to copy.
+	sel *histSel
 }
 
 // maxLog is the most lines the pane keeps.
@@ -135,6 +137,7 @@ func (m *Model) openHistory() tea.Cmd {
 
 // closeHistory closes the pane. The shells keep their terminals.
 func (m *Model) closeHistory() {
+	m.hist.sel = nil
 	m.hist.open, m.hist.focus = false, false
 	m.hist.lines = nil
 	m.hist.input.Reset()
@@ -198,6 +201,9 @@ func (m *Model) histLog(lines ...string) {
 	}
 	if n := len(m.hist.log) - maxLog; n > 0 {
 		m.hist.log = slices.Delete(m.hist.log, 0, n)
+		if s := m.hist.sel; s != nil {
+			s.anchor, s.cur = max(s.anchor-n, 0), max(s.cur-n, 0)
+		}
 	}
 }
 
@@ -259,6 +265,11 @@ func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 		return nil
 	case "tab":
 		m.complete()
+		return nil
+	case "shift+up":
+		if why := m.selectHistory(); why != "" {
+			m.status = why
+		}
 		return nil
 	case "enter":
 		m.entered()
@@ -512,10 +523,15 @@ func (m *Model) histView() string {
 	if m.hist.running {
 		hint = " keys go to the command · ctrl+] stops it "
 	}
+	if m.hist.sel != nil {
+		hint = " ↑/↓ select · y copy · esc cancel "
+	}
 	fill := max(m.width-lipgloss.Width(title)-lipgloss.Width(hint)-2, 1)
 	rule := histRule.Render("──"+title+strings.Repeat("─", fill)) + helpStyle.Render(hint)
 	var lines []string
-	if m.hist.running {
+	if m.hist.sel != nil {
+		lines = m.selView(rows)
+	} else if m.hist.running {
 		lines = strings.Split(m.pane.screen(), "\n")
 	} else {
 		lines = slices.Clone(m.hist.log)

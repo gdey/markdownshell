@@ -15,7 +15,7 @@ import { busyFrontMatter, frontMatterOpen, initFrontMatter, loadFrontMatter, sho
 import { linkify } from "./links.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { consoleFile, initConsole, showConsole } from "./console.js";
-import { fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, showBar, showHistory } from "./history.js";
+import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, selectAllHistory, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
 import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
@@ -2250,6 +2250,9 @@ function toggle(key: keyof View, on = !view[key]) {
 
 const actions: Record<string, () => Promise<void> | void> = {
   newfile: () => openNewFile(),
+  // The History transcript's right-click menu.
+  historycopy: () => copyHistory(),
+  historyselectall: () => selectAllHistory(),
   async save() {
     try {
       await nvimState();
@@ -3538,6 +3541,7 @@ initHistory({
     }
     await refresh();
   },
+  say: status,
 });
 initFrontMatter({ edit });
 initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line), fix: (warning) => void fixWarning(warning) });

@@ -5,6 +5,7 @@
 // where a command runs, so what you type while it runs goes to it.
 
 import { Terminal } from "@xterm/xterm";
+import { Clipboard } from "/wails/runtime.js";
 import { App, message } from "./api.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
@@ -44,6 +45,8 @@ export interface HistoryHooks {
   stop: () => void;
   // restart starts the shells again.
   restart: () => Promise<void>;
+  // say shows text in the status line.
+  say: (text: string) => void;
 }
 
 let hooks: HistoryHooks;
@@ -55,7 +58,19 @@ const input = () => $<HTMLTextAreaElement>("history-input");
 function colors(): Record<string, string> {
   const css = getComputedStyle($("history"));
   const v = (name: string, or: string) => css.getPropertyValue(name).trim() || or;
-  return { background: v("--bg", "#0d1117"), foreground: v("--fg", "#e6edf3"), cursor: v("--fg", "#e6edf3") };
+  // Selected lines take the look's selection color, as text does
+  // elsewhere in the window.
+  const sel = cssColor(v("--selection", "rgb(56 139 253 / 0.4)"));
+  return { background: v("--bg", "#0d1117"), foreground: v("--fg", "#e6edf3"), cursor: v("--fg", "#e6edf3"), selectionBackground: sel, selectionInactiveBackground: sel };
+}
+
+// cssColor is color as rgba(r, g, b, a) or #rrggbb, which xterm reads,
+// rather than the space-separated rgb() the looks write.
+function cssColor(color: string): string {
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (!ctx) return color;
+  ctx.fillStyle = color;
+  return ctx.fillStyle;
 }
 
 // The look changed: the transcript takes the pane's new colors and font.
@@ -94,7 +109,47 @@ function ensureTerm(): Terminal {
   term.onData((keys) => {
     if (block >= 0) typeKeys(keys);
   });
+  // With lines selected, cmd/ctrl+c copies them rather than reaching a
+  // command that runs, as in most terminals.
+  term.attachCustomKeyEventHandler((e) => {
+    if (e.type !== "keydown" || !copyKey(e) || !term?.hasSelection()) return true;
+    e.preventDefault();
+    void copyHistory();
+    return false;
+  });
   return term;
+}
+
+// copyKey reports whether e is the copy key: cmd+c on macOS, ctrl+c or
+// ctrl+shift+c elsewhere.
+function copyKey(e: KeyboardEvent): boolean {
+  const mac = navigator.platform.startsWith("Mac");
+  return e.key.toLowerCase() === "c" && !e.altKey && (mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey);
+}
+
+// selected is the transcript's selection as plain text, its colors and
+// links left out, or "" for none.
+function selected(): string {
+  return term?.hasSelection() ? term.getSelection().replace(/[ \t]+$/gm, "").replace(/\n+$/, "") : "";
+}
+
+// copyHistory puts the lines selected in the transcript on the
+// clipboard, as text, and says so in the status line.
+export async function copyHistory() {
+  const text = selected();
+  if (!text) return hooks.say("Nothing selected in History: drag over its lines first");
+  try {
+    await Clipboard.SetText(text);
+  } catch (err) {
+    return hooks.say("couldn't copy: " + message(err));
+  }
+  const n = text.split("\n").length;
+  hooks.say(`Copied ${n} ${n === 1 ? "line" : "lines"} from History`);
+}
+
+// selectAllHistory selects the whole transcript, scrollback included.
+export function selectAllHistory() {
+  term?.selectAll();
 }
 
 // isOpen reports whether the pane is open, rather than only its bar.
@@ -481,6 +536,12 @@ async function complete() {
 
 async function onKey(e: KeyboardEvent) {
   const box = input();
+  // The input keeps the keys, but with nothing of its own selected the
+  // copy key copies what is selected in the transcript.
+  if (copyKey(e) && box.selectionStart === box.selectionEnd && term?.hasSelection()) {
+    e.preventDefault();
+    return copyHistory();
+  }
   if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
     // Tab completes, as in a shell, rather than leaving the input.
     e.preventDefault();
@@ -621,4 +682,18 @@ export function initHistory(h: HistoryHooks) {
   $("history-term").onclick = () => {
     if (block < 0) input().focus();
   };
+  // Edit › Copy, or the copy key where the menu takes it first, copies
+  // the transcript's selection while the keys are in the pane and the
+  // input has none of its own.
+  document.addEventListener("copy", (e) => {
+    const box = input();
+    const at = document.activeElement;
+    if (!at || !$("history").contains(at) || (at === box && box.selectionStart !== box.selectionEnd)) return;
+    const text = selected();
+    if (!text || !e.clipboardData) return;
+    e.preventDefault();
+    e.clipboardData.setData("text/plain", text);
+    const n = text.split("\n").length;
+    hooks.say(`Copied ${n} ${n === 1 ? "line" : "lines"} from History`);
+  });
 }

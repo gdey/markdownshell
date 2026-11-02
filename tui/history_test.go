@@ -201,3 +201,63 @@ func TestHistoryReadlineKeys(t *testing.T) {
 		t.Error("ctrl+d with nothing typed didn't close the pane")
 	}
 }
+
+func TestHistorySelectCopy(t *testing.T) {
+	var got []string
+	old := setClipboard
+	setClipboard = func(s string) error { got = append(got, s); return nil }
+	t.Cleanup(func() { setClipboard = old })
+
+	m, _ := newModel(t, "# Log\n", Options{})
+	press(m, "h")
+	typeLine(m, `printf '\033[32mone\033[0m  \ntwo\nthree\n'`)
+	pump(t, m)
+	n := len(m.hist.log)
+	if n < 4 || m.hist.log[n-1] != "three" {
+		t.Fatalf("log = %q", m.hist.log)
+	}
+
+	// shift+up in the pane selects the last line; up takes in the two
+	// before it, and y copies them as text, without colors or the
+	// spaces that end them.
+	m.Update(tea.KeyMsg{Type: tea.KeyShiftUp})
+	if m.hist.sel == nil {
+		t.Fatal("shift+up selected nothing")
+	}
+	press(m, "k", "k")
+	if v := m.View(); !strings.Contains(v, "y copy") {
+		t.Errorf("the pane doesn't say how to copy:\n%s", v)
+	}
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if cmd == nil {
+		t.Fatal("y gave no command")
+	}
+	m.Update(cmd())
+	if len(got) != 1 || got[0] != "one\ntwo\nthree" {
+		t.Errorf("copied %q", got)
+	}
+	if m.status != "copied 3 lines from History" {
+		t.Errorf("status = %q", m.status)
+	}
+	if m.hist.sel != nil || !m.hist.focus {
+		t.Errorf("after y: sel %v, focus %v; want the keys back in the pane", m.hist.sel, m.hist.focus)
+	}
+
+	// V in the file selects too; o swaps the ends, so k takes the last
+	// line back off, and esc copies nothing.
+	press(m, "esc", "V", "k", "k", "o", "k")
+	if from, to := m.hist.sel.selRange(); from != n-3 || to != n-2 {
+		t.Errorf("selected %d to %d, want %d to %d", from, to, n-3, n-2)
+	}
+	press(m, "esc")
+	if m.hist.sel != nil || m.hist.focus || len(got) != 1 {
+		t.Errorf("after esc: sel %v, focus %v, copied %q", m.hist.sel, m.hist.focus, got)
+	}
+
+	press(m, "h")
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	press(m, "V")
+	if m.hist.sel != nil || m.status != "History is closed; h opens it" {
+		t.Errorf("V with History closed: sel %v, status %q", m.hist.sel, m.status)
+	}
+}
