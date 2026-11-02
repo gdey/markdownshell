@@ -251,8 +251,12 @@ Each file opens in a tab of its own, with its own shells.
   and a dark theme to match the window. When a diagram has a mistake,
   the code shows with d2's message under it. Pictures are shown as
   images, so an SVG's scripts don't run and it loads nothing.
-- **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it and
-  `e` edits it.
+- **Keys:** `j`/`k` select a block, `enter` runs it, `a` runs from it,
+  `e` edits it and `c` copies its code.
+- **Copy:** the copy button on a block's card (or `c`) puts its code on
+  the clipboard, as written in the file, without the fences or output.
+  Other fenced code in the document shows the same button in its corner
+  when the pointer is over it.
 - **Screen readers and the keyboard:** every button, pane, tab and
   field has a name, and the toolbar's buttons say whether they are on.
   Each block's card is a tab stop, named for the block, its language,

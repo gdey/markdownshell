@@ -63,6 +63,7 @@ with the reason.
 | ctrl+c | stop the run; quits when nothing runs |
 | ctrl+] | stop a `tty` block running in its card |
 | `e` / `E` | edit the block, or the whole file, in `$EDITOR` |
+| `y` | copy the block's code to the clipboard |
 | `J`/`K`, alt+↓/↑ | move the block down or up |
 | `u` | undo the last move |
 | `w`, ctrl+s / `W` | save / save as |

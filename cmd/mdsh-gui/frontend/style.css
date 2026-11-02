@@ -362,6 +362,11 @@ th { background: var(--code-bg); }
 /* d2 and svg fences drawn as pictures, with a button to switch to their
    code. A d2 diagram comes in a light and a dark theme. */
 figure.diagram { position: relative; margin: 12px 0; }
+/* A fenced block in prose shows its copy button on hover or focus. */
+.copyable { position: relative; margin: 1em 0; }
+.copyable > pre { margin: 0; }
+.copyable > .copy-code { position: absolute; top: 4px; right: 4px; z-index: 1; background: var(--code-bg); opacity: 0; }
+.copyable:hover > .copy-code, .copyable > .copy-code:focus-visible { opacity: 1; }
 figure.diagram .diagram-image { padding: 8px 0; }
 figure.diagram .diagram-image img { display: block; margin: 0; }
 figure.diagram[data-show="image"] > pre, figure.diagram[data-show="code"] > .diagram-image { display: none; }

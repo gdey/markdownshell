@@ -14,6 +14,15 @@ follow [Semantic Versioning](https://semver.org/).
   they open in the browser or mail app. Commands typed in the History
   pane are added with `links`, and the addresses they print are
   clickable in the pane too. Take `links` off a block to turn it off.
+- Copy a fenced block's code to the clipboard. In mdsh-gui each block's
+  card has a copy button (or press `c` on the selected block), and other
+  fenced code in the document shows one in its corner on hover; the
+  status line says what was copied. In `mdsh -i`, `y` copies the
+  block under the cursor, through the terminal (OSC 52, which works over
+  ssh) and, run locally, the system clipboard too. The code is copied as
+  written in the file, without its fences or output.
+
+  ![A block card with its copy button, and a YAML fence in the prose with the same button in its corner](docs/changelog/copy-code.png)
 
 ### Changed
 
