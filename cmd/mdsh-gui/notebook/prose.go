@@ -12,6 +12,7 @@ import (
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/weblink"
 )
 
 // Cells lays the document out for drawing: one cell per top-level
@@ -103,6 +104,7 @@ func (n *Notebook) cells() []Cell {
 			Depends:         b.Depends(),
 			Output:          n.html(out),
 			OutputTasks:     tasksIn(l.tasks, b.Output),
+			Links:           b.Attrs.Has(weblink.Attr),
 			Ran:             r.Ran,
 			Status:          r.Status,
 			Failed:          r.Failed(),

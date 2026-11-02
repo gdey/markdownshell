@@ -1209,3 +1209,26 @@ func TestConfirmShowsControlChars(t *testing.T) {
 	press(m, "s")
 	pump(t, m)
 }
+
+// TestOutputLinks checks that a links block's output, run or saved, has
+// its web addresses as OSC 8 links, and other blocks' don't.
+func TestOutputLinks(t *testing.T) {
+	src := "```sh {#a links}\necho see https://example.com/a.\n```\n\n" +
+		"```sh {#b links}\ntrue\n```\n\n" +
+		"```output {for=b}\nsaved https://example.com/b\n```\n\n" +
+		"```sh {#c}\necho https://example.com/c\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	for _, want := range []string{"\x1b]8;;https://example.com/a\x1b\\", "\x1b]8;;https://example.com/b\x1b\\"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view has no link %q:\n%q", want, v)
+		}
+	}
+	press(m, "j", "j", "enter")
+	pump(t, m)
+	if v := m.View(); strings.Contains(v, "]8;;https://example.com/c") {
+		t.Errorf("block c has no links attribute, but its output is linked:\n%q", v)
+	}
+}

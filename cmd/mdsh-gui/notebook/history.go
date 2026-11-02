@@ -206,10 +206,7 @@ func (n *Notebook) Enter(input string) error {
 	body, bg := backgrounded(input)
 	return n.start(func(ctx context.Context) error {
 		n.mu.Lock()
-		info := fmt.Sprintf("%s {#%s}", n.lang(), n.nextHistoryID())
-		if bg {
-			info = strings.TrimSuffix(info, "}") + " background}"
-		}
+		info := history.Info(n.lang(), n.nextHistoryID(), bg)
 		b, err := n.d.AppendBlock(info, body)
 		if err == nil {
 			err = n.sync()

@@ -33,7 +33,7 @@ func TestHistoryPane(t *testing.T) {
 	typeLine(m, "echo hi${X-gone}")
 	pump(t, m)
 	text := read(t, file)
-	if !strings.Contains(text, "```sh {#history-1}\necho hi${X-gone}\n```\n") || !strings.Contains(text, "higone") {
+	if !strings.Contains(text, "```sh {#history-1 links}\necho hi${X-gone}\n```\n") || !strings.Contains(text, "higone") {
 		t.Errorf("file:\n%s", text)
 	}
 	if v := m.View(); !strings.Contains(v, "History") || !strings.Contains(v, "higone") {
@@ -48,7 +48,7 @@ func TestHistoryPane(t *testing.T) {
 	typeLine(m, "echo two")
 	typeLine(m, "fi")
 	pump(t, m)
-	if text := read(t, file); !strings.Contains(text, "```sh {#history-2}\nif true; then\necho two\nfi\n```\n") {
+	if text := read(t, file); !strings.Contains(text, "```sh {#history-2 links}\nif true; then\necho two\nfi\n```\n") {
 		t.Errorf("file:\n%s", text)
 	}
 
@@ -89,7 +89,7 @@ func TestHistoryFullScreen(t *testing.T) {
 		t.Errorf("the pane doesn't show the command:\n%s", v)
 	}
 	pump(t, m)
-	if text := read(t, file); !strings.Contains(text, "{#history-1 tty}") {
+	if text := read(t, file); !strings.Contains(text, "{#history-1 links tty}") {
 		t.Errorf("not kept as a tty block:\n%s", text)
 	}
 }
@@ -99,7 +99,7 @@ func TestHistoryBackgroundAndComplete(t *testing.T) {
 	press(m, "h")
 	typeLine(m, "true &")
 	pump(t, m)
-	if text := string(m.d.Src); !strings.Contains(text, "```sh {#history-1 background}\ntrue\n```") {
+	if text := string(m.d.Src); !strings.Contains(text, "```sh {#history-1 background links}\ntrue\n```") {
 		t.Errorf("file:\n%s", text)
 	}
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ech"), Paste: true})

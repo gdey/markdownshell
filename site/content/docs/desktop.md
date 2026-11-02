@@ -99,7 +99,8 @@ This page is the reference.
   An experimental Neovim pane can take its place.
 - **History** (View › History, cmd/ctrl+shift+H). A terminal along the
   bottom, with your shell's prompt and completion. Commands are added to
-  the file as `#history-N` blocks with their output; `#` lines become
+  the file as `#history-N` blocks with their output, and with `links`,
+  so the web addresses they print are clickable; `#` lines become
   notes. A history block deletes without asking, and becomes a plain
   block once moved.
 - **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from

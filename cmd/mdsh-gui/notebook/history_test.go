@@ -67,13 +67,13 @@ func TestHistory(t *testing.T) {
 	}
 	want := "# Log\n\n```sh {#setup}\nX=one\n```\n\n" +
 		"Setting up\n the *shell*.\nagain\n\n" +
-		"```sh {#history-1}\nX=two; cd /\n```\n\n" +
-		"```sh {#history-2}\nprintf '\\033[1m%s\\033[0m %s\\n' \"$X\" \"$PWD\"\n```\n\n" +
+		"```sh {#history-1 links}\nX=two; cd /\n```\n\n" +
+		"```sh {#history-2 links}\nprintf '\\033[1m%s\\033[0m %s\\n' \"$X\" \"$PWD\"\n```\n\n" +
 		"```output {for=history-2 exit=0}\ntwo /\n```\n\n" +
 		"Now fail:\n\n" +
-		"```sh {#history-3}\nfalse\n```\n\n" +
+		"```sh {#history-3 links}\nfalse\n```\n\n" +
 		"```output {for=history-3 exit=1}\n```\n\n" +
-		"```sh {#history-4 tty}\nprintf '\\033[?1049hfull\\033[?1049l'\n```\n"
+		"```sh {#history-4 links tty}\nprintf '\\033[?1049hfull\\033[?1049l'\n```\n"
 	got := n.Text()
 	if !strings.HasPrefix(got, want) {
 		t.Errorf("text =\n%s\nwant it to start\n%s", got, want)
@@ -113,8 +113,27 @@ func TestHistoryNumbers(t *testing.T) {
 	if err := n.Enter("true"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(n.Text(), "{#history-8}") {
+	if !strings.Contains(n.Text(), "{#history-8 links}") {
 		t.Errorf("text = %s", n.Text())
+	}
+}
+
+// TestCellLinks checks that a block's cell says whether it has links, so
+// the rendered view makes the web addresses in its output clickable.
+func TestCellLinks(t *testing.T) {
+	n, err := Open(write(t, "```sh {#a links}\necho https://example.com\n```\n\n```sh {#b}\ntrue\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	got := map[string]bool{}
+	for _, c := range n.Cells() {
+		if c.Block >= 0 {
+			got[c.ID] = c.Links
+		}
+	}
+	if !got["a"] || got["b"] {
+		t.Errorf("links = %v, want a only", got)
 	}
 }
 
@@ -242,7 +261,7 @@ func TestHistoryBackground(t *testing.T) {
 	if err := n.Enter("sleep 0.3; echo later &  "); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(n.Text(), "```sh {#history-1 background}\nsleep 0.3; echo later\n```\n") {
+	if !strings.Contains(n.Text(), "```sh {#history-1 background links}\nsleep 0.3; echo later\n```\n") {
 		t.Fatalf("text = %s", n.Text())
 	}
 	// The prompt is back while it runs.

@@ -55,6 +55,9 @@ type Cell struct {
 	// OutputTasks number the task list checkboxes in Output, as Tasks
 	// does for HTML.
 	OutputTasks []int `json:"outputTasks,omitempty"`
+	// Links is true when the block has the links attribute, so the web
+	// addresses in Output are made clickable.
+	Links bool `json:"links,omitempty"`
 	// Ran is true when the block ran this session; Status and Failed say
 	// how it went.
 	Ran    bool `json:"ran"`

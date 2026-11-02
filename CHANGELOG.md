@@ -6,6 +6,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A `links` block attribute makes the web addresses in a block's output
+  clickable: links in mdsh-gui's rendered view, OSC 8 hyperlinks in
+  `mdsh -i`. Only `http:`, `https:` and `mailto:` addresses count, and
+  they open in the browser or mail app. Commands typed in the History
+  pane are added with `links`, and the addresses they print are
+  clickable in the pane too. Take `links` off a block to turn it off.
+
+  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
+
 ## [1.3.0] - 2026-11-02
 
 The desktop app becomes a full editor: undo and redo, blocks that move

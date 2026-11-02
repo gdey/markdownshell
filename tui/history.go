@@ -369,7 +369,7 @@ func (m *Model) typedDone(d *histDone) {
 		m.histLog(helpStyle.Render("(full screen: kept as a recording)"))
 	} else if r != nil {
 		if out := strings.TrimRight(string(r.Stdout), "\n"); out != "" {
-			m.histLog(out)
+			m.histLog(links(b, out))
 		}
 	}
 	if r != nil && r.Err != nil {
