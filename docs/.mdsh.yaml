@@ -1,0 +1,7 @@
+# Makes this folder a collection on mdsh-gui's start screen. Edit it
+# with the ⚙ beside the folder there, or by hand: see "Collections" in
+# cmd/mdsh-gui/README.md.
+title: Design docs
+description: How mdsh works and why, what is planned next, and the security reviews.
+icon: 📐
+color: "#7c3aed"

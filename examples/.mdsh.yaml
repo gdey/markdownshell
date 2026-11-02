@@ -1,0 +1,7 @@
+# Makes this folder a collection on mdsh-gui's start screen. Edit it
+# with the ⚙ beside the folder there, or by hand: see "Collections" in
+# cmd/mdsh-gui/README.md.
+title: A tour of mdsh
+description: The examples in reading order. Start with README.md, then hello.md.
+icon: 🧭
+color: "#4f7cff"

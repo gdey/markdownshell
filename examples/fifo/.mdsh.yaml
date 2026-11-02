@@ -1,0 +1,6 @@
+# Part of the tour in ../README.md: background blocks talking through a pipe.
+title: Background blocks and FIFOs
+description: A reader, a writer and a named pipe, and the two ways that can hang.
+icon: 🔀
+color: "#d97706"
+tags: [background]
