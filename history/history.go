@@ -206,14 +206,15 @@ func NextID(d *doc.Document) string {
 	return "history-" + strconv.Itoa(high+1)
 }
 
-// Info is the info string a command is added with: lang, id and links,
-// so the web addresses it prints are clickable, and background if it
-// was typed with a trailing &.
+// Info is the info string a command is added with: lang and id; skip,
+// so running the whole file doesn't run it again, though it still runs
+// by hand; links, so the web addresses it prints are clickable; and
+// background if it was typed with a trailing &.
 func Info(lang, id string, background bool) string {
 	if background {
-		return lang + " {#" + id + " background links}"
+		return lang + " {#" + id + " skip background links}"
 	}
-	return lang + " {#" + id + " links}"
+	return lang + " {#" + id + " skip links}"
 }
 
 // incomplete matches what sh, bash and zsh say about input that ends

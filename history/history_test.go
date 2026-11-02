@@ -200,7 +200,7 @@ func TestNextID(t *testing.T) {
 	if got := history.NextID(moved); got != "history-10" {
 		t.Errorf("NextID past a moved block's file = %q", got)
 	}
-	if got := history.Info("zsh", "history-8", true); got != "zsh {#history-8 background links}" {
+	if got := history.Info("zsh", "history-8", true); got != "zsh {#history-8 skip background links}" {
 		t.Errorf("Info = %q", got)
 	}
 }

@@ -94,8 +94,9 @@ Each file opens in a tab of its own, with its own shells.
   the terminal slides up out of the bar. Type a command and press enter:
   it runs in the file's shell, sharing variables and the working
   directory with the blocks, and is added to the end of the file as a
-  block, `#history-1 links`, `#history-2 links`…, with its output and
-  exit status, failures included. `links` makes the web addresses it
+  block, `#history-1 skip links`, `#history-2 skip links`…, with its
+  output and exit status, failures included. `skip` keeps Run all from
+  running it again, though its play button still does. `links` makes the web addresses it
   prints (`http:`, `https:` and `mailto:` only) clickable in the
   block's output, and they are in the pane too; take it off the block
   to turn them off, or add it to any block. It runs on a real terminal, so you can type at a

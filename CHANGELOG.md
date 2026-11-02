@@ -15,6 +15,12 @@ follow [Semantic Versioning](https://semver.org/).
   pane are added with `links`, and the addresses they print are
   clickable in the pane too. Take `links` off a block to turn it off.
 
+### Changed
+
+- Commands typed in the History pane, in mdsh-gui and `mdsh -i`, are
+  added with `skip`, so running the whole file doesn't run them again.
+  Running one by hand still does.
+
   ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
 
 ## [1.3.0] - 2026-11-02
