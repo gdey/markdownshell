@@ -2632,14 +2632,14 @@ $("options").onclick = openRunOptions;
 
 // Start screen
 
-let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "", writable: [] };
+let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], pinned: [], lastSession: "", writable: [] };
 
 async function drawStart() {
   try {
     startScreen = await App.StartScreen();
     $("start-dir").textContent = tilde(startScreen.dir) + (startScreen.full ? " (showing the first " + (startScreen.files ?? []).length + " files)" : "");
   } catch (err) {
-    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], lastSession: "", writable: [] };
+    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], pinned: [], lastSession: "", writable: [] };
     $("start-dir").textContent = message(err);
   }
   const last = $<HTMLButtonElement>("last-session");
@@ -2658,7 +2658,38 @@ function fileRow(path: string, label: string, detail: string, desc = "", tags: s
   const left = desc ? el("span", { className: "fleft" }, name, el("span", { className: "fdesc muted", title: desc }, desc)) : name;
   const b = el("button", { className: "file", title: path }, left, el("span", { className: "muted" }, detail));
   b.onclick = () => openPath(path);
-  return el("li", {}, b);
+  return el("li", {}, b, pinButton(path, label));
+}
+
+const isPinned = (path: string) => (startScreen.pinned ?? []).includes(path);
+
+// pinButton pins path to the top of the start screen, or unpins it.
+function pinButton(path: string, label: string): HTMLButtonElement {
+  const on = isPinned(path);
+  const b = iconButton("pin", (on ? "Unpin " : "Pin ") + label, () => void setPinned(path, !on));
+  b.classList.add("pin");
+  b.classList.toggle("pinned", on);
+  b.title = on ? "Unpin" : "Pin to the top";
+  b.setAttribute("aria-pressed", String(on));
+  b.dataset.path = path;
+  return b;
+}
+
+async function setPinned(path: string, pin: boolean) {
+  // Keep the keyboard on the button, which is drawn again where it was clicked.
+  const section = document.activeElement?.closest("#pinned-list, #recent-list, #file-list")?.id;
+  try {
+    await App.Pin(path, pin);
+  } catch (err) {
+    $("start-dir").textContent = message(err);
+    return;
+  }
+  const pinned = (startScreen.pinned ?? []).filter((p) => p !== path);
+  startScreen.pinned = pin ? [...pinned, path] : pinned;
+  filterStart();
+  announce(pin ? "Pinned" : "Unpinned");
+  const again = [...document.querySelectorAll<HTMLButtonElement>(`#${section ?? "file-list"} button.pin`)].find((b) => b.dataset.path === path);
+  (again ?? $("filter")).focus();
 }
 
 // startFilter splits the filter box into #tags, which a file must all
@@ -2743,16 +2774,20 @@ function filterStart() {
     return has(f.rel) || has(f.description) || ft.some(has) || has(c?.title) || has(c?.description);
   };
 
-  // Recent files match on their path; with #tags, only listed files that have them.
-  const recent = (startScreen.recent ?? []).filter((p) => {
+  // Pinned and recent files match on their path; with #tags, only listed files that have them.
+  const shown = (p: string) => {
     if (tags.length === 0) return has(p);
     const f = byPath.get(p);
     return f !== undefined && matches(f);
-  });
+  };
+  const pathRow = (p: string) => fileRow(p, p.split(/[\\/]/).pop() ?? p, tilde(p.replace(/[\\/][^\\/]*$/, "")));
+  const pinned = (startScreen.pinned ?? []).filter(shown);
+  $("pinned-list").hidden = pinned.length === 0;
+  $("pinned-list").querySelector("ul")!.replaceChildren(...pinned.map(pathRow));
+  // A pinned file is listed once, under Pinned.
+  const recent = (startScreen.recent ?? []).filter((p) => !isPinned(p) && shown(p));
   $("recent-list").hidden = recent.length === 0;
-  $("recent-list")
-    .querySelector("ul")!
-    .replaceChildren(...recent.map((p) => fileRow(p, p.split(/[\\/]/).pop() ?? p, tilde(p.replace(/[\\/][^\\/]*$/, "")))));
+  $("recent-list").querySelector("ul")!.replaceChildren(...recent.map(pathRow));
 
   // Every tag in the listing, with how many files have it.
   const counts = new Map<string, number>();
@@ -2803,7 +2838,7 @@ function filterStart() {
     if (!err && writable(dir)) list.append(el("div", { className: "fhead" }, h, folderGear(dir, folderName(dir), drawStart)), ul);
     else list.append(h, ul);
   }
-  $("start-empty").hidden = groups.size > 0 || recent.length > 0;
+  $("start-empty").hidden = groups.size > 0 || recent.length > 0 || pinned.length > 0;
 }
 
 // tilde shows a path under home as ~/….

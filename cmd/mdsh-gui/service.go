@@ -483,6 +483,8 @@ type Start struct {
 	Collections []library.Collection `json:"collections"`
 	Full        bool                 `json:"full"` // more files than listed
 	Recent      []string             `json:"recent"`
+	// Pinned are the pinned files that still exist, shown above Recent.
+	Pinned []string `json:"pinned"`
 	// LastSession is the file Last Session opens, or "" if there are no
 	// sessions yet.
 	LastSession string `json:"lastSession"`
@@ -518,15 +520,32 @@ func (a *App) StartScreen() (Start, error) {
 	a.startImages = images
 	a.startFolders = folders
 	a.mu.Unlock()
-	var recent []string
-	for _, f := range a.settings.Get().Recent {
-		if _, err := os.Stat(f); err == nil {
-			recent = append(recent, f)
-		}
-	}
+	s := a.settings.Get()
 	home, _ := os.UserHomeDir()
 	last, _ := session.Last(a.sessionDir())
-	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: recent, LastSession: last, Writable: writable}, nil
+	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: existing(s.Recent), Pinned: existing(s.Pinned), LastSession: last, Writable: writable}, nil
+}
+
+// existing are the files that still exist. The others stay in the
+// settings, so a file that comes back, such as on a drive plugged in
+// again, shows again.
+func existing(files []string) []string {
+	var out []string
+	for _, f := range files {
+		if _, err := os.Stat(f); err == nil {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// Pin pins file to the top of the start screen, or unpins it.
+func (a *App) Pin(file string, pin bool) error {
+	if !filepath.IsAbs(file) {
+		return fmt.Errorf("pin %q: not an absolute path", file)
+	}
+	file = filepath.Clean(file)
+	return a.settings.Update(func(s *settings.Settings) { s.Pin(file, pin) })
 }
 
 // Settings are the app-wide settings.

@@ -25,6 +25,8 @@ export const icons = {
   gear:
     '<circle cx="8" cy="8" r="3.7" fill="none" stroke="currentColor" stroke-width="2.2"/>' +
     [0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<rect x="6.9" y="0.8" width="2.2" height="3.4" rx="0.5" transform="rotate(${a} 8 8)"/>`).join(""),
+  // Pins a file to the top of the start screen.
+  pin: '<path d="M5.2 1.5h5.6v1.4l-1 .7v3.3l2.5 2.4v1.4H8.7v3.6L8 15.5l-.7-1.2v-3.6H3.7V9.3l2.5-2.4V3.6l-1-.7z"/>',
   info: '<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="7.3" y="7" width="1.4" height="4.5"/><rect x="7.3" y="4.4" width="1.4" height="1.4"/>',
   // The markdown bar, the outline drawer and the view switch.
   heading: '<path d="M3 2.5h1.6v4.7h6.8V2.5H13v11h-1.6V8.7H4.6v4.8H3z"/>',

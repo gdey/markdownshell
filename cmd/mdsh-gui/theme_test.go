@@ -117,12 +117,12 @@ func TestLookTokens(t *testing.T) {
 // The Settings window's edits must all be saved, the look among them,
 // or the other windows never hear of a change.
 func TestEditedSettings(t *testing.T) {
-	cur := settings.Settings{Recent: []string{"/a.md"}, LastFolder: "/a"}
+	cur := settings.Settings{Recent: []string{"/a.md"}, Pinned: []string{"/p.md"}, LastFolder: "/a"}
 	edited(&cur, settings.Settings{Look: "tty", Theme: "dark", NoSpellCheck: true, View: "both", Recent: nil})
 	if cur.Look != "tty" || cur.Theme != "dark" || !cur.NoSpellCheck || cur.View != "both" {
 		t.Errorf("edited = %+v", cur)
 	}
-	if len(cur.Recent) != 1 || cur.LastFolder != "/a" {
+	if len(cur.Recent) != 1 || len(cur.Pinned) != 1 || cur.LastFolder != "/a" {
 		t.Errorf("edited changed what the window doesn't edit: %+v", cur)
 	}
 	edited(&cur, settings.Settings{Look: "tty", TextSize: 300, UIFont: "Inter", CodeFont: `x"; } body {`, LineSpacing: "relaxed", NoRules: true, Accent: "#AABBCC", HistoryPane: "invert"})

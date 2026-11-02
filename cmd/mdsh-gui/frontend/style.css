@@ -464,6 +464,20 @@ ul.files li:last-child button.file { border-radius: 0 0 6px 6px; }
 .fname { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fleft { display: flex; flex-direction: column; min-width: 0; }
 button.file .fdesc { font-size: calc(12px * var(--text-scale)); }
+/* A file's pin, shown on hover and focus, and always once pinned. The
+   row is lit as a whole, pin and all. */
+ul.files li { display: flex; align-items: center; }
+ul.files li:first-child { border-radius: 6px 6px 0 0; }
+ul.files li:last-child { border-radius: 0 0 6px 6px; }
+.coll ul.files li { border-radius: 0; }
+ul.files li:has(button.pin):hover { background: var(--hover); }
+ul.files li:has(button.pin):hover button.file { background: none; }
+ul.files li button.file { flex: 1; min-width: 0; }
+button.icon.pin { flex: none; margin: 0 6px 0 -4px; padding: 3px 5px; opacity: 0; }
+button.pin svg { width: 14px; height: 14px; display: block; fill: none; stroke: currentColor; stroke-width: 1.2; }
+ul.files li:hover button.pin, button.pin:focus-visible, button.pin.pinned { opacity: 1; }
+button.icon.pin.pinned { color: var(--accent); }
+button.pin.pinned svg { fill: currentColor; }
 
 /* Dialogs */
 dialog { border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--fg); padding: 20px 24px; width: min(440px, 90vw); }
