@@ -93,6 +93,9 @@ type Cell struct {
 	// in the document uses it, such as another block's depends=. Empty
 	// when it can.
 	Undeletable string `json:"undeletable,omitempty"`
+	// History is set on a top-level block the History pane added,
+	// #history-N, which deletes without asking.
+	History bool `json:"history,omitempty"`
 	// Drop is set when a block or section can be moved to just before
 	// the cell, with MoveTo at From.
 	Drop bool `json:"drop,omitempty"`

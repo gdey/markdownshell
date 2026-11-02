@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/history"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -330,21 +330,8 @@ func (n *Notebook) addNote(text string) error {
 	return nil
 }
 
-var historyID = regexp.MustCompile(`^history-([0-9]+)$`)
-
-// nextHistoryID is the id for the next command, one past the highest
-// history-N in the document, with n.mu held.
-func (n *Notebook) nextHistoryID() string {
-	high := 0
-	for _, b := range n.d.Blocks {
-		if m := historyID.FindStringSubmatch(b.ID); m != nil {
-			if v, err := strconv.Atoi(m[1]); err == nil && v > high {
-				high = v
-			}
-		}
-	}
-	return "history-" + strconv.Itoa(high+1)
-}
+// nextHistoryID is the id for the next command, with n.mu held.
+func (n *Notebook) nextHistoryID() string { return history.NextID(n.d) }
 
 // shell is the shell blocks run in, with n.mu held.
 func (n *Notebook) shell() string {

@@ -145,6 +145,12 @@ export interface Cell {
     "undeletable"?: string;
 
     /**
+     * History is set on a top-level block the History pane added,
+     * #history-N, which deletes without asking.
+     */
+    "history"?: boolean;
+
+    /**
      * Drop is set when a block or section can be moved to just before
      * the cell, with MoveTo at From.
      */

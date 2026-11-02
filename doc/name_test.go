@@ -95,3 +95,38 @@ func TestLabel(t *testing.T) {
 		t.Errorf("labels = %q, want %q", strings.Join(got, "|"), want)
 	}
 }
+
+func TestRenameBlock(t *testing.T) {
+	src := "```sh {#history-2}\necho hi\n```\n\n" +
+		"```output {for=history-2 exit=0}\nhi\n![](d.md.assets/history-2.png)\n```\n\n" +
+		"It said {{#history-2/?}}.\n\n" +
+		"```sh {#history-20 depends=history-2}\ntrue\n```\n\n" +
+		"```sh {#other depends=\"history-20, history-2\"}\ntrue\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := d.Blocks[0]
+	if err := d.RenameBlock(b, "block-x"); err != nil {
+		t.Fatal(err)
+	}
+	want := "```sh {#block-x}\necho hi\n```\n\n" +
+		"```output {for=block-x exit=0}\nhi\n![](d.md.assets/history-2.png)\n```\n\n" +
+		"It said {{#block-x/?}}.\n\n" +
+		"```sh {#history-20 depends=block-x}\ntrue\n```\n\n" +
+		"```sh {#other depends=\"history-20, block-x\"}\ntrue\n```\n"
+	if string(d.Src) != want {
+		t.Errorf("src =\n%s\nwant\n%s", d.Src, want)
+	}
+	if d.Blocks[0] != b || b.ID != "block-x" || !b.HasOutput() {
+		t.Errorf("block = %p %q output %v, want %p block-x with output", d.Blocks[0], b.ID, b.HasOutput(), b)
+	}
+	if err := d.RenameBlock(b, "other"); err == nil {
+		t.Error("renaming to a taken id worked")
+	}
+	for id, want := range map[string]bool{"history-1": true, "history-12": true, "history-": false, "history-x": false, "block-1": false} {
+		if IsHistoryID(id) != want {
+			t.Errorf("IsHistoryID(%q) = %v, want %v", id, !want, want)
+		}
+	}
+}

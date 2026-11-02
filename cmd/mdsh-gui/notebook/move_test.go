@@ -261,3 +261,95 @@ func TestMoveDependsOrder(t *testing.T) {
 		t.Errorf("a to just above b: %v\n%s", err, n.Text())
 	}
 }
+
+func TestMoveHistory(t *testing.T) {
+	src := "# One\n\n```sh {#a}\necho a\n```\n\n" +
+		"# Two\n\n```sh {#history-1}\necho one\n```\n\n" +
+		"```output {for=history-1 exit=0}\none\n![](x.md.assets/history-1.png)\n```\n\n" +
+		"```sh {#history-2}\necho two\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(2); err != nil {
+		t.Fatal(err)
+	}
+	// A history block that moves gets an id of its own, and its output
+	// follows; its run stays.
+	m, err := n.MoveBlock(1, -1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := n.d.Blocks[m.Block]
+	if !doc.GeneratedID(b.ID) || !b.HasOutput() || b.Body != "echo one\n" {
+		t.Fatalf("moved block is #%s, output %v:\n%s", b.ID, b.HasOutput(), n.Text())
+	}
+	if !strings.Contains(n.Text(), "```output {for="+b.ID+" exit=0}\none\n![](x.md.assets/history-1.png)") {
+		t.Errorf("output didn't follow:\n%s", n.Text())
+	}
+	// Its old file is still linked, so the next history block doesn't
+	// take its number.
+	if id := n.nextHistoryID(); id != "history-3" {
+		t.Errorf("next history id = %s, want history-3", id)
+	}
+	// Undo puts the old id back.
+	if what, err := n.Undo(); err != nil || what != "move block" || !strings.Contains(n.Text(), "{#history-1}") {
+		t.Errorf("undo %q %v:\n%s", what, err, n.Text())
+	}
+	// A section's history blocks are renamed with it; a ran one keeps its
+	// run.
+	m, err = n.MoveTo(from(t, n, "# Two"), from(t, n, "# One"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(n.Text(), "history-2}") || strings.Contains(n.Text(), "{#history-1}") || !strings.Contains(n.Text(), "{#a}") {
+		t.Errorf("after moving section Two:\n%s", n.Text())
+	}
+	if r := n.results[n.index[n.d.Blocks[1]]]; !r.Ran || r.Block.Body != "echo two\n" {
+		t.Errorf("history-2 lost its run: %+v", r)
+	}
+	// An ordinary block keeps its id.
+	if _, err := n.MoveTo(from(t, n, "```sh {#a}"), from(t, n, "# Two")); err != nil {
+		t.Fatal(err)
+	}
+	if n.d.Blocks[0].ID != "a" {
+		t.Errorf("a renamed:\n%s", n.Text())
+	}
+}
+
+// from is the From of the cell that starts with text.
+func from(t *testing.T, n *Notebook, text string) int {
+	t.Helper()
+	for _, c := range n.Cells() {
+		if strings.HasPrefix(n.Text()[c.From:], text) {
+			return c.From
+		}
+	}
+	t.Fatalf("no cell %q", text)
+	return 0
+}
+
+func TestMoveHistoryNowhere(t *testing.T) {
+	src := "```sh {#a}\ntrue\n```\n\n```sh {#history-1}\ntrue\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	// Dropped on its own spot, it stays a history block.
+	m, err := n.MoveTo(from(t, n, "```sh {#history-1}"), from(t, n, "```sh {#history-1}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Text != m.Base || n.Text() != src {
+		t.Errorf("a drop in place changed the file:\n%s", n.Text())
+	}
+	// A move past nothing at the top renames nothing either.
+	if _, err := n.MoveBlock(0, -1, false); !errors.Is(err, ErrNoMove) {
+		t.Errorf("move up from the top: %v", err)
+	}
+	if n.Text() != src {
+		t.Errorf("file changed:\n%s", n.Text())
+	}
+}
