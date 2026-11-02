@@ -35,7 +35,9 @@ func (n *Notebook) cells() []Cell {
 		tasks:  n.taskMarks(),
 	}
 	l.cuts = cuts(d, n.results, l.lookup)
-	pieces := render.Pieces(d, n.results, render.Options{Env: environ()})
+	// The view numbers the lines of code itself, so an include's
+	// numbers start at its cell's FirstLine, not text in the code.
+	pieces := render.Pieces(d, n.results, render.Options{Env: environ(), PlainIncludes: true})
 	pos := max(d.FrontMatter.End, len(d.Shebang))
 	for i, b := range d.Blocks {
 		l.prose(pos, b.Span.Start)
@@ -74,7 +76,11 @@ func (n *Notebook) cells() []Cell {
 			continue
 		}
 		if !run.Runnable(b) {
-			l.cells = append(l.cells, Cell{Block: -1, HTML: n.html(append(append([]byte(nil), code...), out...)), From: span.Start, To: span.End})
+			c := Cell{Block: -1, HTML: n.html(append(append([]byte(nil), code...), out...)), From: span.Start, To: span.End}
+			if inc, err := b.Include(); err == nil && b.IsInclude() && inc.From > 1 {
+				c.FirstLine = inc.From
+			}
+			l.cells = append(l.cells, c)
 			continue
 		}
 		r := n.results[i]

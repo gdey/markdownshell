@@ -387,8 +387,10 @@ reads `notes.md` from the document's assets folder, `<doc>.assets/`.
 `out=image:res://plot.png` saves an image there the same way. `from=` and `to=` are line
 numbers counted from 1 and inclusive; `from` defaults to the start of the
 file and `to` to the end. The fence's language is the language, and
-`number_on` shows line numbers when the document is printed. An include
-block never runs and has no name. [examples/include.md](examples/include.md)
+`number_on` shows line numbers when the document is printed, in the
+TUI, and in `--html` and `--pdf`. mdsh-gui numbers every code block, so
+it numbers an include's lines from `from=` with or without `number_on`.
+An include block never runs and has no name. [examples/include.md](examples/include.md)
 shows each option.
 
 ## Confirming blocks

@@ -614,3 +614,31 @@ func TestDepend(t *testing.T) {
 		t.Errorf("build ran %v, deploy ran %v", c[0].Ran, c[1].Ran)
 	}
 }
+
+// An include's cell holds the file's lines as they are, number_on or
+// not, and FirstLine starts the view's line numbers at from=, so the
+// code shows one column of numbers, the file's.
+func TestIncludeNumbered(t *testing.T) {
+	file := write(t, "```text {<include file=a.txt from=2 to=3 number_on}\n```\n\n```text {<include file=a.txt from=3}\n```\n\n```text {<include file=a.txt to=1 number_on}\n```\n")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(file), "a.txt"), []byte("one\ntwo\nthree\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	cells := n.Cells()
+	if len(cells) != 3 {
+		t.Fatalf("want 3 cells, got %+v", cells)
+	}
+	if c := cells[0]; c.FirstLine != 2 || !strings.Contains(c.HTML, ">two\nthree\n</code>") {
+		t.Errorf("number_on include: FirstLine %d, HTML %q", c.FirstLine, c.HTML)
+	}
+	if c := cells[1]; c.FirstLine != 3 || !strings.Contains(c.HTML, ">three\n</code>") {
+		t.Errorf("include without number_on: FirstLine %d, HTML %q", c.FirstLine, c.HTML)
+	}
+	if c := cells[2]; c.FirstLine != 0 || !strings.Contains(c.HTML, ">one\n</code>") {
+		t.Errorf("include from line 1: FirstLine %d, HTML %q", c.FirstLine, c.HTML)
+	}
+}

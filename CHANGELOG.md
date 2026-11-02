@@ -418,6 +418,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `mdsh-gui`: an include's line numbers are the file's (4, 5, 6 for
+  `from=4`), with or without `number_on`, in one column. Before, the
+  view counted 1, 2, 3, and a `number_on` include also showed the
+  file's numbers written into the code beside them.
+
 - `mdsh-gui`: on macOS the app menu's About opens Settings at its About
   tab instead of the stock Cocoa About panel.
 - A block whose `timeout` ran out while mdsh checked its syntax was

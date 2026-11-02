@@ -79,6 +79,10 @@ type Cell struct {
 	// OutputLine is the line a block's saved output starts on, counting
 	// from 1, or 0 when it has none, for folding it in the source.
 	OutputLine int `json:"outputLine,omitempty"`
+	// FirstLine is set on the cell of an include with from= past 1: the
+	// line in its file the included lines start on, where the code's line
+	// numbers count from, so they are the file's.
+	FirstLine int `json:"firstLine,omitempty"`
 	// From and To are the cell's bytes in the file, output included.
 	From int `json:"from"`
 	To   int `json:"to"`

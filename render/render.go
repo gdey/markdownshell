@@ -36,6 +36,10 @@ type Options struct {
 	// code blocks are shown as ^[ and the like (see termsafe.Visible),
 	// so the code on the screen is the code that runs.
 	Terminal bool
+	// PlainIncludes leaves a number_on include's lines unnumbered, for a
+	// caller that draws the numbers in a gutter of its own, as mdsh-gui
+	// does. Otherwise printing puts each line's number in front of it.
+	PlainIncludes bool
 }
 
 // Markdown renders d with results spliced in after their blocks. Blocks
@@ -110,7 +114,7 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 				pos = skipBlankLine(src, pos)
 				continue
 			}
-			writeInclude(buf, src, b, r, opts.WriteBack)
+			writeInclude(buf, src, b, r, opts.WriteBack || opts.PlainIncludes)
 			buf = &bufs[3*i+2]
 			switch {
 			case opts.HideOutput:
@@ -434,15 +438,16 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 }
 
 // writeInclude writes include block b with the lines r read as its body.
-// Printing numbers the lines if b asks for it; write-back stores them as
-// they are. Without lines, b is written as it is in src.
-func writeInclude(buf *bytes.Buffer, src []byte, b *doc.Block, r *run.Result, writeBack bool) {
+// Printing numbers the lines if b asks for it; with plain, as for
+// write-back, they are written as they are. Without lines, b is written
+// as it is in src.
+func writeInclude(buf *bytes.Buffer, src []byte, b *doc.Block, r *run.Result, plain bool) {
 	if r == nil || !r.Ran || r.Err != nil {
 		buf.Write(src[b.Span.Start:b.Span.End])
 		return
 	}
 	body := withNewline(string(r.Stdout))
-	if inc, _ := b.Include(); inc.Numbered && !writeBack {
+	if inc, _ := b.Include(); inc.Numbered && !plain {
 		body = NumberLines(body, max(inc.From, 1))
 	}
 	open := string(src[b.Span.Start:lineEnd(src, b.Span.Start)])

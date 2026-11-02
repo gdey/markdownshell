@@ -248,6 +248,9 @@ function drawProse(c: Cell): HTMLElement {
   const s = el("section", { className: "prose" + (c.hidden ? " hidden-block" : ""), innerHTML: c.html ?? "", title: "Click to show it in the source" });
   if (c.hidden) s.prepend(hiddenBadge(c.hidden));
   highlightProse(s);
+  // An include's lines are numbered as they are in its file.
+  const code = c.firstLine ? s.querySelector<HTMLElement>("pre.numbered > code") : null;
+  if (code) code.style.counterReset = `line ${c.firstLine! - 1}`;
   enableDiagrams(s);
   s.onclick = (e) => {
     if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
