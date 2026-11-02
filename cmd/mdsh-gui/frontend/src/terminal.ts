@@ -81,7 +81,7 @@ export function openTerminal(i: number) {
   out.replaceChildren(host);
   block = i;
   // screenReaderMode has xterm read out what the block writes.
-  term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: true, theme: colors(), scrollback: 1000, screenReaderMode: true });
+  term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: !matchMedia("(prefers-reduced-motion: reduce)").matches, theme: colors(), scrollback: 1000, screenReaderMode: true });
   term.open(host);
   term.onData(typeKeys);
   term.focus();

@@ -10,15 +10,15 @@
 :root[data-look="blueprint"][data-history-scheme="light"] #history {
   --bg: #1d5ba3;
   --fg: #f4f8ff;
-  --muted: #b9d0ee;
-  --border: #7ea6d6;
+  --muted: #dce8f8;
+  --border: #a6c3e6;
   --code-bg: #184d8c;
   --hover: #2466b2;
   --accent: #f4f8ff;
   --accent-fg: #1d5ba3;
   --link: #ffd75e;
   --ok: #8ff0b4;
-  --bad: #ffa59c;
+  --bad: #ffc9c0;
   --control: #e2c6ff;
   --warn-bg: #4f5a3a;
   --warn-border: #ffd75e;
@@ -65,7 +65,7 @@
   --bg: #0b1e3b;
   --fg: #d6e8ff;
   --muted: #7d9cc4;
-  --border: #2f5282;
+  --border: #4f7ab4;
   --code-bg: #0e2547;
   --hover: #12305a;
   --accent: #8fd3ff;

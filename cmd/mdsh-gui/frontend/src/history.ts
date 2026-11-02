@@ -380,7 +380,7 @@ export function historyTerminal(i: number, pane: string | undefined): boolean {
   const t = ensureTerm();
   block = last = i;
   t.options.disableStdin = false;
-  t.options.cursorBlink = true;
+  t.options.cursorBlink = !matchMedia("(prefers-reduced-motion: reduce)").matches;
   t.focus();
   return true;
 }

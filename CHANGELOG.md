@@ -29,6 +29,12 @@ follow [Semantic Versioning](https://semver.org/).
   of a run are read out. The terminals use xterm's screen reader
   mode. Keyboard focus shows a ring in every look, and the system's
   reduce-motion setting turns off the sliding and smooth scrolling.
+- `mdsh-gui`: Edit › Depends On… (`d`) edits the selected block's
+  `depends=` from the keyboard, as a list of the blocks above it to
+  check in order. In the outline, ↑/↓ move between entries and ←/→
+  fold and unfold a section. The text size goes up to 200%, and the
+  outline widens with it. The terminals' cursors don't blink under the
+  system's reduce-motion setting.
 - `mdsh -i`: `?` opens a panel of the keys, grouped, each with what it
   does. Keys that do nothing now, such as `u` with no move to undo or
   `s` on a block under no heading, are greyed with the reason. ↑/↓
@@ -242,6 +248,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `mdsh-gui`: the Teletype and Blueprint looks' muted text, card
+  borders and failure red are a little stronger, so they meet the
+  WCAG AA contrast ratios (4.5:1 for text, 3:1 for borders).
 - `mdsh-gui`: blocks the History pane adds (`#history-N`) are scratch
   work, so their trash buttons, on the block and on its output, always
   show, and deleting one doesn't ask first; the bar's Undo brings it
