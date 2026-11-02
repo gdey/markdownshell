@@ -16,6 +16,10 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Props<K
 
 export const icons = {
   play: '<path d="M4 2.5v11l9-5.5z"/>',
+  // The cast player's pause and frame steps.
+  pause: '<rect x="3.5" y="2.5" width="3" height="11"/><rect x="9.5" y="2.5" width="3" height="11"/>',
+  stepBack: '<rect x="2.5" y="2.5" width="2" height="11"/><path d="M13 2.5v11L5.5 8z"/>',
+  stepForward: '<path d="M3 2.5v11L10.5 8z"/><rect x="11.5" y="2.5" width="2" height="11"/>',
   runFrom: '<path d="M2.5 2.5v11l8-5.5z"/><rect x="11.5" y="2.5" width="2" height="11"/>',
   stop: '<rect x="3.5" y="3.5" width="9" height="9" rx="1"/>',
   pencil: '<path d="M11.1 1.9a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L5.6 13.4 2 14l.6-3.6z"/>',
@@ -51,6 +55,7 @@ export const icons = {
   chevron: '<path d="M3.7 5.6 8 9.9l4.3-4.3 1 1L8 11.9 2.7 6.6z"/>',
   rendered: '<path d="M3.5 1.5h6l3.5 3.5v9.5h-9.5zm1.4 1.4v10.2h6.7V6H8.5V2.9z"/>',
   // Two sheets, the front one copied from the back one.
+  camera: '<path d="M5.6 2.5h4.8l1 1.8h2.6v9.2H2V4.3h2.6zM8 5.8a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6zm0 1.4a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8z"/>',
   copy: '<path d="M2 1.5h8v2H8.6v-.6H3.4v8.2H4v1.4H2z"/><path d="M5.5 5h8.5v9.5H5.5zm1.4 1.4v6.7h5.7V6.4z"/>',
 };
 

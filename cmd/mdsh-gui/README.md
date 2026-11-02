@@ -258,9 +258,10 @@ Each file opens in a tab of its own, with its own shells.
   Click an output image to see it full size. Images from other sites
   are not loaded: opening a file never reaches the network, so a note
   with the image's alt text and host shows in its place.
-- **Diagrams:** a fenced `d2` block shows as the diagram it draws, and
-  a fenced `svg` block as its picture, with a button to switch to the
-  code and back. d2 diagrams are drawn by the built-in
+- **Diagrams:** a fenced `d2` block shows as the diagram it draws, a
+  fenced `svg` block as its picture, and a fenced `cast` block (an
+  asciinema recording) in the cast player, with a button to switch to
+  the code and back. d2 diagrams are drawn by the built-in
   [d2](https://d2lang.com) library, with its dagre layout, in a light
   and a dark theme to match the window. When a diagram has a mistake,
   the code shows with d2's message under it. Pictures are shown as
@@ -299,7 +300,7 @@ Each file opens in a tab of its own, with its own shells.
   the last tab had) and the start folder; Look for the theme (System,
   Light or Dark), the look (Plain, or Teletype: the site's typewriter
   face on fan-fold paper in the light theme and green phosphor in the
-  dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts, line spacing,
+  dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts (any installed; the code font any of one width), line spacing,
   an accent color, the History pane's colors (the window's, inverted,
   or always dark) and, for Teletype, the paper's sprocket strips,
   ruled lines and card shadows; Editing for autosave after

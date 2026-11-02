@@ -2,6 +2,7 @@ package termrec
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,6 +61,14 @@ func incomplete(p []byte) int {
 		}
 	}
 	return 0
+}
+
+// IsCast reports whether data starts like an asciicast v2 file: a JSON
+// object with "version": 2 on its first line.
+func IsCast(data []byte) bool {
+	line, _, _ := bytes.Cut(data[:min(len(data), 4096)], []byte("\n"))
+	var h castHeader
+	return len(line) > 0 && line[0] == '{' && json.Unmarshal(line, &h) == nil && h.Version == 2 && h.Width > 0
 }
 
 // ReadCast reads an asciicast v2 file. Events other than output are

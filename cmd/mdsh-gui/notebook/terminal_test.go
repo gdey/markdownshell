@@ -57,7 +57,7 @@ func TestTerminal(t *testing.T) {
 			img = cell.HTML + cell.Output
 		}
 	}
-	if !strings.Contains(img, ".gif") {
+	if !strings.Contains(img, ".cast") {
 		t.Errorf("no recording in the cell: %q", img)
 	}
 	// Keys with no tty block running go nowhere.

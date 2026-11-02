@@ -1,5 +1,5 @@
 // Package termrec records what a program writes to a terminal, saves it
-// as an asciinema cast, and plays it back as an animated GIF.
+// as an asciinema cast, and draws it as an animated GIF or a still.
 package termrec
 
 import (
@@ -79,6 +79,41 @@ const (
 // ErrEmpty is returned by GIF for a recording with nothing in it.
 var ErrEmpty = errors.New("nothing was written to the terminal")
 
+// shot is the screen at one frame of a recording.
+type shot struct {
+	at     time.Duration
+	screen [][]cell
+}
+
+// shots plays rec through a terminal emulator and returns its frames,
+// and how many rows the session used. Writes less than step apart share
+// a frame, and a write that changes nothing on screen makes none. The
+// GUI's cast player steps through the same frames, so frame=N means
+// the same screen there and in a still view.
+func shots(rec Recording) (frames []shot, cols, used int) {
+	cols, rows := rec.Cols, rec.Rows
+	if cols <= 0 || rows <= 0 {
+		cols, rows = 80, 24
+	}
+	vt := vt10x.New(vt10x.WithSize(cols, rows))
+	used = 1
+	for i, e := range rec.Events {
+		vt.Write(e.Data)
+		if i+1 < len(rec.Events) && len(frames) > 0 && rec.Events[i+1].At-frames[len(frames)-1].at < step {
+			continue
+		}
+		screen := snapshot(vt, cols, rows)
+		if n := len(frames); n > 0 {
+			if y0, y1 := changed(frames[n-1].screen, screen); y0 > y1 {
+				continue
+			}
+		}
+		frames = append(frames, shot{e.At, screen})
+		used = max(used, usedRows(screen))
+	}
+	return frames, cols, used
+}
+
 // GIF plays rec through a terminal emulator and returns the screens it
 // shows as a looping animated GIF. A frame is drawn at most every 100ms,
 // and only the rows that changed are stored. Rows the session never
@@ -87,34 +122,7 @@ func GIF(rec Recording) ([]byte, error) {
 	if len(rec.Events) == 0 {
 		return nil, ErrEmpty
 	}
-	cols, rows := rec.Cols, rec.Rows
-	if cols <= 0 || rows <= 0 {
-		cols, rows = 80, 24
-	}
-	vt := vt10x.New(vt10x.WithSize(cols, rows))
-
-	// Take the screens first, to find how many rows the session used.
-	type shot struct {
-		at     time.Duration
-		screen [][]cell
-	}
-	var shots []shot
-	used := 1
-	for i, e := range rec.Events {
-		vt.Write(e.Data)
-		if i+1 < len(rec.Events) && len(shots) > 0 && rec.Events[i+1].At-shots[len(shots)-1].at < step {
-			continue
-		}
-		screen := snapshot(vt, cols, rows)
-		if n := len(shots); n > 0 {
-			if y0, y1 := changed(shots[n-1].screen, screen); y0 > y1 {
-				continue
-			}
-		}
-		shots = append(shots, shot{e.At, screen})
-		used = max(used, usedRows(screen))
-	}
-
+	frames, cols, used := shots(rec)
 	p, err := newPainter(cols, used)
 	if err != nil {
 		return nil, err
@@ -126,7 +134,7 @@ func GIF(rec Recording) ([]byte, error) {
 		prevAt time.Duration
 	)
 	out.Config = image.Config{ColorModel: palette, Width: p.width, Height: p.height}
-	for _, sh := range shots {
+	for _, sh := range frames {
 		cur := sh.screen[:used]
 		y0, y1 := changed(prev, cur)
 		if y0 > y1 {
@@ -147,6 +155,24 @@ func GIF(rec Recording) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+// Still draws frame n of rec, counting from 1, as GIF would show it.
+// n <= 0, or past the end, is the last frame.
+func Still(rec Recording, n int) (image.Image, error) {
+	if len(rec.Events) == 0 {
+		return nil, ErrEmpty
+	}
+	frames, cols, used := shots(rec)
+	if n <= 0 || n > len(frames) {
+		n = len(frames)
+	}
+	p, err := newPainter(cols, used)
+	if err != nil {
+		return nil, err
+	}
+	defer p.face.Close()
+	return p.paint(frames[n-1].screen[:used], 0, used-1), nil
 }
 
 // delay converts d to GIF hundredths of a second, capped at maxDelay.

@@ -8,6 +8,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui's font menus (Settings › Look) list the fonts installed on
+  the computer, from AppKit on macOS and fontconfig on Linux, instead of
+  a set of common ones; the code font's lists those whose letters are
+  all one width, Nerd Fonts included. The terminals fall back to
+  Symbols Nerd Font where it is installed, so a prompt drawn with Nerd
+  Font icons shows them whatever the code font.
+
+  ![Settings › Look with the code font menu open on the installed monospace fonts, JetBrainsMono Nerd Font Mono chosen](docs/changelog/settings-fonts.png)
+
 - mdsh-gui can view and edit a file's front matter from the rendered
   view. The Front matter tab at the top of the page (or Edit › Front
   Matter, cmd/ctrl+shift+M) slides the page down to show a form for the
@@ -55,6 +64,32 @@ follow [Semantic Versioning](https://semver.org/).
   Drop one with `-NAME`, as in `share=GREETING,-PATH`. `share=` (empty)
   now passes just this base set. Documents loaded from a URL, once mdsh
   can, won't get it.
+
+- A `tty` block's output is now its asciinema cast, not an animated GIF:
+  mdsh links `<doc>.assets/<block-id>.cast` below the block, and
+  mdsh-gui plays it in the block's card, with play and pause, a
+  scrubber, and steps to the previous or next frame (the arrow keys, `,`
+  and `.`, space to play). Drag over the screen to select text and press
+  cmd+c (ctrl+c elsewhere) to copy it without its colors, even in a
+  recording of a program that turned on mouse reporting; a right-click
+  keeps the selection and offers Copy and Copy as GIF. The camera button
+  copies the frame shown as plain text, with no colors or cursor moves. The copy button puts an animated
+  GIF of the recording on the clipboard, and in a file in the temporary
+  folder for apps that paste files (macOS; elsewhere it copies the
+  screen's text). Where you leave the player's head is written to the
+  block as `frame=N`, so the file opens there again. A PDF shows the
+  last frame, or the one `frame=N` picks, and the player opens there;
+  `mdsh -i` previews the last frame, and an HTML report plays a GIF made
+  from the cast. For a document read on GitHub, which can't play a cast,
+  give `out=recording:` a path ending in `.gif` to link a GIF as before.
+  A fenced `cast` block, an asciinema recording pasted into the
+  document, plays in the same player, with a button to show its code, as
+  `svg` fences show their picture.
+
+  ![A tty block's card in mdsh-gui playing its recording, two lines selected and "Copied 2 lines" beside the frame counter, with step, play, a scrubber and a copy button below the terminal](docs/changelog/cast-player.png)
+
+  ![A cast fence in the prose of a document playing in the cast player, after its copy button put a GIF of the recording on the clipboard](docs/changelog/cast-fence.png)
+
 - Commands typed in the History pane, in mdsh-gui and `mdsh -i`, are
   added with `skip`, so running the whole file doesn't run them again.
   Running one by hand still does.

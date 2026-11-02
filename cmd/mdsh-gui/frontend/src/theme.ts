@@ -102,6 +102,11 @@ export function applyTheme(s: LookSettings) {
 const fallbackUI = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 const fallbackCode = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
+// nerdSymbols are the Nerd Fonts of icons alone. A shell prompt drawn
+// with a Nerd Font's icons shows them in the terminals, whatever the
+// code font, where one of these is installed.
+export const nerdSymbols = '"Symbols Nerd Font Mono", "Symbols Nerd Font"';
+
 // luminance is a #rrggbb color's relative luminance, 0 to 1.
 function luminance(hex: string): number {
   const c = [1, 3, 5].map((i) => {
@@ -112,9 +117,10 @@ function luminance(hex: string): number {
 }
 
 // codeFont is the page's code font, from --font-code, for the terminals,
-// which draw on a canvas and so can't use the variable themselves.
+// which draw on a canvas and so can't use the variable themselves; then
+// the Nerd Font icons, for a prompt that uses them.
 export function codeFont(el: Element = document.documentElement): string {
-  return getComputedStyle(el).getPropertyValue("--font-code").trim() || "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  return `${getComputedStyle(el).getPropertyValue("--font-code").trim() || fallbackCode}, ${nerdSymbols}`;
 }
 
 // textSize is a font size in px scaled by the look's --text-scale, for

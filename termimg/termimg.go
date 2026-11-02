@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gdey/markdownshell/termrec"
 	xdraw "golang.org/x/image/draw"
 )
 
@@ -43,9 +44,17 @@ func Load(link string) (image.Image, error) {
 	return Decode(data)
 }
 
-// Decode decodes a PNG, JPEG or GIF. An animated GIF gives its last
-// frame, which for a recording is how the session ended.
+// Decode decodes a PNG, JPEG or GIF, or an asciinema cast. An animated
+// GIF or a cast gives its last frame, which for a recording is how the
+// session ended.
 func Decode(data []byte) (image.Image, error) {
+	if termrec.IsCast(data) {
+		rec, err := termrec.ReadCast(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+		return termrec.Still(rec, 0)
+	}
 	head := bytes.TrimSpace(data[:min(len(data), 512)])
 	if bytes.HasPrefix(head, []byte("<svg")) || bytes.HasPrefix(head, []byte("<?xml")) {
 		return nil, ErrSVG

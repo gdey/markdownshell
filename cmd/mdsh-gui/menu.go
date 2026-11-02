@@ -92,6 +92,17 @@ func (a *App) buildSourceMenu() {
 	n.Update()
 }
 
+// buildCastMenu makes a recording player's right-click menu, in place
+// of the web view's, which has nothing to copy: the player's selection
+// is xterm's, not the page's. The frontend gives the player's name as
+// the menu's data, and does the copying.
+func (a *App) buildCastMenu() {
+	m := application.NewContextMenu("cast")
+	m.Add("Copy").OnClick(func(c *application.Context) { a.app.Event.Emit("cast-menu", "text:"+menuHref(c)) })
+	m.Add("Copy as GIF").OnClick(func(c *application.Context) { a.app.Event.Emit("cast-menu", "gif:"+menuHref(c)) })
+	m.Update()
+}
+
 // addInsertMenu adds the Insert submenu to a right-click menu.
 func (a *App) addInsertMenu(m *application.ContextMenu) {
 	ins := m.AddSubmenu("Insert")

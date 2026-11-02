@@ -151,8 +151,9 @@ mdsh --hide-code inputs.md
 prompt that reads a name, a small menu in
 [terminal/fruit.sh](terminal/fruit.sh), and a login that turns echo
 off. A block marked `tty` runs on a real terminal, and mdsh records the
-session as an asciinema cast and an animated GIF in
-[terminal.md.assets](terminal.md.assets), linked under the block.
+session as an asciinema cast in
+[terminal.md.assets](terminal.md.assets), linked under the block, which
+mdsh-gui plays a frame at a time if you like.
 
 A `tape` fence types the block's input for it, in
 [VHS](https://github.com/charmbracelet/vhs) tape commands, so the block
@@ -303,7 +304,7 @@ include/greet.sh      the script include.md quotes and runs
 guardrails.md         3. confirm, depends=, run=once, timeout=, on_error, skip, output copies
 inputs.md             4. textbox and choice blocks, var=, mdsh ctl set, folding
 terminal.md           5. tty blocks and tapes
-terminal.md.assets/   its recordings, as casts and GIFs
+terminal.md.assets/   its recordings, as asciinema casts
 terminal/             the prompt script and tape it uses
 fifo/                 6. background blocks and named pipes
 report.md             7. a document written as a report

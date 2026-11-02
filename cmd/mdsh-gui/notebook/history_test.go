@@ -79,7 +79,7 @@ func TestHistory(t *testing.T) {
 	if !strings.HasPrefix(got, want) {
 		t.Errorf("text =\n%s\nwant it to start\n%s", got, want)
 	}
-	if !strings.Contains(got[len(want)-1:], "history-4.gif") {
+	if !strings.Contains(got[len(want)-1:], "history-4.cast") {
 		t.Errorf("no recording after the full-screen command:\n%s", got)
 	}
 	if !n.Dirty() {

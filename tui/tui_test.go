@@ -1017,7 +1017,10 @@ func TestTTYInCard(t *testing.T) {
 		t.Fatalf("result: %+v", r)
 	}
 	img := m.results[0].Image
-	cast := read(t, filepath.Join(filepath.Dir(file), strings.TrimSuffix(img, ".gif")+".cast"))
+	if !strings.HasSuffix(img, ".cast") {
+		t.Errorf("output %q, want the cast", img)
+	}
+	cast := read(t, filepath.Join(filepath.Dir(file), img))
 	if !strings.Contains(cast, "hi qbob") {
 		t.Errorf("the recording doesn't have the answer:\n%s", cast)
 	}

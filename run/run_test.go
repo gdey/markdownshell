@@ -560,7 +560,7 @@ func TestTapedBlock(t *testing.T) {
 	if ask.Err != nil || ask.Status != 0 {
 		t.Fatalf("ask: status %d, err %v", ask.Status, ask.Err)
 	}
-	if ask.Image != "d.md.assets/ask.gif" {
+	if ask.Image != "d.md.assets/ask.cast" {
 		t.Errorf("ask image = %q", ask.Image)
 	}
 	cast, err := os.ReadFile(filepath.Join(dir, "d.md.assets", "ask.cast"))
@@ -570,11 +570,33 @@ func TestTapedBlock(t *testing.T) {
 	if !strings.Contains(string(cast), "hi bob") || !strings.Contains(string(cast), `"width":80,"height":24`) {
 		t.Errorf("cast = %s", cast)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "d.md.assets", "ask.gif")); err != nil {
-		t.Error(err)
+	// The cast is the output; a GIF is made only when asked for.
+	if _, err := os.Stat(filepath.Join(dir, "d.md.assets", "ask.gif")); err == nil {
+		t.Error("ask.gif written without out=recording:*.gif")
 	}
 	if got := string(r["next"].Stdout); got != "bob\n" {
 		t.Errorf("next stdout = %q", got)
+	}
+}
+
+// out=recording: with a .gif path makes an animated GIF from the cast,
+// and keeps the cast beside it.
+func TestTapedBlockGIF(t *testing.T) {
+	src := "```sh {#ask tty out=recording:rec/ask.gif}\necho hi\n```\n\n```tape {for=ask}\nSleep 10ms\n```\n\n" +
+		"```sh {#in tty embed=inline}\necho hi\n```\n\n```tape {for=in}\nSleep 10ms\n```\n"
+	dir := t.TempDir()
+	_, results := runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md")})
+	r := byID(results)
+	if r["ask"].Err != nil || r["ask"].Image != "rec/ask.gif" {
+		t.Fatalf("ask: image %q, err %v", r["ask"].Image, r["ask"].Err)
+	}
+	for _, f := range []string{"rec/ask.gif", "rec/ask.cast"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			t.Error(err)
+		}
+	}
+	if img := r["in"].Image; !strings.HasPrefix(img, "data:"+run.CastMIME+";base64,") {
+		t.Errorf("in: image %.60q, want a cast data: URI", img)
 	}
 }
 
