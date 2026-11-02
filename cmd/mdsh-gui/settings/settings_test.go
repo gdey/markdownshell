@@ -135,3 +135,27 @@ func TestStorePlaces(t *testing.T) {
 		}
 	}
 }
+
+func TestPin(t *testing.T) {
+	var s Settings
+	if !s.Pin("/d/a.md", true) || !s.Pin("/d/b.md", true) {
+		t.Fatal("pinning a new file changed nothing")
+	}
+	if s.Pin("/d/a.md", true) {
+		t.Error("pinning a pinned file changed something")
+	}
+	if !slices.Equal(s.Pinned, []string{"/d/a.md", "/d/b.md"}) {
+		t.Errorf("Pinned = %v", s.Pinned)
+	}
+	c := s.clone()
+	c.Pinned[0] = "/x.md"
+	if s.Pinned[0] != "/d/a.md" {
+		t.Error("clone shares Pinned")
+	}
+	if !s.Pin("/d/a.md", false) || s.Pin("/d/a.md", false) {
+		t.Error("unpinning reported the wrong change")
+	}
+	if !slices.Equal(s.Pinned, []string{"/d/b.md"}) {
+		t.Errorf("Pinned = %v", s.Pinned)
+	}
+}

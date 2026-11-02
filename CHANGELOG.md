@@ -52,6 +52,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui: a pin on each file of the start screen pins it to a
+  **Pinned** list at the top, above Recent, until it is unpinned. Pins
+  are kept in the settings file with the recent files.
 - mdsh-gui: a ⚙ on each folder of the start screen that you can write
   to opens a form for its `.mdsh.yaml` (title, description, icon,
   color, background and tags) and saves the file, so making a

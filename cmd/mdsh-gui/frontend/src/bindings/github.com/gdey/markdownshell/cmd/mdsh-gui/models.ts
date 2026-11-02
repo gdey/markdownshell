@@ -197,6 +197,11 @@ export interface Start {
     "recent": string[] | null;
 
     /**
+     * Pinned are the pinned files that still exist, shown above Recent.
+     */
+    "pinned": string[] | null;
+
+    /**
      * LastSession is the file Last Session opens, or "" if there are no
      * sessions yet.
      */

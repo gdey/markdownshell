@@ -26,6 +26,9 @@ the Dock) to pick from, with the description from each file's front
 matter (`description`, else `summary`, else `abstract`) under its name.
 A folder with a `.mdsh.yaml` shows as a collection, with its own title,
 icon, color, background and tags (see [Collections](#collections)).
+The pin at the end of a file's row pins it to a Pinned list at the top,
+above Recent, until its pin is clicked again. Pins are kept in the
+settings file with the recent files.
 Each file opens in a tab of its own, with its own shells.
 
 - **Tabs:** New Tab (cmd/ctrl+T, or the + in the tab bar) opens the

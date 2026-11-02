@@ -159,6 +159,12 @@ export interface Settings {
     "recent": string[] | null;
 
     /**
+     * Pinned are the files pinned to the top of the start screen, in
+     * the order they were pinned.
+     */
+    "pinned"?: string[] | null;
+
+    /**
      * Places are where the windows of the files last shown alone in a
      * new window were, newest first.
      */

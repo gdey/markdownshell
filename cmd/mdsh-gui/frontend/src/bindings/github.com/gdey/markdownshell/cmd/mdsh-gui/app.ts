@@ -430,6 +430,13 @@ export function OpenURL(u: string): $CancellablePromise<void> {
 }
 
 /**
+ * Pin pins file to the top of the start screen, or unpins it.
+ */
+export function Pin(file: string, pin: boolean): $CancellablePromise<void> {
+    return $Call.ByName("main.App.Pin", file, pin);
+}
+
+/**
  * PlanMove works out MoveBlock's move without making it, for the source
  * view to make as its own edit.
  */

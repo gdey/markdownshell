@@ -105,6 +105,9 @@ type Settings struct {
 	LastFolder string `json:"lastFolder"`
 	// Recent are the files opened last, newest first.
 	Recent []string `json:"recent"`
+	// Pinned are the files pinned to the top of the start screen, in
+	// the order they were pinned.
+	Pinned []string `json:"pinned,omitempty"`
 	// Places are where the windows of the files last shown alone in a
 	// new window were, newest first.
 	Places []Place `json:"places,omitempty"`
@@ -160,6 +163,7 @@ func (st *Store) Get() Settings {
 // clone copies s, so that changing the copy leaves s as it was.
 func (s Settings) clone() Settings {
 	s.Recent = slices.Clone(s.Recent)
+	s.Pinned = slices.Clone(s.Pinned)
 	s.Places = slices.Clone(s.Places)
 	if s.SettingsWindow != nil {
 		sz := *s.SettingsWindow
@@ -197,6 +201,20 @@ func (s *Settings) Opened(file string) {
 		s.Recent = s.Recent[:MaxRecent]
 	}
 	s.LastFolder = filepath.Dir(file)
+}
+
+// Pin pins file to the start screen, after the files pinned before it,
+// or unpins it. It reports whether that changed anything.
+func (s *Settings) Pin(file string, pin bool) bool {
+	if slices.Contains(s.Pinned, file) == pin {
+		return false
+	}
+	if pin {
+		s.Pinned = append(s.Pinned, file)
+	} else {
+		s.Pinned = slices.DeleteFunc(s.Pinned, func(f string) bool { return f == file })
+	}
+	return true
 }
 
 // Place is where file's window was last, if that is remembered.
