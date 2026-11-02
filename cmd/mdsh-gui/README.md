@@ -68,7 +68,7 @@ Each file opens in a tab of its own, with its own shells.
   blocks run), Stop (cmd/ctrl+.), Clear All Outputs… (cmd/ctrl+alt+K,
   or the toolbar's eraser button) and Run Options… for the file's
   arguments, `--only`, step mode and stop on error. Clear All Outputs
-  asks first, then takes every block's output, output copy and stored
+  is off while there is no output to clear. It asks first, then takes every block's output, output copy and stored
   block value out of the document and starts the shells again, as if
   nothing had run. It isn't saved until you save; with the source view
   open, undo there brings the output back. A block marked

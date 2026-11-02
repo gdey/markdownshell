@@ -1027,7 +1027,26 @@ function runAllButton() {
   b.replaceChildren(svg(running ? icons.stop : icons.play), el("span", {}, running ? "Stop" : "Run all"));
   b.classList.toggle("stop", running);
   b.disabled = !running && !cells.some((c) => c.block >= 0);
-  $<HTMLButtonElement>("clear-outputs").disabled = running || !cells.some((c) => c.block >= 0);
+  void clearOutputsButton();
+}
+
+// clearOutputsButton offers Clear All Outputs only when there is output
+// to clear, so once the outputs are cleared it stays off until a block's
+// output comes in.
+async function clearOutputsButton() {
+  const b = $<HTMLButtonElement>("clear-outputs");
+  if (running || !doc.file) {
+    b.disabled = true;
+    return;
+  }
+  let has = false;
+  try {
+    has = await App.HasOutput();
+  } catch {
+    // No notebook, as while a tab closes: nothing to clear.
+  }
+  // A run may have started while Go was asked.
+  b.disabled = running || !has;
 }
 
 function busy(on: boolean) {
@@ -2036,8 +2055,10 @@ const actions: Record<string, () => Promise<void> | void> = {
   // the source pane it is one edit, so undo brings the output back.
   async clearoutputs() {
     if (!doc.file || running || $<HTMLDialogElement>("clear-dialog").open) return;
-    if (!(await confirmClear())) return;
+    // What was typed may have taken output out, or put some in.
     await applySource();
+    if (!(await App.HasOutput())) return status("no output to clear");
+    if (!(await confirmClear())) return;
     try {
       await App.ClearOutputs();
       status("outputs cleared");

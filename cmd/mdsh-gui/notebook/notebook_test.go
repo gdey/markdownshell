@@ -438,14 +438,24 @@ func TestClearOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
+	if n.HasOutput() {
+		t.Errorf("HasOutput before anything ran = true")
+	}
 	if err := n.RunFrom(0); err != nil {
 		t.Fatal(err)
+	}
+	if !n.HasOutput() {
+		t.Errorf("HasOutput after a run = false")
 	}
 	if err := n.Save(); err != nil {
 		t.Fatal(err)
 	}
 	if err := n.ClearOutputs(); err != nil {
 		t.Fatal(err)
+	}
+	// Nothing is left to clear, so Clear All Outputs isn't offered again.
+	if n.HasOutput() {
+		t.Errorf("HasOutput after ClearOutputs = true")
 	}
 	if got := n.Text(); got != src {
 		t.Errorf("text after ClearOutputs:\n%s\nwant:\n%s", got, src)
@@ -464,6 +474,9 @@ func TestClearOutputs(t *testing.T) {
 	}
 	if c := n.Cells()[2]; !c.Ran || !strings.Contains(c.Output, "hello") {
 		t.Errorf("hello cell after running again = %+v", c)
+	}
+	if !n.HasOutput() {
+		t.Errorf("HasOutput after running again = false")
 	}
 }
 
