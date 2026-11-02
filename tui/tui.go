@@ -136,6 +136,13 @@ type Model struct {
 	// help until the next key.
 	notice string
 
+	// helping is set while the help panel ? opens is up, and helpAt is
+	// the key picked in it.
+	helping bool
+	helpAt  int
+	// tabs is how many tabs the app has, for the help panel.
+	tabs int
+
 	// back is set when the TUI came from the start screen: q goes back
 	// to it rather than quitting.
 	back bool
@@ -403,6 +410,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.reply <- run.Skip
 		} else {
 			m.prompt = &msg
+			m.helping = false
 			m.moveTo(i)
 		}
 		m.refresh()
@@ -416,6 +424,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.pane.take(i)
 		m.termBlock = i
+		m.helping = false
 		close(msg.reply)
 		m.moveTo(i)
 		m.follow(i)
@@ -521,6 +530,9 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		return m, tea.Sequence(cmds...)
+	}
+	if m.helping {
+		return m.helped(k)
 	}
 	if m.typing {
 		return m, m.typed(k)
@@ -646,6 +658,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.toggle(&m.shown.HideCode)
 	case "O":
 		return m, m.toggle(&m.shown.HideOutput)
+	case "?":
+		m.openHelp()
 	case "i", ":":
 		if m.running {
 			m.status = "a block is running; ctrl+c stops it"
@@ -859,11 +873,7 @@ func (m *Model) view() tea.Cmd {
 	if i < 0 {
 		return nil
 	}
-	link := m.results[i].Image
-	if !m.results[i].Ran && m.d.Blocks[i].HasOutput() {
-		b := m.d.Blocks[i]
-		link = imageLink(saved(m.d.Src[b.Output.Start:b.Output.End]))
-	}
+	link := m.imageOf(i)
 	if link == "" {
 		m.status = "this block has no image"
 		return nil
@@ -874,6 +884,14 @@ func (m *Model) view() tea.Cmd {
 		return nil
 	}
 	return tea.Exec(&viewer{img: img, protocol: m.opts.Protocol}, func(error) tea.Msg { return ttyBackMsg{} })
+}
+
+// imageOf is the image block i made, or saved in the file, or "".
+func (m *Model) imageOf(i int) string {
+	if b := m.d.Blocks[i]; !m.results[i].Ran && b.HasOutput() {
+		return imageLink(saved(m.d.Src[b.Output.Start:b.Output.End]))
+	}
+	return m.results[i].Image
 }
 
 // typed handles a key while a new block is being typed. Enter appends
@@ -1177,7 +1195,9 @@ func (m *Model) View() string {
 	if m.form != nil {
 		view = m.form.view(m.docWidth(), m.vp.Height)
 	}
-	if m.showOutline() {
+	if m.helping {
+		view = m.helpView(m.width, m.vp.Height)
+	} else if m.showOutline() {
 		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
 		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
 	}
@@ -1216,6 +1236,8 @@ func (m *Model) footer() string {
 	line1 := titleStyle.Render(name) + rest
 	var help string
 	switch {
+	case m.helping:
+		help = helpStyle.Render("↑/↓ pick · enter do it · esc close")
 	case m.termBlock >= 0:
 		help = promptStyle.Render(m.name(m.d.Blocks[m.termBlock])+" runs in its card:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.typing:
@@ -1231,11 +1253,11 @@ func (m *Model) footer() string {
 	case m.prompt != nil:
 		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
 	case m.running:
-		help = helpStyle.Render("j/k move · ctrl+c stop")
+		help = helpStyle.Render("? keys · j/k move · ctrl+c stop")
 	case m.notice != "":
 		help = promptStyle.Render(m.notice)
 	default:
-		help = helpStyle.Render("j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
+		help = helpStyle.Render("? keys · j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }
