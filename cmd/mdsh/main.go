@@ -10,6 +10,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,6 +27,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/lsp"
 	"github.com/gdey/markdownshell/render"
@@ -101,7 +104,7 @@ func lspCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	return lsp.Serve(stdin, stdout, "")
 }
 
-func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr error) {
 	fs := flag.NewFlagSet("mdsh run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
@@ -130,6 +133,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	showVersion := fs.Bool("version", false, "print the version and exit")
+	auditFile := fs.String("audit", "", "write an audit log of the run to this file, one JSON object per line")
 	// Files are read as the flag is parsed, so a pipe such as
 	// <(alias -L) is read once, however many shells start.
 	var sources strings.Builder
@@ -164,7 +168,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if *interactive {
 		set := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
-		for _, name := range []string{"w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output"} {
+		for _, name := range []string{"w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output", "audit"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with -i", name)
 			}
@@ -218,6 +222,38 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 	for _, w := range d.Warnings {
 		fmt.Fprintf(stderr, "mdsh: %s: warning: %s\n", displayName(file), w)
+	}
+	// stopped is whether the run stopped before its end, for the
+	// audit log.
+	var stopped bool
+	var log *audit.Log
+	if *auditFile != "" {
+		// The log can hold variables' values, so only you can read it.
+		f, err := os.OpenFile(*auditFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+		if err != nil {
+			return fmt.Errorf("--audit: %w", err)
+		}
+		log = audit.New(f)
+		sum := sha256.Sum256(src)
+		log.Event("run.start", audit.Fields{"file": displayName(file), "sha256": hex.EncodeToString(sum[:]), "mode": mode, "args": args, "version": versionString()})
+		defer func() {
+			code := 0
+			switch {
+			case retErr == nil:
+			case errors.Is(retErr, errFailed):
+				code = 1
+			default:
+				code = 2
+			}
+			end := audit.Fields{"exit": code, "stopped": stopped}
+			if retErr != nil && code == 2 {
+				end["error"] = retErr.Error()
+			}
+			log.Event("run.end", end)
+			if err := errors.Join(log.Err(), f.Close()); err != nil && retErr == nil {
+				retErr = fmt.Errorf("--audit: %w", err)
+			}
+		}()
 	}
 
 	styled := *color == "always" || (*color == "auto" && isTerminal(stdout) && os.Getenv("NO_COLOR") == "")
@@ -281,6 +317,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		Source:      sources.String(),
 		Environ:     reportOpts.Env,
 		Mode:        mode,
+		Audit:       log,
 	}
 	if file != "" {
 		if abs, err := filepath.Abs(file); err == nil {
@@ -387,6 +424,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if n := stopNote(d, results); n != "" && runErr == nil {
 		note = "mdsh: " + n
 	}
+	stopped = note != "" || runErr != nil
 	if note != "" && (live != nil || (!*write && reportFile == "")) {
 		fmt.Fprintln(stderr, note)
 	}
@@ -407,6 +445,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if err := writeFile(target, out, mode); err != nil {
 			return err
 		}
+		log.Event("write", audit.Fields{"what": "document", "file": target})
 	}
 	if live != nil {
 		if err := live.finish(results); err != nil {

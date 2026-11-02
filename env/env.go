@@ -21,6 +21,10 @@ type Env struct {
 type Stack struct {
 	cfg  Config
 	envs map[string]*Env
+	// OnStart, if set, is called as each env's shell starts, with the
+	// share it was made with (nil for the top level, whose Config.Env
+	// is already filtered) and the names of the variables it was given.
+	OnStart func(e *Env, share, names []string)
 }
 
 // NewStack returns a stack whose top-level env starts with cfg.
@@ -48,6 +52,7 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 		}
 		e := &Env{Name: TopLevel, Shell: sh}
 		s.envs[name] = e
+		s.started(e, nil, s.cfg.Env)
 		return e, nil
 	}
 
@@ -72,7 +77,21 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 	}
 	e := &Env{Name: name, Parent: parent, Shell: sh}
 	s.envs[name] = e
+	s.started(e, share, cfg.Env)
 	return e, nil
+}
+
+func (s *Stack) started(e *Env, share, environ []string) {
+	if s.OnStart == nil {
+		return
+	}
+	names := make([]string, 0, len(environ))
+	for _, kv := range environ {
+		k, _, _ := strings.Cut(kv, "=")
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	s.OnStart(e, share, names)
 }
 
 // Close ends every shell in the stack.

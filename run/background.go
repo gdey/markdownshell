@@ -23,6 +23,7 @@ type bgJob struct {
 	timeout string // the block's timeout=, or ""
 	timer   *time.Timer
 	revoke  func() // stops the block's $MDSH_TOKEN working
+	start   time.Time
 	// timedOut is set when timeout= killed the job, and overdue when
 	// the run's end did.
 	timedOut, overdue atomic.Bool
@@ -46,6 +47,7 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 	r.Ran = true
 	done := func(err error) {
 		r.Err = err
+		s.logEnd(b, r, time.Now())
 		s.emit(Event{Kind: Done, Block: b, Result: r})
 	}
 	e, err := envFor(ctx, s.stack, s.d, b)
@@ -69,7 +71,7 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 		return
 	}
 	r.Running = true
-	j := &bgJob{r: r, job: job, timeout: t, revoke: revoke}
+	j := &bgJob{r: r, job: job, timeout: t, revoke: revoke, start: time.Now()}
 	if hasTimeout {
 		j.timer = time.AfterFunc(dur, func() {
 			j.timedOut.Store(true)
@@ -154,5 +156,6 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, s.opts)
 	}
+	s.logEnd(b, r, j.start)
 	s.emit(Event{Kind: Done, Block: b, Result: r})
 }

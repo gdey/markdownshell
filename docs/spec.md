@@ -166,7 +166,7 @@ v1 ships on `sh` plus a few markdown helpers.
 
 ## Control socket and audit log (partly built)
 
-Built so far: the socket on macOS and Linux, `$MDSH_SOCK` and `$MDSH_TOKEN`, the protocol, and `mdsh ctl set`, `unset`, `get` and `status`. Not built yet: `check`, `uncheck`, `ask` and `confirm`, the named pipe on Windows (blocks there run without `$MDSH_SOCK`, so `mdsh ctl` exits 3), placeholders reading variables that `set` made, status on the TUI and GUI cards, and the audit log.
+Built so far: the socket on macOS and Linux, `$MDSH_SOCK` and `$MDSH_TOKEN`, the protocol, `mdsh ctl set`, `unset`, `get` and `status`, and `--audit FILE` for CLI runs with the `run`, `env.start`, `block`, `ctl`, `var` and `write` events. Not built yet: `check`, `uncheck`, `ask` and `confirm` (and so the `task` and `ask` events), the named pipe on Windows (blocks there run without `$MDSH_SOCK`, so `mdsh ctl` exits 3), placeholders reading variables that `set` made, status on the TUI and GUI cards, and audit logs for `mdsh -i` and mdsh-gui (`--audit` is refused with `-i` for now).
 
 A block can talk back to the run that started it with `mdsh ctl`: set variables for later blocks, tick tasks, ask the user a question, and report progress. Every run also writes an audit log of what happened, socket calls included, so a run that `ctl` changed can be reviewed afterwards.
 
@@ -248,7 +248,7 @@ mdsh handles calls one at a time, in the order they arrive, so calls from backgr
 - Should `set` on a name an input binds update the input, instead of being refused? *For now, no:* it is refused with code 2, as above. Changing an input changes the file's prose, which `ctl` otherwise can't do.
 - Does the audit log need its own viewer in mdsh-gui, or is a file enough for now? *For now, a file:* `--audit FILE`, and Save in the GUI. JSON Lines reads with `jq`.
 
-**Built details.** The socket is `ctl.sock` in a directory made by `mkdtemp` with mode 0700; the socket itself is 0600. On Linux and macOS mdsh also checks the caller's user ID (`SO_PEERCRED`, `LOCAL_PEERCRED`) and refuses another user's call. A request line may be at most 1 MiB and must arrive within 10 seconds of connecting. `unset` on a name that `set` didn't make does nothing and exits 0. `get` on a name nothing set prints an empty line.
+**Built details.** The socket is `ctl.sock` in a directory made by `mkdtemp` with mode 0700; the socket itself is 0600. On Linux and macOS mdsh also checks the caller's user ID (`SO_PEERCRED`, `LOCAL_PEERCRED`) and refuses another user's call. A request line may be at most 1 MiB and must arrive within 10 seconds of connecting. `unset` on a name that `set` didn't make does nothing and exits 0. `get` on a name nothing set prints an empty line. The audit log is created with mode 0600. `block.end` has `exit`, `ms` (the time taken), and `exited` and `error` when they apply; `block.skip` for `run=` has `cond` (as written) and `saw`; a block whose `depends=` failed is skipped with reason `depends` and the block in `failed`. `env.start` has `shared: "all"` when no `share` applies. `write` is one event per save of the document, with `what: "document"`, for now. A `var` event comes just before the `ctl` event for the call that made it.
 
 ## Go architecture
 

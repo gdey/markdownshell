@@ -103,6 +103,11 @@ follow [Semantic Versioning](https://semver.org/).
   the socket is in a directory only you can open, and a token stops
   working when its block ends. Exit codes: 0 done, 2 refused, 3 not
   running under mdsh. macOS and Linux only for now.
+- `--audit FILE` writes an audit log of the run, one JSON object per
+  line: the run starting and ending (with a SHA-256 of the file), envs
+  starting, blocks starting, ending and skipped (and why), every `mdsh
+  ctl` call, refused ones too, variables changing, and the file being
+  written. `--secret` values appear only as an HMAC keyed for that run.
 - `mdsh-gui`: a Console (View › Console, cmd/ctrl+shift+Y, or the
   toolbar's console button) along the bottom of the window shows what
   the app logs, with the time and level: errors from what you did, such

@@ -4,6 +4,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,5 +96,69 @@ func TestCtlOutsideMdsh(t *testing.T) {
 	}
 	if rc := ctlCall([]string{"status", "--step", "1", "hi"}, "", "", nil, &out, &errb); rc != 2 {
 		t.Errorf("--step without --of: rc = %d", rc)
+	}
+}
+
+func TestAudit(t *testing.T) {
+	mdshOnPath(t)
+	dir := t.TempDir()
+	f, logFile := filepath.Join(dir, "d.md"), filepath.Join(dir, "audit.jsonl")
+	os.WriteFile(f, []byte("---\nmdsh:\n  env:\n    share: [PATH, HOME]\n---\n\n"+
+		"```sh {#a}\nmdsh ctl set --secret pw hunter2\nmdsh ctl set env prod\nmdsh ctl set 'x y' 1 2>/dev/null\ntrue\n```\n\n"+
+		"```sh {#b env=sub run={{$MDSH_VAR_env}}==dev}\necho no\n```\n\n"+
+		"```sh {#c skip}\necho no\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	if rc := mdsh([]string{"-w", "--audit", logFile, f}, nil, &out, &errb); rc != 0 {
+		t.Fatalf("rc = %d\n%s", rc, errb.String())
+	}
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := os.Stat(logFile); info.Mode().Perm() != 0o600 {
+		t.Errorf("log mode %o", info.Mode().Perm())
+	}
+	if strings.Contains(string(data), "hunter2") {
+		t.Errorf("secret in the log:\n%s", data)
+	}
+	var events []string
+	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var e map[string]any
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatalf("line %d: %v: %s", i+1, err, line)
+		}
+		if e["v"] != 1.0 || e["seq"] != float64(i+1) || e["t"] == "" {
+			t.Errorf("line %d header: %s", i+1, line)
+		}
+		ev := e["event"].(string)
+		switch ev {
+		case "env.start":
+			ev += ":" + fmt.Sprint(e["shared"])
+		case "ctl":
+			ev += ":" + fmt.Sprint(e["code"])
+		case "var":
+			if _, secret := e["new"].(map[string]any); secret {
+				ev += ":secret"
+			}
+		case "block.skip":
+			ev += ":" + e["block"].(string) + ":" + e["reason"].(string)
+			if e["reason"] == "run=" && e["saw"] != "prod" {
+				t.Errorf("run= saw %v", e["saw"])
+			}
+		case "block.end":
+			ev += ":" + fmt.Sprint(e["exit"])
+		case "run.end":
+			ev += ":" + fmt.Sprint(e["exit"], e["stopped"])
+		}
+		events = append(events, ev)
+	}
+	want := []string{"run.start", "block.start", "env.start:[HOME PATH]", "var:secret", "ctl:0", "var", "ctl:0", "ctl:2", "block.end:0",
+		"block.skip:b:run=", "block.skip:c:skip", "write", "run.end:0 false"}
+	if strings.Join(events, "\n") != strings.Join(want, "\n") {
+		t.Errorf("events:\n%s\nwant:\n%s\nlog:\n%s", strings.Join(events, "\n"), strings.Join(want, "\n"), data)
+	}
+
+	if rc := mdsh([]string{"-i", "--audit", logFile, f}, nil, &out, &errb); rc != 2 {
+		t.Errorf("-i --audit: rc = %d", rc)
 	}
 }

@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/tape"
@@ -80,6 +81,10 @@ type Options struct {
 	// Mode is $MDSH_MODE: ModeRunning, ModeInteractive or ModeReport.
 	// Defaults to ModeRunning.
 	Mode string
+	// Audit, if set, gets the run's events: blocks starting, ending
+	// and skipped, envs starting, and calls to the control socket. The
+	// caller writes run.start and run.end.
+	Audit *audit.Log
 	// PTY starts every shell with a terminal of its own, as a document
 	// with a tty block does, so Session.RunTyped can run any block on
 	// Terminal.
