@@ -113,6 +113,19 @@ export interface Link {
 }
 
 /**
+ * NeovimInfo is what the Settings window shows about Neovim.
+ */
+export interface NeovimInfo {
+    "path": string;
+    "version": string;
+
+    /**
+     * Error is why Neovim can't be used, or "".
+     */
+    "error": string;
+}
+
+/**
  * ReportStart is what the Report dialog starts with.
  */
 export interface ReportStart {

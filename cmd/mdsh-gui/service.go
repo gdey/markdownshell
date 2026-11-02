@@ -433,6 +433,8 @@ func edited(cur *settings.Settings, s settings.Settings) {
 	cur.Autosave, cur.Vim, cur.NoSpellCheck, cur.Shell, cur.StartFolder = s.Autosave, s.Vim, s.NoSpellCheck, s.Shell, s.StartFolder
 	cur.TemplateFolder = s.TemplateFolder
 	cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
+	cur.Neovim, cur.NeovimPath, cur.NeovimClean = s.Neovim, strings.TrimSpace(s.NeovimPath), s.NeovimClean
+	cur.NeovimOwnColors = s.NeovimOwnColors
 	cur.Theme = ""
 	if s.Theme == "light" || s.Theme == "dark" {
 		cur.Theme = s.Theme
