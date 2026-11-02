@@ -68,14 +68,32 @@ var inserts = []struct{ label, name string }{
 	{"Choice", "choice"},
 }
 
-// buildSourceMenu makes the source view's right-click menu: the edit
-// commands, and Insert.
+// buildSourceMenu makes the source view's right-click menus, the
+// built-in editor's and the Neovim pane's: the edit commands, and
+// Insert.
 func (a *App) buildSourceMenu() {
 	m := application.NewContextMenu("source")
 	m.AddRole(application.Cut)
 	m.AddRole(application.Copy)
 	m.AddRole(application.Paste)
 	m.AddSeparator()
+	a.addInsertMenu(m)
+	m.Update()
+
+	// The Neovim pane draws its text on a canvas, so the page has no
+	// selection for the edit roles to act on: its Cut, Copy and Paste
+	// go to Neovim's selection instead.
+	n := application.NewContextMenu("nvim")
+	n.Add("Cut").OnClick(func(*application.Context) { a.nvimEdit("cut") })
+	n.Add("Copy").OnClick(func(*application.Context) { a.nvimEdit("copy") })
+	n.Add("Paste").OnClick(func(*application.Context) { a.nvimEdit("paste") })
+	n.AddSeparator()
+	a.addInsertMenu(n)
+	n.Update()
+}
+
+// addInsertMenu adds the Insert submenu to a right-click menu.
+func (a *App) addInsertMenu(m *application.ContextMenu) {
 	ins := m.AddSubmenu("Insert")
 	for _, it := range inserts {
 		if it.name == "" {
@@ -84,7 +102,6 @@ func (a *App) buildSourceMenu() {
 		}
 		ins.Add(it.label).OnClick(a.send("insert:" + it.name))
 	}
-	m.Update()
 }
 
 // buildMenu makes the menu bar. Commands that act on a document are

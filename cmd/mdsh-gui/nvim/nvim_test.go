@@ -430,3 +430,46 @@ func TestLanguageServer(t *testing.T) {
 		t.Errorf("depends= completions %v, want [a]", labels)
 	}
 }
+
+// TestSelection checks the right-click menu's Copy and Cut, which act on
+// Neovim's selection: characterwise, linewise, in select mode, and none
+// outside visual mode.
+func TestSelection(t *testing.T) {
+	e := startTest(t, "one two\nthree\nfour\n", make(chan [2]string, 100))
+	sel := func(cut bool) string {
+		t.Helper()
+		out, err := e.Call("selection", fmt.Sprintf("[%v]", cut))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if got := sel(false); got != "null" {
+		t.Errorf("in normal mode: %s", got)
+	}
+	e.Input("gg0wve")
+	if got := sel(false); got != `"two"` {
+		t.Errorf("characterwise: %s", got)
+	}
+	e.Input("<Esc>jVj")
+	if got := sel(false); got != `"three\nfour\n"` {
+		t.Errorf("linewise: %s", got)
+	}
+	e.Input("<Esc>gg0v<C-g>")
+	if got := sel(true); got != `"o"` {
+		t.Errorf("select mode: %s", got)
+	}
+	// Cut deletes it, as d does, leaving normal mode.
+	deadline := time.Now().Add(5 * time.Second)
+	for bufLines(t, e) != "ne two\nthree\nfour" {
+		if time.Now().After(deadline) {
+			t.Fatalf("after Cut: %q", bufLines(t, e))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	var mode string
+	e.v.ExecLua(`return vim.api.nvim_get_mode().mode`, &mode)
+	if mode != "n" {
+		t.Errorf("mode after Cut = %q", mode)
+	}
+}

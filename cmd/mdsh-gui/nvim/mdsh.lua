@@ -162,6 +162,30 @@ function calls.state()
   return st
 end
 
+-- selection is the text visual or select mode has selected, or nil
+-- outside them. With cut it deletes it too, as d does, so the
+-- right-click menu's Cut and Copy act on Neovim's selection rather than
+-- the page's, which has none.
+function calls.selection(cut)
+  local w = win()
+  local mode = vim.api.nvim_get_mode().mode
+  local kind = ({ v = "v", V = "V", ["\22"] = "\22", s = "v", S = "V", ["\19"] = "\22" })[mode:sub(1, 1)]
+  if not w or vim.api.nvim_get_current_win() ~= w or not kind then
+    return nil
+  end
+  local lines = vim.fn.getregion(vim.fn.getpos("v"), vim.fn.getpos("."), { type = kind })
+  local text = table.concat(lines, "\n")
+  if kind == "V" then
+    text = text .. "\n"
+  end
+  if cut then
+    -- In select mode, <C-g> goes to visual mode first, or d would be
+    -- typed over the selection.
+    vim.api.nvim_input((mode:match("^[sS\19]") and "<C-g>" or "") .. "d")
+  end
+  return text
+end
+
 -- jump scrolls line to the window's top less rows, and with cursor puts
 -- the cursor on it, at col (bytes from 0) or the line's end if col is -1.
 function calls.jump(line, rows, cursor, col)
