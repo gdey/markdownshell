@@ -17,6 +17,7 @@ import (
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
+	"github.com/gdey/markdownshell/termsafe"
 )
 
 var (
@@ -126,14 +127,16 @@ func (m *Model) block(i int) string {
 	if selected {
 		marker = lipgloss.NewStyle().Foreground(accent).Render("▶ ")
 	}
-	head := marker + titleStyle.Render(b.Lang)
+	// The language, id and attributes come from the document, so they
+	// are shown as the code is.
+	head := marker + titleStyle.Render(termsafe.Visible(b.Lang))
 	if b.IsInclude() {
-		head += tagStyle.Render(" include " + b.Attrs["file"])
+		head += tagStyle.Render(" include " + termsafe.Visible(b.Attrs["file"]))
 	} else {
-		head += " " + lipgloss.NewStyle().Foreground(accent).Render("#"+b.ID)
+		head += " " + lipgloss.NewStyle().Foreground(accent).Render("#"+termsafe.Visible(b.ID))
 	}
 	if tags := tagsOf(b); tags != "" {
-		head += " " + tagStyle.Render(tags)
+		head += " " + tagStyle.Render(termsafe.Visible(tags))
 	}
 	if st := m.state(i, r); st != "" {
 		head += "  " + st
@@ -148,14 +151,16 @@ func (m *Model) block(i int) string {
 	}
 	w := max(m.docWidth()-4, 10)
 	out := head
-	if !m.shown.HideCode {
+	// Code hidden with the Code switch still shows while its block asks
+	// to run, so the question is never asked about unseen code.
+	if !m.shown.HideCode || (m.prompt != nil && m.prompt.block == b) {
 		out += "\n" + lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(border).
 			Padding(0, 1).
 			MarginLeft(2).
 			Width(w-2).
-			Render(clean(body))
+			Render(clean(termsafe.Visible(body)))
 	}
 	// A confirm question is asked in the block's card, under its code, as
 	// in mdsh-gui.
@@ -170,8 +175,11 @@ func (m *Model) block(i int) string {
 			q = fmt.Sprintf("%s depends on this block, which hasn't run. Run it first?", m.d.Label(m.prompt.of))
 			keys = "[r]un  s[k]ip  [s]top"
 		}
+		if termsafe.HasControl(b.Body) {
+			q = "This block's code has control characters, shown as ^X or <U+XXXX>. " + q
+		}
 		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Width(w-2).Render(
-			promptStyle.Render(q)+"\n"+helpStyle.Render(keys))
+			promptStyle.Render(termsafe.Visible(q))+"\n"+helpStyle.Render(keys))
 	}
 	// A tty block runs in a terminal in its card, as in mdsh-gui.
 	if m.termBlock == i && !m.hist.running {

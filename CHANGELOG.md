@@ -22,6 +22,16 @@ follow [Semantic Versioning](https://semver.org/).
   put `$GITHUB_TOKEN` in a file without running anything. **Breaking:**
   a document that used `{{$USER}}` or `run={{$DEBUG}}` now needs
   `--expose USER,DEBUG`. (v1.2.1 review, finding 2.)
+- `confirm`, `--step` and `mdsh -i`: control characters in a block's
+  code, such as `\r` followed by an erase-line escape, are shown as
+  `^M^[[2K` instead of being sent to the terminal, with a warning, so
+  code can't hide itself from the question that asks whether to run it.
+  The printed document shows code the same way, and `mdsh -i` its ids
+  and attributes too; `-w` keeps them as they are.
+  A question asked after the streamed document now shows the code of a
+  block that `show=` or an off `mdsh:if` section left out of it, and
+  `mdsh -i` shows a block's code while asking even with Code switched
+  off. (v1.2.1 review, finding 1.)
 
 ### Added
 

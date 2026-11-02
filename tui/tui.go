@@ -26,6 +26,7 @@ import (
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
+	"github.com/gdey/markdownshell/termsafe"
 )
 
 // Options configure the TUI.
@@ -1283,7 +1284,7 @@ func (m *Model) footer() string {
 	case m.form != nil:
 		help = helpStyle.Render(formHelp + "apply · esc cancel")
 	case m.prompt != nil && m.prompt.of != nil:
-		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", m.d.Label(m.prompt.of), m.d.Label(m.prompt.block)))
+		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", termsafe.Visible(m.d.Label(m.prompt.of)), termsafe.Visible(m.d.Label(m.prompt.block))))
 	case m.prompt != nil:
 		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
 	case m.hist.focus:

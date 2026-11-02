@@ -34,6 +34,7 @@ import (
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
+	"github.com/gdey/markdownshell/termsafe"
 	"github.com/gdey/markdownshell/tui"
 )
 
@@ -270,7 +271,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	// with image links read from linkDir.
 	show := func(results []*run.Result, opts report.Options, linkDir string) error {
 		if reportFile == "" {
-			return print(stdout, render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env}), styled)
+			return print(stdout, render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env, Terminal: true}), styled)
 		}
 		if linkDir == "" && file != "" {
 			if abs, err := filepath.Abs(file); err == nil {
@@ -333,7 +334,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 			opts.File = abs
 		}
 	}
-	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: reportOpts.Env}
+	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: reportOpts.Env, Terminal: true}
 	// When the run stops to ask, print the document as it goes, so each
 	// question comes after the prose and code it is about, and each
 	// block's output shows before the next question. With -w this is
@@ -389,6 +390,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		// The streamed document already shows the code, unless it is
 		// hidden.
 		p.quiet = live != nil && !*hideCode
+		if live != nil {
+			p.shown = live.codeShown
+		}
 		opts.Confirm = p.confirm
 		opts.Depend = p.depend
 	}
@@ -560,6 +564,17 @@ func (s *streamer) event(e run.Event) {
 	}
 }
 
+// codeShown reports whether b's code is in the printed document: not
+// left out by show= or an off mdsh:if section.
+func (s *streamer) codeShown(b *doc.Block) bool {
+	i, ok := s.index[b]
+	if !ok {
+		return false
+	}
+	pieces := render.Pieces(s.d, s.results, s.opts)
+	return len(bytes.TrimSpace(pieces[3*i+1])) > 0
+}
+
 // upTo prints everything before b's output.
 func (s *streamer) upTo(b *doc.Block) { s.flush(3*s.index[b] + 2) }
 
@@ -663,14 +678,37 @@ type prompter struct {
 	quiet bool
 	// d, if set, names blocks in messages; see doc.Document.Label.
 	d *doc.Document
+	// shown, if set, reports whether a block's code was printed, for
+	// quiet.
+	shown func(*doc.Block) bool
 }
 
 // label names b in a message.
 func (p *prompter) label(b *doc.Block) string {
 	if p.d == nil {
-		return b.ID
+		return termsafe.Visible(b.ID)
 	}
-	return p.d.Label(b)
+	return termsafe.Visible(p.d.Label(b))
+}
+
+// printed reports whether b's code was printed above the question, so
+// the question can leave it out. Code hidden by show=, an off mdsh:if
+// section or --hide-code is shown in the question, as is code with
+// control characters, which the printed document can't be trusted to
+// show as it is.
+func (p *prompter) printed(b *doc.Block) bool {
+	if termsafe.HasControl(b.Body) {
+		return false
+	}
+	return p.shown == nil || p.shown(b)
+}
+
+// warnControl says when b's code has control characters, which the
+// question shows as ^[ and the like.
+func (p *prompter) warnControl(b *doc.Block) {
+	if termsafe.HasControl(b.Body) {
+		fmt.Fprintf(p.out, "warning: block %s has control characters in its code, shown above as ^X or <U+XXXX>\n", p.label(b))
+	}
 }
 
 func newPrompter(in io.Reader, out io.Writer) *prompter {
@@ -682,10 +720,11 @@ func newPrompter(in io.Reader, out io.Writer) *prompter {
 // depend asks whether to run dep, which b depends on, first.
 func (p *prompter) depend(dep, b *doc.Block) run.Answer {
 	fmt.Fprintf(p.out, "\n--- block %s depends on %s, which hasn't run ---\n", p.label(b), p.label(dep))
-	if !p.quiet || dep.Span.Start > b.Span.Start {
+	if !p.quiet || dep.Span.Start > b.Span.Start || !p.printed(dep) {
 		// A later block hasn't been printed yet.
-		fmt.Fprintf(p.out, "%s---\n", dep.Body)
+		fmt.Fprintf(p.out, "%s---\n", termsafe.Visible(dep.Body))
 	}
+	p.warnControl(dep)
 	for {
 		fmt.Fprintf(p.out, "Run %s first? [r]un / s[k]ip / [s]top: ", p.label(dep))
 		line, err := p.in.ReadString('\n')
@@ -716,13 +755,14 @@ func (p *prompter) confirm(b *doc.Block) run.Answer {
 	if b.HasOutput() {
 		saved = " (has saved output)"
 	}
-	if p.quiet {
+	if p.quiet && p.printed(b) {
 		fmt.Fprintf(p.out, "\n--- block %s%s ---\n", p.label(b), saved)
 	} else {
-		fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", p.label(b), saved, b.Body)
+		fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", p.label(b), saved, termsafe.Visible(b.Body))
 	}
+	p.warnControl(b)
 	for {
-		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", q)
+		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", termsafe.Visible(q))
 		line, err := p.in.ReadString('\n')
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":

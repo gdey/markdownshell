@@ -1115,3 +1115,23 @@ func TestDoneBlockNotRunning(t *testing.T) {
 	press(m, "s")
 	pump(t, m)
 }
+
+// TestConfirmShowsControlChars checks that the TUI shows escape
+// sequences in a block's code at its question instead of sending them to
+// the terminal, and shows code the Code switch hides while it asks.
+func TestConfirmShowsControlChars(t *testing.T) {
+	src := "```sh {#danger\x1b[2K confirm timeout=\"5s\x1b[1A\"}\necho visible\ntouch /tmp/PWNED #\r\x1b[2K\n```\n"
+	m, _ := newModel(t, src, Options{AutoSave: true})
+	m.shown.HideCode = true
+	press(m, "enter")
+	pump(t, m)
+	if m.prompt == nil {
+		t.Fatal("no prompt")
+	}
+	v := m.View()
+	if strings.Contains(v, "\x1b[2K") || strings.Contains(v, "\x1b[1A") || !strings.Contains(v, "^M^[[2K") || !strings.Contains(v, "#danger^[[2K") || !strings.Contains(v, "control characters") {
+		t.Errorf("prompt view:\n%q", v)
+	}
+	press(m, "s")
+	pump(t, m)
+}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termsafe"
 )
 
 // View is how a file is shown, as in mdsh-gui's View menu. The TUI keeps
@@ -173,12 +174,13 @@ func (m *Model) outline(h int) string {
 }
 
 // name is how the outline and footer name b: #id, or "block at line N"
-// when mdsh made its id up.
+// when mdsh made its id up. The id comes from the document, so control
+// characters in it are shown, not sent to the terminal.
 func (m *Model) name(b *doc.Block) string {
 	if l := m.d.Label(b); l != b.ID {
-		return "block " + l
+		return "block " + termsafe.Visible(l)
 	}
-	return "#" + b.ID
+	return "#" + termsafe.Visible(b.ID)
 }
 
 func truncate(s string, w int) string { return ansi.Truncate(s, w, "…") }
