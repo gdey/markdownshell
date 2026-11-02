@@ -168,7 +168,7 @@
 /* Inputs, menus and dialogs: thin white lines. */
 [data-look="blueprint"] :is(.textbox, .choice-select, input[type="text"], select) { border-color: var(--fg); background-color: var(--code-bg); color: var(--fg); }
 [data-look="blueprint"] :is(dialog, .md-menu) { border-color: var(--fg); box-shadow: none; }
-[data-look="blueprint"] :is(input, select, textarea, button):focus-visible { outline: 1px dashed var(--fg); outline-offset: 2px; }
+[data-look="blueprint"] :is(input, select, textarea, button, a, [tabindex]):focus-visible { outline: 1px dashed var(--fg); outline-offset: 2px; }
 
 /* The start screen and Settings. */
 [data-look="blueprint"] #start h1 { text-transform: uppercase; letter-spacing: 0.08em; }

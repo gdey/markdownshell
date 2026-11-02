@@ -11,15 +11,31 @@ const select = (id: string) => $<HTMLSelectElement>(id);
 
 // The tabs across the top: one section shows at a time.
 const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-function showTab(name: string) {
+function showTab(name: string, focus = false) {
   for (const t of tabs) {
     const on = t.dataset.tab === name;
     t.setAttribute("aria-selected", String(on));
+    t.tabIndex = on ? 0 : -1;
     $(t.dataset.tab!).hidden = !on;
+    if (on && focus) t.focus();
   }
   if (name === "about") void drawAbout();
 }
-for (const t of tabs) t.onclick = () => showTab(t.dataset.tab!);
+tabs.forEach((t, i) => {
+  t.id = "tab-" + t.dataset.tab;
+  t.setAttribute("aria-controls", t.dataset.tab!);
+  $(t.dataset.tab!).setAttribute("aria-labelledby", t.id);
+  t.onclick = () => showTab(t.dataset.tab!);
+  // The arrow keys move between the tabs, as in a native tab bar.
+  t.onkeydown = (e) => {
+    const n = tabs.length;
+    const to = e.key === "ArrowLeft" ? tabs[(i + n - 1) % n] : e.key === "ArrowRight" ? tabs[(i + 1) % n] : e.key === "Home" ? tabs[0] : e.key === "End" ? tabs[n - 1] : null;
+    if (!to) return;
+    e.preventDefault();
+    showTab(to.dataset.tab!, true);
+  };
+});
+showTab("general");
 
 function draw() {
   input("autosave").checked = s.autosave;
@@ -134,6 +150,7 @@ function drawLook() {
   const own = s.look === "tty" ? 115 : 100;
   input("text-size").value = String(s.textSize || own);
   $("text-size-value").textContent = `${s.textSize || own}%${s.textSize ? "" : ", the look's own"}.`;
+  input("text-size").setAttribute("aria-valuetext", `${s.textSize || own} percent${s.textSize ? "" : ", the look's own"}`);
   $("text-size-reset").hidden = !s.textSize;
   select("ui-font").value = s.uiFont;
   select("code-font").value = s.codeFont;

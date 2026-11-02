@@ -82,7 +82,8 @@ function ensureTerm(): Terminal {
   } catch {
     // No storage: the default it is.
   }
-  term = new Terminal({ cols: cols(), rows, fontSize: textSize(13), fontFamily: codeFont(), theme: colors(), scrollback: 5000, disableStdin: true, convertEol: true, cursorInactiveStyle: "none" });
+  // screenReaderMode has xterm read out what arrives.
+  term = new Terminal({ cols: cols(), rows, fontSize: textSize(13), fontFamily: codeFont(), theme: colors(), scrollback: 5000, disableStdin: true, convertEol: true, cursorInactiveStyle: "none", screenReaderMode: true });
   term.open($("history-term"));
   term.onData((keys) => {
     if (block >= 0) typeKeys(keys);
@@ -121,6 +122,7 @@ function setRows(n: number) {
   n = Math.max(1, Math.min(Math.round(n), maxRows()));
   if (n === rows) return;
   rows = n;
+  $("history-grip").setAttribute("aria-valuenow", String(n));
   try {
     localStorage.setItem(rowsKey, String(n));
   } catch {
@@ -430,6 +432,12 @@ export function initHistory(h: HistoryHooks) {
   box.onkeydown = (e) => void onKey(e);
   box.oninput = grow;
   $("history-grip").onpointerdown = dragGrip;
+  $("history-grip").onkeydown = (e) => {
+    const dir = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    setRows(rows + dir);
+  };
   $("history-toggle").onclick = () => hooks.toggle();
   // A command typed here gets ctrl+c, as in a terminal, so the shell
   // and what blocks set in it live on; anything else stops as Run ›

@@ -63,3 +63,27 @@ export function iconButton(icon: keyof typeof icons, title: string, onclick: () 
   b.setAttribute("aria-label", title);
   return b;
 }
+
+// announce says text to a screen reader, through the page's live
+// region, without showing it. The same text twice is said twice.
+let announceTimer = 0;
+export function announce(text: string) {
+  const live = document.getElementById("announce");
+  if (!live) return;
+  clearTimeout(announceTimer);
+  live.textContent = "";
+  announceTimer = window.setTimeout(() => (live.textContent = text), 50);
+}
+
+// scrollBehavior is smooth, unless the system asks for less motion.
+export function scrollBehavior(): ScrollBehavior {
+  return matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
+
+// keyActivates makes a key on an element that acts as a button, such as
+// a fold summary, act as a click does: enter or space.
+export function keyActivates(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" && e.key !== " ") return false;
+  e.preventDefault();
+  return true;
+}

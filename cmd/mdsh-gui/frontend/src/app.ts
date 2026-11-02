@@ -6,7 +6,7 @@ import { Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
-import { $, el, iconButton, icons, svg } from "./dom.js";
+import { $, announce, el, iconButton, icons, keyActivates, scrollBehavior, svg } from "./dom.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
@@ -119,6 +119,7 @@ function drawOptions() {
   if (r.stopOnError) parts.push("stop on error");
   $("options").hidden = parts.length === 0;
   $("options").textContent = parts.join(" · ");
+  $("options").setAttribute("aria-label", "Run options: " + parts.join(", "));
 }
 
 function drawDoc() {
@@ -201,7 +202,7 @@ function showEnd(block: HTMLElement, up: boolean) {
   const r = block.getBoundingClientRect();
   const toTop = r.top - p.top - followMargin;
   const d = up && toTop < 0 ? toTop : Math.max(0, Math.min(r.bottom - p.bottom + followMargin, toTop));
-  if (Math.abs(d) > 1) pane.scrollTo({ top: pane.scrollTop + d, behavior: "smooth" });
+  if (Math.abs(d) > 1) pane.scrollTo({ top: pane.scrollTop + d, behavior: scrollBehavior() });
 }
 
 // scrolledByHand says the rendered view was scrolled by hand since the
@@ -259,8 +260,11 @@ function drawProse(c: Cell): HTMLElement {
       play.classList.add("run-section");
       play.disabled = running;
       // Next to the heading's text, which names it in the outline and
-      // its fold, and a button's svg adds none.
-      (s.querySelector("h1, h2, h3, h4, h5, h6") ?? s).append(play);
+      // its fold, and a button's svg adds none. The heading keeps its
+      // text as its name, without the button's.
+      const h = s.querySelector("h1, h2, h3, h4, h5, h6");
+      if (h) h.setAttribute("aria-label", h.textContent ?? "");
+      (h ?? s).append(play);
     }
     s.dataset.foldDefault = c.collapsed ? "1" : "";
     const note = el("button", { className: "fold-note", title: "Unfold this section" });
@@ -311,6 +315,7 @@ function enableTasks(e: HTMLElement, tasks: number[] | null | undefined) {
   boxes.forEach((box, i) => {
     box.disabled = false;
     box.title = "Check or uncheck it in the file";
+    box.setAttribute("aria-label", (box.closest("li")?.textContent ?? "").trim() || "Task");
     box.onchange = () => void edit(() => App.SetTask(tasks[i], box.checked)).then((ok) => ok || (box.checked = !box.checked));
   });
 }
@@ -390,7 +395,11 @@ function drawChoice(c: Cell): HTMLElement {
 // its name over it and, when its var= binds nothing, why.
 function inputCell(className: string, id: string, problem: string | undefined, control: HTMLElement): HTMLElement {
   const cell = el("section", { className: "input-cell " + className + (problem ? " taken" : ""), title: problem || id }, el("span", { className: "name" }, id), control);
-  if (problem) cell.append(el("p", { className: "problem" }, problem));
+  if (problem) {
+    const p = el("p", { className: "problem", id: "problem-" + control.dataset.input }, problem);
+    control.setAttribute("aria-describedby", p.id);
+    cell.append(p);
+  }
   return cell;
 }
 
@@ -483,6 +492,15 @@ function drawBlock(c: Cell): HTMLElement {
   colorOutput(block.querySelector(".output")!);
   block.dataset.foldCode = c.collapsed ? "1" : "";
   block.dataset.foldOutput = c.collapsedOutput ? "1" : "";
+  // The card is a tab stop, named for the block and its state, so the
+  // keyboard and a screen reader reach it; focusing it selects it, as a
+  // click does.
+  block.setAttribute("role", "group");
+  block.tabIndex = 0;
+  labelBlock(block);
+  block.onfocus = () => {
+    if (!block.classList.contains("selected")) select(blocks().indexOf(block), false);
+  };
   // Checkboxes in output, such as out=markdown's, are edited in place
   // too, until the block runs again.
   enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
@@ -497,6 +515,18 @@ function drawBlock(c: Cell): HTMLElement {
     if (!(e.target as HTMLElement).closest("button, input")) void showInSource(block, c.line, false);
   };
   return block;
+}
+
+// labelBlock names block's card for a screen reader: its name, its
+// language, its attributes and its state, as the card shows them.
+function labelBlock(block: HTMLElement) {
+  const text = (sel: string) => block.querySelector(sel)?.textContent?.trim() ?? "";
+  const name = text(".head .id") || "block " + (Number(block.dataset.block) + 1);
+  const states: Record<string, string> = { "?": "waiting for an answer", "▶": "running now", "◐": "running in the background", "✗": "failed", "✓": "ran" };
+  const state = states[blockMark(block)] ?? "";
+  const exit = text(".head .exit");
+  const parts = [name, text(".head .lang") + " block", text(".head .attrs"), state, state && exit && !exit.startsWith("running") ? exit : ""];
+  block.setAttribute("aria-label", parts.filter(Boolean).join(", "));
 }
 
 // Folds in the rendered view. A block's code and its output each fold
@@ -616,10 +646,14 @@ function foldButton(title: string, onclick: () => void): HTMLButtonElement {
 // foldPart wraps a block's code or output with its fold button and the
 // one line it shows when folded.
 function foldPart(part: Part, full: HTMLElement, toggle: () => void): HTMLElement {
-  const summary = el("div", { className: "fold-summary", hidden: true, title: "Unfold" });
+  const summary = el("div", { className: "fold-summary", hidden: true, title: "Unfold", role: "button", tabIndex: 0 });
+  summary.setAttribute("aria-label", "Unfold the " + part);
   summary.onclick = (e) => {
     e.stopPropagation();
     toggle();
+  };
+  summary.onkeydown = (e) => {
+    if (keyActivates(e)) toggle();
   };
   return el("div", { className: "part " + part + "-part" }, foldButton(part === "code" ? "Fold or unfold the code" : "Fold or unfold the output", toggle), full, summary);
 }
@@ -668,6 +702,7 @@ function drawPart(block: HTMLElement, part: Part) {
   if (!wrap) return;
   const on = blockFolded(block, part);
   wrap.classList.toggle("folded", on);
+  wrap.querySelector(":scope > button.fold")?.setAttribute("aria-expanded", String(!on));
   const summary = wrap.querySelector<HTMLElement>(".fold-summary")!;
   summary.hidden = !on;
   if (on) summarize(wrap.children[1] as HTMLElement, summary);
@@ -709,8 +744,11 @@ function applyFolds() {
     }
   }
   for (const h of headings) {
+    h.cell.querySelector(":scope > button.fold")?.setAttribute("aria-expanded", String(!h.folded));
     const note = h.cell.querySelector<HTMLElement>(".fold-note");
-    if (note) note.textContent = h.folded && h.hidden ? "… " + h.hidden + (h.hidden === 1 ? " part" : " parts") : "";
+    if (!note) continue;
+    note.textContent = h.folded && h.hidden ? "… " + h.hidden + (h.hidden === 1 ? " part" : " parts") : "";
+    note.setAttribute("aria-label", note.textContent ? note.textContent.slice(2) + " folded away: unfold this section" : "");
   }
   // A selected block that a fold hides is selected no longer.
   const current = doc.querySelector<HTMLElement>(".block.selected");
@@ -903,6 +941,10 @@ function select(i: number, scroll = true) {
   if (i < 0 || i >= all.length) return;
   all[i].classList.add("selected");
   if (scroll) all[i].scrollIntoView({ block: "nearest" });
+  // j and k move the focus with the selection, so a screen reader
+  // follows and enter runs the block the focus is on.
+  const at = document.activeElement;
+  if (scroll && (at === document.body || at?.closest("#doc > .block"))) all[i].focus({ preventScroll: true });
 }
 
 // selectSection selects the heading cell, so its play button shows in
@@ -1014,6 +1056,8 @@ async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   busy(false);
   await refresh();
   const card = home?.();
+  const ended = card?.classList.contains("block") ? card.getAttribute("aria-label") ?? "" : "";
+  announce(ended ? "Run finished: " + ended : "Run finished");
   if (card) {
     following = null;
     if (!scrolledByHand) goHome(card, back);
@@ -1050,7 +1094,7 @@ function goHome(card: HTMLElement, offset: number | null) {
   const bottom = top + r.height;
   const at = top - (offset ?? followMargin);
   const to = Math.max(at, Math.min(bottom + followMargin - p.height, top - followMargin));
-  if (Math.abs(to - pane.scrollTop) > 1) pane.scrollTo({ top: to, behavior: "smooth" });
+  if (Math.abs(to - pane.scrollTop) > 1) pane.scrollTo({ top: to, behavior: scrollBehavior() });
 }
 
 // Editing happens in the source pane. The pencil and a click on prose
@@ -1715,6 +1759,9 @@ function drawOutline() {
         mark.classList.add("fold");
         mark.classList.toggle("closed", shownFolded(e));
         mark.title = "Fold or unfold this section";
+        // The mark is a mouse target; the heading's own fold button and
+        // the Folding menu do the same from the keyboard.
+        item.setAttribute("aria-label", item.getAttribute("aria-label") + (shownFolded(e) ? ", folded" : ""));
         mark.onclick = (ev) => {
           ev.stopPropagation();
           foldSection(e);
@@ -1741,7 +1788,11 @@ function drawOutline() {
 function markOutline() {
   const b = blocks()[selected]?.dataset.block;
   for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) {
-    row.classList.toggle("active", row.dataset.section !== undefined ? !!selectedSection && row.dataset.section === selectedSection : row.dataset.block === b);
+    const on = row.dataset.section !== undefined ? !!selectedSection && row.dataset.section === selectedSection : row.dataset.block === b;
+    row.classList.toggle("active", on);
+    const item = row.querySelector(".item");
+    if (on) item?.setAttribute("aria-current", "true");
+    else item?.removeAttribute("aria-current");
   }
   markDeps();
 }
@@ -1792,8 +1843,12 @@ function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLEl
 // label. Its mark is its state, or a heading's fold, and icon says what
 // it is: a block, a heading, a textbox or a choice.
 function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string, icon: keyof typeof icons, label = text): HTMLElement {
-  const b = el("button", { className: "item " + kind, title: text }, el("span", { className: "mark" }, mark), el("span", { className: "kind" }, svg(icons[icon])), el("span", { className: "text" }, label));
+  const b = el("button", { className: "item " + kind, title: text }, el("span", { className: "mark", ariaHidden: "true" }, mark), el("span", { className: "kind" }, svg(icons[icon])), el("span", { className: "text" }, label));
   b.style.paddingLeft = 8 + (level - 1) * 12 + "px";
+  // The mark is said in words, and what the entry is, after its name.
+  const what = ({ heading: "heading, level " + level, mdsh: "block", textbox: "textbox", choice: "choice" } as Record<string, string>)[icon] ?? "";
+  const states: Record<string, string> = { "?": "waiting for an answer", "▶": "running now", "◐": "running in the background", "✗": "failed", "✓": "ran", "!": "its variable is taken" };
+  b.setAttribute("aria-label", [text, what, states[mark] ?? ""].filter(Boolean).join(", "));
   b.onclick = () => jumpTo(target);
   return b;
 }
@@ -1804,7 +1859,7 @@ function jumpTo(target: HTMLElement) {
   reveal(target.closest<HTMLElement>("#doc > *") ?? target);
   // Both panes go to the entry, so neither follows the other meanwhile.
   holdScroll();
-  target.scrollIntoView({ block: "start", behavior: "smooth" });
+  target.scrollIntoView({ block: "start", behavior: scrollBehavior() });
   const i = blocks().indexOf(target);
   if (i >= 0) select(i, false);
   const heading = target.closest<HTMLElement>("#doc > .heading-cell");
@@ -1830,7 +1885,8 @@ function drawRunning() {
     const mark = blockMark(e);
     const name = e.querySelector(".name")?.firstChild?.textContent || "block " + (all.indexOf(e) + 1);
     const why = mark === "?" ? "waiting for an answer" : mark === "▶" ? "running now" : "running in the background";
-    const b = el("button", { className: "chip" + markClass(mark), title: name + ": " + why + ". Click to go to it." }, el("span", { className: "mark" }, mark), name);
+    const b = el("button", { className: "chip" + markClass(mark), title: name + ": " + why + ". Click to go to it." }, el("span", { className: "mark", ariaHidden: "true" }, mark), name);
+    b.setAttribute("aria-label", name + ", " + why + ". Go to it");
     b.onclick = () => jumpTo(e);
     return b;
   };
@@ -1850,8 +1906,11 @@ function applyView() {
   document.body.classList.toggle("hide-code", !view.code);
   document.body.classList.toggle("hide-output", !view.output);
   $("outline-toggle").classList.toggle("on", view.outline);
+  $("outline-toggle").setAttribute("aria-expanded", String(view.outline));
   $("view-split").classList.toggle("on", view.split);
+  $("view-split").setAttribute("aria-pressed", String(view.split));
   $("view-rendered").classList.toggle("on", view.rendered);
+  $("view-rendered").setAttribute("aria-pressed", String(view.rendered));
   showConsole(view.console);
   syncHistory();
   if (view.split) openSource();
@@ -2239,6 +2298,7 @@ function confirmClear(): Promise<boolean> {
 
 function grip(title: string, start: (ev: PointerEvent, handle: HTMLElement) => void): HTMLElement {
   const g = el("button", { className: "grip", title, tabIndex: -1 }, "⋮⋮");
+  g.setAttribute("aria-label", title);
   g.onpointerdown = (ev) => {
     if (ev.button === 0) start(ev, g);
   };
@@ -2506,7 +2566,11 @@ function toggleTag(tag: string) {
 
 function tagButton(tag: string, on: boolean, count?: number): HTMLElement {
   const b = el("button", { className: "tag" + (on ? " on" : ""), title: (on ? "Stop filtering on #" : "Show files tagged #") + tag }, "#" + tag);
-  if (count !== undefined) b.append(el("span", { className: "n" }, String(count)));
+  b.setAttribute("aria-pressed", String(on));
+  if (count !== undefined) {
+    b.append(el("span", { className: "n", ariaHidden: "true" }, String(count)));
+    b.setAttribute("aria-label", `${tag}, ${count} ${count === 1 ? "file" : "files"}`);
+  }
   b.onclick = () => toggleTag(tag);
   return b;
 }
@@ -2765,7 +2829,10 @@ function onBlock(e: BlockEvent) {
       endTerminal(e.block);
       break;
   }
-  if (e.kind !== "stdout" && e.kind !== "stderr") drawOutline();
+  if (e.kind !== "stdout" && e.kind !== "stderr") {
+    labelBlock(block);
+    drawOutline();
+  }
 }
 
 function onConfirm({ block, question, of }: Question) {
@@ -2778,7 +2845,8 @@ function onConfirm({ block, question, of }: Question) {
     of === undefined
       ? "This block is marked confirm, so it waits for you before it runs."
       : "A block you ran lists this one in depends=, and it hasn't run in this session.";
-  const info = el("span", { className: "info", title: why }, svg(icons.info));
+  const info = el("span", { className: "info", title: why, role: "img", tabIndex: 0 }, svg(icons.info));
+  info.setAttribute("aria-label", why);
   const answer = (reply: string) => async () => {
     ask.hidden = true;
     drawOutline();
@@ -2791,11 +2859,18 @@ function onConfirm({ block, question, of }: Question) {
   const stop = el("button", {}, "Stop");
   stop.onclick = answer("stop");
   ask.replaceChildren(info, el("span", { className: "question" }, question), run, skip, stop);
+  ask.setAttribute("role", "group");
+  ask.setAttribute("aria-label", question);
   ask.hidden = false;
   reveal(card);
   card.scrollIntoView({ block: "center" });
   status("waiting for you");
+  labelBlock(card);
   drawOutline();
+  // The question goes to the keyboard and the screen reader: Run has
+  // the focus, and the question is said with its reason.
+  announce(question + " " + why + " Run, skip or stop?");
+  run.focus({ preventScroll: true });
 }
 
 Events.On("block", mine(onBlock));

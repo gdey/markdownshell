@@ -253,6 +253,7 @@ function draw() {
   if (toggle) {
     toggle.title = title;
     toggle.setAttribute("aria-label", title);
+    toggle.setAttribute("aria-pressed", String(showLines));
     toggle.classList.toggle("on", showLines);
     toggle.hidden = !cards.length;
   }

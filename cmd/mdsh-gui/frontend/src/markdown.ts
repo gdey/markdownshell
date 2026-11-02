@@ -120,6 +120,8 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         exTarget(() => target),
         clickFocus(),
         EditorView.lineWrapping,
+        // The name a screen reader says for the editor's text.
+        EditorView.contentAttributes.of({ "aria-label": "Markdown source" }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !quiet) {
             sync.typed(u.changes);
@@ -388,17 +390,36 @@ export function markdownBar(editor: () => EditorView | null): HTMLElement {
     b.onmousedown = (e) => e.preventDefault();
     bar.append(b);
   }
-  const menu = el("div", { className: "md-menu", hidden: true });
+  const menu = el("div", { className: "md-menu", hidden: true, role: "menu" });
+  const show = (on: boolean) => {
+    menu.hidden = !on;
+    mdsh.setAttribute("aria-expanded", String(on));
+    if (on) menu.querySelector("button")?.focus();
+  };
   for (const m of mdshBlocks) {
-    const item = el("button", {}, m.label);
+    const item = el("button", { role: "menuitem" }, m.label);
     item.onmousedown = (e) => e.preventDefault();
     item.onclick = () => {
-      menu.hidden = true;
+      show(false);
       act(insertBlock(m.text, "id"))();
     };
     menu.append(item);
   }
-  const mdsh = iconButton("mdsh", "mdsh block", () => (menu.hidden = !menu.hidden));
+  // Up and down move through the menu; escape closes it.
+  menu.onkeydown = (e) => {
+    const items = [...menu.querySelectorAll<HTMLButtonElement>("button")];
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") items[(i + 1) % items.length]?.focus();
+    else if (e.key === "ArrowUp") items[(i + items.length - 1) % items.length]?.focus();
+    else if (e.key === "Escape") {
+      show(false);
+      editor()?.focus();
+    } else return;
+    e.preventDefault();
+  };
+  const mdsh = iconButton("mdsh", "Insert an mdsh block", () => show(menu.hidden));
+  mdsh.setAttribute("aria-haspopup", "menu");
+  mdsh.setAttribute("aria-expanded", "false");
   mdsh.onmousedown = (e) => e.preventDefault();
   bar.append(el("span", { className: "md-mdsh" }, mdsh, menu));
   return bar;

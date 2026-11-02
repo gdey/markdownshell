@@ -241,7 +241,7 @@ body.dragging-dep #deps-ui .port { opacity: 0.8; }
 /* The grip over the source view's right edge, to drag. */
 #split-grip { flex: none; position: relative; z-index: 3; width: 7px; margin: 0 -4px 0 -3px; cursor: col-resize; }
 #split-grip[hidden] { display: none; }
-#split-grip:hover { background: var(--accent); opacity: 0.4; }
+#split-grip:hover, #split-grip:focus-visible { background: var(--accent); opacity: 0.4; outline: none; }
 body.resizing-cols { cursor: col-resize; user-select: none; }
 .cm-mdsh-attrs { color: var(--accent); }
 
@@ -268,6 +268,7 @@ button.fold svg, #outline .mark.fold svg { width: 12px; height: 12px; fill: curr
 .block .part > button.fold { top: 10px; left: 2px; }
 .block .code-part > pre.code { padding-left: 22px; }
 .block .part.folded > :is(pre.code, .output) { display: none; }
+.block .fold-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .block .fold-summary { padding: 6px 12px 6px 22px; font: calc(13px * var(--text-scale))/calc(1.45 * var(--line-scale)) var(--font-code); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .block .code-part > .fold-summary { background: var(--code-bg); }
 .block .part.folded > button.fold { top: 6px; }
@@ -309,6 +310,7 @@ th { background: var(--code-bg); }
 
 .block { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; background: var(--bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block .head button.trash { display: none; }
 .block.selected .head button.trash, .block.history .head button.trash { display: inline-block; }
 .block .output-part > button.clear-output { position: absolute; top: 2px; right: 6px; display: none; }
@@ -457,7 +459,7 @@ body.settings main { flex: 1; overflow: auto; max-width: none; margin: 0; width:
 .setting { display: flex; gap: 20px; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .setting:last-child { border-bottom: 0; }
 .setting .text { flex: 1; min-width: 0; }
-.setting .text label { margin: 0; font-size: calc(14px * var(--text-scale)); }
+.setting .text label, .setting .text .label-text { display: block; margin: 0; font-size: calc(14px * var(--text-scale)); }
 .setting .text p { font-size: calc(12px * var(--text-scale)); margin: 2px 0 0; }
 .setting > select { flex: none; width: 200px; font: inherit; font-size: calc(13px * var(--text-scale)); padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
 .setting > input[type="range"] { flex: none; width: 200px; accent-color: var(--accent); }
@@ -525,7 +527,7 @@ dialog#report { width: min(560px, 92vw); }
 #history[hidden] { display: none; }
 #history { position: relative; }
 #history-grip { position: absolute; z-index: 3; top: -3px; left: 0; right: 0; height: 7px; cursor: ns-resize; }
-#history-grip:hover { background: var(--accent); opacity: 0.4; }
+#history-grip:hover, #history-grip:focus-visible { background: var(--accent); opacity: 0.4; outline: none; }
 body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-term { padding: 4px 8px 0; overflow-x: auto; overflow-y: hidden; }
 /* Closed, the pane is a status bar: the prompt line, with the status in
@@ -552,7 +554,7 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-prompt-head { padding: 4px 8px 0; border-top: 1px solid var(--border); color: var(--fg); font: calc(13px * var(--text-scale))/18px var(--font-code); white-space: pre; overflow: hidden; }
 #history-prompt-head[hidden] { display: none; }
 #history:has(#history-prompt-head:not([hidden])):not(.closed) .history-line { border-top: 0; padding-top: 0; }
-#history-input { flex: 1; resize: none; border: 0; outline: none; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
+#history-input { flex: 1; resize: none; border: 0; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
 #history-input::placeholder { color: var(--muted); }
 #history-input:disabled { opacity: 0.5; }
 
@@ -561,14 +563,14 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #console { order: 2; flex: none; position: relative; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border); background: var(--bg); font-size: calc(12px * var(--text-scale)); }
 #history { order: 3; }
 #console-grip { position: absolute; z-index: 3; top: -3px; left: 0; right: 0; height: 7px; cursor: ns-resize; }
-#console-grip:hover { background: var(--accent); opacity: 0.4; }
+#console-grip:hover, #console-grip:focus-visible { background: var(--accent); opacity: 0.4; outline: none; }
 #console .console-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--border); }
 #console .console-title { font-weight: 600; }
 #console-note { flex: 1; min-width: 0; color: var(--muted); }
 #console .console-bar button { font-size: calc(12px * var(--text-scale)); padding: 1px 8px; }
 #console .console-bar button.icon { padding: 2px 4px; background: none; }
 #console .console-bar svg { width: 12px; height: 12px; fill: currentColor; }
-#console-log { flex: 1; min-height: 0; overflow: auto; padding: 2px 0; font: calc(12px * var(--text-scale))/18px var(--font-code); outline: none; user-select: text; }
+#console-log { flex: 1; min-height: 0; overflow: auto; padding: 2px 0; font: calc(12px * var(--text-scale))/18px var(--font-code); user-select: text; }
 #console-log .entry { display: flex; gap: 8px; padding: 0 8px; }
 #console-log .entry:hover { background: var(--hover); }
 #console-log time { flex: none; color: var(--muted); }
@@ -598,14 +600,16 @@ body.shell { overflow: hidden; }
   user-select: none;
   -webkit-user-select: none;
 }
-#tabs { display: flex; gap: 2px; min-width: 0; flex: 1; overflow: hidden; }
+/* The tab list is as wide as its tabs, so the + sits after the last one, and shrinks with them. */
+#tabs { display: flex; gap: 2px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
 #new-tab { flex: none; align-self: center; margin-bottom: 4px; }
 .tab {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 60px;
-  flex: 0 1 200px;
+  width: 200px;
+  flex: 0 1 auto;
   padding: 3px 4px 3px 10px;
   font-size: calc(13px * var(--text-scale));
   color: var(--muted);
@@ -662,3 +666,19 @@ body.shell { overflow: hidden; }
 /* The drag is past a depends= limit, so the line holds at the last spot short of it. */
 .drop-line.held { background: var(--muted); }
 #outline .row .grip { padding: 0 2px; margin-left: 2px; }
+
+/* Keyboard focus shows on every control, as it does in the other looks.
+   Only focus from the keyboard: a click leaves no ring. */
+:is(button, input, select, textarea, a, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab:focus-visible { outline-offset: -2px; }
+#source-editor .cm-content:focus-visible, .xterm textarea:focus-visible, .nvim-input:focus-visible { outline: none; }
+.textbox:focus-visible { outline-offset: -1px; }
+
+/* Text for a screen reader only, such as the live region. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Less motion when the system asks for it: the panes open and the
+   folds turn without sliding, and the views jump rather than scroll. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
