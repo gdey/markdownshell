@@ -174,7 +174,7 @@ func (m *Model) block(i int) string {
 			promptStyle.Render(q)+"\n"+helpStyle.Render(keys))
 	}
 	// A tty block runs in a terminal in its card, as in mdsh-gui.
-	if m.termBlock == i {
+	if m.termBlock == i && !m.hist.running {
 		return out + "\n" + lipgloss.NewStyle().MarginLeft(4).Render(m.paneView())
 	}
 	if m.shown.HideOutput {

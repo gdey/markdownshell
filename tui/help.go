@@ -40,6 +40,12 @@ var helpItems = []helpItem{
 	{group: "Run", keys: "a", key: runeKey("a"), what: says("run from this block to the end"), off: needIdleBlock},
 	{group: "Run", keys: "s", key: runeKey("s"), what: says("run the section the block is in"), off: noSection},
 	{group: "Run", keys: "i :", key: runeKey("i"), what: says("type a new sh block and run it"), off: busy},
+	{group: "Run", keys: "h", key: runeKey("h"), what: says("History: a shell whose commands are added to the file"), off: func(m *Model) string {
+		if m.running && !m.hist.open {
+			return "a block is running"
+		}
+		return ""
+	}},
 	{group: "Run", keys: "ctrl+c", key: tea.KeyMsg{Type: tea.KeyCtrlC}, what: func(m *Model) string {
 		if m.running {
 			return "stop the run"

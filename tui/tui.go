@@ -143,6 +143,9 @@ type Model struct {
 	// tabs is how many tabs the app has, for the help panel.
 	tabs int
 
+	// hist is the History pane h opens.
+	hist hist
+
 	// back is set when the TUI came from the start screen: q goes back
 	// to it rather than quitting.
 	back bool
@@ -171,7 +174,11 @@ type confirmMsg struct {
 	reply chan run.Answer
 }
 
-type runDoneMsg struct{ err error }
+type runDoneMsg struct {
+	err error
+	// hist, for a command typed in the History pane, is how it ended.
+	hist *histDone
+}
 
 // reapMsg is the tick that checks for background blocks that ended.
 // Ticks name their model, so a model that replaced it ignores them.
@@ -255,6 +262,8 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	m.input.Placeholder = "a command to add to the document as a new block"
 	m.saveAs = textinput.New()
 	m.saveAs.Prompt = "save as: "
+	m.hist.input = textinput.New()
+	m.hist.noteEnd = -1
 	return m, nil
 }
 
@@ -265,6 +274,10 @@ func (m *Model) newSession(ro run.Options) (*run.Session, error) {
 	ro.Depend = m.depend
 	// tty blocks run in a terminal drawn in their card.
 	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
+	// Commands typed in the History pane run on a terminal.
+	if m.hist.open {
+		ro.PTY, ro.Environ = true, historyEnv(ro.Environ)
+	}
 	return run.NewSession(m.d, ro)
 }
 
@@ -448,6 +461,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case runDoneMsg:
 		m.running, m.active = false, -1
 		m.cancel()
+		if msg.hist != nil {
+			m.typedDone(msg.hist)
+		}
 		switch {
 		case errors.Is(msg.err, context.Canceled):
 			m.status = "stopped"
@@ -465,6 +481,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.status = was + " · " + m.status
 				}
 			}
+		}
+		// What ran may have changed the prompt, as cd does.
+		if m.hist.open {
+			m.askPrompt()
 		}
 		m.refresh()
 		return m, m.wait
@@ -547,6 +567,11 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.answer(k.String())
 		m.refresh()
 		return m, nil
+	}
+	if m.hist.focus {
+		cmd := m.histKey(k)
+		m.refresh()
+		return m, cmd
 	}
 	quitArmed, forceArm, reloadArmed := m.quitArmed, m.forceArm, m.reloadArmed
 	m.notice = ""
@@ -660,6 +685,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.toggle(&m.shown.HideOutput)
 	case "?":
 		m.openHelp()
+	case "h":
+		cmd := m.openHistory()
+		m.refresh()
+		return m, cmd
 	case "i", ":":
 		if m.running {
 			m.status = "a block is running; ctrl+c stops it"
@@ -983,7 +1012,7 @@ func (m *Model) start(all bool) {
 		} else {
 			_, err = m.sess.RunBlock(ctx, i)
 		}
-		m.events <- runDoneMsg{err}
+		m.events <- runDoneMsg{err: err}
 	}()
 }
 
@@ -1010,7 +1039,7 @@ func (m *Model) startSection() {
 	m.running, m.cancel, m.status = true, cancel, ""
 	m.skipSaved = false
 	go func() {
-		m.events <- runDoneMsg{m.sess.RunRange(ctx, from, to)}
+		m.events <- runDoneMsg{err: m.sess.RunRange(ctx, from, to)}
 	}()
 }
 
@@ -1179,7 +1208,7 @@ func (m *Model) resize(w, h int) {
 // vpHeight is the height left for the document, under the banner, if
 // one shows, and over the footer.
 func (m *Model) vpHeight() int {
-	h := m.height - footerLines
+	h := m.height - footerLines - m.histHeight()
 	if m.changed {
 		h--
 	}
@@ -1200,6 +1229,9 @@ func (m *Model) View() string {
 	} else if m.showOutline() {
 		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
 		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
+	}
+	if m.hist.open {
+		view += "\n" + m.histView()
 	}
 	view += "\n" + m.footer()
 	if m.changed {
@@ -1238,6 +1270,8 @@ func (m *Model) footer() string {
 	switch {
 	case m.helping:
 		help = helpStyle.Render("↑/↓ pick · enter do it · esc close")
+	case m.termBlock >= 0 && m.hist.running:
+		help = promptStyle.Render("The command runs in History:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.termBlock >= 0:
 		help = promptStyle.Render(m.name(m.d.Blocks[m.termBlock])+" runs in its card:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.typing:
@@ -1252,12 +1286,14 @@ func (m *Model) footer() string {
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", m.d.Label(m.prompt.of), m.d.Label(m.prompt.block)))
 	case m.prompt != nil:
 		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
+	case m.hist.focus:
+		help = helpStyle.Render("enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
 	case m.running:
 		help = helpStyle.Render("? keys · j/k move · ctrl+c stop")
 	case m.notice != "":
 		help = promptStyle.Render(m.notice)
 	default:
-		help = helpStyle.Render("? keys · j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
+		help = helpStyle.Render("? keys · j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · h history · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }
