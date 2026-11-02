@@ -1,5 +1,5 @@
 // Package fonts lists the font families installed on this computer, for
-// the Settings window's font menus.
+// the Settings tab's font menus.
 package fonts
 
 import (
