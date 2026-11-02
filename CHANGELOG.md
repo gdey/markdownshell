@@ -52,6 +52,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A Homebrew tap: `brew install gdey/tap/mdsh` installs the command line
+  with its completions on macOS and Linux, and
+  `brew install --cask gdey/tap/mdsh` the desktop app on macOS. A
+  workflow writes the formula and cask into `gdey/homebrew-tap` when a
+  release is published. Releases also carry a `.deb` and an `.rpm` for
+  `mdsh`.
 - `examples/` and `docs/`, and the folders in them, have a `.mdsh.yaml`,
   so mdsh-gui's start screen shows the examples tour and the design docs
   as collections, each with a title, description, icon and color.
