@@ -63,7 +63,70 @@
       <div id="source-editor"></div>
     </div>
     <div id="split-grip" title="Drag to resize; double-click to share evenly" role="separator" aria-orientation="vertical" aria-label="Width of the source view: drag, or press left and right" aria-valuemin="15" aria-valuemax="85" aria-valuenow="50" tabindex="0" hidden></div>
-    <div id="doc-scroll"><main id="doc"></main></div>
+    <div id="doc-scroll">
+      <div id="fm">
+        <div id="fm-sheet" inert aria-hidden="true">
+          <form id="fm-form" aria-labelledby="fm-heading" autocomplete="off">
+            <div class="fm-head">
+              <h2 id="fm-heading">Front matter</h2>
+              <p class="muted">Each change is written to the file as you make it; Undo takes it back.</p>
+            </div>
+            <fieldset id="fm-fields">
+              <div class="fm-col">
+                <section class="fm-group" aria-labelledby="fm-about">
+                  <h3 id="fm-about">About the file</h3>
+                  <label>Title <input id="fm-title-in" type="text"></label>
+                  <label><span id="fm-desc-label">Description</span> <textarea id="fm-desc" rows="2" placeholder="Shown under the file's name on the start screen"></textarea></label>
+                  <label>Tags <input id="fm-tags" type="text" spellcheck="false" placeholder="ops, deploy"></label>
+                </section>
+                <section class="fm-group" aria-labelledby="fm-env">
+                  <h3 id="fm-env">Environment <code>env:</code></h3>
+                  <fieldset class="fm-share">
+                    <legend>Variables shared from the caller</legend>
+                    <label class="check"><input type="radio" name="fm-share" value="all"> All of them</label>
+                    <label class="check"><input type="radio" name="fm-share" value="some"> Only these</label>
+                    <input id="fm-share-list" type="text" spellcheck="false" aria-label="Variables to share, separated by spaces" placeholder="HOME PATH (empty for none)">
+                  </fieldset>
+                  <label>Files sourced into every shell, one a line <textarea id="fm-source" rows="2" spellcheck="false" placeholder="~/.aliases"></textarea></label>
+                </section>
+              </div>
+              <div class="fm-col">
+                <section class="fm-group" aria-labelledby="fm-running">
+                  <h3 id="fm-running">Running <code>mdsh:</code></h3>
+                  <label>Shell <input id="fm-shell" type="text" list="fm-shells" spellcheck="false" placeholder="zsh with zsh blocks, else /bin/sh"></label>
+                  <datalist id="fm-shells"><option value="sh"></option><option value="zsh"></option><option value="bash"></option></datalist>
+                  <label>When a block fails
+                    <select id="fm-onerror"><option value="">Go on (default)</option><option value="continue">Go on</option><option value="stop">Stop the run</option></select>
+                  </label>
+                  <label>Placeholders
+                    <select id="fm-interp"><option value="">Filled in (default)</option><option value="on">Filled in</option><option value="off">Left as written</option></select>
+                  </label>
+                  <label>Stderr
+                    <select id="fm-stderr"><option value="">Shown for failed blocks (default)</option><option value="on">Always shown</option><option value="off">Never shown</option></select>
+                  </label>
+                  <label class="check"><input id="fm-step" type="checkbox"> Ask before every block (step)</label>
+                  <div class="fm-pair">
+                    <label>Terminal columns <input id="fm-cols" type="number" min="0" max="1000" placeholder="fit"></label>
+                    <label>Rows <input id="fm-rows" type="number" min="0" max="500" placeholder="24"></label>
+                  </div>
+                </section>
+                <section class="fm-group" aria-labelledby="fm-other-h">
+                  <h3 id="fm-other-h">Other keys</h3>
+                  <label>YAML, kept as written <textarea id="fm-other" class="code" rows="4" spellcheck="false" placeholder="author: me"></textarea></label>
+                </section>
+              </div>
+            </fieldset>
+            <p id="fm-error" class="error" role="alert" hidden></p>
+            <div class="buttons"><button type="button" id="fm-done">Done</button></div>
+          </form>
+        </div>
+        <button id="fm-toggle" type="button" title="Front matter (cmd/ctrl+shift+M)" aria-expanded="false" aria-controls="fm-sheet">
+          <span id="fm-toggle-text">Front matter</span>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.3 5.7 8 10.4l4.7-4.7 1.1 1.1L8 12.6 2.2 6.8z"/></svg>
+        </button>
+      </div>
+      <main id="doc"></main>
+    </div>
   </div>
   <section id="console" aria-label="Console" hidden>
     <div id="console-grip" title="Drag to resize" role="separator" aria-orientation="horizontal" aria-label="Height of the console: drag, or press up and down" aria-valuemin="48" aria-valuemax="2000" aria-valuenow="160" tabindex="0"></div>

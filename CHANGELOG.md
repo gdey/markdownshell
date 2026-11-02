@@ -8,6 +8,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui can view and edit a file's front matter from the rendered
+  view. The Front matter tab at the top of the page (or Edit › Front
+  Matter, cmd/ctrl+shift+M) slides the page down to show a form for the
+  title, description, tags, the `mdsh:` options and `env:`'s shared
+  variables and sourced files, with any other keys as YAML. Each change
+  is written to the file as one edit Undo takes back, rewriting only
+  the keys that changed.
+
+  ![The front matter form open above a runbook, with its title, tags, mdsh options, shared variables and other keys](docs/changelog/front-matter.png)
+
 - A `links` block attribute makes the web addresses in a block's output
   clickable: links in mdsh-gui's rendered view, OSC 8 hyperlinks in
   `mdsh -i`. Only `http:`, `https:` and `mailto:` addresses count, and

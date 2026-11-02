@@ -205,7 +205,7 @@
 [data-look="tty"] #doc > .block.dep-target { outline-color: var(--fg); }
 
 /* Inputs: typed onto the paper. */
-[data-look="tty"] :is(.textbox, .choice-select, input[type="text"], select) { border-color: var(--fg); }
+[data-look="tty"] :is(.textbox, .choice-select, input[type="text"], input[type="number"], #fm-form textarea, select) { border-color: var(--fg); }
 [data-look="tty"] .textbox:focus { outline-color: var(--fg); }
 
 /* Menus and dialogs sit on the paper with the same hard shadow. */

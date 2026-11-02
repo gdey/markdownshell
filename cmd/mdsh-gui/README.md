@@ -124,6 +124,20 @@ Each file opens in a tab of its own, with its own shells.
   the file runs in zsh, else `sh`. Turning History on starts the shells
   again, on a terminal, with `TERM=xterm-256color`, unless a `tty` block
   already did.
+- **Front matter:** the Front matter tab at the top of the rendered
+  view (or Edit › Front Matter, cmd/ctrl+shift+M) pulls the page down
+  to show a form for the file's front matter: its title, description
+  (or `summary` or `abstract`, whichever it has) and tags, the `mdsh:`
+  options (shell, on error, placeholders, stderr, step, terminal size)
+  and `env:`'s shared variables and sourced files. Keys the form has no
+  field for are edited as YAML under Other keys. A field is written to
+  the file as it changes, on leaving a text field or pressing enter, as
+  one edit that Undo takes back; only the keys that changed are
+  rewritten, so the rest keep their place and comments. Front matter
+  mdsh refuses, or Other keys that aren't YAML, are said under the form
+  and change nothing. Emptying every field takes the front matter out.
+  The tab, Done or escape puts the page back. A file without front
+  matter shows Add front matter instead.
 - **Editing** happens in the source view. The pencil (or `e`) on a block
   opens it with the cursor on the block's code, and clicking prose opens
   it on that text. New blocks are typed there too. Inside
