@@ -270,6 +270,10 @@ function draw() {
   const mr = main.getBoundingClientRect();
   const cardLeft = mr.left + parseFloat(style.paddingLeft) - left;
   const cardRight = mr.right - parseFloat(style.paddingRight) - left;
+  // The layers are sized to the page, so they mustn't hold it open: a
+  // window that got narrower would keep scrolling sideways to their old
+  // width.
+  for (const layer of [svg, ui]) layer.setAttribute("width", "0"), layer.setAttribute("height", "0");
   const width = scroll.scrollWidth;
   const height = scroll.scrollHeight;
   for (const layer of [svg, ui]) {

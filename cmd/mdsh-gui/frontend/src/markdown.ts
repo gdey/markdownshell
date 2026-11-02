@@ -127,7 +127,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
           }
           if (u.selectionSet || u.docChanged) opts.onCursor?.(u.state.doc.lineAt(u.state.selection.main.head).number);
         }),
-        EditorView.theme({ "&": { fontSize: "13px" }, ".cm-content": { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } }),
+        EditorView.theme({ "&": { fontSize: "calc(13px * var(--text-scale))" }, ".cm-content": { fontFamily: "var(--font-code)" } }),
       ],
     }),
   });

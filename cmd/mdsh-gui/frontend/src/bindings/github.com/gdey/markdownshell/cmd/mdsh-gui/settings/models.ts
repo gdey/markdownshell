@@ -39,6 +39,52 @@ export interface Settings {
     "theme": string;
 
     /**
+     * Look is "tty" for the Teletype look, paper in the light theme and
+     * phosphor in the dark; empty is the plain look.
+     */
+    "look": string;
+
+    /**
+     * TextSize is the text's size in percent, 80 to 150; 0 is the
+     * look's own (100 for plain, 115 for Teletype).
+     */
+    "textSize": number;
+
+    /**
+     * UIFont and CodeFont are font families for the interface and for
+     * code; empty is the look's own.
+     */
+    "uiFont": string;
+    "codeFont": string;
+
+    /**
+     * LineSpacing is "compact" or "relaxed"; empty is normal.
+     */
+    "lineSpacing": string;
+
+    /**
+     * NoSprockets, NoRules and NoShadows take the Teletype paper's
+     * sprocket strips, its line rules and the shadows under cards off.
+     */
+    "noSprockets": boolean;
+    "noRules": boolean;
+    "noShadows": boolean;
+
+    /**
+     * Accent is a #rrggbb color for links, run buttons and selection;
+     * empty is the look's own.
+     */
+    "accent": string;
+
+    /**
+     * HistoryPane is the History pane's colors: "match" the window,
+     * "invert" them (light under a dark window, dark under a light one)
+     * or "dark" always. Empty is the look's own: dark for plain, match
+     * for Teletype.
+     */
+    "historyPane": string;
+
+    /**
      * Shell, if set, overrides the front matter's shell for every file.
      */
     "shell": string;

@@ -4,10 +4,9 @@
 
 import { Terminal } from "@xterm/xterm";
 import { App } from "./api.js";
+import { codeFont, textSize } from "./theme.js";
 
 const defaultRows = 24;
-const fontSize = 13;
-const fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 let term: Terminal | null = null;
 let block = -1;
@@ -43,7 +42,7 @@ function cols(): number {
   const card = document.querySelector<HTMLElement>(".block") ?? document.getElementById("doc");
   const ctx = document.createElement("canvas").getContext("2d");
   if (!card || !ctx) return 80;
-  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.font = `${textSize(13)}px ${codeFont()}`;
   const cell = ctx.measureText("W").width || 8;
   // The card's border, the output's padding and the pane's, and a cell
   // to spare for rounding.
@@ -63,6 +62,14 @@ function colors(): Record<string, string> {
   return { background: v("--term-bg", "#1e1e1e"), foreground: v("--term-fg", "#d4d4d4"), cursor: v("--term-fg", "#d4d4d4") };
 }
 
+// The look changed: a terminal that is open takes its colors and font.
+window.addEventListener("mdsh-look", () => {
+  if (!term) return;
+  term.options.theme = colors();
+  term.options.fontFamily = codeFont();
+  term.options.fontSize = textSize(13);
+});
+
 // openTerminal shows the pane in block i's card, and focuses it.
 export function openTerminal(i: number) {
   closeTerminal();
@@ -73,7 +80,7 @@ export function openTerminal(i: number) {
   host.className = "terminal";
   out.replaceChildren(host);
   block = i;
-  term = new Terminal({ cols: cols(), rows: rows(), fontSize, fontFamily, cursorBlink: true, theme: colors(), scrollback: 1000 });
+  term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: true, theme: colors(), scrollback: 1000 });
   term.open(host);
   term.onData(typeKeys);
   term.focus();
