@@ -581,6 +581,8 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #console-log .jump .where { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 #console-empty { position: absolute; top: 28px; left: 8px; margin: 0; font-size: calc(12px * var(--text-scale)); pointer-events: none; }
 #console-toggle { position: relative; }
+/* A setting that's still being tried out, such as the Neovim pane. */
+.experimental { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--warn-border); border-radius: 999px; background: var(--warn-bg); color: var(--fg); font-size: calc(10px * var(--text-scale)); font-weight: 600; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; vertical-align: 1px; }
 #console-toggle .badge { position: absolute; top: -3px; right: -4px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; background: var(--bad); color: #fff; font-size: calc(10px * var(--text-scale)); line-height: 14px; text-align: center; }
 
 /* A window: the tab bar, and the tab in front under it. */

@@ -237,7 +237,8 @@ follow [Semantic Versioning](https://semver.org/).
   back. A history block that moves, by dragging or with alt+↑/↓, becomes
   an ordinary block with an id of its own, `block-<uuid>`, and its
   output's `for=` and anything else that named it follow.
-
+- `mdsh-gui`: Settings marks "Use Neovim for the source pane" with an
+  Experimental badge, as the pane still has rough edges.
 - `mdsh-gui`: windows open bigger: 1280×900 for a file and 720×720 for
   Settings, so the Settings tabs fit without scrolling. A window that
   wouldn't fit the screen is cut down to fit.
