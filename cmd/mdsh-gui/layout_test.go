@@ -95,3 +95,30 @@ func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
 		}
 	}
 }
+
+// A running block's output comes in while the card is on screen.
+// WebKitGTK doesn't restyle a :has() rule that tests :empty as children
+// are added, so `.output-part:has(> .output:empty)` kept the output
+// hidden until the run ended and the card was drawn again. The part
+// carries an empty class instead, which setOutput keeps up to date.
+func TestOutputPartHidesByClassNotHasEmpty(t *testing.T) {
+	for _, file := range []string{"style.css", "blueprint.css", "teletype.css"} {
+		for sel := range cssProps(t, "frontend/"+file) {
+			if strings.Contains(sel, ":has(") && strings.Contains(sel, ":empty") {
+				t.Errorf("%s: %q tests :empty inside :has(), which WebKit doesn't update as content comes in; toggle a class instead", file, sel)
+			}
+		}
+	}
+	if !cssProps(t, "frontend/style.css")[".block .output-part.empty"]["display"] {
+		t.Error("style.css: .block .output-part.empty doesn't hide the empty output part")
+	}
+	for _, file := range []string{"app.ts", "terminal.ts"} {
+		src, err := os.ReadFile("frontend/src/" + file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(src), "out.replaceChildren(") {
+			t.Errorf("%s: a block's output is replaced without setOutput, so its part's empty class goes stale", file)
+		}
+	}
+}

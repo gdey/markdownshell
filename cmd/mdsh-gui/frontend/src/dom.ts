@@ -93,3 +93,19 @@ export function keyActivates(e: KeyboardEvent): boolean {
   e.preventDefault();
   return true;
 }
+
+// setOutput puts nodes in a block's output, out, and hides the output's
+// part while that leaves it empty.
+export function setOutput(out: HTMLElement, ...nodes: (Node | string)[]) {
+  out.replaceChildren(...nodes);
+  markOutput(out);
+}
+
+// markOutput hides the part holding a block's output, out, while out is
+// empty. This was `.output-part:has(> .output:empty)`, but WebKitGTK
+// doesn't look at that rule again as a running block's output comes in,
+// so the output stayed hidden until the run ended and the card was drawn
+// again.
+export function markOutput(out: HTMLElement) {
+  out.parentElement?.classList.toggle("empty", !out.hasChildNodes());
+}

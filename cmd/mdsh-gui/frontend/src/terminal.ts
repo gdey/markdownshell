@@ -4,6 +4,7 @@
 
 import { Terminal } from "@xterm/xterm";
 import { App } from "./api.js";
+import { setOutput } from "./dom.js";
 import { codeFont, textSize } from "./theme.js";
 
 const defaultRows = 24;
@@ -78,7 +79,7 @@ export function openTerminal(i: number) {
   if (!card || !out) return;
   const host = document.createElement("div");
   host.className = "terminal";
-  out.replaceChildren(host);
+  setOutput(out, host);
   block = i;
   // screenReaderMode has xterm read out what the block writes.
   term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: !matchMedia("(prefers-reduced-motion: reduce)").matches, theme: colors(), scrollback: 1000, screenReaderMode: true });
