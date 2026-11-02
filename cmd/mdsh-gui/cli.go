@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/gdey/markdownshell/ui"
 )
 
 // The app carries the mdsh command line tool: mdsh.app has it beside
@@ -20,32 +22,7 @@ import (
 // docs/design/cli-in-app.md.
 
 // CLI is where the command line tool stands, for Settings › Shell.
-type CLI struct {
-	// Bundled is the mdsh this app carries, or "" when this build
-	// carries none (go run, go install, a .deb, Windows).
-	Bundled string `json:"bundled"`
-	// Link is where Install puts it.
-	Link string `json:"link"`
-	// Copy is whether Install copies Bundled to Link (an AppImage)
-	// rather than linking to it (macOS).
-	Copy bool `json:"copy"`
-	// Installed is whether Link is this app's: a symlink to Bundled, or
-	// a copy with the marker beside it.
-	Installed bool `json:"installed"`
-	// Broken is where Link points when it's a symlink into an mdsh.app
-	// that isn't this one, such as after the app moved.
-	Broken string `json:"broken"`
-	// Linked is another mdsh on PATH that is this app's, such as the
-	// Homebrew cask's link, which comes first on PATH.
-	Linked string `json:"linked"`
-	// Other is an mdsh on PATH that isn't this app's, such as the
-	// formula's. Install won't put a second one beside it.
-	Other string `json:"other"`
-	// InPath is whether Link's folder is on PATH.
-	InPath bool `json:"inPath"`
-	// Home is for showing paths as ~/….
-	Home string `json:"home"`
-}
+type CLI = ui.CLI
 
 // cliHost is what the CLI's install needs to know about the platform,
 // so the logic can be tested anywhere.
@@ -270,22 +247,22 @@ func envPathDirs() []string {
 }
 
 // CLIState says where the command line tool stands.
-func (a *App) CLIState() CLI {
-	return a.cli.state()
+func (g *gui) CLIState() CLI {
+	return g.cli.state()
 }
 
 // InstallCLI puts the command line tool on PATH, and returns where it
 // stands after.
-func (a *App) InstallCLI() (CLI, error) {
-	err := a.cli.install()
-	a.updateCLIMenu()
-	return a.cli.state(), err
+func (g *gui) InstallCLI() (CLI, error) {
+	err := g.cli.install()
+	g.updateCLIMenu()
+	return g.cli.state(), err
 }
 
 // UninstallCLI takes the command line tool off PATH, when it's this
 // app's, and returns where it stands after.
-func (a *App) UninstallCLI() (CLI, error) {
-	err := a.cli.uninstall()
-	a.updateCLIMenu()
-	return a.cli.state(), err
+func (g *gui) UninstallCLI() (CLI, error) {
+	err := g.cli.uninstall()
+	g.updateCLIMenu()
+	return g.cli.state(), err
 }

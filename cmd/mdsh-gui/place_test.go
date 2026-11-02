@@ -7,6 +7,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/ui"
 )
 
 func TestFit(t *testing.T) {
@@ -65,7 +66,8 @@ func TestPlaceFor(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	a := &App{settings: st}
+	a := &gui{}
+	a.ctrl = ui.ControlOf(ui.New(a, st, "", "", ""))
 	screen := []application.Rect{{X: 0, Y: 25, Width: 1440, Height: 875}}
 	def := settings.Place{Width: 1280, Height: 787}
 	// Off the screens, a window that goes back where it was opens

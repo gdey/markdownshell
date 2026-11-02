@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -30,11 +31,12 @@ import (
 	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/settings"
 	"github.com/gdey/markdownshell/trust"
+	"github.com/gdey/markdownshell/ui"
 	"github.com/gdey/markdownshell/web"
 )
 
 // The frontend is the web package: TypeScript in web/src, bundled into
-// web/bundle. The bindings in web/src/bindings are generated from App.
+// web/bundle. The bindings in web/src/bindings are generated from ui.App.
 //
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d ../../web/src/bindings
 //go:generate go run ./internal/build
@@ -154,16 +156,24 @@ func mdshGUI(o options) error {
 		args = nil
 	}
 	cwd, _ := os.Getwd()
+	g := &gui{cli: newCLIHost()}
+	a := ui.New(g, store, cwd, dir, o.source)
+	g.ctrl = ui.ControlOf(a)
+	g.ctrl.SetBuild(thisBuild())
+	g.ctrl.SetTrust(trust.OpenDefault())
+	// The Neovim pane's language server is this program, run with --lsp.
+	if exe, err := os.Executable(); err == nil {
+		g.ctrl.SetLSP(func(file string) []string { return []string{exe, "--lsp", file} })
+	}
 	// What Wails and the app log goes to the Console pane, as well as
 	// where Wails would send it.
-	cons := newConsole()
-	logger := slog.New(newConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
+	cons := g.ctrl.Console()
+	logger := slog.New(ui.NewConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
 	slog.SetDefault(logger)
-	a := &App{console: cons, settings: store, trust: trust.OpenDefault(), cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}, cli: newCLIHost()}
 	// A link left by a moved app is pointed back here, and an
 	// AppImage's copy brought up to this version, quietly.
 	go func() {
-		if err := a.cli.repair(); err != nil {
+		if err := g.cli.repair(); err != nil {
 			slog.Warn("updating the mdsh command line tool", "err", err)
 		}
 	}()
@@ -171,42 +181,40 @@ func mdshGUI(o options) error {
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(web.FS)), Middleware: tabCalls},
+		Assets:      application.AssetOptions{Handler: withIcon(g.ctrl.Assets(application.AssetFileServerFS(web.FS))), Middleware: ui.TabCalls},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		ShouldQuit: a.shouldQuit,
+		ShouldQuit: g.ctrl.ShouldQuit,
 		Logger:     logger,
 	})
-	a.app = app
+	g.app = app
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		a.started.Store(true)
-		go a.systemOpensReady()
-		go cons.send(app.Context(), func(e ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
+		g.started.Store(true)
+		go g.ctrl.SystemOpensReady()
+		go cons.Send(app.Context(), func(e ui.ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
 	})
 	// Finder's Open With, a double click on a file mdsh is the default
 	// for, or a file dropped on the Dock icon arrives here, not in
 	// os.Args.
 	app.Event.OnApplicationEvent(events.Common.ApplicationOpenedWithFile, func(e *application.ApplicationEvent) {
-		a.openFromSystem(e.Context().Filename())
+		g.ctrl.OpenFromSystem(e.Context().Filename())
 	})
-	a.menu = a.buildMenu()
-	a.buildSourceMenu()
-	a.buildLinkMenu()
-	a.buildCastMenu()
+	g.menu = g.buildMenu()
+	g.buildSourceMenu()
+	g.buildLinkMenu()
+	g.buildCastMenu()
 	if runtime.GOOS == "darwin" {
-		app.Menu.Set(a.menu)
+		app.Menu.Set(g.menu)
 	}
 
-	t := a.newTab()
+	file, run := "", o.run
 	if len(args) > 0 {
-		ro := a.runOptions()
-		ro.Args, ro.Only, ro.Step, ro.StopOnError = o.run.Args, o.run.Only, o.run.Step, o.run.StopOnError
-		if err := t.open(args[0], ro); err != nil {
-			return err
-		}
+		file, run.Args = args[0], args[1:]
 	}
-	a.newWindow(t)
+	if err := g.ctrl.Start(file, run); err != nil {
+		return err
+	}
 	return app.Run()
 }
 
@@ -223,4 +231,16 @@ func argDir(args []string) (string, error) {
 		return "", errors.New("arguments after a folder are only for a file")
 	}
 	return filepath.Abs(args[0])
+}
+
+// withIcon serves the app icon at /appicon.svg, for the About tab, and
+// everything else with next.
+func withIcon(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/appicon.svg" {
+			http.ServeFileFS(w, r, appicon, "build/appicon.svg")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

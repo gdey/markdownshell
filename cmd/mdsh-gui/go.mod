@@ -6,7 +6,6 @@ require (
 	github.com/evanw/esbuild v0.28.2
 	github.com/gdey/markdownshell v0.0.0
 	github.com/wailsapp/wails/v3 v3.0.0
-	github.com/yuin/goldmark v1.7.17
 )
 
 require (
@@ -35,6 +34,7 @@ require (
 	github.com/neovim/go-client v1.2.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
+	github.com/yuin/goldmark v1.7.17 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
