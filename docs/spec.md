@@ -164,9 +164,9 @@ v1 ships on `sh` plus a few markdown helpers.
 - `out=markdown` puts a block's output into the document as raw markdown, so a script can print a table or a list that renders.
 - Each shell starts with helper functions: `md_h1`, `md_h2`, `md_h3` (headings), `md_table [-F SEP] [-s N]` (tab-separated lines on stdin, or split on SEP as `awk -F` does; the first line after skipping N is the header) and `md_code LANG` (stdin as a fenced block). They are plain shell functions, so blocks stay valid `sh`.
 
-## Control socket and audit log (planned)
+## Control socket and audit log (partly built)
 
-Not built yet. This section sets the rules before any code is written.
+Built so far: the socket on macOS and Linux, `$MDSH_SOCK` and `$MDSH_TOKEN`, the protocol, and `mdsh ctl set`, `unset`, `get` and `status`. Not built yet: `check`, `uncheck`, `ask` and `confirm`, the named pipe on Windows (blocks there run without `$MDSH_SOCK`, so `mdsh ctl` exits 3), placeholders reading variables that `set` made, status on the TUI and GUI cards, and the audit log.
 
 A block can talk back to the run that started it with `mdsh ctl`: set variables for later blocks, tick tasks, ask the user a question, and report progress. Every run also writes an audit log of what happened, socket calls included, so a run that `ctl` changed can be reviewed afterwards.
 
@@ -242,11 +242,13 @@ mdsh handles calls one at a time, in the order they arrive, so calls from backgr
 
 `--secret` values never appear in the log. Where a value would go, the log stores `{"secret":true,"hmac":"…"}`, an HMAC-SHA-256 keyed with a random key for each run. So you can tell whether two secret values in one run were the same, but a short secret can't be guessed from the log. Answers to `ask --secret` are treated the same way.
 
-**Open questions.**
+**Open questions, with the answers taken for now.**
 
-- Should `check` also reach tasks in a block's `out=markdown` output, as clicks in mdsh-gui can?
-- Should `set` on a name an input binds update the input, instead of being refused?
-- Does the audit log need its own viewer in mdsh-gui, or is a file enough for now?
+- Should `check` also reach tasks in a block's `out=markdown` output, as clicks in mdsh-gui can? *For now, no:* `check` reaches tasks in the file only. Output is rewritten on the next run, so a tick there is lost, and a block can print its output ticked in the first place.
+- Should `set` on a name an input binds update the input, instead of being refused? *For now, no:* it is refused with code 2, as above. Changing an input changes the file's prose, which `ctl` otherwise can't do.
+- Does the audit log need its own viewer in mdsh-gui, or is a file enough for now? *For now, a file:* `--audit FILE`, and Save in the GUI. JSON Lines reads with `jq`.
+
+**Built details.** The socket is `ctl.sock` in a directory made by `mkdtemp` with mode 0700; the socket itself is 0600. On Linux and macOS mdsh also checks the caller's user ID (`SO_PEERCRED`, `LOCAL_PEERCRED`) and refuses another user's call. A request line may be at most 1 MiB and must arrive within 10 seconds of connecting. `unset` on a name that `set` didn't make does nothing and exits 0. `get` on a name nothing set prints an empty line.
 
 ## Go architecture
 
@@ -283,7 +285,7 @@ Settled on 2026-10-27.
 - **Placeholders:** `{{#block/env(VAR)}}` in prose, on by default, `interpolate: false` to turn off.
 - **Output copies:** an `output {for=id}` fence or region that isn't right after block `id` is refilled from it on every run, like a placeholder. Settled on 2026-10-29.
 - **Includes:** a block marked `<include` with `file=`, `from=`, `to=` (1-based, inclusive) and `number_on`; mdsh writes the lines into the block's body, and the fence's language is the language. Include blocks never run and have no name.
-- **Control socket:** blocks talk back to the run with `mdsh ctl` over a socket in `$MDSH_SOCK`, limited to vars, tasks, questions and status; every run can write a JSON Lines audit log. Settled on 2026-10-31; not built yet.
+- **Control socket:** blocks talk back to the run with `mdsh ctl` over a socket in `$MDSH_SOCK`, limited to vars, tasks, questions and status; every run can write a JSON Lines audit log. Settled on 2026-10-31; the socket and `set`, `unset`, `get` and `status` are built.
 
 ## Collections
 
