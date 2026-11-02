@@ -3,6 +3,7 @@ package main
 import (
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -19,6 +20,8 @@ type docWindow struct {
 	tabs    []*docTab
 	active  *docTab
 	closing bool // its tabs may close: the window goes once they have
+
+	placeTimer *time.Timer // saves where the window is, after a move
 }
 
 // Tabs is what a window's tab bar shows.
@@ -109,6 +112,7 @@ func (w *docWindow) activeTab() *docTab {
 // closingHook closes the window's tabs first, asking about unsaved
 // output in each, and lets the window close once none are left.
 func (w *docWindow) closingHook(e *application.WindowEvent) {
+	w.flushPlace()
 	w.app.mu.Lock()
 	closing := w.closing || w.app.quitting
 	tabs, _ := w.tabsLocked()
@@ -161,6 +165,8 @@ func (w *docWindow) dropped(e *application.WindowEvent) {
 func (w *docWindow) hook() {
 	w.win.RegisterHook(events.Common.WindowClosing, w.closingHook)
 	w.win.OnWindowEvent(events.Common.WindowFilesDropped, w.dropped)
+	w.win.OnWindowEvent(events.Common.WindowDidResize, w.moved)
+	w.win.OnWindowEvent(events.Common.WindowDidMove, w.moved)
 	w.win.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) {
 		if t := w.activeTab(); t != nil {
 			t.mu.Lock()

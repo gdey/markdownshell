@@ -36,6 +36,12 @@ Each file opens in a tab of its own, with its own shells.
   (cmd/ctrl+W, the ×, or a middle click) closes it, and the window goes
   with its last tab. View › Show Next Tab and Show Previous Tab
   (cmd/ctrl+shift+] and [) move between them.
+- **Window sizes:** a file that opens in a window of its own, or in a
+  window showing only the start screen, gets the size its window had
+  last, and on macOS and Windows its place too. Opening it in a tab
+  beside others leaves the window as it is. The Settings window keeps
+  its size too. These are kept in the settings file, not in the
+  markdown.
 - **File:** New File… (cmd/ctrl+N, or New File… on the start screen)
   offers the templates in the templates folder from Settings, if one
   is set, then asks where to save the file and opens it. Without a

@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a file opens in a window the size its window was last,
+  and on macOS and Windows in the same place, when it opens in a window
+  of its own. Opened in a tab beside others, it leaves the window's
+  size alone. The Settings window remembers its size as well. Both are
+  kept in `gui.json`, not in the file.
 - `mdsh-gui`: dragging a dependency line over a folded section's heading
   opens the section for the moment, so a block in it can be dropped on.
   It folds again when the line leaves it; dropping on a block in it
@@ -187,6 +192,9 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `mdsh-gui`: windows open bigger: 1280×900 for a file and 720×720 for
+  Settings, so the Settings tabs fit without scrolling. A window that
+  wouldn't fit the screen is cut down to fit.
 - `mdsh-gui`'s outline marks what each entry is: an H for a heading, a
   run icon for a block, and, in purple, a textbox or choice icon for a
   control. A block's name shows its underscores as spaces, so `make_db`
