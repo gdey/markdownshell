@@ -485,7 +485,7 @@ func TestMode(t *testing.T) {
 
 // TestPDFExamples checks that the examples still lay out as PDFs.
 func TestPDFExamples(t *testing.T) {
-	for _, name := range []string{"hello.md", "include.md", "report.md", "terminal.md"} {
+	for _, name := range []string{"README.md", "hello.md", "include.md", "guardrails.md", "inputs.md", "history.md", "report.md", "terminal.md"} {
 		t.Run(name, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), "out.pdf")
 			run := "--yes"

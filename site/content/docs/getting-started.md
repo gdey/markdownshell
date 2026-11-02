@@ -65,6 +65,11 @@ hello from Linux
 
 Run it again and mdsh replaces that output instead of adding more.
 
+From here, the
+[examples tutorial](https://github.com/gdey/markdownshell/blob/main/examples/README.md)
+walks through what a document can do, one example at a time, and the
+pages in this section go into each part.
+
 ## Shell completion
 
 Completion covers flags, `.md` files and, after `--only`, the file's block
