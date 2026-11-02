@@ -5,11 +5,7 @@ go 1.27
 require (
 	github.com/evanw/esbuild v0.28.2
 	github.com/gdey/markdownshell v0.0.0
-	github.com/neovim/go-client v1.2.1
 	github.com/wailsapp/wails/v3 v3.0.0
-	github.com/yuin/goldmark v1.7.17
-	gopkg.in/yaml.v3 v3.0.1
-	oss.terrastruct.com/d2 v0.7.2
 )
 
 require (
@@ -34,8 +30,10 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mazznoer/csscolorparser v0.1.5 // indirect
+	github.com/neovim/go-client v1.2.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
+	github.com/yuin/goldmark v1.7.17 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
@@ -44,6 +42,8 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+	oss.terrastruct.com/d2 v0.7.2 // indirect
 	oss.terrastruct.com/util-go v0.0.0-20250213174338-243d8661088a // indirect
 )
 

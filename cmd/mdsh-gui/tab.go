@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
+	"github.com/gdey/markdownshell/notebook"
+	"github.com/gdey/markdownshell/nvim"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/writable"
 )

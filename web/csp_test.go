@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"crypto/sha256"
@@ -19,12 +19,12 @@ var (
 // the network, so an image or link in a document can't reach a server
 // when it is drawn, and lets in its own inline scripts by hash.
 func TestPagesCSP(t *testing.T) {
-	pages, err := fs.Glob(frontend, "frontend/*.html")
+	pages, err := fs.Glob(FS, "*.html")
 	if err != nil || len(pages) < 3 {
 		t.Fatalf("pages: %v %v", pages, err)
 	}
 	for _, page := range pages {
-		b, err := fs.ReadFile(frontend, page)
+		b, err := fs.ReadFile(FS, page)
 		if err != nil {
 			t.Fatal(err)
 		}

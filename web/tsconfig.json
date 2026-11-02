@@ -1,5 +1,5 @@
 {
-  "//": "For type checking only (tsc --noEmit); internal/build bundles with esbuild.",
+  "//": "For type checking only (tsc --noEmit); cmd/mdsh-gui/internal/build bundles with esbuild.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

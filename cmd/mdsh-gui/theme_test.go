@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/settings"
 )
 
 var (
@@ -73,7 +73,7 @@ var lookAttr = regexp.MustCompile(`data-look="(\w+)"`)
 // window as for the History pane. And a look's own tokens (--tty-*,
 // --bp-*) must be set in its dark palette as well as its light one.
 func TestLookTokens(t *testing.T) {
-	plain := cssVars(t, "frontend/style.css", palette)
+	plain := cssVars(t, "../../web/style.css", palette)
 	if len(plain["light"]) < 40 || len(plain["dark"]) < 40 {
 		t.Fatalf("found %d light and %d dark tokens in style.css; is the parse right?", len(plain["light"]), len(plain["dark"]))
 	}
@@ -93,8 +93,8 @@ func TestLookTokens(t *testing.T) {
 	}
 	paneCovers("plain", plain, "")
 	for _, look := range []struct{ name, attr, file, own string }{
-		{"Teletype", "tty", "frontend/teletype.css", "--tty-"},
-		{"Blueprint", "blueprint", "frontend/blueprint.css", "--bp-"},
+		{"Teletype", "tty", "../../web/teletype.css", "--tty-"},
+		{"Blueprint", "blueprint", "../../web/blueprint.css", "--bp-"},
 	} {
 		sets := cssVars(t, look.file, palette)
 		prefix := look.attr + " "

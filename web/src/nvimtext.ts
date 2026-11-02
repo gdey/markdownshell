@@ -6,7 +6,7 @@ import { EditorState, Text } from "@codemirror/state";
 
 import { diff } from "./sync.js";
 
-import type { Edit } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/nvim/models.js";
+import type { Edit } from "./bindings/github.com/gdey/markdownshell/nvim/models.js";
 
 const utf8 = new TextEncoder();
 
