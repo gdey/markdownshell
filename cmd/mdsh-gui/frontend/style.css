@@ -733,3 +733,42 @@ body.shell { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* The front matter sheet, over the rendered view's page. The tab at the
+   top pulls the page down to show it: the sheet's row grows from
+   nothing to its height, so the page slides down under it, and the tab
+   rides on its bottom edge like a blind's pull. */
+#fm { max-width: 860px; margin: 0 auto; padding: 0 16px 0 28px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
+#fm-sheet { display: grid; grid-template-rows: 0fr; width: 100%; transition: grid-template-rows 0.22s ease; }
+#fm-sheet.open { grid-template-rows: 1fr; }
+#fm-sheet > form { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s 0.22s; }
+#fm-sheet.open > form { visibility: visible; transition: none; }
+@media (prefers-reduced-motion: reduce) { #fm-sheet, #fm-sheet > form { transition: none; } }
+#fm-form { box-sizing: border-box; }
+#fm-form .fm-head { padding: 18px 0 0; }
+#fm-form h2 { margin: 0; font-size: calc(17px * var(--text-scale)); }
+#fm-form .fm-head p { margin: 2px 0 0; font-size: calc(12px * var(--text-scale)); }
+#fm-fields { border: 0; padding: 0; margin: 4px 0 0; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 28px; }
+#fm-fields:disabled { opacity: 0.6; }
+.fm-col, .fm-group { min-width: 0; }
+#fm-form label { margin: 8px 0; }
+.fm-group h3 { margin: 16px 0 0; font-size: calc(12px * var(--text-scale)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.fm-group h3 code { text-transform: none; letter-spacing: 0; font-weight: 400; }
+#fm-form label input[type="number"], #fm-form label textarea, #fm-share-list { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
+#fm-form textarea { resize: vertical; line-height: 1.4; }
+#fm-form :is(textarea.code, #fm-share-list, #fm-source, #fm-shell, #fm-tags) { font-family: var(--font-code); font-size: calc(12px * var(--text-scale)); }
+#fm-form label.check { margin: 10px 0; }
+.fm-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fm-pair label { margin: 4px 0 10px; }
+.fm-share { border: 0; padding: 0; margin: 10px 0; min-width: 0; font-size: calc(13px * var(--text-scale)); }
+.fm-share legend { padding: 0; }
+.fm-share label.check { display: inline-flex; margin: 6px 16px 2px 0; }
+#fm-form .error { margin: 8px 0 0; font-size: calc(13px * var(--text-scale)); white-space: pre-wrap; }
+#fm-form .buttons { margin: 8px 0 14px; }
+#fm-toggle { display: inline-flex; gap: 4px; align-items: center; margin-top: -1px; padding: 2px 12px 3px; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 8px 8px; background: var(--bg); color: var(--muted); font-size: calc(12px * var(--text-scale)); }
+#fm-toggle:hover { color: var(--fg); background: var(--hover); }
+#fm-toggle svg { width: 11px; height: 11px; fill: currentColor; transition: transform 0.22s ease; }
+#fm-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+#fm-sheet.open + #fm-toggle { color: var(--fg); }
+#fm:has(#fm-sheet.open) { border-bottom: 1px solid var(--border); background: var(--code-bg); max-width: none; padding: 0 max(16px, calc((100% - 860px) / 2 + 16px)) 0 max(28px, calc((100% - 860px) / 2 + 28px)); }
+#fm:has(#fm-sheet.open) #fm-toggle { margin-bottom: -1px; transform: translateY(100%); background: var(--code-bg); }

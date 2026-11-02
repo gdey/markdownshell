@@ -257,6 +257,60 @@ export interface Fold {
 }
 
 /**
+ * FrontMatter is the document's front matter as the rendered view's form
+ * edits it: the keys mdsh and the start screen read, each in a field of
+ * its own, and the rest as YAML.
+ */
+export interface FrontMatter {
+    /**
+     * Exists is whether the file has front matter at all.
+     */
+    "exists": boolean;
+    "title": string;
+
+    /**
+     * Description is the first of description, summary and abstract
+     * the file has, the start screen's description; DescriptionKey is
+     * which, or description when it has none.
+     */
+    "description": string;
+    "descriptionKey": string;
+    "tags": string[] | null;
+
+    /**
+     * The rest are under mdsh:, as doc.Options reads them.
+     */
+    "shell": string;
+
+    /**
+     * "", "continue" or "stop"
+     */
+    "onError": string;
+    "step": boolean;
+
+    /**
+     * Interpolate and ShowStderr are "" when unset, else "on" or "off".
+     */
+    "interpolate": string;
+    "showStderr": string;
+    "cols": number;
+    "rows": number;
+
+    /**
+     * ShareAll is env.share left out, which shares every variable;
+     * otherwise Share lists those shared, maybe none.
+     */
+    "shareAll": boolean;
+    "share": string[] | null;
+    "source": string[] | null;
+
+    /**
+     * Other is the other top-level keys, as YAML, in the file's order.
+     */
+    "other": string;
+}
+
+/**
  * Move is a block move, planned or done.
  */
 export interface Move {

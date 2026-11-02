@@ -10,6 +10,7 @@ import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBeh
 import { folderGear, initFolders } from "./folders.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
+import { busyFrontMatter, frontMatterOpen, initFrontMatter, loadFrontMatter, showFrontMatter } from "./frontmatter.js";
 import { linkify } from "./links.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { consoleFile, initConsole, showConsole } from "./console.js";
@@ -96,6 +97,7 @@ async function refresh() {
   drawOptions();
   cells = (await App.Cells()) ?? [];
   drawDoc();
+  await loadFrontMatter();
   if (doc.fresh) openView();
   if (doc.running && !ranHere) await catchUp();
   known = await names();
@@ -1094,6 +1096,7 @@ function busy(on: boolean) {
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   runAllButton();
   historyBusy(on);
+  busyFrontMatter(on);
   for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run, .heading-cell .run-section")) x.disabled = on;
 }
 
@@ -2141,6 +2144,12 @@ const actions: Record<string, () => Promise<void> | void> = {
   moveblockup: () => void moveAction(-1, true),
   moveblockdown: () => void moveAction(1, true),
   depends: () => openDepends(),
+  // Edit › Front Matter opens the sheet, in the rendered view.
+  frontmatter() {
+    if (!doc.file) return;
+    if (!view.rendered) toggle("rendered", true);
+    return showFrontMatter(!frontMatterOpen(), true);
+  },
   history: () => toggle("history"),
   // A session already open in this tab: show History and type there.
   "history-open"() {
@@ -3203,6 +3212,7 @@ initHistory({
     await refresh();
   },
 });
+initFrontMatter({ edit });
 initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line) });
 initReport({
   dirty: () => !$("dirty").hidden,

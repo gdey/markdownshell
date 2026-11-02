@@ -766,6 +766,28 @@ func (a *App) SetDepends(ctx context.Context, i int, deps []int) error {
 	return err
 }
 
+// FrontMatter reads the file's front matter for the rendered view's
+// front matter form.
+func (a *App) FrontMatter(ctx context.Context) (notebook.FrontMatter, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.FrontMatter{}, err
+	}
+	return n.FrontMatter()
+}
+
+// SetFrontMatter writes the front matter form's fields to the file,
+// changing only the keys whose field changed. Undo takes it back.
+func (a *App) SetFrontMatter(ctx context.Context, f notebook.FrontMatter) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetFrontMatter(f)
+	t.changed()
+	return err
+}
+
 // SetTextbox replaces the text of textbox block i, as typed in it.
 func (a *App) SetTextbox(ctx context.Context, i int, text string) error {
 	t, n, err := a.notebook(ctx)

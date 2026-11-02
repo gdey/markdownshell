@@ -208,6 +208,14 @@ export function FolderSettings(rel: string): $CancellablePromise<$models.FolderF
 }
 
 /**
+ * FrontMatter reads the file's front matter for the rendered view's
+ * front matter form.
+ */
+export function FrontMatter(): $CancellablePromise<notebook$0.FrontMatter> {
+    return $Call.ByName("main.App.FrontMatter");
+}
+
+/**
  * HasOutput reports whether the file has output for ClearOutputs to
  * take out, so Clear All Outputs is only offered when it would do
  * something.
@@ -569,6 +577,14 @@ export function SetFolderSettings(rel: string, s: collection$0.Settings): $Cance
  */
 export function SetFolds(folds: notebook$0.Fold[] | null): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetFolds", folds);
+}
+
+/**
+ * SetFrontMatter writes the front matter form's fields to the file,
+ * changing only the keys whose field changed. Undo takes it back.
+ */
+export function SetFrontMatter(f: notebook$0.FrontMatter): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetFrontMatter", f);
 }
 
 /**

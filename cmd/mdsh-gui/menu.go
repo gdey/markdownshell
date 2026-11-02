@@ -159,6 +159,7 @@ func (a *App) buildMenu() *application.Menu {
 	edit.Add("Move Block Above Previous Block").SetAccelerator("Alt+Shift+Up").OnClick(send("moveblockup"))
 	edit.Add("Move Block Below Next Block").SetAccelerator("Alt+Shift+Down").OnClick(send("moveblockdown"))
 	edit.Add("Depends On…").OnClick(send("depends"))
+	edit.Add("Front Matter").SetAccelerator("CmdOrCtrl+Shift+M").OnClick(send("frontmatter"))
 	edit.AddSeparator()
 	edit.AddRole(application.Cut)
 	edit.AddRole(application.Copy)
