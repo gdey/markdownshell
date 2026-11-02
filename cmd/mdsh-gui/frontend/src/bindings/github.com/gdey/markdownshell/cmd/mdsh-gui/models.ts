@@ -6,6 +6,9 @@
 import * as notebook$0 from "./notebook/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as collection$0 from "../../collection/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as library$0 from "../../library/models.js";
 
 /**
@@ -112,6 +115,22 @@ export interface Doc {
 }
 
 /**
+ * FolderForm is what the folder settings dialog edits.
+ */
+export interface FolderForm {
+    /**
+     * Path is the folder's absolute path.
+     */
+    "path": string;
+    "settings": collection$0.Settings;
+
+    /**
+     * Images are image files in the folder, for the icon and background.
+     */
+    "images": string[] | null;
+}
+
+/**
  * Link is a place to read more.
  */
 export interface Link {
@@ -182,6 +201,12 @@ export interface Start {
      * sessions yet.
      */
     "lastSession": string;
+
+    /**
+     * Writable are the listed folders, by rel, whose .mdsh.yaml the
+     * folder settings can save.
+     */
+    "writable": string[] | null;
 }
 
 /**

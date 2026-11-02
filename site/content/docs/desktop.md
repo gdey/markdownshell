@@ -47,7 +47,8 @@ mdsh-gui notes.md staging # open a file; $1 is staging
   first and each file's front matter `description` under its name. Type
   to filter, or `#tag` to show only files with that tag. A folder with
   a `.mdsh.yaml` (`title`, `description`, `icon`, `color`, `background`,
-  `tags`) shows as a collection with a header of its own.
+  `tags`) shows as a collection with a header of its own; the ⚙ beside
+  a folder you can write to edits those keys in a form and saves the file.
 - **Tabs.** Each file opens in a tab with shells of its own. Drag a tab
   to reorder it, onto another window to move it there, or away from the
   tab bar for a window of its own; a block running in it carries on.

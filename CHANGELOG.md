@@ -41,6 +41,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui: a ⚙ on each folder of the start screen that you can write
+  to opens a form for its `.mdsh.yaml` (title, description, icon,
+  color, background and tags) and saves the file, so making a
+  collection doesn't need the YAML format. Other keys and comments in
+  the file are kept, and a value the start screen would ignore, such as
+  an icon that isn't in the folder, is refused with the reason.
 - mdsh-gui: **New Session** and **Last Session** on the start screen.
   New Session opens a file named for the day, such as `2026-11-02.md`,
   in a sessions folder (`~/.mdsh/sessions` by default), making it from

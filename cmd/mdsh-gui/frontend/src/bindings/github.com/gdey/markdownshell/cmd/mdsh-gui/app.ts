@@ -22,6 +22,9 @@ import * as nvim$0 from "./nvim/models.js";
 import * as settings$0 from "./settings/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as collection$0 from "../../collection/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as doc$0 from "../../doc/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -194,6 +197,14 @@ export function DropTab(i: number): $CancellablePromise<void> {
  */
 export function EndDrag(id: number, outside: boolean, x: number, y: number): $CancellablePromise<void> {
     return $Call.ByName("main.App.EndDrag", id, outside, x, y);
+}
+
+/**
+ * FolderSettings reads the .mdsh.yaml of rel, a folder the start screen
+ * lists, for the folder settings dialog.
+ */
+export function FolderSettings(rel: string): $CancellablePromise<$models.FolderForm> {
+    return $Call.ByName("main.App.FolderSettings", rel);
 }
 
 /**
@@ -526,6 +537,14 @@ export function SetChoice(i: number, checked: boolean[] | null): $CancellablePro
  */
 export function SetDepends(i: number, deps: number[] | null): $CancellablePromise<void> {
     return $Call.ByName("main.App.SetDepends", i, deps);
+}
+
+/**
+ * SetFolderSettings saves s as the .mdsh.yaml of rel, a folder the start
+ * screen lists. See collection.Write.
+ */
+export function SetFolderSettings(rel: string, s: collection$0.Settings): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetFolderSettings", rel, s);
 }
 
 /**

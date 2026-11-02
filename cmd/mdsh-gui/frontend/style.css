@@ -441,6 +441,19 @@ button.tag.on .n { color: inherit; opacity: 0.8; }
 .ctags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
 .ctags button.tag { border-color: color-mix(in srgb, var(--c) 40%, var(--border)); background: color-mix(in srgb, var(--c) 10%, var(--bg)); }
 .ctags button.tag.on { background: var(--c); border-color: var(--c); color: #fff; }
+/* A folder's gear, which opens its settings. */
+.fhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0 6px; }
+#start .fhead h2 { margin: 0; }
+.chead .ctext { flex: 1; }
+button.gear { flex: none; padding: 3px 5px; }
+button.gear svg { width: 14px; height: 14px; display: block; }
+.chead button.gear { color: var(--fg); opacity: 0.75; }
+.chead button.gear:hover, .chead button.gear:focus-visible { opacity: 1; }
+#folder-dialog { width: min(480px, 92vw); }
+#folder-dialog .hint { display: block; margin-top: 3px; font-size: calc(12px * var(--text-scale)); }
+.fs-color { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0; }
+.fs-color label { flex: 1; margin: 0; }
+.fs-color input[type="color"] { flex: none; width: 36px; height: 30px; margin-top: calc(1.3em + 4px); padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
 .ftag { font-size: calc(11px * var(--text-scale)); font-weight: 400; color: var(--muted); margin-left: 6px; }
 ul.files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; }
 ul.files li + li { border-top: 1px solid var(--border); }
