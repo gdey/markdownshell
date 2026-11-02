@@ -11,7 +11,14 @@ same way in both, and what it saves is what `mdsh -w` would write.
 
 ## Install
 
-Each [release](https://github.com/gdey/markdownshell/releases) has the
+On macOS with Homebrew:
+
+```sh
+brew install --cask gdey/tap/mdsh
+```
+
+Add `--no-quarantine` to skip the Gatekeeper step below. Otherwise, each
+[release](https://github.com/gdey/markdownshell/releases) has the
 desktop app beside the command line archives:
 
 | File | For |

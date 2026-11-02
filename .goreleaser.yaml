@@ -32,6 +32,28 @@ archives:
       - README.md
       - CHANGELOG.md
 
+# .deb and .rpm packages for the CLI, beside the archives. The Homebrew
+# tap is not made here: releases are drafts, which goreleaser won't
+# publish a formula for, so .github/workflows/tap.yml writes the formula
+# and the cask when the release is published.
+nfpms:
+  - package_name: mdsh
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: Gautam Dey
+    homepage: https://github.com/gdey/markdownshell
+    maintainer: Gautam Dey <gautam.dey77@gmail.com>
+    description: Run the code blocks in a markdown file, like a notebook whose file format is plain markdown.
+    license: MIT
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/mdsh/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/mdsh/README.md
+      - src: CHANGELOG.md
+        dst: /usr/share/doc/mdsh/CHANGELOG.md
+
 checksum:
   name_template: checksums.txt
   # mdsh-gui's packages, which .github/workflows/gui-packages.yml builds.

@@ -1,0 +1,60 @@
+name: Homebrew tap
+
+# Writes the Homebrew formula (the CLI) and cask (the desktop app) for a
+# release into gdey/homebrew-tap, so that
+#   brew install gdey/tap/mdsh
+#   brew install --cask gdey/tap/mdsh
+# get the new version. It runs when a release is published, not when
+# goreleaser drafts it, so a draft can still be looked over first. Run it
+# by hand with a tag to redo one.
+#
+# It needs a HOMEBREW_TAP_TOKEN secret: a fine-grained token with
+# contents read and write on gdey/homebrew-tap.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, such as v1.3.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  tap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Download checksums.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ steps.v.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern checksums.txt --dir "$RUNNER_TEMP"
+      - name: Check out the tap
+        uses: actions/checkout@v4
+        with:
+          repository: gdey/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - name: Write the formula and cask
+        run: .github/scripts/tap.sh "${{ steps.v.outputs.version }}" "$RUNNER_TEMP/checksums.txt" tap
+      - name: Push
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/mdsh.rb Casks/mdsh.rb
+          if git diff --cached --quiet; then
+            echo "tap already at ${{ steps.v.outputs.tag }}"
+            exit 0
+          fi
+          git commit -m "mdsh ${{ steps.v.outputs.tag }}"
+          git push

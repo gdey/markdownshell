@@ -6,7 +6,17 @@ weight: 10
 
 ## Install
 
-Download an archive for your system from the
+With Homebrew, on macOS or Linux:
+
+```sh
+brew install gdey/tap/mdsh          # the command line and mdsh -i
+brew install --cask gdey/tap/mdsh   # the desktop app, macOS only
+```
+
+On Debian, Ubuntu, Fedora and the like, each release has a `.deb` and an
+`.rpm` for `mdsh`.
+
+Or download an archive for your system from the
 [releases page](https://github.com/gdey/markdownshell/releases), unpack it,
 and put `mdsh` on your `PATH`. Builds cover Linux, macOS and Windows on
 amd64 and arm64; `checksums.txt` lists each archive's SHA-256. For example,
