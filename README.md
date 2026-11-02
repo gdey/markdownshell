@@ -265,6 +265,7 @@ its output.
 | `i` or `:` | type a command; enter adds it to the end of the document as an `sh` block and runs it, esc cancels |
 | `h` | open the History pane: a shell along the bottom whose commands are added to the end of the document as `#history-N skip links` blocks with their output (`skip` keeps a whole-file run from running them again; `links` makes web addresses in it OSC 8 links), `#` lines as prose; tab completes, ↑/↓ recall, esc goes back to the document, ctrl+d closes it |
 | `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
+| `y` | copy the block's code, without its fences, to the clipboard. It is sent to the terminal as OSC 52, which works over ssh in terminals that allow it, and run locally it also goes to the system clipboard (`pbcopy`, `wl-copy`, `xclip` or `xsel`), for terminals that don't, such as macOS's Terminal or tmux by default |
 | `E` | edit the whole file in `$VISUAL`, `$EDITOR` or `vi`, at the block under the cursor, with output not saved yet in it. Blocks whose code didn't change keep their output, as in `mdsh-gui`'s source view; save with `w` |
 | alt+↑/↓, or `K`/`J` | move the block, with its output and tape, up or down past the paragraph, heading or block next to it, as alt+↑/↓ does in `mdsh-gui`. Prose stays put. What the move breaks that depends on block order, such as a `run=` that now reads a block below it, shows in the footer. Not while a block runs |
 | `u` | undo the last move |

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -1230,5 +1231,46 @@ func TestOutputLinks(t *testing.T) {
 	pump(t, m)
 	if v := m.View(); strings.Contains(v, "]8;;https://example.com/c") {
 		t.Errorf("block c has no links attribute, but its output is linked:\n%q", v)
+	}
+}
+
+func TestCopyBlock(t *testing.T) {
+	var got []string
+	old := setClipboard
+	setClipboard = func(s string) error { got = append(got, s); return nil }
+	t.Cleanup(func() { setClipboard = old })
+
+	m, _ := newModel(t, "# T\n\n```sh {#one}\necho a\necho b\n```\n\n```sh {#two}\necho c\n```\n", Options{})
+	copy := func() {
+		t.Helper()
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+		if cmd == nil {
+			t.Fatal("y gave no command")
+		}
+		m.Update(cmd())
+	}
+	copy()
+	if len(got) != 1 || got[0] != "echo a\necho b" {
+		t.Errorf("copied %q, want the first block's code without its fences", got)
+	}
+	if m.status != "copied one, 2 lines" {
+		t.Errorf("status = %q", m.status)
+	}
+	press(m, "j")
+	copy()
+	if got[len(got)-1] != "echo c" || m.status != "copied two, 1 line" {
+		t.Errorf("copied %q, status %q", got[len(got)-1], m.status)
+	}
+
+	setClipboard = func(string) error { return errors.New("no terminal") }
+	copy()
+	if m.status != "copy: no terminal" {
+		t.Errorf("status = %q", m.status)
+	}
+}
+
+func TestOSC52(t *testing.T) {
+	if got, want := osc52("hi\n"), "\x1b]52;c;aGkK\a"; got != want {
+		t.Errorf("osc52 = %q, want %q", got, want)
 	}
 }

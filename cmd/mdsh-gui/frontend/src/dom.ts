@@ -50,6 +50,8 @@ export const icons = {
   lines: '<path d="M12.5 3H6.8a2.3 2.3 0 0 0-2.3 2.3v5.4A2.3 2.3 0 0 0 6.8 13h5.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12.5" cy="13" r="1.9"/>',
   chevron: '<path d="M3.7 5.6 8 9.9l4.3-4.3 1 1L8 11.9 2.7 6.6z"/>',
   rendered: '<path d="M3.5 1.5h6l3.5 3.5v9.5h-9.5zm1.4 1.4v10.2h6.7V6H8.5V2.9z"/>',
+  // Two sheets, the front one copied from the back one.
+  copy: '<path d="M2 1.5h8v2H8.6v-.6H3.4v8.2H4v1.4H2z"/><path d="M5.5 5h8.5v9.5H5.5zm1.4 1.4v6.7h5.7V6.4z"/>',
 };
 
 export function svg(path: string): SVGSVGElement {

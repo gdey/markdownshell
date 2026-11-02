@@ -2,7 +2,7 @@ import "./tab.js";
 import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
 import { type StateCommand, Text } from "@codemirror/state";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
-import { Events, Window } from "/wails/runtime.js";
+import { Clipboard, Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
@@ -253,6 +253,7 @@ function drawProse(c: Cell): HTMLElement {
   const code = c.firstLine ? s.querySelector<HTMLElement>("pre.numbered > code") : null;
   if (code) code.style.counterReset = `line ${c.firstLine! - 1}`;
   enableDiagrams(s);
+  enableCopy(s);
   s.onclick = (e) => {
     if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
     if (c.heading) selectSection(s);
@@ -285,6 +286,40 @@ function drawProse(c: Cell): HTMLElement {
     s.append(note);
   }
   return s;
+}
+
+// enableCopy gives each fenced code block in prose a button that copies
+// its code to the clipboard. The button sits in a wrapper, so it stays
+// put while a wide block scrolls. A diagram's corner holds its own button.
+function enableCopy(e: HTMLElement) {
+  for (const pre of e.querySelectorAll<HTMLElement>("pre")) {
+    if (pre.closest("figure.diagram")) continue;
+    const b = iconButton("copy", "Copy this code", () => void copyCode(preText(pre), ""));
+    b.classList.add("copy-code");
+    const wrap = el("div", { className: "copyable" });
+    pre.replaceWith(wrap);
+    wrap.append(pre, b);
+  }
+}
+
+// preText is the code in pre, a line per .line where it is numbered.
+function preText(pre: HTMLElement): string {
+  const lines = pre.querySelectorAll(".line");
+  if (lines.length) return [...lines].map((l) => l.textContent ?? "").join("\n");
+  return pre.querySelector("code")?.textContent ?? "";
+}
+
+// copyCode puts a fenced block's code on the clipboard, as written in the
+// file, and says so in the status line.
+async function copyCode(code: string, name: string) {
+  const text = code.endsWith("\n") ? code.slice(0, -1) : code;
+  try {
+    await Clipboard.SetText(text);
+  } catch (err) {
+    return status("couldn't copy: " + message(err));
+  }
+  const n = text ? text.split("\n").length : 0;
+  status("Copied " + (name ? name + ", " : "") + n + (n === 1 ? " line" : " lines"));
 }
 
 // shownAsCode holds the source of the diagrams switched to their code,
@@ -495,6 +530,7 @@ function drawBlock(c: Cell): HTMLElement {
       name,
       c.hidden ? hiddenBadge(c.hidden) : "",
       exit,
+      iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "")),
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
       iconButton("play", "Run this block (enter)", () => start("RunBlock", c.block)),
       iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
@@ -3178,8 +3214,8 @@ $("keep").onclick = () => {
 };
 
 // Keys follow mdsh -i where they don't clash with the OS: j/k move
-// between blocks, enter runs the selected one, a runs from it and e edits
-// it. s runs the selected heading's section, or the selected block's.
+// between blocks, enter runs the selected one, a runs from it, e edits
+// it and c copies its code. s runs the selected heading's section, or the selected block's.
 document.addEventListener("keydown", (e) => {
   if (!doc.file || e.metaKey || e.ctrlKey || e.altKey) return;
   const target = e.target as HTMLElement | null;
@@ -3211,6 +3247,12 @@ document.addEventListener("keydown", (e) => {
       if (selected >= 0) {
         const c = cells.find((c) => c.block === current());
         if (c) void editBlock(all[selected], c);
+      }
+      break;
+    case "c":
+      if (selected >= 0) {
+        const c = cells.find((c) => c.block === current());
+        if (c) void copyCode(c.body ?? "", c.name ?? c.id ?? "");
       }
       break;
     case "d":

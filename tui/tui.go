@@ -467,6 +467,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.edited(msg)
 		m.refresh()
 		return m, nil
+	case copiedMsg:
+		m.copied(msg)
+		m.refresh()
+		return m, nil
 	case ttyBackMsg:
 		m.refresh()
 		return m, nil
@@ -648,6 +652,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "E":
 		if cmd := m.editAll(); cmd != nil {
+			return m, cmd
+		}
+	case "y":
+		if cmd := m.copyBlock(); cmd != nil {
 			return m, cmd
 		}
 	case "v":

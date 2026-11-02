@@ -56,6 +56,7 @@ var helpItems = []helpItem{
 	{group: "Run", keys: ",", key: runeKey(","), what: says("run options: arguments, step, stop on error"), off: busy},
 
 	{group: "Edit", keys: "e", key: runeKey("e"), what: says("edit the block in $EDITOR"), off: noEdit},
+	{group: "Edit", keys: "y", key: runeKey("y"), what: says("copy the block's code to the clipboard"), off: noBlocks},
 	{group: "Edit", keys: "E", key: runeKey("E"), what: says("edit the whole file in $EDITOR"), off: busy},
 	{group: "Edit", keys: "J/K alt+↓/↑", key: runeKey("J"), what: says("move the block down (K: up)"), off: noMove},
 	{group: "Edit", keys: "u", key: runeKey("u"), what: says("undo the last move"), off: noUndo},
