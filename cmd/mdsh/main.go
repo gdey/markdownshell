@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -55,6 +56,9 @@ func versionString() string {
 var errFailed = errors.New("a block failed")
 
 func mdsh(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "ctl" {
+		return ctlCmd(args[1:], stdin, stdout, stderr)
+	}
 	var err error
 	switch {
 	case len(args) > 0 && args[0] == "completion":
@@ -85,6 +89,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mdsh [run] [flags] file.md [args...]")
 		fmt.Fprintln(stderr, "       mdsh completion bash|zsh")
+		fmt.Fprintln(stderr, "       mdsh ctl COMMAND ...  (from inside a block; mdsh ctl help lists them)")
 		fmt.Fprintln(stderr, "       use - as the file to read markdown from stdin")
 		fs.PrintDefaults()
 	}
@@ -331,6 +336,22 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		opts.Depend = func(dep, b *doc.Block) run.Answer {
 			live.upTo(b)
 			return depend(dep, b)
+		}
+	}
+
+	// mdsh ctl status shows on stderr. It comes from the control
+	// socket while its block runs.
+	next := opts.OnEvent
+	var statusMu sync.Mutex
+	opts.OnEvent = func(e run.Event) {
+		if e.Kind == run.Status {
+			statusMu.Lock()
+			fmt.Fprintln(stderr, progressLine(d.Label(e.Block), e.Progress))
+			statusMu.Unlock()
+			return
+		}
+		if next != nil {
+			next(e)
 		}
 	}
 

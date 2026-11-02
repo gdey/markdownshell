@@ -706,6 +706,10 @@ func (n *Notebook) event(e run.Event) {
 	if e.Kind == run.Started && background {
 		kind = "background"
 	}
+	if kind == "" {
+		// Such as mdsh ctl status, which the notebook doesn't show yet.
+		return
+	}
 	n.opts.OnEvent(Event{Kind: kind, Block: i, Data: string(e.Data)})
 }
 
