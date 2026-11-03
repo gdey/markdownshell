@@ -8,6 +8,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A running block shows that it is running, and for how long. In
+  mdsh-gui its card gets a spinner and a timer that counts up by tenths
+  of a second; with `timeout=` the timer reads `12.3s / 1m` and a bar
+  under the card's head fills toward the timeout, turning amber and
+  then red as it nears. When the block ends, the card keeps how long it
+  took (`1.4s`), or says it timed out. `mdsh -i` shows the same in the
+  block's header: `running… 12s / 1m`, then `✓ 1.4s`. The time is how
+  long the block ran this session; it isn't saved in the file.
+
+  ![mdsh-gui running a runbook: a block's timer counting up against its timeout, the bar under its head filling, and the finished blocks keeping how long they took](docs/changelog/run-timer.gif)
+
 - While a command typed in mdsh-gui's History pane runs, the prompt
   dims and the input shows how long it has run, in every look. With
   reduced motion the clock ticks once a second.

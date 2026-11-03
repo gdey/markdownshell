@@ -145,6 +145,7 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 	if errors.Is(err, env.ErrKilled) {
 		switch {
 		case j.timedOut.Load():
+			r.TimedOut = true
 			err = fmt.Errorf("timed out after %s", j.timeout)
 		case j.overdue.Load():
 			err = fmt.Errorf("still running %s after the last block, so it was killed", BackgroundWait)

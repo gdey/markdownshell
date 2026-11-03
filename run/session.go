@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gdey/markdownshell/audit"
@@ -38,6 +39,10 @@ type Session struct {
 	tty        bool // whether the shells have terminals of their own
 	jobs       []*bgJob
 	seq        uint64 // the last Result.Seq given out
+	// started holds when each running block started, for its
+	// Result.Duration.
+	startMu sync.Mutex
+	started map[*doc.Block]time.Time
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -264,6 +269,24 @@ func (s *Session) Close() {
 }
 
 func (s *Session) emit(e Event) {
+	switch e.Kind {
+	case Started:
+		s.startMu.Lock()
+		if s.started == nil {
+			s.started = map[*doc.Block]time.Time{}
+		}
+		s.started[e.Block] = time.Now()
+		s.startMu.Unlock()
+	case Done:
+		s.startMu.Lock()
+		if t, ok := s.started[e.Block]; ok {
+			delete(s.started, e.Block)
+			if e.Result != nil {
+				e.Result.Duration = time.Since(t)
+			}
+		}
+		s.startMu.Unlock()
+	}
 	if s.opts.OnEvent != nil {
 		s.opts.OnEvent(e)
 	}

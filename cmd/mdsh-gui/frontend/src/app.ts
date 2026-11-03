@@ -604,6 +604,7 @@ function drawBlock(c: Cell): HTMLElement {
   // The outline names a block by the .name's first child.
   const name = el("span", { className: "name" }, el("span", { className: "id" }, c.name ?? c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
   const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
+  const timer = el("span", { className: "timer" });
   const block = el(
     "section",
     { className: "block" + (c.history ? " history" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : "") + (c.stale ? " stale" : ""), id: "block-" + c.block },
@@ -614,6 +615,7 @@ function drawBlock(c: Cell): HTMLElement {
       c.hidden ? hiddenBadge(c.hidden) : "",
       c.stale ? el("span", { className: "stale-badge", title: staleNote }, "stale") : "",
       exit,
+      timer,
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "")),
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
       iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block)),
@@ -649,6 +651,15 @@ function drawBlock(c: Cell): HTMLElement {
     if (img) viewImage(img);
   };
   block.dataset.block = String(c.block);
+  if (c.timeout) block.dataset.timeout = String(c.timeout);
+  if (timerStarts.has(c.block)) {
+    // Drawn again while it runs, as a background block is when the
+    // run ends: its timer goes on.
+    block.classList.add("timing");
+    drawTimer(block, performance.now() - timerStarts.get(c.block)!, true);
+  } else if (c.ran && c.ms) {
+    restTimer(timer, c.ms, !!c.timedOut, c.timeout ?? 0);
+  }
   block.onclick = (e) => {
     select(blocks().indexOf(block), false);
     if (!(e.target as HTMLElement).closest("button, input")) void showInSource(block, c.line, false);
@@ -664,7 +675,8 @@ function labelBlock(block: HTMLElement) {
   const states: Record<string, string> = { "?": "waiting for an answer", "▶": "running now", "◐": "running in the background", "✗": "failed", "✓": "ran" };
   const state = states[blockMark(block)] ?? "";
   const exit = text(".head .exit");
-  const parts = [name, text(".head .lang") + " block", text(".head .attrs"), state, state && exit && !exit.startsWith("running") ? exit : ""];
+  const took = block.classList.contains("timing") ? "" : block.querySelector<HTMLElement>(".head .timer")?.title ?? "";
+  const parts = [name, text(".head .lang") + " block", text(".head .attrs"), state, state && exit && !exit.startsWith("running") ? exit : "", state ? took.toLowerCase() : ""];
   block.setAttribute("aria-label", parts.filter(Boolean).join(", "));
 }
 
@@ -1228,6 +1240,7 @@ function busy(on: boolean) {
   running = on;
   document.body.classList.toggle("running", on);
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
+  if (!on) stopTimers();
   runAllButton();
   historyBusy(on);
   busyFrontMatter(on);
@@ -3154,6 +3167,110 @@ interface Question {
   of?: number;
 }
 
+// Run timers. A running block's card shows how long it has run, ticking
+// every tenth of a second, so a long block plainly hasn't hung. With
+// timeout= it shows the time against the timeout, and a bar under the
+// card's head fills toward it, turning to a warning near the end. When
+// the block is done the timer stops at how long it took, which the card
+// shows from then on, from the cell's ms. timerStarts holds when each
+// running block started, by its index, so a card drawn again goes on.
+const timerStarts = new Map<number, number>();
+let ticker = 0;
+
+function startTimer(block: HTMLElement) {
+  timerStarts.set(Number(block.dataset.block), performance.now());
+  block.classList.add("timing");
+  tick();
+  if (!ticker) ticker = window.setInterval(tick, 100);
+}
+
+function stopTimer(block: HTMLElement) {
+  const i = Number(block.dataset.block);
+  const t0 = timerStarts.get(i);
+  if (t0 === undefined) return;
+  timerStarts.delete(i);
+  block.classList.remove("timing", "late", "later");
+  restTimer(block.querySelector<HTMLElement>(".head .timer")!, performance.now() - t0, false, Number(block.dataset.timeout ?? 0));
+  if (!timerStarts.size) stopTicker();
+}
+
+// stopTimers stops the timers of the blocks that aren't running in the
+// background, when a run ends, in case a block's done never came.
+function stopTimers() {
+  for (const i of [...timerStarts.keys()]) {
+    const block = document.getElementById("block-" + i);
+    if (!block?.classList.contains("background")) {
+      if (block) stopTimer(block);
+      else timerStarts.delete(i);
+    }
+  }
+  if (!timerStarts.size) stopTicker();
+}
+
+function stopTicker() {
+  window.clearInterval(ticker);
+  ticker = 0;
+}
+
+function tick() {
+  const now = performance.now();
+  for (const [i, t0] of timerStarts) {
+    const block = document.getElementById("block-" + i);
+    if (block) drawTimer(block, now - t0, true);
+  }
+}
+
+// drawTimer shows a running block's time, ms, and against its timeout.
+function drawTimer(block: HTMLElement, ms: number, live: boolean) {
+  const span = block.querySelector<HTMLElement>(".head .timer");
+  if (!span) return;
+  const limit = Number(block.dataset.timeout ?? 0);
+  span.textContent = limit ? runTime(ms) + " / " + limitTime(limit) : runTime(ms);
+  span.title = "Running for " + runTime(ms) + (limit ? ", of a " + limitTime(limit) + " timeout" : "");
+  span.classList.remove("bad");
+  if (limit && live) {
+    const f = Math.min(ms / limit, 1);
+    block.style.setProperty("--timeout-done", String(f));
+    block.classList.toggle("late", f >= 0.75 && f < 0.9);
+    block.classList.toggle("later", f >= 0.9);
+  }
+}
+
+// restTimer shows how long a block that is done took.
+function restTimer(span: HTMLElement, ms: number, timedOut: boolean, limit: number) {
+  const card = span.closest<HTMLElement>(".block");
+  card?.style.removeProperty("--timeout-done");
+  if (timedOut) {
+    span.textContent = "timed out at " + limitTime(limit || ms);
+    span.title = "Timed out after " + runTime(ms);
+    span.classList.add("bad");
+    return;
+  }
+  span.textContent = runTime(ms);
+  span.title = "Took " + runTime(ms) + (limit ? ", of a " + limitTime(limit) + " timeout" : "");
+  span.classList.remove("bad");
+}
+
+// runTime says ms to a tenth of a second under a minute, as 12.3s, and
+// to the second past it, as 1m 05s or 1h 02m 05s.
+function runTime(ms: number): string {
+  if (ms < 60_000) return (Math.floor(ms / 100) / 10).toFixed(1) + "s";
+  const s = Math.floor(ms / 1000);
+  const two = (n: number) => String(n).padStart(2, "0");
+  if (s < 3600) return Math.floor(s / 60) + "m " + two(s % 60) + "s";
+  return Math.floor(s / 3600) + "h " + two(Math.floor(s / 60) % 60) + "m " + two(s % 60) + "s";
+}
+
+// limitTime says a timeout as written, more or less: 30s, 1.5s, 5m, 1h,
+// or as runTime does when it doesn't come out even.
+function limitTime(ms: number): string {
+  const s = ms / 1000;
+  if (s < 60) return String(Math.round(s * 10) / 10) + "s";
+  if (s % 3600 === 0) return s / 3600 + "h";
+  if (s % 60 === 0) return s / 60 + "m";
+  return runTime(ms);
+}
+
 // liveColors is the ANSI state of each stream of a running block's
 // output.
 const liveColors = new WeakMap<HTMLElement, Record<string, Ansi>>();
@@ -3175,6 +3292,7 @@ function onBlock(e: BlockEvent) {
       block.classList.add("background");
       block.querySelector(".exit")!.textContent = backgroundNote;
       setOutput(out);
+      startTimer(block);
       break;
     case "started":
       for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
@@ -3182,6 +3300,9 @@ function onBlock(e: BlockEvent) {
       closeAsks(block);
       block.querySelector<HTMLElement>(".ask")!.hidden = true;
       setOutput(out, el("pre", { className: "live" }));
+      // The last run's exit would sit by the new run's timer.
+      block.querySelector(".exit")!.textContent = "";
+      startTimer(block);
       follow(block);
       break;
     case "stdout":
@@ -3199,6 +3320,7 @@ function onBlock(e: BlockEvent) {
     case "done":
       $("dirty").hidden = false;
       block.classList.remove("now");
+      stopTimer(block);
       // A background block can end while nothing runs, so nothing
       // else would draw its output.
       if (block.classList.contains("background")) {

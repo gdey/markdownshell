@@ -79,7 +79,13 @@ Each file opens in a tab of its own, with its own shells.
   it. A block marked `background` starts and lets other blocks run: its
   card has a dashed edge and says it is running in the background, the
   status line counts them, and its output shows when it ends. Closing
-  the window kills those still running.
+  the window kills those still running. A running block's card has a
+  spinner and a timer that counts up by tenths of a second, so a long
+  block plainly hasn't hung; a block with `timeout=` shows its time
+  against the timeout, as `12.3s / 1m`, with a bar under its head that
+  fills toward it, turning amber at three quarters and red at nine
+  tenths. When it ends the card keeps how long it took, or says it
+  timed out.
 - **Console** (View › Console, cmd/ctrl+shift+Y, or the toolbar's
   console button): what the app logs, errors and notes, each with its
   time and level, such as a call that failed because the file no longer
