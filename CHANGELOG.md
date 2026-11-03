@@ -63,6 +63,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- In `mdsh-gui`, a block's confirm question is now scrolled to the
+  middle of the rendered view when it's asked, even when the block's
+  last output is longer than the view; before, the card was centered
+  and the question could land far above the fold. Picking the block's
+  `?` in the outline, or its chip in the toolbar, centers the question
+  too. If you're scrolling by hand when the question comes, the view
+  waits until you stop. The block waiting for an answer is ringed in
+  the outline, and a section folded over it opens for the question and
+  folds again once the run moves past it.
+
+  ![A run waiting on swap_live: the folded Swap section has opened, swap live is ringed in the outline, and the question sits in the view](docs/changelog/confirm-centered.png)
+
 - In `mdsh-gui` on macOS, the source pane no longer jumps to the block
   at the top of the rendered view while you type or click in it. The
   panes follow only the one you last scrolled, clicked or typed in, so

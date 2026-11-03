@@ -221,6 +221,31 @@ let scrolledByHand = false;
 function stopFollowing() {
   following = null;
   scrolledByHand = true;
+  handScrollAt = Date.now();
+}
+
+// handScrollAt is when the rendered view was last scrolled by hand.
+let handScrollAt = 0;
+// handScrollQuiet is how long after scrolling by hand the user counts as
+// still scrolling, in milliseconds.
+const handScrollQuiet = 1000;
+let askTimer = 0;
+
+// centerAsk puts a block's question in the middle of the rendered view.
+// The question, not its card, is centered: the card holds the output of
+// the block's last run, which can be far taller than the view, and the
+// card's middle would leave the question out of sight. While the view is
+// being scrolled by hand it waits for the scrolling to stop, so the view
+// isn't pulled from under the user.
+function centerAsk(ask: HTMLElement, behavior: ScrollBehavior = "auto") {
+  clearTimeout(askTimer);
+  const wait = handScrollAt + handScrollQuiet - Date.now();
+  if (wait > 0) {
+    askTimer = window.setTimeout(() => centerAsk(ask, behavior), wait);
+    return;
+  }
+  if (!ask.isConnected || ask.hidden || $("doc-scroll").hidden) return;
+  ask.scrollIntoView({ block: "center", behavior });
 }
 
 function drawCell(c: Cell): HTMLElement {
@@ -624,10 +649,40 @@ let peekCell: HTMLElement | null = null;
 // How long the line is held over a folded heading before it opens.
 const peekDelay = 400;
 
+// askPeeks are the folded sections a block's question has opened, by
+// heading key, so the question can be seen. Like peeks they change
+// neither folds nor the file: each closes again once the run moves on
+// to a block outside it, or ends.
+const askPeeks = new Set<string>();
+
 // shownFolded is whether a section is drawn folded: folded, and not
-// opened by a drag.
+// opened by a drag or a question.
 function shownFolded(cell: HTMLElement): boolean {
-  return !peeks.has(cell.dataset.fold ?? "") && sectionFolded(cell);
+  const key = cell.dataset.fold ?? "";
+  return !peeks.has(key) && !askPeeks.has(key) && sectionFolded(cell);
+}
+
+// peekAsk opens the folded sections that hide cell, for its question.
+function peekAsk(cell: HTMLElement) {
+  if (!cell.classList.contains("in-fold")) return;
+  for (const key of hidingSections(cell)) askPeeks.add(key);
+  applyFolds();
+}
+
+// closeAsks closes the sections a question opened, except those that
+// hold cell, the block the run is at now; with no cell, all of them.
+function closeAsks(cell?: HTMLElement | null) {
+  let closed = false;
+  for (const key of [...askPeeks]) {
+    const h = headingFor(key);
+    if (h && cell && holds(h, cell)) continue;
+    askPeeks.delete(key);
+    closed = true;
+  }
+  if (closed) {
+    applyFolds();
+    drawOutline();
+  }
 }
 
 // holds is whether cell is in the section under heading, at any depth.
@@ -722,7 +777,9 @@ function foldBlock(block: HTMLElement, part: Part, on = !blockFolded(block, part
   void saveFolds([blockFold(block, part, on)]);
 }
 
-function foldSection(cell: HTMLElement, on = !sectionFolded(cell)) {
+function foldSection(cell: HTMLElement, on = !shownFolded(cell)) {
+  // Folding by hand takes over from a question that opened it.
+  askPeeks.delete(cell.dataset.fold ?? "");
   folds.set(cell.dataset.fold ?? "", on);
   applyFolds();
   drawOutline();
@@ -817,15 +874,25 @@ function applyFolds() {
 // when a block asks before it runs or the toolbar jumps to it.
 function reveal(cell: HTMLElement) {
   if (!cell.classList.contains("in-fold")) return;
+  for (const key of hidingSections(cell)) {
+    folds.set(key, false);
+    askPeeks.delete(key);
+  }
+  applyFolds();
+  drawOutline();
+}
+
+// hidingSections are the keys of the folded sections that hold cell.
+function hidingSections(cell: HTMLElement): string[] {
+  const keys: string[] = [];
   let level = Number(cell.dataset.level ?? 0) || 7;
   for (let e = cell.previousElementSibling as HTMLElement | null; e && level > 1; e = e.previousElementSibling as HTMLElement | null) {
     const l = Number(e.dataset.level ?? 0);
     if (!l || l >= level) continue;
     level = l;
-    if (sectionFolded(e)) folds.set(e.dataset.fold ?? "", false);
+    if (sectionFolded(e)) keys.push(e.dataset.fold ?? "");
   }
-  applyFolds();
-  drawOutline();
+  return keys;
 }
 
 // foldAll folds or unfolds every block's code and output, or every
@@ -1132,6 +1199,7 @@ async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   }
   ranHere = false;
   busy(false);
+  closeAsks();
   await refresh();
   const card = home?.();
   const ended = card?.classList.contains("block") ? card.getAttribute("aria-label") ?? "" : "";
@@ -1833,6 +1901,8 @@ function drawOutline() {
       play.classList.add("run");
       play.disabled = running;
       const row = outlineRow(item, e, 0);
+      // The block waiting for an answer is ringed, to be found at a glance.
+      row.classList.toggle("asking", mark === "?");
       row.append(play);
       row.dataset.block = String(block);
       items.push(row);
@@ -1970,7 +2040,12 @@ function jumpTo(target: HTMLElement) {
   reveal(target.closest<HTMLElement>("#doc > *") ?? target);
   // Both panes go to the entry, so neither follows the other meanwhile.
   holdScroll();
-  target.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+  // A block waiting for an answer shows its question, in the middle.
+  const ask = target.querySelector<HTMLElement>(":scope > .ask");
+  if (ask && !ask.hidden) {
+    handScrollAt = 0;
+    centerAsk(ask, scrollBehavior());
+  } else target.scrollIntoView({ block: "start", behavior: scrollBehavior() });
   const i = blocks().indexOf(target);
   if (i >= 0) select(i, false);
   const heading = target.closest<HTMLElement>("#doc > .heading-cell");
@@ -3034,6 +3109,7 @@ function onBlock(e: BlockEvent) {
     case "started":
       for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
       block.classList.add("now");
+      closeAsks(block);
       block.querySelector<HTMLElement>(".ask")!.hidden = true;
       setOutput(out, el("pre", { className: "live" }));
       follow(block);
@@ -3085,7 +3161,8 @@ function onBlock(e: BlockEvent) {
 function onConfirm({ block, question, of }: Question) {
   const card = document.getElementById("block-" + block);
   if (!card) return;
-  // The question is asked in the block's card, so show it.
+  // The question is asked in the block's card, so show it, opening the
+  // sections it's folded in until the run moves past them.
   if (!view.rendered) toggle("rendered", true);
   const ask = card.querySelector<HTMLElement>(".ask")!;
   const why =
@@ -3109,8 +3186,14 @@ function onConfirm({ block, question, of }: Question) {
   ask.setAttribute("role", "group");
   ask.setAttribute("aria-label", question);
   ask.hidden = false;
-  reveal(card);
-  card.scrollIntoView({ block: "center" });
+  closeAsks(card);
+  peekAsk(card);
+  // The run waits now, so the block it last followed is done; its
+  // output mustn't scroll the view away from the question.
+  following = null;
+  cancelAnimationFrame(followFrame);
+  followFrame = 0;
+  centerAsk(ask);
   status("waiting for you");
   labelBlock(card);
   drawOutline();
@@ -3128,6 +3211,7 @@ Events.On(
   mine(() => {
     if (ranHere || !running) return;
     busy(false);
+    closeAsks();
     status("");
     void refresh().then(() => (following = null));
   }),
