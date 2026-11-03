@@ -6,6 +6,7 @@ import { Events, Window } from "/wails/runtime.js";
 
 import { App, type Settings, type Tab, type Tabs } from "./api.js";
 import { $, el } from "./dom.js";
+import { applyKeyHints, hinted } from "./keys.js";
 import { applyTheme } from "./theme.js";
 
 const frames = new Map<number, HTMLIFrameElement>();
@@ -77,7 +78,7 @@ function draw() {
 function tabButton(t: Tab): HTMLElement {
   // The close button is for the mouse: a tab's children are
   // presentational, and delete on the tab closes it from the keyboard.
-  const close = el("span", { className: "close", title: "Close tab (cmd/ctrl+W)", ariaHidden: "true" }, "×");
+  const close = el("span", { className: "close", title: hinted("Close tab", "Mod-W"), ariaHidden: "true" }, "×");
   close.onclick = (e) => {
     e.stopPropagation();
     void App.CloseTab(t.id);
@@ -210,6 +211,7 @@ Events.On("tabs", (ev: { sender?: string; data: Tabs }) => {
 });
 Events.On("settings", (ev: { data: Settings }) => applyTheme(ev.data));
 
+applyKeyHints();
 me = await Window.Name();
 applyTheme(await App.Settings());
 show(await App.Tabs());
