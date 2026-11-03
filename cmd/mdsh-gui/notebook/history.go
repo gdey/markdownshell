@@ -124,10 +124,12 @@ const promptMark = "\n--mdsh-ps2--\n"
 // promptScript prints PS1 and PS2, expanded. zsh runs its precmd hooks
 // first, as many prompt themes need, and expands % escapes, and $(…)
 // too with promptsubst; bash expands its \ escapes; other shells, as
-// dash does, expand the variables in them.
-func promptScript(zsh bool) string {
+// dash does, expand the variables in them. COLUMNS and LINES are the
+// pane's, so a prompt drawn to fit the width fits the pane.
+func promptScript(zsh bool, cols, rows int) string {
+	size := fmt.Sprintf("export COLUMNS=%d LINES=%d\n", cols, rows)
 	if zsh {
-		return `(for f in precmd $precmd_functions; do (( $+functions[$f] )) && $f >/dev/null 2>&1 </dev/null; done
+		return `(` + size + `for f in precmd $precmd_functions; do (( $+functions[$f] )) && $f >/dev/null 2>&1 </dev/null; done
 p1=$PS1 p2=$PS2
 if [[ -o promptsubst ]]; then p1=${(e)p1} p2=${(e)p2}; fi 2>/dev/null
 print -rn -- "${(%)p1}"$'` + strings.ReplaceAll(promptMark, "\n", `\n`) + `'"${(%)p2}")`
@@ -135,7 +137,7 @@ print -rn -- "${(%)p1}"$'` + strings.ReplaceAll(promptMark, "\n", `\n`) + `'"${(
 	// ${PS1@P} needs bash 4.4; macOS's sh is bash 3.2, where it is an
 	// error that ends the subshell, so older shells expand only the
 	// variables, each in a subshell of its own in case that fails too.
-	return `(p1=${PS1-} p2=${PS2-}
+	return `(` + size + `p1=${PS1-} p2=${PS2-}
 case ${BASH_VERSION-} in
 ''|[123].*|4.[0-3]*)
 	x=$(eval "printf '%s' \"$p1\"" 2>/dev/null) && p1=$x
@@ -146,8 +148,18 @@ printf '%s\n%s\n%s' "$p1" '--mdsh-ps2--' "$p2")`
 }
 
 // Prompt asks the shell blocks run in for its prompts, so the History
-// pane can show them. It returns ErrBusy while a block runs.
+// pane can show them, at the terminal's size. It returns ErrBusy while a
+// block runs.
 func (n *Notebook) Prompt() (Prompt, error) {
+	return n.PromptAt(n.term.size())
+}
+
+// PromptAt is Prompt at cols by rows, the History pane's size, which can
+// differ from the terminal's: a block's card sizes that too.
+func (n *Notebook) PromptAt(cols, rows int) (Prompt, error) {
+	if cols <= 0 || rows <= 0 {
+		cols, rows = n.term.size()
+	}
 	n.mu.Lock()
 	if n.running {
 		n.mu.Unlock()
@@ -163,7 +175,7 @@ func (n *Notebook) Prompt() (Prompt, error) {
 		n.idle.Broadcast()
 		n.mu.Unlock()
 	}()
-	out, err := sess.Ask(context.Background(), promptScript(zsh))
+	out, err := sess.AskSized(context.Background(), promptScript(zsh, cols, rows), cols, rows)
 	if err != nil {
 		return Prompt{}, err
 	}

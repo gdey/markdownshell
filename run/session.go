@@ -220,10 +220,17 @@ func (s *Session) readInclude(b *doc.Block) *Result {
 // change none of it, so put it in a subshell. Call it while nothing
 // runs; ending ctx ends the shell.
 func (s *Session) Ask(ctx context.Context, script string) (string, error) {
+	return s.AskSized(ctx, script, 0, 0)
+}
+
+// AskSized is Ask with the shell's terminal, if it has one, sized cols
+// by rows first. Zero leaves it as it is.
+func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (string, error) {
 	e, err := s.stack.Get(ctx, "", s.d.Options.Env.Share)
 	if err != nil {
 		return "", err
 	}
+	e.Shell.SetSize(cols, rows)
 	var out bytes.Buffer
 	if _, _, err := e.Shell.Run(ctx, script, &out, io.Discard); err != nil {
 		return "", err

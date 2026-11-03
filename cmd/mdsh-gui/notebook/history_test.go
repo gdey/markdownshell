@@ -2,6 +2,7 @@ package notebook
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -390,5 +391,43 @@ func TestHistorySkipped(t *testing.T) {
 	}
 	if got := count(); got != 2 {
 		t.Errorf("after running it by hand, it ran %d times, want 2", got)
+	}
+}
+
+// The prompt is asked at the pane's size, so one drawn to fit the width
+// follows the pane as it is resized, between commands too.
+func TestPromptFollowsSize(t *testing.T) {
+	n, err := Open(write(t, "```sh\nPS1='$COLUMNS:$(stty size </dev/tty)> '\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if _, err := n.SetHistory(true); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	for _, cols := range []int{100, 60} {
+		n.SetTerminalSize(cols, 10)
+		p, err := n.Prompt()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := fmt.Sprintf("%d:10 %d> ", cols, cols); p.PS1 != want {
+			t.Errorf("at %d columns: prompt %q, want %q", cols, p.PS1, want)
+		}
+	}
+	// The pane's size wins over the terminal's, which a block's card
+	// sets too.
+	n.SetTerminalSize(90, 24)
+	for _, cols := range []int{120, 70} {
+		p, err := n.PromptAt(cols, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := fmt.Sprintf("%d:10 %d> ", cols, cols); p.PS1 != want {
+			t.Errorf("at %d columns: prompt %q, want %q", cols, p.PS1, want)
+		}
 	}
 }
