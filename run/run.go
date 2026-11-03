@@ -72,6 +72,8 @@ type Options struct {
 	// did). Go runs dep first, Skip goes on without it, and Stop runs
 	// neither. Answering Go also answers dep's own confirm. If Depend
 	// is nil, the run stops there with ErrNoConfirm, as for Confirm.
+	// A dep with nothing to run, only blank lines and # comments, and
+	// no confirm attribute, runs without asking.
 	Depend func(dep, b *doc.Block) Answer
 	// TTY is the terminal that blocks marked tty run on. If it is nil,
 	// such blocks fail with ErrNoTTY.

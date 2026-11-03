@@ -436,7 +436,7 @@ func (e *depError) Unwrap() error { return ErrDependency }
 // runDepends readies b to run: in the order b's depends= lists them,
 // each block that hasn't run in this session, or failed when it did, is
 // asked about with Depend, and run if the answer is Go, after its own
-// dependencies. A dependency the answer skips is left as it is. It
+// dependencies. An empty block (see emptyDep) runs without asking. A dependency the answer skips is left as it is. It
 // returns errStopped if an answer was Stop, a *depError if a dependency
 // failed or ended its shell, and ctx's error if ctx ended. ran, if not
 // nil, gets each block it runs.
@@ -455,9 +455,12 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 		if !Runnable(dep) {
 			return fmt.Errorf("%s depends on %s, but mdsh can't run %s blocks", s.d.Label(b), s.d.Label(dep), dep.Lang)
 		}
-		a, err := s.depend(dep, b)
-		if err != nil {
-			return err
+		a := Go
+		if !emptyDep(dep) {
+			var err error
+			if a, err = s.depend(dep, b); err != nil {
+				return err
+			}
 		}
 		switch a {
 		case Stop:
@@ -483,6 +486,24 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 		}
 	}
 	return nil
+}
+
+// emptyDep reports whether dep can run as a dependency without asking:
+// its body has no commands, only blank lines and # comments, and it
+// isn't marked confirm. Running it does nothing in the shell, so there
+// is nothing to ask about, though its own dependencies are still asked
+// about. A confirm block is still asked about, since an empty one is a
+// way to make a run stop and ask.
+func emptyDep(dep *doc.Block) bool {
+	if dep.Attrs.Has("confirm") {
+		return false
+	}
+	for line := range strings.Lines(dep.Body) {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Session) depend(dep, b *doc.Block) (Answer, error) {
