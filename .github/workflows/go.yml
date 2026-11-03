@@ -19,10 +19,11 @@ on:
       - "!cmd/mdsh-gui/README.md"
 
 # A new push to a pull request cancels that pull request's older run, so a
-# rebase does not leave stale jobs waiting on scarce macOS runners. Runs on
-# main are never cancelled.
+# rebase does not leave stale jobs waiting on scarce macOS runners. Each push
+# to main gets a group of its own, so main's runs neither wait on each other
+# nor cancel each other.
 concurrency:
-  group: go-${{ github.event.pull_request.number || github.ref }}
+  group: go-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
