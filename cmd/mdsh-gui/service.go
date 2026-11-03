@@ -614,6 +614,10 @@ func edited(cur *settings.Settings, s settings.Settings) {
 	if s.HistoryPane == "match" || s.HistoryPane == "invert" || s.HistoryPane == "dark" {
 		cur.HistoryPane = s.HistoryPane
 	}
+	cur.HistoryFocus = ""
+	if s.HistoryFocus == "cursor" {
+		cur.HistoryFocus = s.HistoryFocus
+	}
 	cur.View = ""
 	if s.View == "rendered" || s.View == "source" || s.View == "both" {
 		cur.View = s.View

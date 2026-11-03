@@ -125,8 +125,8 @@ func TestEditedSettings(t *testing.T) {
 	if len(cur.Recent) != 1 || len(cur.Pinned) != 1 || cur.LastFolder != "/a" {
 		t.Errorf("edited changed what the window doesn't edit: %+v", cur)
 	}
-	edited(&cur, settings.Settings{Look: "tty", TextSize: 300, UIFont: "Inter", CodeFont: `x"; } body {`, LineSpacing: "relaxed", NoRules: true, Accent: "#AABBCC", HistoryPane: "invert"})
-	if cur.TextSize != 150 || cur.UIFont != "Inter" || cur.CodeFont != "" || cur.LineSpacing != "relaxed" || !cur.NoRules || cur.Accent != "#aabbcc" || cur.HistoryPane != "invert" {
+	edited(&cur, settings.Settings{Look: "tty", TextSize: 300, UIFont: "Inter", CodeFont: `x"; } body {`, LineSpacing: "relaxed", NoRules: true, Accent: "#AABBCC", HistoryPane: "invert", HistoryFocus: "cursor"})
+	if cur.TextSize != 150 || cur.UIFont != "Inter" || cur.CodeFont != "" || cur.LineSpacing != "relaxed" || !cur.NoRules || cur.Accent != "#aabbcc" || cur.HistoryPane != "invert" || cur.HistoryFocus != "cursor" {
 		t.Errorf("look options = %+v", cur)
 	}
 	edited(&cur, settings.Settings{SessionFolder: " ~/notes ", SessionTemplate: "/t/session.md"})
@@ -137,8 +137,8 @@ func TestEditedSettings(t *testing.T) {
 	if cur.Look != "blueprint" {
 		t.Errorf("blueprint look dropped: %q", cur.Look)
 	}
-	edited(&cur, settings.Settings{Look: "bogus", Theme: "bogus", LineSpacing: "huge", Accent: "red", HistoryPane: "sideways"})
-	if cur.Look != "" || cur.Theme != "" || cur.LineSpacing != "" || cur.Accent != "" || cur.HistoryPane != "" || cur.TextSize != 0 {
+	edited(&cur, settings.Settings{Look: "bogus", Theme: "bogus", LineSpacing: "huge", Accent: "red", HistoryPane: "sideways", HistoryFocus: "ring"})
+	if cur.Look != "" || cur.Theme != "" || cur.LineSpacing != "" || cur.Accent != "" || cur.HistoryPane != "" || cur.HistoryFocus != "" || cur.TextSize != 0 {
 		t.Errorf("values the window can't send kept: %+v", cur)
 	}
 }

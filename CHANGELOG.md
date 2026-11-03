@@ -8,6 +8,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui's History pane can show that its prompt has the keyboard
+  with a blinking block cursor where you type, as a terminal does,
+  in place of the outline around the field. Pick it in Settings › Look
+  › History prompt focus. The cursor stays solid while it moves, doesn't
+  blink with reduced motion, and gives way to the outline with forced
+  colors.
+
+  ![The History pane's prompt in the Teletype look, with a block cursor over a letter of "echo hello" and no outline around the field](docs/changelog/history-cursor.png)
+
 - mdsh-gui's Console strikes out a warning once an edit fixes it, and
   marks it "(fixed)", instead of leaving it looking current. A warning
   with a plain fix gets a Fix button, which says what it will do and

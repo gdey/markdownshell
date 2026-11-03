@@ -298,6 +298,7 @@ function startClock() {
   tick();
   pane.classList.add("running");
   $("history-timer").hidden = false;
+  placeCursor();
   clock = window.setInterval(tick, calm ? 1000 : 100);
 }
 
@@ -306,6 +307,7 @@ function stopClock() {
   clock = 0;
   $("history").classList.remove("running");
   $("history-timer").hidden = true;
+  placeCursor();
 }
 
 // submit runs entered, what the input held when enter was pressed. What
@@ -348,6 +350,72 @@ async function submit(entered: string) {
 function grow() {
   const box = input();
   box.rows = Math.min(6, Math.max(1, box.value.split("\n").length));
+  placeCursor();
+}
+
+// The block cursor, for Settings › Look › History prompt focus set to
+// the cursor, sits over the character at the caret, as a terminal's
+// does, and blinks. A hidden copy of the input's text, laid out as the
+// input lays it out, says where that character is.
+let mirror: HTMLDivElement | null = null;
+let composing = false;
+let placed = "";
+
+function placeCursor() {
+  const box = input();
+  const cursor = $("history-cursor");
+  const show =
+    document.documentElement.dataset.historyFocus === "cursor" &&
+    document.activeElement === box &&
+    document.hasFocus() &&
+    !box.disabled &&
+    !composing &&
+    box.selectionStart === box.selectionEnd &&
+    box.offsetParent !== null;
+  cursor.hidden = !show;
+  if (!show) {
+    placed = "";
+    return;
+  }
+  const css = getComputedStyle(box);
+  if (!mirror) {
+    mirror = document.createElement("div");
+    mirror.setAttribute("aria-hidden", "true");
+    mirror.style.cssText = "position:absolute;top:0;left:0;visibility:hidden;white-space:pre-wrap;overflow-wrap:break-word;padding:0;border:0";
+    document.body.append(mirror);
+  }
+  mirror.style.font = css.font;
+  mirror.style.lineHeight = css.lineHeight;
+  mirror.style.letterSpacing = css.letterSpacing;
+  mirror.style.tabSize = css.tabSize;
+  mirror.style.width = `${box.clientWidth}px`;
+  const at = box.selectionStart;
+  const next = box.value.codePointAt(at);
+  // The character under the block: the one at the caret, the
+  // placeholder's first while the input is empty, or a space.
+  let under = " ";
+  if (next !== undefined && next !== 10) under = String.fromCodePoint(next);
+  else if (!box.value && box.placeholder) under = String.fromCodePoint(box.placeholder.codePointAt(0)!);
+  const mark = document.createElement("span");
+  mark.style.display = "inline-block";
+  mark.textContent = under === "\t" ? " " : under;
+  mirror.replaceChildren(box.value.slice(0, at), mark);
+  const left = box.offsetLeft + mark.offsetLeft - box.scrollLeft;
+  const top = box.offsetTop + mark.offsetTop - box.scrollTop;
+  cursor.style.font = css.font;
+  cursor.style.left = `${left}px`;
+  cursor.style.top = `${top}px`;
+  cursor.style.width = `${mark.offsetWidth}px`;
+  cursor.textContent = mark.textContent;
+  // It stays solid while it moves, as a terminal's does, and blinks
+  // once it stops.
+  const where = `${left},${top},${under}`;
+  if (where !== placed) {
+    placed = where;
+    cursor.style.animation = "none";
+    void cursor.offsetWidth;
+    cursor.style.animation = "";
+  }
 }
 
 // recall puts entry at of typed in the input, or empties it past the end.
@@ -509,6 +577,7 @@ export function historyStatus(text: string) {
 // start.
 export function historyBusy(on: boolean) {
   input().disabled = on && block < 0;
+  placeCursor();
   $<HTMLButtonElement>("history-stop").disabled = !on;
   $<HTMLButtonElement>("history-restart").disabled = on;
   historyStatus(said);
@@ -521,6 +590,14 @@ export function initHistory(h: HistoryHooks) {
   const box = input();
   box.onkeydown = (e) => void onKey(e);
   box.oninput = grow;
+  box.onfocus = box.onblur = box.onscroll = placeCursor;
+  box.addEventListener("compositionstart", () => ((composing = true), placeCursor()));
+  box.addEventListener("compositionend", () => ((composing = false), placeCursor()));
+  document.addEventListener("selectionchange", placeCursor);
+  window.addEventListener("focus", placeCursor);
+  window.addEventListener("blur", placeCursor);
+  window.addEventListener("resize", placeCursor);
+  window.addEventListener("mdsh-look", placeCursor);
   $("history-grip").onpointerdown = dragGrip;
   $("history-grip").onkeydown = (e) => {
     const dir = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;

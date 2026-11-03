@@ -660,6 +660,24 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-timer { flex: 1; min-width: 0; line-height: 18px; color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
 #history-timer[hidden], #history.closed #history-timer { display: none; }
 #history-timer .label { color: var(--muted); }
+/* Settings › Look › History prompt focus can show the prompt's focus as
+   a terminal does, with a blinking block where you type, in place of the
+   outline: history.ts places the block over the character at the caret,
+   which it shows in the pane's background color. It is placed against
+   #history-foot, as the buttons on the separator are. The block is the
+   focus indicator, so it doesn't blink with reduced motion, and with
+   forced colors the outline and the system's caret come back. */
+#history-cursor { position: absolute; pointer-events: none; height: 18px; line-height: 18px; background: var(--fg); color: var(--bg); white-space: pre; animation: history-blink 1.06s steps(1) infinite; }
+#history-cursor[hidden] { display: none; }
+@keyframes history-blink { 50% { opacity: 0; } }
+:root[data-history-focus="cursor"] #history-input { caret-color: transparent; }
+:root[data-history-focus="cursor"] #history-input:is(:focus, :focus-visible) { outline: none; }
+@media (prefers-reduced-motion: reduce) { #history-cursor { animation: none; } }
+@media (forced-colors: active) {
+  #history-cursor { display: none !important; }
+  :root[data-history-focus="cursor"] #history-input { caret-color: auto; }
+  :root[data-history-focus="cursor"] #history-input:focus-visible { outline: 2px solid CanvasText; }
+}
 
 /* The Console pane, under the document and over the History bar,
    whatever screen the tab shows. */

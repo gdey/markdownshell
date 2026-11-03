@@ -175,6 +175,7 @@ function drawLook() {
   input("accent-custom").hidden = !custom;
   if (custom) input("accent-custom").value = s.accent;
   select("history-pane").value = s.historyPane;
+  select("history-focus").value = s.historyFocus;
   // Teletype's paper has sprockets, rules and shadows; Blueprint's
   // sheet only its grid.
   const tty = s.look === "tty";
@@ -213,6 +214,7 @@ select("accent").onchange = () => {
 };
 input("accent-custom").onchange = () => lookChange(() => (s.accent = input("accent-custom").value));
 select("history-pane").onchange = () => lookChange(() => (s.historyPane = select("history-pane").value));
+select("history-focus").onchange = () => lookChange(() => (s.historyFocus = select("history-focus").value));
 input("sprockets").onchange = () => lookChange(() => (s.noSprockets = !input("sprockets").checked));
 input("rules").onchange = () => lookChange(() => (s.noRules = !input("rules").checked));
 input("shadows").onchange = () => lookChange(() => (s.noShadows = !input("shadows").checked));
