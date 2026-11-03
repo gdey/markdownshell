@@ -3,7 +3,20 @@ name: Go
 on:
   push:
     branches: [main]
+  # A pull request that only touches docs, the site, or the changelog skips
+  # these jobs. docs/spec.md stays in because doc's tests read it, and
+  # examples/ stays in because its files are run as tests.
   pull_request:
+    paths:
+      - "**"
+      - "!README.md"
+      - "!CHANGELOG.md"
+      - "!SECURITY.md"
+      - "!LICENSE"
+      - "!site/**"
+      - "!docs/**"
+      - "docs/spec.md"
+      - "!cmd/mdsh-gui/README.md"
 
 # A new push to a pull request cancels that pull request's older run, so a
 # rebase does not leave stale jobs waiting on scarce macOS runners. Runs on
