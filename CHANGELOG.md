@@ -245,6 +245,15 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh-gui's History pane after ctrl+p recalled kubectl get pods -n staging, ctrl+w killed staging, and alt+d swapped get for describe](docs/changelog/history-readline.png)
 
+- In `mdsh-gui`, the History pane no longer reads a `.zshrc` (or
+  another rc file named for a different shell) when blocks run in
+  `sh` or `bash`. Read by macOS's `/bin/sh`, a `.zshrc` that sets up
+  zoxide made `cd` fail with `(Ie)__zoxide_hook: syntax error in
+  expression`. A `.zshrc` is read only when blocks run in zsh, and a
+  `.bashrc` only in bash.
+
+  ![The Shell settings, saying a file named for one shell is read only when blocks run in that shell](docs/changelog/history-rc-shell.png)
+
 - In `mdsh-gui` on macOS, the source pane no longer jumps to the block
   at the top of the rendered view while you type or click in it. The
   panes follow only the one you last scrolled, clicked or typed in, so

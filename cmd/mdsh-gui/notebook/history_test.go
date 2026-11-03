@@ -431,3 +431,60 @@ func TestPromptFollowsSize(t *testing.T) {
 		}
 	}
 }
+
+func TestRCScriptShell(t *testing.T) {
+	for _, c := range []struct {
+		path, sh string
+		read     bool
+	}{
+		{"~/.zshrc", "/bin/zsh", true},
+		{"~/.zshrc", "/bin/sh", false},
+		{"/home/me/.zshenv", "bash", false},
+		{"~/.zprofile", "/bin/sh", false},
+		{"~/.bashrc", "/bin/bash", true},
+		{"~/.bashrc", "/bin/zsh", false},
+		{"~/rc", "/bin/sh", true},
+		{"", "/bin/zsh", false},
+	} {
+		if got := rcScript(c.path, c.sh) != ""; got != c.read {
+			t.Errorf("rcScript(%q, %q) reads it: %v, want %v", c.path, c.sh, got, c.read)
+		}
+	}
+}
+
+// A .zshrc that sets up zoxide isn't read by bash, as macOS's /bin/sh
+// is: its cd, in zsh's syntax, would fail.
+func TestHistoryRCOtherShell(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash")
+	}
+	dir := t.TempDir()
+	rc := filepath.Join(dir, ".zshrc")
+	zoxide := `PS1='zsh> '
+function __zoxide_doctor() {
+    [[ ${chpwd_functions[(Ie)__zoxide_hook]:-} -eq 0 ]] || return 0
+}
+function cd() { __zoxide_doctor; builtin cd "$@"; }
+`
+	if err := os.WriteFile(rc, []byte(zoxide), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(write(t, "# Log\n"), Options{Run: RunOptions{HistoryRC: rc, Shell: bash}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if _, err := n.SetHistory(true); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := n.Prompt(); p.PS1 == "zsh> " {
+		t.Fatal("bash read the .zshrc")
+	}
+	if err := n.Enter("cd " + dir); err != nil {
+		t.Fatal(err)
+	}
+	if text := n.Text(); strings.Contains(text, "syntax error") || strings.Contains(text, "exit=1") {
+		t.Errorf("text = %s", text)
+	}
+}
