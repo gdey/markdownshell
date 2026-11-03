@@ -126,6 +126,16 @@ func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec 
 	return status, exited, err
 }
 
+// SetSize sizes the shell's pseudo-terminal, if it has one, so what asks
+// the terminal its size between blocks, such as a prompt drawn to fit
+// the width, sees the size it is shown at.
+func (s *Shell) SetSize(cols, rows int) {
+	if s.pty == nil || cols <= 0 || rows <= 0 {
+		return
+	}
+	pty.Setsize(s.pty.ptm, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+}
+
 // ErrTapeEnded is returned by RunScripted when the block is still
 // running a while after drive has typed everything, most likely waiting
 // for input that will never come.

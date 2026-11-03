@@ -250,10 +250,10 @@ export function HistoryEnter(input: string): $CancellablePromise<void> {
 
 /**
  * HistoryPrompt is the shell's PS1 and PS2, expanded, for the History
- * pane's prompt.
+ * pane's prompt, at the pane's size, cols by rows.
  */
-export function HistoryPrompt(): $CancellablePromise<notebook$0.Prompt> {
-    return $Call.ByName("main.App.HistoryPrompt");
+export function HistoryPrompt(cols: number, rows: number): $CancellablePromise<notebook$0.Prompt> {
+    return $Call.ByName("main.App.HistoryPrompt", cols, rows);
 }
 
 /**

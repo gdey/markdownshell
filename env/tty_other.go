@@ -27,6 +27,9 @@ func (s *Shell) RunScripted(context.Context, string, int, int, io.Writer, func(c
 	return 0, false, errNoTTY
 }
 
+// SetSize does nothing here: there is no pseudo-terminal to size.
+func (s *Shell) SetSize(int, int) {}
+
 type ptyConn struct{}
 
 func openPTY(*exec.Cmd) (*ptyConn, error) { return nil, errNoTTY }

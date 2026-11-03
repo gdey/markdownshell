@@ -26,6 +26,7 @@ let ps1 = ""; // the shell's prompts, expanded, or "" for none
 let ps2 = "";
 let asking = false; // a prompt is being asked for
 let at = 0; // where up and down are in typed
+let promptCols = 0; // the width the prompt was last asked at
 
 export interface HistoryHooks {
   // canRun says whether a run may start, which it can't while one goes.
@@ -105,6 +106,10 @@ export function fitHistory() {
   if (rows > maxRows()) rows = maxRows();
   if (c !== term.cols || rows !== term.rows) term.resize(c, rows);
   App.SetTerminalSize(c, rows).catch(() => {});
+  // A prompt drawn to fit the width is asked for again at the new one.
+  // While a block runs the shell can't answer; the prompt is asked for
+  // when it ends.
+  if (c !== promptCols && block < 0) void updatePrompt();
 }
 
 // cellHeight is the height of a line of the transcript, in pixels.
@@ -215,15 +220,21 @@ export function focusHistory() {
 export async function updatePrompt() {
   if ($("history").hidden || asking) return;
   asking = true;
+  // At the pane's size, not the terminal's, which a block's card sets
+  // too, so the prompt fits the pane however the calls cross.
+  const cols = term?.cols ?? 0;
   try {
-    const p = await App.HistoryPrompt();
+    const p = await App.HistoryPrompt(cols, term?.rows ?? 0);
     ps1 = p.ps1;
     ps2 = p.ps2;
+    promptCols = cols;
   } catch {
     return;
   } finally {
     asking = false;
   }
+  // Resized while asking: ask again at the size it is now.
+  if (term && term.cols !== cols) fitHistory();
   const at = ps1.lastIndexOf("\n");
   const head = $("history-prompt-head");
   const prompt = $("history-prompt");

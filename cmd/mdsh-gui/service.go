@@ -480,13 +480,13 @@ func (a *App) HistoryCompletions(ctx context.Context, before string) (notebook.C
 }
 
 // HistoryPrompt is the shell's PS1 and PS2, expanded, for the History
-// pane's prompt.
-func (a *App) HistoryPrompt(ctx context.Context) (notebook.Prompt, error) {
+// pane's prompt, at the pane's size, cols by rows.
+func (a *App) HistoryPrompt(ctx context.Context, cols, rows int) (notebook.Prompt, error) {
 	_, n, err := a.notebook(ctx)
 	if err != nil {
 		return notebook.Prompt{}, err
 	}
-	return n.Prompt()
+	return n.PromptAt(cols, rows)
 }
 
 // Start is what the start screen lists.

@@ -63,6 +63,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- In `mdsh-gui`, the History pane's prompt follows the pane's width. A
+  prompt drawn to fit the terminal, such as one with a rule or a
+  right-aligned part, kept the width of the last command run there (or
+  none at all), since the shell's terminal was only sized while a
+  command ran. Now the prompt is asked for at the pane's size, with
+  `COLUMNS` and `LINES` set, and asked for again when the pane is
+  resized.
+
+  ![The History pane's prompt, a rule across the pane, at two window widths](docs/changelog/history-prompt-resize.png)
+
 - In `mdsh-gui`, a block's confirm question is now scrolled to the
   middle of the rendered view when it's asked, even when the block's
   last output is longer than the view; before, the card was centered
