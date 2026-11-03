@@ -223,6 +223,10 @@ follow [Semantic Versioning](https://semver.org/).
   at the top of the rendered view while you type or click in it. The
   panes follow only the one you last scrolled, clicked or typed in, so
   the rendered view redrawing after an edit can't move the source.
+- In `mdsh-gui`, reloading or reopening a tab while a block waits on its
+  confirm question now stops that run. Before, the old run stayed
+  parked on the question, and the next answer, meant for the reloaded
+  file, woke it on its closed shells instead.
 
 ## [1.3.0] - 2026-11-02
 

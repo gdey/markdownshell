@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
@@ -91,7 +92,7 @@ func TestTabLive(t *testing.T) {
 	err := tab.run(func() error {
 		tab.emit("block", "started")
 		answered := make(chan run.Answer)
-		go func() { answered <- tab.confirm(0, "Run this block?") }()
+		go func() { answered <- tab.confirm(nil, 0, "Run this block?") }()
 		tab.answers <- run.Go // confirm has asked once this is taken
 		if ans := <-answered; ans != run.Go {
 			t.Errorf("answer %v, want Go", ans)
@@ -180,5 +181,57 @@ func TestAskReadOnly(t *testing.T) {
 	tab.runReadOnly("ro.md")
 	if tab.askReadOnly("ro.md") {
 		t.Error("asked again after the user chose to run without saving")
+	}
+}
+
+// Reopening a tab while a block waits on its confirm question stops the
+// old run, so the next answer can't wake it on the closed notebook.
+func TestTabReopenWhileAsking(t *testing.T) {
+	dir := t.TempDir()
+	st, err := settings.Open(filepath.Join(dir, "gui.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "ask.md")
+	if err := os.WriteFile(file, []byte("```sh {#ask confirm=\"Really?\"}\necho yes\n```\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{settings: st, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	tab := &docTab{app: a, id: 1, answers: make(chan run.Answer), done: make(chan struct{})}
+	a.tabs[1] = tab
+	t.Cleanup(tab.shutdown)
+	ctx := context.WithValue(context.Background(), tabKey{}, 1)
+	if err := tab.open(file, notebook.RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := tab.notebook()
+
+	ran := make(chan error, 1)
+	go func() { ran <- tab.run(func() error { return old.RunFrom(0) }) }()
+	asking := func() bool {
+		live, _ := a.Live(ctx)
+		for _, e := range live {
+			if e.Name == "confirm" {
+				return true
+			}
+		}
+		return false
+	}
+	for deadline := time.Now().Add(5 * time.Second); !asking(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the block never asked")
+		}
+	}
+
+	if err := tab.open(file, notebook.RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ran:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the old run is still waiting for an answer after the tab reopened")
+	}
+	if err := a.Answer(ctx, "run"); err == nil {
+		t.Error("an answer after reopening was taken by the old run")
 	}
 }
