@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
@@ -153,6 +154,17 @@ func (t images) inline(dest string) string {
 		typ = "image/jpeg"
 	case bytes.HasPrefix(data, []byte("GIF8")):
 		// A recording's #frame= is for still pages; here it plays.
+		typ = "image/gif"
+	case termrec.IsCast(data):
+		// A tty block's cast plays as a GIF made from it, so the page
+		// needs no script.
+		rec, err := termrec.ReadCast(bytes.NewReader(data))
+		if err != nil {
+			return ""
+		}
+		if data, err = termrec.GIF(rec); err != nil {
+			return ""
+		}
 		typ = "image/gif"
 	case bytes.HasPrefix(data, []byte("RIFF")) && len(data) > 12 && string(data[8:12]) == "WEBP":
 		typ = "image/webp"

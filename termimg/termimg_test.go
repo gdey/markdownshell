@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gdey/markdownshell/termrec"
 )
 
 func square(c color.Color, n int) *image.RGBA {
@@ -102,5 +104,22 @@ func TestShow(t *testing.T) {
 	}
 	if err := Show(&bytes.Buffer{}, None, img, 80); err == nil {
 		t.Error("None showed an image")
+	}
+}
+
+// A cast is drawn as its last frame.
+func TestDecodeCast(t *testing.T) {
+	rec := termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{{At: 0, Data: []byte("hi")}}}
+	var b bytes.Buffer
+	if err := termrec.WriteCast(&b, rec); err != nil {
+		t.Fatal(err)
+	}
+	img, err := Decode(b.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := termrec.Still(rec, 0)
+	if img.Bounds() != want.Bounds() {
+		t.Errorf("bounds %v, want %v", img.Bounds(), want.Bounds())
 	}
 }

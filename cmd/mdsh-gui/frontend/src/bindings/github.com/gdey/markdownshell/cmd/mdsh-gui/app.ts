@@ -13,6 +13,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "/wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as fonts$0 from "./fonts/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as notebook$0 from "./notebook/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -144,6 +147,14 @@ export function Console(): $CancellablePromise<$models.ConsoleEntry[] | null> {
 }
 
 /**
+ * CopyCastGIF puts an animated GIF of cast, an asciicast v2 recording, on
+ * the clipboard.
+ */
+export function CopyCastGIF(cast: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.CopyCastGIF", cast);
+}
+
+/**
  * CreateReport writes the report r describes.
  */
 export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
@@ -205,6 +216,14 @@ export function EndDrag(id: number, outside: boolean, x: number, y: number): $Ca
  */
 export function FolderSettings(rel: string): $CancellablePromise<$models.FolderForm> {
     return $Call.ByName("main.App.FolderSettings", rel);
+}
+
+/**
+ * Fonts lists the font families installed on this computer, for the
+ * Look tab's font menus.
+ */
+export function Fonts(): $CancellablePromise<fonts$0.Fonts> {
+    return $Call.ByName("main.App.Fonts");
 }
 
 /**
@@ -546,6 +565,15 @@ export function SaveAs(): $CancellablePromise<boolean> {
  */
 export function SelectTab(id: number): $CancellablePromise<void> {
     return $Call.ByName("main.App.SelectTab", id);
+}
+
+/**
+ * SetCastFrame writes frame=n, where a recording's player was left, on
+ * tty block i, or with i < 0 on the cast fence holding body. Undo takes
+ * it back.
+ */
+export function SetCastFrame(i: number, body: string, frame: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetCastFrame", i, body, frame);
 }
 
 /**

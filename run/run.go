@@ -620,36 +620,45 @@ func hasTTY(d *doc.Document) bool {
 	return false
 }
 
-// saveRecording saves a tty block's session as an asciinema cast and as
-// an animated GIF made from it, and returns the link to the GIF. The cast
-// is a file even with embed=inline, at the GIF's path with a .cast
-// extension, or <doc>.assets/<block id>.cast. A session that showed
-// nothing saves nothing.
+// saveRecording saves a tty block's session as an asciinema cast and
+// returns the link to it: <doc>.assets/<block id>.cast, the path
+// out=recording:path names, or a data: URI with embed=inline. A path
+// ending in .gif asks for an animated GIF instead, made from the cast;
+// the cast is then saved too, at the GIF's path with a .cast extension
+// (or <doc>.assets/<block id>.cast with embed=inline). A session that
+// showed nothing saves nothing.
 func saveRecording(b *doc.Block, rec termrec.Recording, opts Options) (string, error) {
-	data, err := termrec.GIF(rec)
-	if errors.Is(err, termrec.ErrEmpty) {
+	if len(rec.Events) == 0 {
 		return "", nil
 	}
-	if err != nil {
-		return "", fmt.Errorf("recording: %w", err)
-	}
 	_, rel := outKind(b)
-	if rel, err = resolveRes(rel, opts); err != nil {
+	rel, err := resolveRes(rel, opts)
+	if err != nil {
 		return "", err
-	}
-	castRel := ""
-	if rel != "" {
-		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
 	}
 	var cast bytes.Buffer
 	if err := termrec.WriteCast(&cast, rec); err != nil {
 		return "", fmt.Errorf("recording: %w", err)
+	}
+	if !strings.EqualFold(filepath.Ext(rel), ".gif") {
+		return saveAsset(b, rel, cast.Bytes(), CastMIME, ".cast", opts)
+	}
+	data, err := termrec.GIF(rec)
+	if err != nil {
+		return "", fmt.Errorf("recording: %w", err)
+	}
+	castRel := ""
+	if !b.Attrs.Has("embed") || b.Attrs["embed"] != "inline" {
+		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
 	}
 	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes()); err != nil {
 		return "", err
 	}
 	return saveAsset(b, rel, data, "image/gif", ".gif", opts)
 }
+
+// CastMIME is the media type of an asciicast v2 file, for data: URIs.
+const CastMIME = "application/x-asciicast"
 
 // OutKind returns the block's output kind: text, markdown, image,
 // screenshot, or recording for a tty block.

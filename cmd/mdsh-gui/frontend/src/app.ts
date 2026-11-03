@@ -5,6 +5,7 @@ import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Clipboard, Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
+import { enableCasts } from "./cast.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBehavior, setOutput, svg } from "./dom.js";
 import { folderGear, initFolders } from "./folders.js";
@@ -282,6 +283,7 @@ function drawProse(c: Cell): HTMLElement {
   const code = c.firstLine ? s.querySelector<HTMLElement>("pre.numbered > code") : null;
   if (code) code.style.counterReset = `line ${c.firstLine! - 1}`;
   enableDiagrams(s);
+  enableCasts(s, { save: (n, body) => void saveFrame(-1, body, n) });
   enableCopy(s);
   s.onclick = (e) => {
     if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
@@ -355,8 +357,8 @@ async function copyCode(code: string, name: string) {
 // so a redraw keeps them that way.
 const shownAsCode = new Set<string>();
 
-// enableDiagrams gives each d2 or svg diagram Go drew in e a button that
-// switches between the picture and its code. A diagram Go couldn't draw
+// enableDiagrams gives each d2 or svg diagram, or cast recording, Go drew
+// in e a button that switches between the picture and its code. A diagram Go couldn't draw
 // shows only its code and a note saying why.
 function enableDiagrams(e: HTMLElement) {
   for (const fig of e.querySelectorAll<HTMLElement>("figure.diagram")) {
@@ -367,7 +369,7 @@ function enableDiagrams(e: HTMLElement) {
       fig.dataset.show = code ? "code" : "image";
       if (code) shownAsCode.add(key);
       else shownAsCode.delete(key);
-      const title = code ? "Show the diagram" : "Show the " + fig.dataset.lang + " source";
+      const title = code ? (fig.dataset.lang === "cast" ? "Show the recording" : "Show the diagram") : "Show the " + fig.dataset.lang + " source";
       b.title = title;
       b.setAttribute("aria-label", title);
       b.replaceChildren(svg(icons[code ? "image" : "code"]));
@@ -588,6 +590,7 @@ function drawBlock(c: Cell): HTMLElement {
   // too, until the block runs again.
   enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
   enableDiagrams(block.querySelector<HTMLElement>(".output")!);
+  enableCasts(block.querySelector<HTMLElement>(".output")!, { frame: Number(/(?:^|\s)frame=(\d+)/.exec(c.attrs ?? "")?.[1] ?? 0) || undefined, save: (n) => void saveFrame(c.block, "", n) });
   block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
     const img = (e.target as HTMLElement).closest("img");
     if (img) viewImage(img);
@@ -809,6 +812,15 @@ async function saveFolds(list: Fold[]) {
   }
   // Where the file folds by a condition, nothing changed.
   $("dirty").hidden = !(await App.Doc()).dirty;
+}
+
+// saveFrame writes frame=n, where a recording's player was left, to tty
+// block i, or with i < 0 to the cast fence holding body, so the file
+// opens at that frame. n is 0 for the last frame. While a block runs the
+// file can't change, so it is left as it is.
+async function saveFrame(i: number, body: string, n: number) {
+  if (running) return;
+  await edit(() => App.SetCastFrame(i, body, n));
 }
 
 // drawPart shows a block's code or output whole, or as its first line.
@@ -3327,7 +3339,7 @@ $("keep").onclick = () => {
 document.addEventListener("keydown", (e) => {
   if (!doc.file || e.metaKey || e.ctrlKey || e.altKey) return;
   const target = e.target as HTMLElement | null;
-  if (target?.closest?.("input, textarea, select, dialog, [contenteditable], .cm-editor, .terminal")) return;
+  if (target?.closest?.("input, textarea, select, dialog, [contenteditable], .cm-editor, .terminal, .cast-player")) return;
   // These keys move around the rendered view, so it leads the scrolling.
   lead = "doc";
   const all = blocks();

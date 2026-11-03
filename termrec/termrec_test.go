@@ -102,3 +102,34 @@ func TestScreen(t *testing.T) {
 		t.Errorf("Text() = %q", got)
 	}
 }
+
+// Still draws the frames GIF does, each one whole.
+func TestStill(t *testing.T) {
+	r := rec("one\r\n", "two\r\n", "\x1b[2J")
+	data, err := GIF(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []int{1, 2, 3, 0, 9} {
+		got, err := Still(r, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _ := Frame(data, n)
+		if got.Bounds() != want.Bounds() {
+			t.Fatalf("frame %d: bounds %v, want %v", n, got.Bounds(), want.Bounds())
+		}
+		for y := range want.Bounds().Dy() {
+			for x := range want.Bounds().Dx() {
+				r1, g1, b1, _ := got.At(x, y).RGBA()
+				r2, g2, b2, _ := want.At(x, y).RGBA()
+				if r1 != r2 || g1 != g2 || b1 != b2 {
+					t.Fatalf("frame %d differs from the GIF's at %d,%d", n, x, y)
+				}
+			}
+		}
+	}
+	if _, err := Still(Recording{}, 0); err != ErrEmpty {
+		t.Errorf("empty: err = %v, want ErrEmpty", err)
+	}
+}

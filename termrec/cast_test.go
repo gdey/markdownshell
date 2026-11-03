@@ -49,3 +49,23 @@ func TestReadCastSkipsInput(t *testing.T) {
 		t.Errorf("events = %+v", rec.Events)
 	}
 }
+
+func TestIsCast(t *testing.T) {
+	var b bytes.Buffer
+	WriteCast(&b, rec("hi"))
+	for _, tc := range []struct {
+		data string
+		want bool
+	}{
+		{b.String(), true},
+		{`{"version":1,"width":80}` + "\n", false},
+		{`{"version":2}` + "\n", false},
+		{"GIF89a", false},
+		{"", false},
+		{`{"version":2,"width":80,"height":24}`, true},
+	} {
+		if got := IsCast([]byte(tc.data)); got != tc.want {
+			t.Errorf("IsCast(%.30q) = %v", tc.data, got)
+		}
+	}
+}

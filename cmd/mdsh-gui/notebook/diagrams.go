@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
@@ -28,15 +30,17 @@ import (
 	"oss.terrastruct.com/d2/lib/textmeasure"
 )
 
-// A diagram is a fenced d2 or svg block drawn as a picture. It holds the
-// fenced block, which is drawn too, so the window can switch between the
-// two. It's drawn when it's rendered, not when it's parsed. Without a
+// A diagram is a fenced d2, svg or cast block drawn as a picture; a
+// cast, an asciinema recording, is played by the window's cast player.
+// It holds the fenced block, which is drawn too, so the window can switch
+// between the two. It's drawn when it's rendered, not when it's parsed. Without a
 // picture, such as when d2 isn't installed or the diagram has a
 // mistake, note says why and only the code shows.
 type diagram struct {
 	ast.BaseBlock
 	lang        string
 	body        []byte
+	frame       string // a cast's frame=, where its player opens
 	light, dark []byte
 	note        string
 }
@@ -47,7 +51,7 @@ func (d *diagram) Kind() ast.NodeKind { return kindDiagram }
 
 func (d *diagram) Dump(src []byte, level int) { ast.DumpHelper(d, src, level, nil, nil) }
 
-// diagrams wraps fenced d2 and svg blocks in a diagram.
+// diagrams wraps fenced d2, svg and cast blocks in a diagram.
 type diagrams struct{}
 
 func (diagrams) Transform(root *ast.Document, reader text.Reader, _ parser.Context) {
@@ -55,7 +59,7 @@ func (diagrams) Transform(root *ast.Document, reader text.Reader, _ parser.Conte
 	var fences []*ast.FencedCodeBlock
 	_ = ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if fc, ok := node.(*ast.FencedCodeBlock); ok && entering {
-			if l := string(fc.Language(src)); l == "d2" || l == "svg" {
+			if l := string(fc.Language(src)); l == "d2" || l == "svg" || l == "cast" {
 				fences = append(fences, fc)
 			}
 		}
@@ -68,6 +72,12 @@ func (diagrams) Transform(root *ast.Document, reader text.Reader, _ parser.Conte
 			body.Write(seg.Value(src))
 		}
 		d := &diagram{lang: string(fc.Language(src)), body: body.Bytes()}
+		if d.lang == "cast" && fc.Info != nil {
+			_, attrs := doc.ParseInfo(string(fc.Info.Segment.Value(src)))
+			if n, err := strconv.Atoi(attrs["frame"]); err == nil && n > 0 {
+				d.frame = strconv.Itoa(n)
+			}
+		}
 		parent := fc.Parent()
 		parent.ReplaceChild(parent, fc, d)
 		d.AppendChild(d, fc)
@@ -91,9 +101,22 @@ func (diagramRenderer) RegisterFuncs(r renderer.NodeRendererFuncRegisterer) {
 			_, _ = w.WriteString("</figure>\n")
 			return ast.WalkContinue, nil
 		}
-		if d.lang == "svg" {
+		switch d.lang {
+		case "svg":
 			d.light = d.body
-		} else {
+		case "cast":
+			if termrec.IsCast(d.body) {
+				// The window swaps the image for its cast player.
+				_, _ = w.WriteString(`<figure class="diagram" data-lang="cast"><div class="diagram-image"><img alt="recording" src="data:application/x-asciicast;base64,`)
+				_, _ = w.WriteString(base64.StdEncoding.EncodeToString(d.body))
+				if d.frame != "" {
+					_, _ = w.WriteString("#frame=" + d.frame)
+				}
+				_, _ = w.WriteString("\"></div>\n")
+				return ast.WalkContinue, nil
+			}
+			d.note = "not an asciinema recording: a cast block holds an asciicast v2 file, a JSON header line and then one line per event"
+		default:
 			d.light, d.dark, d.note = drawD2(d.body)
 		}
 		_, _ = w.WriteString(`<figure class="diagram" data-lang="` + d.lang + `">`)

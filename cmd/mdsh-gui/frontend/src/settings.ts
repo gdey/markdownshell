@@ -126,7 +126,9 @@ select("theme").onchange = () => lookChange(() => (s.theme = select("theme").val
 select("look").onchange = () => lookChange(() => (s.look = select("look").value));
 
 // The Look tab's options. Each change shows at once in every window.
-// fonts are common faces, of which the menus list those installed.
+// The font menus list the families installed on this computer, the
+// code font's those of one width. Where the system can't say, they list
+// those of these common faces that are installed.
 const fonts = {
   ui: ["Inter", "SF Pro Text", "Helvetica Neue", "Helvetica", "Avenir Next", "Segoe UI", "Roboto", "Ubuntu", "Noto Sans", "DejaVu Sans", "Liberation Sans", "IBM Plex Sans", "Source Sans 3", "Georgia", "Charter", "Iowan Old Style"],
   code: ["SF Mono", "Menlo", "Monaco", "JetBrains Mono", "Fira Code", "Fira Mono", "Source Code Pro", "IBM Plex Mono", "Cascadia Code", "Consolas", "Hack", "Inconsolata", "Roboto Mono", "Ubuntu Mono", "DejaVu Sans Mono", "Liberation Mono", "Courier Prime", "Courier New"],
@@ -148,13 +150,14 @@ function installed(family: string): boolean {
 
 function fillFonts(id: string, families: string[], chosen: string) {
   const sel = select(id);
-  const names = families.filter(installed);
+  const names = [...families];
   if (chosen && !names.includes(chosen)) names.push(chosen);
   sel.replaceChildren(el("option", { value: "" }, "The look's own"), ...names.map((n) => el("option", { value: n }, n)));
   sel.value = chosen;
 }
-fillFonts("ui-font", fonts.ui, s.uiFont);
-fillFonts("code-font", fonts.code, s.codeFont);
+const system = await App.Fonts().catch(() => null);
+fillFonts("ui-font", system?.all?.length ? system.all : fonts.ui.filter(installed), s.uiFont);
+fillFonts("code-font", system?.mono?.length ? system.mono : fonts.code.filter(installed), s.codeFont);
 
 const presets = ["", "#3fb950", "#d4a017", "#2f81f7", "#d1495b", "#8250df"];
 

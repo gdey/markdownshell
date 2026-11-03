@@ -354,7 +354,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run) |
-| `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an animated GIF |
+| `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
 | `frame=N` | With `tty`, the frame a PDF shows (default the last) |
 | `out=markdown` | Insert output as raw markdown |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
@@ -485,10 +485,15 @@ directory carry over as usual. Ctrl+c goes to the command, not to mdsh,
 and window resizes are passed on.
 
 mdsh records the session as an [asciinema](https://asciinema.org) cast,
-`<doc>.assets/<block-id>.cast` (or `out=recording:path` with `.cast`),
-and makes an animated GIF from it beside the cast, linked below the
-block, since GitHub and PDFs can't play a cast. A PDF can't animate, so it shows the last frame; set
-`frame=N` to show frame `N` instead, counting from 1.
+`<doc>.assets/<block-id>.cast` (or the path `out=recording:path` names),
+and links it below the block. mdsh-gui plays it in the block's card,
+where you can pause, scrub, and step back and forth a frame at a time.
+GitHub can't play a cast, so for a document read there, give a path
+ending in `.gif`, as in `out=recording:res://demo.gif`: mdsh links an
+animated GIF made from the cast instead, and keeps the cast beside it.
+An HTML report plays a GIF made from the cast. A PDF can't animate, so
+it shows the last frame; set `frame=N` to show frame `N` instead,
+counting from 1.
 
 A `tape` fence types the input for a `tty` block, in the commands of a
 [VHS](https://github.com/charmbracelet/vhs) tape, so the block runs with

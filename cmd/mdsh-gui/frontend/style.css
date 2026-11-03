@@ -573,6 +573,21 @@ dialog#report { width: min(560px, 92vw); }
 .block .output .terminal :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
 .block .output:has(.terminal) { padding: 0 12px 0 22px; }
 
+/* The cast player, where a tty block's recording plays */
+.cast-player { margin: 12px 0; max-width: 100%; display: inline-flex; flex-direction: column; border-radius: 6px; background: var(--term-bg); overflow: hidden; }
+.cast-player:focus-within { outline: 2px solid var(--accent, #4a90e2); outline-offset: 2px; }
+.cast-screen { box-sizing: border-box; overflow-x: auto; overflow-y: hidden; }
+.cast-player .terminal, .block .output .cast-player .terminal { margin: 0; padding: 6px; border-radius: 0; background: var(--term-bg); }
+/* A cast fence's player sits below the button that shows its code. */
+figure.diagram[data-lang="cast"] .diagram-image { padding-top: 32px; }
+.cast-screen :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--term-bg) !important; }
+.cast-player.loading .cast-screen, .cast-player.failed .cast-screen { display: none; }
+.cast-controls { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--bg); border-top: 1px solid var(--border); color: var(--fg); }
+.cast-controls button.icon svg { width: 14px; height: 14px; fill: currentColor; }
+.cast-scrub { flex: 1; min-width: 80px; margin: 0 6px; accent-color: var(--accent, #4a90e2); }
+.cast-status { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: calc(12px * var(--text-scale, 1)); }
+.cast-note { margin-right: 8px; white-space: nowrap; font-size: calc(12px * var(--text-scale, 1)); color: var(--accent); }
+
 /* The History pane: a terminal along the bottom whose commands are
    added to the file. */
 #history { flex: none; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--bg); color: var(--fg); }

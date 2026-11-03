@@ -53,7 +53,12 @@ func (t docImages) Transform(root *ast.Document, reader text.Reader, _ parser.Co
 		}
 		link := string(img.Destination)
 		if path, ok := beside(dir, link); ok {
-			img.Destination = []byte(DocURL(path))
+			u := DocURL(path)
+			// A recording's #frame=N is the frame its player opens at.
+			if _, frag, ok := strings.Cut(link, "#"); ok {
+				u += "#" + frag
+			}
+			img.Destination = []byte(u)
 		} else if host, ok := remoteImage(link); ok {
 			remote = append(remote, note{img, host})
 		}

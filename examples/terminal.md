@@ -3,9 +3,11 @@
 
 Some programs need a terminal: `docker run -it`, `ssh`, `sudo`, editors
 and REPLs. A block marked `tty` runs on one. mdsh records the session
-as an [asciinema](https://asciinema.org) cast and an animated GIF and
-links the GIF below the block. A PDF can't animate, so it shows the GIF's
-last frame, or the frame `frame=N` picks.
+as an [asciinema](https://asciinema.org) cast and links it below the
+block. mdsh-gui plays it, a frame at a time if you like; give
+`out=recording:` a path ending in `.gif` for an animated GIF instead. A
+PDF can't animate, so it shows the last frame, or the frame `frame=N`
+picks.
 
 Without a tape, you type the input yourself. A `tape` fence types it
 instead, in [VHS](https://github.com/charmbracelet/vhs) tape commands,
@@ -24,7 +26,7 @@ printf 'Hello, %s!\n' "$NAME"
 ```
 
 <!-- mdsh:output for="greet" -->
-![greet](terminal.md.assets/greet.gif)
+![greet](terminal.md.assets/greet.cast)
 <!-- /mdsh:output -->
 
 The tape waits for the prompt before typing. Keys go out as soon as the
@@ -57,7 +59,7 @@ sh terminal/fruit.sh
 ```
 
 <!-- mdsh:output for="fruit" -->
-![fruit](terminal.md.assets/fruit.gif)
+![fruit](terminal.md.assets/fruit.cast)
 <!-- /mdsh:output -->
 
 ```tape {for=fruit <include file=terminal/fruit.tape}
@@ -84,7 +86,7 @@ mdsh's environment (once `--expose VAR` or `$MDSH_EXPOSE` names it), or `{{#bloc
 are filled in as the tape plays, so the document keeps the placeholder,
 never the value. In single quotes or backticks, text is typed as it is. The
 recording only holds what the screen shows, and this prompt turns echo
-off, so the token stays out of the GIF and the cast too.
+off, so the token stays out of the cast too.
 
 ```sh {#token}
 TOKEN=$(printf 'demo-%s' 4242)
@@ -99,7 +101,7 @@ printf '\nGot a token of %d characters.\n' "${#t}"
 ```
 
 <!-- mdsh:output for="login" -->
-![login](terminal.md.assets/login.gif)
+![login](terminal.md.assets/login.cast)
 <!-- /mdsh:output -->
 
 ```tape {for=login}

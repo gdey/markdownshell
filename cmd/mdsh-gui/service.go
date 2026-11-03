@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/fonts"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/session"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
@@ -22,6 +22,7 @@ import (
 	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/writable"
 )
 
@@ -757,6 +758,33 @@ func (a *App) SetFolds(ctx context.Context, folds []notebook.Fold) error {
 	return err
 }
 
+// SetCastFrame writes frame=n, where a recording's player was left, on
+// tty block i, or with i < 0 on the cast fence holding body. Undo takes
+// it back.
+func (a *App) SetCastFrame(ctx context.Context, i int, body string, frame int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetCastFrame(i, body, frame)
+	t.changed()
+	return err
+}
+
+// CopyCastGIF puts an animated GIF of cast, an asciicast v2 recording, on
+// the clipboard.
+func (a *App) CopyCastGIF(cast string) error {
+	rec, err := termrec.ReadCast(strings.NewReader(cast))
+	if err != nil {
+		return err
+	}
+	data, err := termrec.GIF(rec)
+	if err != nil {
+		return err
+	}
+	return copyGIF(data)
+}
+
 // SetDepends sets block i's depends= to the blocks deps names, by index,
 // or takes it out when deps is empty. Undo takes it back.
 func (a *App) SetDepends(ctx context.Context, i int, deps []int) error {
@@ -1137,15 +1165,9 @@ func (a *App) detach(t *docTab, x, y int) {
 
 var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
-// fontName is a font family name as the page can take it in a CSS
-// variable: letters, digits, spaces, dots, hyphens and underscores,
-// trimmed; anything else gives "", the look's own font.
-func fontName(name string) string {
-	name = strings.TrimSpace(name)
-	for _, r := range name {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(" .-_", r) {
-			return ""
-		}
-	}
-	return name
-}
+// fontName is a font family name Settings can save; see fonts.Name.
+func fontName(name string) string { return fonts.Name(name) }
+
+// Fonts lists the font families installed on this computer, for the
+// Look tab's font menus.
+func (a *App) Fonts() fonts.Fonts { return fonts.List() }

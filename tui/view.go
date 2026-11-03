@@ -312,6 +312,11 @@ func imageLink(md string) string {
 
 // imagePath resolves link, relative to the document, for termimg.Load.
 func (m *Model) imagePath(link string) string {
+	// A recording's #frame=N is for still pages; the preview is the
+	// last frame.
+	if !strings.HasPrefix(link, "data:") {
+		link, _, _ = strings.Cut(link, "#")
+	}
 	if link == "" || strings.HasPrefix(link, "data:") || filepath.IsAbs(link) {
 		return link
 	}

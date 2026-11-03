@@ -10,6 +10,8 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
+
+	"github.com/gdey/markdownshell/termrec"
 )
 
 // png1 is a 1x1 PNG.
@@ -97,5 +99,17 @@ func TestFormatOf(t *testing.T) {
 	}
 	if Title("/a/b/notes.md") != "notes" || Title("") != "" {
 		t.Error("Title")
+	}
+}
+
+// A tty block's cast goes into the page as a GIF made from it, so it
+// plays without a script.
+func TestInlineCast(t *testing.T) {
+	dir := t.TempDir()
+	var cast bytes.Buffer
+	termrec.WriteCast(&cast, termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{{At: 0, Data: []byte("hi")}}})
+	os.WriteFile(filepath.Join(dir, "r.cast"), cast.Bytes(), 0o644)
+	if got := (images{dir}).inline("r.cast#frame=1"); !strings.HasPrefix(got, "data:image/gif;base64,") {
+		t.Errorf("inline = %.40q, want a GIF data: URI", got)
 	}
 }

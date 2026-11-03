@@ -38,6 +38,23 @@ func TestSVGFence(t *testing.T) {
 	}
 }
 
+// A cast fence is drawn as a cast image, which the window plays; one
+// that isn't a cast shows its code and says why.
+func TestCastFence(t *testing.T) {
+	cast := `{"version":2,"width":20,"height":2}` + "\n" + `[0.1,"o","hi"]` + "\n"
+	got := cellsHTML(t, "```cast\n"+cast+"```\n\n```cast\nnot one\n```\n")
+	uri := "data:application/x-asciicast;base64," + base64.StdEncoding.EncodeToString([]byte(cast))
+	if !strings.Contains(got, `<figure class="diagram" data-lang="cast"><div class="diagram-image"><img alt="recording" src="`+uri+`">`) {
+		t.Errorf("cast not drawn as a recording: %s", got)
+	}
+	if !strings.Contains(got, `<code class="language-cast">{&quot;version&quot;`) {
+		t.Errorf("cast source not kept: %s", got)
+	}
+	if !strings.Contains(got, `class="diagram-note">not an asciinema recording`) {
+		t.Errorf("a bad cast has no note: %s", got)
+	}
+}
+
 func TestD2Fence(t *testing.T) {
 	got := cellsHTML(t, "```d2\nclient -> api: HTTPS\n```\n")
 	for _, want := range []string{

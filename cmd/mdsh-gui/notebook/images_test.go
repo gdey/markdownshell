@@ -37,6 +37,20 @@ func TestImages(t *testing.T) {
 	}
 }
 
+// A recording's #frame=N stays on the link, for the player to open at.
+func TestImageFrame(t *testing.T) {
+	file := write(t, "![rec](doc.md.assets/a.cast#frame=3)\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	html := n.Cells()[0].HTML
+	if !strings.Contains(html, DocPrefix) || !strings.Contains(html, `a.cast#frame=3"`) {
+		t.Errorf("prose: %s", html)
+	}
+}
+
 // Opening a file must not fetch anything from the network: an image
 // with a remote link, filled in from the environment or not, is drawn
 // as a note, in prose and in output.

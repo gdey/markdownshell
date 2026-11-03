@@ -137,6 +137,38 @@ func TestLoadGIFFrame(t *testing.T) {
 	}
 }
 
+// A cast is drawn like the GIF made from it: one frame, as a PNG.
+func TestLoadCastFrame(t *testing.T) {
+	dir := t.TempDir()
+	rec := termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{
+		{At: 0, Data: []byte("first")},
+		{At: time.Second, Data: []byte("\x1b[2J\x1b[Hsecond")},
+	}}
+	var cast bytes.Buffer
+	if err := termrec.WriteCast(&cast, rec); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "s.cast"), cast.Bytes(), 0o644)
+	r := &renderer{dir: dir}
+	for _, tt := range []struct {
+		dest  string
+		frame int
+	}{{"s.cast", 0}, {"s.cast#frame=1", 1}, {"s.cast#frame=9", 0}} {
+		got, typ := r.load(tt.dest)
+		if typ != "PNG" {
+			t.Fatalf("%s: type %q, want a PNG of one frame", tt.dest, typ)
+		}
+		img, err := png.Decode(bytes.NewReader(got))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _ := termrec.Still(rec, tt.frame)
+		if !sameImage(img, double(want)) {
+			t.Errorf("%s: not frame %d", tt.dest, tt.frame)
+		}
+	}
+}
+
 func sameImage(a, b image.Image) bool {
 	if a.Bounds() != b.Bounds() {
 		return false

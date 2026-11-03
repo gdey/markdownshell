@@ -110,7 +110,8 @@ This page is the reference.
 - **Outline** (cmd/ctrl+shift+O). Headings, blocks and controls, with a
   play button on the selected block.
 - **Pictures.** Images, screenshots and recordings show in the block.
-  `d2` fences draw diagrams and `svg` fences pictures. Images from other
+  `d2` fences draw diagrams, `svg` fences pictures, and `cast` fences
+  (asciinema recordings) play in the cast player. Images from other
   sites are never loaded.
 - **Reports.** Save writes the output into the file, and File › Create
   Report… makes a PDF, HTML or markdown report, and shows the `mdsh`
@@ -126,7 +127,7 @@ six tabs:
 | Tab | Holds |
 | --- | --- |
 | General | the view a file opens in, the start folder |
-| Look | Plain, Teletype or Blueprint; light, dark or the system's; text size, fonts, line spacing, accent, the History pane's colors, and the Teletype paper's sprockets, rules and shadows |
+| Look | Plain, Teletype or Blueprint; light, dark or the system's; text size, fonts (any installed), line spacing, accent, the History pane's colors, and the Teletype paper's sprockets, rules and shadows |
 | Editing | autosave after each run, Vim keys, spell checking, the Neovim pane (experimental) |
 | Shell | a shell for every file, the file the History shell reads, and a switch that gives blocks your zsh aliases and functions |
 | Files | the templates folder for New File…, the sessions folder and template |

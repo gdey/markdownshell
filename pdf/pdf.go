@@ -623,20 +623,30 @@ func (r *renderer) image(n *ast.Image) {
 }
 
 // load reads an image from a data: URI or a local path, and names its
-// type. It returns nil for anything that isn't PNG, JPEG, GIF or SVG. A
-// GIF becomes a PNG of one frame: the last, or the one a #frame=N
-// fragment names, counting from 1, so an animation shows how it ends.
+// type. It returns nil for anything that isn't PNG, JPEG, GIF, SVG or an
+// asciinema cast. A GIF or a cast becomes a PNG of one frame: the last,
+// or the one a #frame=N fragment names, counting from 1, so a recording
+// shows how it ends.
 func (r *renderer) load(dest string) ([]byte, string) {
 	dest, frag, _ := strings.Cut(dest, "#")
 	data, typ := r.read(dest)
-	if typ != "GIF" {
+	if typ != "GIF" && typ != "CAST" {
 		return data, typ
 	}
 	n := 0
 	if v, ok := strings.CutPrefix(frag, "frame="); ok {
 		n, _ = strconv.Atoi(v)
 	}
-	img, err := termrec.Frame(data, n)
+	var img image.Image
+	var err error
+	if typ == "GIF" {
+		img, err = termrec.Frame(data, n)
+	} else {
+		var rec termrec.Recording
+		if rec, err = termrec.ReadCast(bytes.NewReader(data)); err == nil {
+			img, err = termrec.Still(rec, n)
+		}
+	}
 	if err != nil {
 		return nil, ""
 	}
@@ -694,6 +704,8 @@ func (r *renderer) read(dest string) ([]byte, string) {
 		return data, "JPG"
 	case bytes.HasPrefix(data, []byte("GIF8")):
 		return data, "GIF"
+	case termrec.IsCast(data):
+		return data, "CAST"
 	case bytes.Contains(data[:min(len(data), 512)], []byte("<svg")):
 		return data, "SVG"
 	}
