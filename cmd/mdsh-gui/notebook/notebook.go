@@ -265,6 +265,13 @@ func Open(file string, opts Options) (*Notebook, error) {
 	}
 	n.sess = sess
 	n.results = append([]*run.Result(nil), sess.Results()...)
+	// Copies of an input that disagree, as the warnings logged above
+	// say, all take the first's value: a change Undo can take back.
+	if src, ok := d.MatchMirrors(); ok {
+		if err := n.change("match copies", "", src, nil); err != nil {
+			return nil, err
+		}
+	}
 	go n.reaper()
 	return n, nil
 }

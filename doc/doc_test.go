@@ -472,7 +472,7 @@ func TestDuplicateVar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `var=env is already bound by "a" on line 1, so this one is ignored`
+	want := `var=env is already bound by "a" on line 1, and this isn't a copy of it (it is a choice, not a textbox), so it is ignored`
 	if b := d.Block("b"); b.VarTaken != want || !slices.Equal(d.Warnings, []string{"line 4: " + want}) {
 		t.Errorf("VarTaken = %q, warnings %q", b.VarTaken, d.Warnings)
 	}
@@ -485,5 +485,66 @@ func TestDuplicateVar(t *testing.T) {
 	// var= on other blocks binds nothing, so it doesn't clash.
 	if _, err := Parse([]byte("```textbox {var=env}\n```\n```sh {var=env}\n```\n")); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestMirrorVar(t *testing.T) {
+	doc := func(a, b, c, d string) string {
+		return "```choice {#a mode=radio var=env}\n" + a + "```\n\n" +
+			"> ```choice {#b mode=radio var=env}\n" + strings.ReplaceAll(b, "- ", "> - ") + "> ```\n\n" +
+			"```choice {#c mode=multi var=env}\n" + c + "```\n\n" +
+			"```choice {#d mode=radio var=env}\n" + d + "```\n\n" +
+			"```textbox {#t var=host}\none\n```\n\n```textbox {#u var=host}\none\n```\n"
+	}
+	const prod, staging = "- [ ] staging\n- [x] prod\n", "- [x] staging\n- [ ] prod\n"
+	src := doc(prod, staging, prod, prod)
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"a": "", "b": "a", "c": "", "d": "a", "t": "", "u": "t"} {
+		if got := d.Block(id).MirrorOf; got != want {
+			t.Errorf("%s mirrors %q, want %q", id, got, want)
+		}
+	}
+	if d.Block("c").VarTaken == "" {
+		t.Error("c, a multi, mirrors a radio")
+	}
+	wantWarn := []string{
+		`line 6: var=env: this copy of "a" on line 1 has a different value, so it is set to that one's`,
+		`line 11: var=env is already bound by "a" on line 1, and this isn't a copy of it (mode= differs), so it is ignored`,
+	}
+	if !slices.Equal(d.Warnings, wantWarn) {
+		t.Errorf("warnings %q\nwant %q", d.Warnings, wantWarn)
+	}
+	if _, _, ok := d.Block("b").Var(); ok {
+		t.Error("b binds env too")
+	}
+	if got := d.Mirrors(d.Block("b")); len(got) != 3 || got[0].ID != "a" || got[1].ID != "b" || got[2].ID != "d" {
+		t.Errorf("Mirrors(b) = %v", got)
+	}
+
+	// Loading puts every copy at the first's value.
+	fixed, ok := d.MatchMirrors()
+	if !ok || string(fixed) != doc(prod, prod, prod, prod) {
+		t.Fatalf("MatchMirrors = %v %q", ok, fixed)
+	}
+	if err := d.SetSource(fixed); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Warnings) != 1 {
+		t.Errorf("warnings after matching: %q", d.Warnings)
+	}
+	if _, ok := d.MatchMirrors(); ok {
+		t.Error("MatchMirrors changed matched copies")
+	}
+
+	// Setting one sets them all, but not the one that isn't a copy.
+	if got, want := string(d.SetChoice(d.Block("d"), []bool{true, false})), doc(staging, staging, prod, staging); got != want {
+		t.Errorf("SetChoice:\n%s\nwant:\n%s", got, want)
+	}
+	got := string(d.SetText(d.Block("t"), "two\n```"))
+	if strings.Count(got, "````textbox") != 2 || strings.Count(got, "two\n```\n````") != 2 {
+		t.Errorf("SetText:\n%s", got)
 	}
 }

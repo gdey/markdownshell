@@ -514,7 +514,11 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   } else {
     // Each card's handlers hold its cell, so update them in place.
     fresh.forEach((c, i) => {
-      const changed = c.block < 0 && !c.textbox && !c.choice && c.html !== cells[i].html;
+      // An input is drawn again when its value changed, as a copy of the
+      // one being typed in does, but not the one that has the focus.
+      const inputChanged = (c.textbox && c.textbox.text !== cells[i].textbox?.text) || (c.choice && JSON.stringify(c.choice.options) !== JSON.stringify(cells[i].choice?.options));
+      const holdsFocus = !!focused && !!$("doc").children[i]?.contains(focused);
+      const changed = c.block < 0 && (c.textbox || c.choice ? inputChanged && !holdsFocus : c.html !== cells[i].html);
       // Go leaves out fields that are false, so clear the fold flags first.
       Object.assign(cells[i], { collapsed: false, collapsedOutput: false }, c);
       const card = $("doc").children[i] as HTMLElement | undefined;

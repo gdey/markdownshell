@@ -31,9 +31,24 @@ func TestCheck(t *testing.T) {
 	want := []string{
 		"9:20-24 error name is an input, which never runs, so depends= ignores it",
 		"9:25-27 error There is no block zz, so depends= ignores it",
-		"13:17-24 error var=who is already bound on line 7, so this one is ignored",
+		`13:17-24 error var=who is already bound by "name" on line 7, and this isn't a copy of it (it is a choice, not a textbox), so it is ignored`,
 		"16:10-22 error timeout= is a duration such as 30s or 5m",
 		"16:23-28 warning mdsh doesn't know bogus and leaves it as it is",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Check:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestCheckMirrors(t *testing.T) {
+	text := "```textbox {#a var=who}\nme\n```\n> ```textbox {#b var=who}\n> me\n> ```\n```textbox {#c var=who}\nyou\n```\n```textbox {#d lines=2 var=who}\nme\n```\n"
+	var got []string
+	for _, d := range Check(text) {
+		got = append(got, fmt.Sprintf("%d:%d-%d %s %s", d.Line, d.From, d.To, d.Severity, d.Message))
+	}
+	want := []string{
+		"6:15-22 warning this copy of line 1's var=who has a different value; mdsh-gui sets it to that one's",
+		`9:23-30 error var=who is already bound by "a" on line 1, and this isn't a copy of it (lines= differs), so it is ignored`,
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("Check:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))

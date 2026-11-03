@@ -654,7 +654,8 @@ An explicit `exit` ends the shell and stops the run. Blocks can use
 `$MDSH_BLOCK`, `$MDSH_FILE`, `$MDSH_DIR`, `$MDSH_MODE` (`running`,
 `interactive` or `report`, also readable in conditions as
 `{{$MDSH_MODE}}`), `$MDSH_VAR_name` for each `textbox` or `choice` block
-with `var=name`, the script's arguments as `$1`…,
+with `var=name` (the same control can appear more than once with one
+`var=`, and changing one copy changes them all), the script's arguments as `$1`…,
 and the helpers `md_h1`, `md_h2`, `md_h3`, `md_table [-F SEP] [-s N]` (TSV
 on stdin) and `md_code`.
 

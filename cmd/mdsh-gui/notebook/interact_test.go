@@ -1,6 +1,7 @@
 package notebook
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -189,8 +190,51 @@ func TestVarTaken(t *testing.T) {
 			problems = append(problems, c.Choice.Problem)
 		}
 	}
-	if want := []string{"", `var=env is already bound by "a" on line 1, so this one is ignored`}; !slices.Equal(problems, want) {
+	if want := []string{"", `var=env is already bound by "a" on line 1, and this isn't a copy of it (it is a choice, not a textbox), so it is ignored`}; !slices.Equal(problems, want) {
 		t.Errorf("problems = %q, want %q", problems, want)
+	}
+}
+
+func TestMirrors(t *testing.T) {
+	src := "```textbox {#a var=who}\none\n```\n\n```textbox {#b var=who}\ntwo\n```\n\nHi {{$MDSH_VAR_who}}.\n\n" +
+		"```choice {#c var=env}\n- [x] x\n- [ ] y\n```\n\n```choice {#d var=env}\n- [x] x\n- [ ] y\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	// On open, b takes a's value: a change, which Undo takes back.
+	opened := strings.Replace(src, "two", "one", 1)
+	if got := n.Text(); got != opened || !n.Dirty() {
+		t.Fatalf("opened as %q, dirty %v", got, n.Dirty())
+	}
+	values := func() []string {
+		var out []string
+		for _, c := range n.Cells() {
+			switch {
+			case c.Textbox != nil:
+				out = append(out, c.Textbox.Text+c.Textbox.Problem)
+			case c.Choice != nil:
+				out = append(out, fmt.Sprint(c.Choice.Options[0].Checked)+c.Choice.Problem)
+			}
+		}
+		return out
+	}
+	if got := values(); !slices.Equal(got, []string{"one", "one", "true", "true"}) {
+		t.Errorf("values = %q", got)
+	}
+	// Typing in one types in both, and setting a choice sets its copy.
+	if err := n.SetTextbox(1, "three"); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.SetChoice(2, []bool{false, true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := values(); !slices.Equal(got, []string{"three", "three", "false", "false"}) {
+		t.Errorf("values = %q", got)
+	}
+	if !strings.Contains(n.Text(), "Hi {{$MDSH_VAR_who}}.") {
+		t.Errorf("text = %q", n.Text())
 	}
 }
 

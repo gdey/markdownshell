@@ -8,6 +8,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A textbox or choice can appear more than once with the same `var=`.
+  A later input with that `var=` that is the same control, differing
+  only in what is typed or checked, is a copy of the first: typing or
+  picking in mdsh-gui changes every copy. A file that opens with copies
+  that disagree gets a warning for each, and mdsh-gui sets them to the
+  first's value, which Undo takes back. An input with that `var=` that
+  isn't the same control is still ignored, and the warning now says how
+  it differs.
+
+  ![A deploy runbook with the env choice and host textbox at the top and again lower down, both copies showing prod and db7.example.com after changing the lower ones](docs/changelog/var-mirrors.png)
+
 - mdsh-gui's font menus (Settings › Look) list the fonts installed on
   the computer, from AppKit on macOS and fontconfig on Linux, instead of
   a set of common ones; the code font's lists those whose letters are
