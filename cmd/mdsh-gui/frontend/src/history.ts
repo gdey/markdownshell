@@ -256,17 +256,56 @@ function say(text: string) {
   t.write((t.buffer.active.cursorX > 0 ? "\n" : "") + text + "\n");
 }
 
+// isNote reports whether text is a note, every line starting with #,
+// which is added as prose rather than run.
+const isNote = (text: string) => text.split("\n").every((l) => l.trimStart().startsWith("#"));
+
 // echo writes what was entered to the transcript: a command after a
 // prompt, a note dimmed.
 function echo(text: string) {
   const lines = text.split("\n");
-  if (lines.every((l) => l.trimStart().startsWith("#"))) {
+  if (isNote(text)) {
     say(lines.map((l) => `\x1b[2;3m${l}\x1b[0m`).join("\n"));
     return;
   }
   const first = ps1 ? `${ps1}\x1b[0m` : "\x1b[1;32m$\x1b[0m ";
   const more = ps2 ? `${ps2}\x1b[0m` : "\x1b[1;32m>\x1b[0m ";
   say(lines.map((l, i) => `${i ? more : first}${l}`).join("\n"));
+}
+
+// elapsed says how long a command has run for: tenths of a second for
+// the first minute, then minutes and seconds, then hours. Whole seconds
+// only when the system asks for less motion, as the clock ticks less.
+export function elapsed(ms: number, tenths = true): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return tenths ? `${(Math.floor(ms / 100) / 10).toFixed(1)}s` : `${s}s`;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (s < 3600) return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+  return `${Math.floor(s / 3600)}h ${pad(Math.floor(s / 60) % 60)}m ${pad(s % 60)}s`;
+}
+
+// While a command typed here runs, the prompt dims and the input gives
+// its place to a clock of how long it has run, until it ends.
+let clock = 0;
+
+function startClock() {
+  stopClock();
+  const pane = $("history");
+  const time = $("history-time");
+  const start = performance.now();
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const tick = () => (time.textContent = elapsed(performance.now() - start, !calm));
+  tick();
+  pane.classList.add("running");
+  $("history-timer").hidden = false;
+  clock = window.setInterval(tick, calm ? 1000 : 100);
+}
+
+function stopClock() {
+  clearInterval(clock);
+  clock = 0;
+  $("history").classList.remove("running");
+  $("history-timer").hidden = true;
 }
 
 // submit runs entered, what the input held when enter was pressed. What
@@ -282,13 +321,18 @@ async function submit(entered: string) {
   echo(text);
   fitHistory();
   last = -1;
-  await hooks.enter(async () => {
-    try {
-      await App.HistoryEnter(text);
-    } catch (err) {
-      say(`\x1b[31m${message(err)}\x1b[0m`);
-    }
-  });
+  if (!isNote(text)) startClock();
+  try {
+    await hooks.enter(async () => {
+      try {
+        await App.HistoryEnter(text);
+      } catch (err) {
+        say(`\x1b[31m${message(err)}\x1b[0m`);
+      }
+    });
+  } finally {
+    stopClock();
+  }
   // A lone & at the end runs it as a background block, as Go decides.
   if (last < 0 && /(^|[^&|<>\\])&\s*$/.test(text)) say("\x1b[2m(running in the background; its output goes to its block when it ends)\x1b[0m");
   const status = last >= 0 ? hooks.status(last) : undefined;

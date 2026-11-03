@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- While a command typed in mdsh-gui's History pane runs, the prompt
+  dims and the input shows how long it has run, in every look. With
+  reduced motion the clock ticks once a second.
+
+  ![The History pane running a command in the Plain, Teletype and Blueprint looks: the prompt dimmed and the input showing "running 12.4s"](docs/changelog/history-timer.png)
+
 - An `always` block attribute makes a dependency run again each time a
   block that `depends=` on it runs, even if it already ran in this
   session, for steps whose effect doesn't last such as logging in.
@@ -20,6 +26,7 @@ follow [Semantic Versioning](https://semver.org/).
   *stale* badge on the card, and `mdsh -i` shows `✓ stale`.
 
   ![A notebook where block a ran again: c, d and e carry a stale badge and b doesn't](docs/changelog/stale.png)
+
 - A textbox or choice can appear more than once with the same `var=`.
   A later input with that `var=` that is the same control, differing
   only in what is typed or checked, is a copy of the first: typing or

@@ -228,5 +228,8 @@
 [data-look="tty"] dl.info :is(dt, dd) { border-top-style: dashed; }
 
 [data-look="tty"] #history { border-top-style: dashed; }
+/* The clock reads as a teletype's, bracketed on the paper. */
+[data-look="tty"] #history-time::before { content: "["; color: var(--muted); }
+[data-look="tty"] #history-time::after { content: "]"; color: var(--muted); }
 [data-look="tty"] #console .console-bar { border-bottom-style: dashed; }
 [data-look="tty"] :is(input, select, textarea, button, a, [tabindex]):focus-visible { outline: 2px solid var(--fg); outline-offset: -1px; }

@@ -184,4 +184,6 @@
 [data-look="blueprint"] header { border-bottom-style: dashed; }
 [data-look="blueprint"] #source { border-right-style: dashed; }
 [data-look="blueprint"] #history { border-top-style: dashed; }
+/* The clock is lettered like a drawing's title block. */
+[data-look="blueprint"] #history-timer .label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.85em; }
 [data-look="blueprint"] #console .console-bar { border-bottom-style: dashed; }
