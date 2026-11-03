@@ -140,7 +140,7 @@ func (n *Notebook) setResultTask(marks []int, task int, mark byte) []outChange {
 	return nil
 }
 
-// SetTextbox replaces the text of textbox i.
+// SetTextbox replaces the text of textbox i, and of every copy of it.
 func (n *Notebook) SetTextbox(i int, text string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -151,11 +151,11 @@ func (n *Notebook) SetTextbox(i int, text string) error {
 		return fmt.Errorf("block %d isn't a textbox", i)
 	}
 	b := n.d.Blocks[i]
-	return n.change("edit textbox", "textbox:"+b.ID, n.d.SetBody(b, text), nil)
+	return n.change("edit textbox", "textbox:"+b.ID, n.d.SetText(b, text), nil)
 }
 
 // SetChoice checks the options of choice i as checked says, one bool
-// per option.
+// per option, and those of every copy of it.
 func (n *Notebook) SetChoice(i int, checked []bool) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()

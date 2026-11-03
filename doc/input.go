@@ -2,6 +2,7 @@ package doc
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -50,14 +51,19 @@ const VarPrefix = "MDSH_VAR_"
 // Var is the variable input b binds with var=, such as MDSH_VAR_host,
 // and its value: a textbox's text, or the labels a choice has checked,
 // one per line. ok is false when b binds none, the name isn't valid or an
-// earlier input binds it.
+// earlier input binds it, including one b is a copy of.
 func (b *Block) Var() (name, value string, ok bool) {
 	v := b.Attrs["var"]
-	if !b.IsInput() || !ValidVar(v) || b.VarTaken != "" {
+	if !b.IsInput() || !ValidVar(v) || b.VarTaken != "" || b.MirrorOf != "" {
 		return "", "", false
 	}
+	return VarPrefix + v, b.Value(), true
+}
+
+// Value is what input b's var= holds, or would if it bound it.
+func (b *Block) Value() string {
 	if b.IsTextbox() {
-		return VarPrefix + v, b.Textbox().Text, true
+		return b.Textbox().Text
 	}
 	var checked []string
 	for _, o := range b.Choice().Options {
@@ -65,7 +71,99 @@ func (b *Block) Var() (name, value string, ok bool) {
 			checked = append(checked, o.Label)
 		}
 	}
-	return VarPrefix + v, strings.Join(checked, "\n"), true
+	return strings.Join(checked, "\n")
+}
+
+// controlDiff says how inputs a and b ask for different things, so b
+// can't be a copy of a: "" when they are the same kind, with the same
+// lines= or mode=, placeholder= and options, whatever is typed or
+// checked.
+func controlDiff(a, b *Block) string {
+	switch {
+	case a.Lang != b.Lang:
+		return "it is a " + b.Lang + ", not a " + a.Lang
+	case a.IsTextbox() && a.Textbox().Lines != b.Textbox().Lines:
+		return "lines= differs"
+	case a.IsTextbox():
+		if a.Textbox().Placeholder != b.Textbox().Placeholder {
+			return "placeholder= differs"
+		}
+		return ""
+	}
+	ca, cb := a.Choice(), b.Choice()
+	switch {
+	case ca.Mode != cb.Mode:
+		return "mode= differs"
+	case ca.Placeholder != cb.Placeholder:
+		return "placeholder= differs"
+	case !slices.EqualFunc(ca.Options, cb.Options, func(x, y Option) bool { return x.Label == y.Label }):
+		return "its options differ"
+	}
+	return ""
+}
+
+// Mirrors is input b with every copy of it: the first input that binds
+// its var= and those that mirror it, in order. It is just b when b has
+// none.
+func (d *Document) Mirrors(b *Block) []*Block {
+	first := b.ID
+	if b.MirrorOf != "" {
+		first = b.MirrorOf
+	}
+	var out []*Block
+	for _, c := range d.Blocks {
+		if c.ID == first || (c.MirrorOf == first && c.IsInput()) {
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		out = []*Block{b}
+	}
+	return out
+}
+
+// SetText returns d's source with textbox b's text replaced by text,
+// and that of every copy of it.
+func (d *Document) SetText(b *Block, text string) []byte {
+	bodies := map[*Block]string{}
+	for _, c := range d.Mirrors(b) {
+		bodies[c] = text
+	}
+	return d.setBodies(bodies)
+}
+
+// MatchMirrors returns d's source with every copy of an input set to the
+// value of the first, and whether that changed anything: the fix for
+// the warning Parse gives when copies differ.
+func (d *Document) MatchMirrors() ([]byte, bool) {
+	bodies := map[*Block]string{}
+	for _, b := range d.Blocks {
+		if b.MirrorOf == "" {
+			continue
+		}
+		first := d.Block(b.MirrorOf)
+		if first == nil || b.Value() == first.Value() {
+			continue
+		}
+		if b.IsTextbox() {
+			bodies[b] = first.Textbox().Text
+		} else {
+			bodies[b] = choiceBody(b, checks(first))
+		}
+	}
+	if len(bodies) == 0 {
+		return d.Src, false
+	}
+	return d.setBodies(bodies), true
+}
+
+// checks is which of choice b's options are checked.
+func checks(b *Block) []bool {
+	var out []bool
+	for _, o := range b.Choice().Options {
+		out = append(out, o.Checked)
+	}
+	return out
 }
 
 var varName = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
@@ -128,8 +226,19 @@ func (b *Block) Choice() Choice {
 }
 
 // SetChoice returns d's source with choice b's options checked as
-// checked says, one bool per option. Options past its end are unchecked.
+// checked says, one bool per option, and those of every copy of it.
+// Options past its end are unchecked.
 func (d *Document) SetChoice(b *Block, checked []bool) []byte {
+	bodies := map[*Block]string{}
+	for _, c := range d.Mirrors(b) {
+		bodies[c] = choiceBody(c, checked)
+	}
+	return d.setBodies(bodies)
+}
+
+// choiceBody is choice b's body with its options checked as checked
+// says, leaving its other lines alone.
+func choiceBody(b *Block, checked []bool) string {
 	var body strings.Builder
 	i := 0
 	for line := range strings.Lines(b.Body) {
@@ -148,7 +257,7 @@ func (d *Document) SetChoice(b *Block, checked []bool) []byte {
 		i++
 		body.WriteString(line[:m[4]] + mark + line[m[5]:])
 	}
-	return d.SetBody(b, body.String())
+	return body.String()
 }
 
 // SetBody returns d's source with b's body replaced by body, which gets
@@ -156,6 +265,30 @@ func (d *Document) SetChoice(b *Block, checked []bool) []byte {
 // gets longer if a line of body would close it, and each line starts
 // with b's container prefix.
 func (d *Document) SetBody(b *Block, body string) []byte {
+	return d.setBodies(map[*Block]string{b: body})
+}
+
+// setBodies returns d's source with the body of each block in bodies
+// replaced, as SetBody replaces one.
+func (d *Document) setBodies(bodies map[*Block]string) []byte {
+	src := d.Src
+	var out strings.Builder
+	pos := 0
+	for _, b := range d.Blocks {
+		body, ok := bodies[b]
+		if !ok {
+			continue
+		}
+		out.Write(src[pos:b.Span.Start])
+		out.WriteString(d.fenced(b, body))
+		pos = b.Span.End
+	}
+	out.Write(src[pos:])
+	return []byte(out.String())
+}
+
+// fenced is block b, fences and all, with body as its body.
+func (d *Document) fenced(b *Block, body string) string {
 	src := d.Src
 	if body != "" && !strings.HasSuffix(body, "\n") {
 		body += "\n"
@@ -171,7 +304,6 @@ func (d *Document) SetBody(b *Block, body string) []byte {
 		open, closing = head+f+b.Info+"\n", b.Prefix+f+"\n"
 	}
 	var out strings.Builder
-	out.Write(src[:b.Span.Start])
 	out.WriteString(open)
 	for line := range strings.Lines(body) {
 		if b.Prefix != "" && strings.TrimSpace(line) == "" {
@@ -182,8 +314,7 @@ func (d *Document) SetBody(b *Block, body string) []byte {
 		out.WriteString(line)
 	}
 	out.WriteString(closing)
-	out.Write(src[b.Span.End:])
-	return []byte(out.String())
+	return out.String()
 }
 
 // fenceRun is the length of a fence of c that no line of s can close:

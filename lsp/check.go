@@ -206,6 +206,7 @@ func Check(text string) []Diagnostic {
 		fences[b.Line-1] = true
 	}
 	vars := map[string]int{}
+	var parsed *doc.Document // parsed once, when a var= is bound twice
 	var out []Diagnostic
 	for n, line := range lines {
 		if !strings.Contains(line, "{") {
@@ -236,10 +237,43 @@ func Check(text string) []Diagnostic {
 			vars[name] = n
 			continue
 		}
-		out = append(out, Diagnostic{Line: n, From: from + m[0] + 1, To: from + m[1], Severity: "error",
-			Message: fmt.Sprintf("var=%s is already bound on line %d, so this one is ignored", name, first+1)})
+		// A copy of the first, the same control, is fine.
+		if parsed == nil {
+			parsed, _ = doc.Parse([]byte(text))
+		}
+		at := Diagnostic{Line: n, From: from + m[0] + 1, To: from + m[1], Severity: "error",
+			Message: fmt.Sprintf("var=%s is already bound on line %d, and this isn't a copy of it, so it is ignored", name, first+1)}
+		b := blockAt(parsed, lines, n)
+		if b != nil && b.VarTaken != "" {
+			at.Message = b.VarTaken
+		}
+		if b != nil && b.MirrorOf != "" {
+			if f := parsed.Block(b.MirrorOf); f == nil || f.Value() == b.Value() {
+				continue
+			}
+			at.Severity, at.Message = "warning", fmt.Sprintf("this copy of line %d's var=%s has a different value; mdsh-gui sets it to that one's", first+1, name)
+		}
+		out = append(out, at)
 	}
 	return out
+}
+
+// blockAt is the block of d whose opening fence is on line n of lines,
+// counting from 0, or nil.
+func blockAt(d *doc.Document, lines []string, n int) *doc.Block {
+	if d == nil {
+		return nil
+	}
+	start := 0
+	for _, l := range lines[:n] {
+		start += len(l) + 1
+	}
+	for _, b := range d.Blocks {
+		if b.Span.Start == start {
+			return b
+		}
+	}
+	return nil
 }
 
 // checkDepends flags the names in a fence's depends= that aren't a block

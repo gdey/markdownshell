@@ -119,7 +119,10 @@ func (d *Document) OrderProblems(runnable func(*Block) bool) []OrderProblem {
 		}
 	}
 	for _, v := range vars {
-		if bs := binders[v]; len(bs) > 1 {
+		// Copies share one value, so which of them comes first doesn't
+		// matter.
+		bs := binders[v]
+		if len(bs) > 1 && slices.ContainsFunc(bs[1:], func(b *Block) bool { return b.MirrorOf == "" }) {
 			add("var\x00"+v+"\x00"+bs[0].ID, fmt.Sprintf("%s now sets var=%s, since it is the first input that binds it", d.name(bs[0]), v))
 		}
 	}

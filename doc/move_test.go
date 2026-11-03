@@ -221,7 +221,7 @@ func TestOrderProblems(t *testing.T) {
 		"```sh {#use run={{#detect/?}}==0}\necho\n```\n\n" +
 		"```sh {#after run={{$?}}==0}\necho\n```\n\n" +
 		"```choice {#c1 var=env}\na\nb\n```\n\n" +
-		"```choice {#c2 var=env}\nb\na\n```\n\n" +
+		"```choice {#c2 mode=multi var=env}\nb\na\n```\n\n" +
 		"OS is {{#detect/env(OS)}}.\n\n" +
 		"<!-- mdsh:if {{$X}} -->\n\n```sh {#inside}\ntrue\n```\n\n<!-- mdsh:end -->\n"
 	d := mustParse(t, src)

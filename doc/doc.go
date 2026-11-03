@@ -41,8 +41,14 @@ type Block struct {
 	// "- " or "> 1. ". Empty otherwise.
 	Lead string
 	// VarTaken says why an input's var= binds nothing: an earlier input
-	// binds the same name. Empty otherwise.
+	// binds the same name and this one isn't a copy of it. Empty
+	// otherwise.
 	VarTaken string
+	// MirrorOf is the id of the first input that binds this input's var=,
+	// when this one is a copy of it: the same control, differing at most
+	// in its value. Copies show one value, and setting one sets them all
+	// (see SetText and SetChoice). Empty otherwise.
+	MirrorOf string
 
 	quote, col int // the container: block quote depth and list content column
 	// outMain and outErr are set once Output holds a stdout part (a
@@ -126,7 +132,7 @@ func Parse(src []byte) (*Document, error) {
 	}
 
 	ids := map[string]bool{}
-	vars := map[string]string{} // var= names, and the input that binds each
+	vars := map[string]*Block{} // var= names, and the input that binds each
 	includes, tapes := 0, 0
 	var last *Block
 	var open []*Section
@@ -199,13 +205,20 @@ func Parse(src []byte) (*Document, error) {
 			}
 			ids[b.ID] = true
 			if v := b.Attrs["var"]; v != "" && b.IsInput() {
-				// Only one input can set a variable: the first. Later
-				// ones are flagged and bind nothing.
-				if first, ok := vars[v]; ok {
-					b.VarTaken = fmt.Sprintf("var=%s is already bound by %s, so this one is ignored", v, first)
+				// Only one input sets a variable: the first. A later
+				// one that is the same control is a copy of it, which
+				// shows and sets the same value; any other is flagged
+				// and binds nothing.
+				if first, ok := vars[v]; !ok {
+					vars[v] = b
+				} else if where, diff := fmt.Sprintf("%q on line %d", first.ID, lineNo(src, first.Span.Start)), controlDiff(first, b); diff != "" {
+					b.VarTaken = fmt.Sprintf("var=%s is already bound by %s, and this isn't a copy of it (%s), so it is ignored", v, where, diff)
 					d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(src, pos), b.VarTaken))
 				} else {
-					vars[v] = fmt.Sprintf("%q on line %d", b.ID, lineNo(src, pos))
+					b.MirrorOf = first.ID
+					if b.Value() != first.Value() {
+						d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: var=%s: this copy of %s has a different value, so it is set to that one's", lineNo(src, pos), v, where))
+					}
 				}
 			}
 			b.Output = Span{next, next}
