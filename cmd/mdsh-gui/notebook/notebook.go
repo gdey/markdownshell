@@ -176,6 +176,10 @@ type Options struct {
 	// and which hasn't run in this session. If it is nil, block of
 	// doesn't run.
 	Depend func(block, of int, question string) run.Answer
+	// Resolved, if set, is told of each warning logged for the console
+	// that the document no longer has, as logged, after an edit fixes
+	// it.
+	Resolved func(file, warning string)
 }
 
 // Notebook is an open document.

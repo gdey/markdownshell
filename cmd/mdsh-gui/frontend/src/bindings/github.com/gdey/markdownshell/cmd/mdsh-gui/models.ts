@@ -66,6 +66,16 @@ export interface ConsoleEntry {
      * the line in File, from a "line" attribute; 0 if none
      */
     "line"?: number;
+
+    /**
+     * names the fix for it, from a "fix" attribute
+     */
+    "fix"?: string;
+
+    /**
+     * Stale says it no longer applies: an edit fixed what it warned of.
+     */
+    "stale"?: boolean;
 }
 
 /**

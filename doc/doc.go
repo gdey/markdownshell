@@ -327,7 +327,7 @@ func Parse(src []byte) (*Document, error) {
 	}
 	for _, c := range d.Copies {
 		if b := d.Block(c.For); b == nil || b.IsInclude() || b.IsTape() {
-			d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: output copy for unknown block %q", lineNo(src, c.Span.Start), c.For))
+			d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(src, c.Span.Start), copyWarning(c.For)))
 		}
 	}
 	for _, r := range d.Refs() {

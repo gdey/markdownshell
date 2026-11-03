@@ -73,6 +73,37 @@ func TestConsoleWhere(t *testing.T) {
 	}
 }
 
+// A "fix" attribute names a warning's fix; resolve strikes out the
+// warnings it names, once, and says so on the stale channel.
+func TestConsoleFixAndResolve(t *testing.T) {
+	c := newConsole()
+	log := slog.New(newConsoleHandler(slog.NewTextHandler(io.Discard, nil), c))
+	log.Warn("output copy for unknown block", "file", "/x/a.md", "line", 7, "fix", "Delete the copy")
+	log.Warn("output copy for unknown block", "file", "/x/b.md", "line", 7)
+	log.Warn("no file", "fix", "Delete it")
+
+	got := c.list()
+	if got[0].Fix != "Delete the copy" || got[1].Fix != "" {
+		t.Errorf("fixes %q, %q", got[0].Fix, got[1].Fix)
+	}
+	if got[2].Fix != "" || got[2].Message != `no file fix="Delete it"` {
+		t.Errorf("a fix with no file: %+v", got[2])
+	}
+	if seqs := c.resolve("/x/a.md", "output copy for unknown block"); len(seqs) != 1 || seqs[0] != got[0].Seq {
+		t.Errorf("resolved %v, want [%d]", seqs, got[0].Seq)
+	}
+	if seqs := <-c.stale; len(seqs) != 1 {
+		t.Errorf("sent %v", seqs)
+	}
+	if seqs := c.resolve("/x/a.md", "output copy for unknown block"); seqs != nil {
+		t.Errorf("resolved %v again", seqs)
+	}
+	got = c.list()
+	if !got[0].Stale || got[1].Stale {
+		t.Errorf("stale: %v, %v", got[0].Stale, got[1].Stale)
+	}
+}
+
 func TestConsoleKeepsTheLast(t *testing.T) {
 	c := newConsole()
 	for i := range consoleMax + 5 {
@@ -97,7 +128,7 @@ func TestConsoleSend(t *testing.T) {
 	got := make(chan ConsoleEntry, 1)
 	done := make(chan struct{})
 	go func() {
-		c.send(ctx, func(e ConsoleEntry) { got <- e })
+		c.send(ctx, func(e ConsoleEntry) { got <- e }, func([]int) {})
 		close(done)
 	}()
 	slog.New(newConsoleHandler(slog.DiscardHandler, c)).Error("boom", "err", errors.New("bad depends"))

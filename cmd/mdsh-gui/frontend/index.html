@@ -277,6 +277,17 @@
       </div>
     </form>
   </dialog>
+  <dialog id="fix-dialog" aria-labelledby="fix-title" aria-describedby="fix-detail">
+    <form method="dialog">
+      <h2 id="fix-title">Fix?</h2>
+      <p id="fix-detail"></p>
+      <p class="muted">Edit › Undo takes it back.</p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="fix-ok" value="fix">Fix</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="depends-dialog" aria-labelledby="depends-title">
     <form method="dialog">
       <h2 id="depends-title">Depends on</h2>

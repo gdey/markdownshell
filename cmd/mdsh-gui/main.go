@@ -178,7 +178,7 @@ func mdshGUI(o options) error {
 	a.app = app
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		a.started.Store(true)
-		go cons.send(app.Context(), func(e ConsoleEntry) { app.Event.Emit("console", e) })
+		go cons.send(app.Context(), func(e ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
 	})
 	a.menu = a.buildMenu()
 	a.buildSourceMenu()

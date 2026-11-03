@@ -32,23 +32,9 @@ func (d *Document) DeleteBlock(b *Block) (warnings []string, err error) {
 	if users := d.users(b.ID, u); len(users) > 0 {
 		return nil, fmt.Errorf("can't delete %s: %s still use it; take those out first", d.name(b), strings.Join(users, ", "))
 	}
-	src := d.Src
 	s, e := u.Start, u.End
-	e += leadingBlankLen(src[e:])
-	rest := append(append([]byte(nil), src[:s]...), src[e:]...)
-	body := d.bodyStart()
-	switch {
-	case s == len(rest):
-		// The end of the file: keep one newline.
-		cut := s - trimBlankTail(rest[body:s])
-		rest = rest[:cut]
-		if cut > body {
-			rest = append(rest, '\n')
-		}
-	case s > body && !endsBlank(rest[:s]):
-		// Keep what was on each side apart, as the block kept them.
-		rest = slices.Insert(rest, s, '\n')
-	}
+	e += leadingBlankLen(d.Src[e:])
+	rest := d.cut(s, e)
 
 	var kept []int
 	for i, ob := range d.Blocks {
@@ -74,7 +60,7 @@ func (d *Document) DeleteBlock(b *Block) (warnings []string, err error) {
 		}
 	}
 	if n := countCopies(d, b.ID); n > 0 {
-		warnings = slices.DeleteFunc(warnings, func(w string) bool { return strings.Contains(w, fmt.Sprintf("output copy for unknown block %q", b.ID)) })
+		warnings = slices.DeleteFunc(warnings, func(w string) bool { return strings.HasSuffix(w, copyWarning(b.ID)) })
 		what := "an output copy"
 		if n > 1 {
 			what = fmt.Sprintf("%d output copies", n)
@@ -89,6 +75,27 @@ func (d *Document) DeleteBlock(b *Block) (warnings []string, err error) {
 	*d = *nd
 	d.Blocks = blocks
 	return warnings, nil
+}
+
+// cut returns the source without s to e, whole lines with the blank
+// lines after them, closing the gap to one blank line.
+func (d *Document) cut(s, e int) []byte {
+	src := d.Src
+	rest := append(append([]byte(nil), src[:s]...), src[e:]...)
+	body := d.bodyStart()
+	switch {
+	case s == len(rest):
+		// The end of the file: keep one newline.
+		cut := s - trimBlankTail(rest[body:s])
+		rest = rest[:cut]
+		if cut > body {
+			rest = append(rest, '\n')
+		}
+	case s > body && !endsBlank(rest[:s]):
+		// Keep what was on each side apart, as the cut lines kept them.
+		rest = slices.Insert(rest, s, '\n')
+	}
+	return rest
 }
 
 // DeleteBlockers names what stops DeleteBlock deleting b: what else in

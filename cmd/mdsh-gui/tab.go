@@ -134,6 +134,8 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 		Depend: func(block, of int, question string) run.Answer {
 			return t.depend(done, block, of, question)
 		},
+		// A warning an edit fixed goes stale in the console.
+		Resolved: func(file, warning string) { t.app.console.resolve(file, warning) },
 	})
 	if err != nil {
 		return err

@@ -95,6 +95,11 @@ Each file opens in a tab of its own, with its own shells.
   parses. A badge on the button counts warnings and errors that came
   while it was closed. Copy takes the selected lines, or all of them;
   Clear empties it in every window. Drag its top edge to resize it.
+  A warning an edit fixed stays, struck through and marked "(fixed)".
+  A warning with a plain fix has a Fix button, in a tab showing its
+  file: an output copy whose `for=` names no block is deleted, and an
+  id in a `depends=` that names no block that runs is taken out. Fix
+  says what it will do and asks first; Edit › Undo takes it back.
   Code in the app reports to it by logging with `log/slog`.
 - **History** (View › History, cmd/ctrl+shift+H): a terminal along the
   bottom that works like a paper tape. Closed, it is a status bar with
