@@ -56,6 +56,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- mdsh-gui's shortcut hints name the one shortcut for your platform, as
+  the platform writes it: ⇧⌘H on macOS and Ctrl+Shift+H elsewhere,
+  in place of "cmd/ctrl+shift+H". The History bar's hint is just the
+  shortcut now.
+
+  ![The History bar saying History: ⇧⌘H, with the History and Outline buttons' tooltips showing ⇧⌘H and ⇧⌘O](docs/changelog/shortcut-hints-mac.png)
+
 - **Blocks no longer get your whole environment by default.** A file
   without `env.share` in its front matter now passes just the base set
   below. A file that wants everything says so with `share: [...]`

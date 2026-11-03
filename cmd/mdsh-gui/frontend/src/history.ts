@@ -8,6 +8,7 @@ import { Terminal } from "@xterm/xterm";
 import { App, message } from "./api.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
+import { keyHint } from "./keys.js";
 import { terminalLinks } from "./links.js";
 import { typeKeys, wanted } from "./terminal.js";
 import { codeFont, textSize } from "./theme.js";
@@ -432,7 +433,7 @@ export function historyEnd(i: number): boolean {
 let said = "";
 export function historyStatus(text: string) {
   said = text;
-  const idle = "History: cmd/ctrl+shift+H, or the arrow on the right";
+  const idle = "History: " + keyHint("Mod-Shift-H");
   $("history-status").textContent = text || ($<HTMLButtonElement>("history-stop").disabled ? idle : "running…");
 }
 

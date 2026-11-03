@@ -10,6 +10,7 @@
 import { Clipboard, Events } from "/wails/runtime.js";
 import { App, type ConsoleEntry } from "./api.js";
 import { $, el } from "./dom.js";
+import { hinted } from "./keys.js";
 
 let entries: ConsoleEntry[] = [];
 let lastSeq = 0;
@@ -129,7 +130,7 @@ function badge() {
   const b = $("console-badge");
   b.hidden = unseen === 0;
   b.textContent = unseen > 99 ? "99+" : String(unseen);
-  $("console-toggle").title = "Console (cmd/ctrl+shift+Y)" + (unseen ? ` · ${unseen} new` : "");
+  $("console-toggle").title = hinted("Console", "Mod-Shift-Y") + (unseen ? ` · ${unseen} new` : "");
   $("console-toggle").setAttribute("aria-label", "Console" + (unseen ? `, ${unseen} new ${unseen === 1 ? "warning or error" : "warnings and errors"}` : ""));
 }
 

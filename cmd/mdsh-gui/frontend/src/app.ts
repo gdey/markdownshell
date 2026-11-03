@@ -24,6 +24,7 @@ import { initSplitGrip, showSplitGrip } from "./split.js";
 import { Synced, diff } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
+import { applyKeyHints, hinted, isMac } from "./keys.js";
 
 let me = ""; // this window's name; events from other windows are ignored
 let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "" };
@@ -567,7 +568,7 @@ function drawBlock(c: Cell): HTMLElement {
       exit,
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "")),
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
-      iconButton("play", "Run this block (enter)", () => start("RunBlock", c.block)),
+      iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block)),
       iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
       ...(c.movable ? [trashButton(c)] : []),
     ),
@@ -1913,7 +1914,7 @@ function drawOutline() {
       if (mark === "▶") item.title = name + " (running now)";
       else if (mark === "◐") item.title = name + " (running in the background)";
       const block = Number(e.dataset.block);
-      const play = iconButton("play", "Run this block (enter)", () => start("RunBlock", block));
+      const play = iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", block));
       play.classList.add("run");
       play.disabled = running;
       const row = outlineRow(item, e, 0);
@@ -2426,7 +2427,8 @@ function markTrash(card: HTMLElement, c: Cell) {
   if (!b) return;
   b.classList.toggle("off", !!c.undeletable);
   b.setAttribute("aria-disabled", c.undeletable ? "true" : "false");
-  b.title = c.undeletable || "Delete this block (delete)";
+  // Either key deletes; the hint names the one the keyboard calls delete.
+  b.title = c.undeletable || hinted("Delete this block", isMac ? "Backspace" : "Delete");
   b.setAttribute("aria-label", b.title);
 }
 
@@ -3285,6 +3287,7 @@ window.addEventListener("resize", () => {
     fitHistory();
   }, 200);
 });
+applyKeyHints();
 initSplitGrip();
 initDeps($("doc-scroll"), { jump: jumpTo, setDepends, peek, endPeek });
 initHistory({

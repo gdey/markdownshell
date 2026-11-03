@@ -11,6 +11,7 @@ import type { AttrSpec, Names } from "./api.js";
 import { el, iconButton, type icons } from "./dom.js";
 import { type ExTarget, attrHelp, clickFocus, exTarget, forgetEx } from "./editor.js";
 import { codeLanguages } from "./highlight.js";
+import { hinted } from "./keys.js";
 import { Synced } from "./sync.js";
 import { spellCheck } from "./spell.js";
 import { editorLook } from "./theme.js";
@@ -332,10 +333,10 @@ interface Action {
 
 const actions: Action[] = [
   { name: "heading", icon: "heading", title: "Heading", run: heading },
-  { name: "bold", icon: "bold", title: "Bold (cmd/ctrl+B)", run: wrap("**", "**", "bold text"), key: "Mod-b" },
-  { name: "italic", icon: "italic", title: "Italic (cmd/ctrl+I)", run: wrap("_", "_", "italic text"), key: "Mod-i" },
-  { name: "code", icon: "code", title: "Code (cmd/ctrl+E)", run: wrap("`", "`", "code"), key: "Mod-e" },
-  { name: "link", icon: "link", title: "Link (cmd/ctrl+K)", run: link(false), key: "Mod-k" },
+  { name: "bold", icon: "bold", title: hinted("Bold", "Mod-B"), run: wrap("**", "**", "bold text"), key: "Mod-b" },
+  { name: "italic", icon: "italic", title: hinted("Italic", "Mod-I"), run: wrap("_", "_", "italic text"), key: "Mod-i" },
+  { name: "code", icon: "code", title: hinted("Code", "Mod-E"), run: wrap("`", "`", "code"), key: "Mod-e" },
+  { name: "link", icon: "link", title: hinted("Link", "Mod-K"), run: link(false), key: "Mod-k" },
   { name: "image", icon: "image", title: "Image", run: link(true) },
   { name: "ul", icon: "ul", title: "Bulleted list", run: prefixLines(() => "- ", /^\s*[-*+] (?!\[[ xX]\] )/) },
   { name: "ol", icon: "ol", title: "Numbered list", run: prefixLines((i) => i + 1 + ". ", /^\s*\d+[.)] /) },
