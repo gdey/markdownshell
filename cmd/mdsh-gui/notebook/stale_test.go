@@ -37,7 +37,7 @@ func TestClearOutputStale(t *testing.T) {
 	if err := n.RunBlock(4); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"0<4", "3<4", "2<3"}; !slices.Equal(asked, want) {
+	if want := []string{"0<4", "2<3", "3<4"}; !slices.Equal(asked, want) {
 		t.Errorf("asked %q, want %q", asked, want)
 	}
 	if got := staleOf(n); slices.Contains(got, true) {

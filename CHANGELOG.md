@@ -95,6 +95,13 @@ follow [Semantic Versioning](https://semver.org/).
   runs, in `mdsh`, `mdsh -i` and mdsh-gui alike. Its own `depends=` are
   still asked about. An empty block marked `confirm` is still asked
   about, so it can serve as a checkpoint.
+- Running a block with `depends=` now works out the whole chain first,
+  then asks about each block from the top of the chain down, right
+  before it runs: a block you say yes to runs straight away, before the
+  next question, and every block a block needs has run by the time it is
+  asked about. Before, mdsh asked its way up the chain and then ran it
+  all at the end. A block marked `confirm` is now confirmed after its
+  dependencies have run, right before it runs.
 - **Blocks no longer get your whole environment by default.** A file
   without `env.share` in its front matter now passes just the base set
   below. A file that wants everything says so with `share: [...]`

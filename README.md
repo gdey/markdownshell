@@ -448,17 +448,24 @@ make
 ```
 ````
 
-When `deploy` is about to run, mdsh checks `build` and then `login`, in
-that order. A block that has already run in this session (in `mdsh -i`
-or mdsh-gui; in a plain `mdsh` run, earlier in the run) and didn't fail
-is passed over, unless it is marked `always` or is stale. For any other,
-mdsh asks
-`Run build first? [r]un / s[k]ip / [s]top`:
+When `deploy` is about to run, mdsh first works out everything it needs:
+`build` and then `login`, in that order, each after the blocks its own
+`depends=` names, all the way up the chain. A block that has already run
+in this session (in `mdsh -i` or mdsh-gui; in a plain `mdsh` run, earlier
+in the run) and didn't fail is passed over, and so is what it needs,
+unless it is marked `always` or is stale. Then
+mdsh walks back down from the top of the chain, asking
+`Run build first? [r]un / s[k]ip / [s]top` about each block right before
+it would run, so each answer is followed by the run it allowed, and every
+block a block needs has run (or been skipped) before it is asked about:
 
-- `r` checks that block's own `depends=` the same way, then runs it. Its
-  `skip`, `run=` and `confirm` don't apply, since you just said to run it.
-- `k` goes on without it.
-- `s`, or just enter, runs neither it nor `deploy`.
+- `r` runs it now. Its `skip`, `run=` and `confirm` don't apply, since
+  you just said to run it.
+- `k` goes on without it; the blocks below it are still asked about.
+- `s`, or just enter, runs neither it nor anything below it, nor `deploy`.
+
+If `deploy` is itself marked `confirm`, it is confirmed last, after the
+blocks it depends on have run.
 
 If a dependency fails, `deploy` doesn't run. In a whole run, the run then
 goes on or stops as the dependency's `on_error` says, and a block already

@@ -43,9 +43,11 @@ func TestRunBlockDepends(t *testing.T) {
 		asked   []string
 		ran     []string
 	}{
-		{"all", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Go}, []string{"build<deploy", "fetch<build", "login<deploy"}, []string{"fetch", "build", "login", "deploy"}},
-		{"skip", map[string]run.Answer{"build": run.Skip, "login": run.Go}, []string{"build<deploy", "login<deploy"}, []string{"login", "deploy"}},
-		{"stop", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Stop}, []string{"build<deploy", "fetch<build", "login<deploy"}, []string{"fetch", "build"}},
+		{"all", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"fetch", "build", "login", "deploy"}},
+		{"skip", map[string]run.Answer{"fetch": run.Go, "build": run.Skip, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"fetch", "login", "deploy"}},
+		{"skip top", map[string]run.Answer{"fetch": run.Skip, "build": run.Go, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"build", "login", "deploy"}},
+		{"stop", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Stop}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"fetch", "build"}},
+		{"stop top", map[string]run.Answer{"fetch": run.Stop}, []string{"fetch<build"}, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := &asker{answers: tc.answers}
@@ -64,6 +66,69 @@ func TestRunBlockDepends(t *testing.T) {
 				t.Errorf("ran %q, want %q", got, tc.ran)
 			}
 		})
+	}
+}
+
+// The chain is worked out to the top first, then each block is asked
+// about right before it runs, from the top down: a block answered Go
+// runs before the next question, and the block asked for is confirmed
+// last, once all it depends on has run. A block two others need is
+// asked about once.
+func TestRunBlockDependsOrder(t *testing.T) {
+	d := parse(t, "```sh {#a}\necho a\n```\n\n```sh {#b depends=a}\necho b\n```\n\n```sh {#c depends=a}\necho c\n```\n\n```sh {#d depends=b,c confirm}\necho d\n```\n")
+	var log []string
+	s, err := run.NewSession(d, run.Options{
+		Environ: []string{},
+		Depend: func(dep, b *doc.Block) run.Answer {
+			log = append(log, "ask "+dep.ID+"<"+b.ID)
+			return run.Go
+		},
+		Confirm: func(b *doc.Block) run.Answer {
+			log = append(log, "confirm "+b.ID)
+			return run.Go
+		},
+		OnEvent: func(e run.Event) {
+			if e.Kind == run.Started {
+				log = append(log, "run "+e.Block.ID)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := s.RunBlock(context.Background(), 3); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"ask a<b", "run a", "ask b<d", "run b", "ask c<d", "run c", "confirm d", "run d"}
+	if !slices.Equal(log, want) {
+		t.Errorf("got %q\nwant %q", log, want)
+	}
+
+	// In a whole run too, a confirm block's dependencies run before
+	// it is confirmed.
+	log = nil
+	d = parse(t, "```sh {#b depends=a confirm}\necho b\n```\n\n```sh {#a}\necho a\n```\n")
+	if _, err := run.Run(context.Background(), d, run.Options{
+		Environ: []string{},
+		Depend: func(dep, b *doc.Block) run.Answer {
+			log = append(log, "ask "+dep.ID+"<"+b.ID)
+			return run.Go
+		},
+		Confirm: func(b *doc.Block) run.Answer {
+			log = append(log, "confirm "+b.ID)
+			return run.Go
+		},
+		OnEvent: func(e run.Event) {
+			if e.Kind == run.Started {
+				log = append(log, "run "+e.Block.ID)
+			}
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"ask a<b", "run a", "confirm b", "run b"}; !slices.Equal(log, want) {
+		t.Errorf("got %q\nwant %q", log, want)
 	}
 }
 
@@ -281,7 +346,7 @@ func TestRunBlockDependsAlways(t *testing.T) {
 	if _, err := s2.RunBlock(ctx, 3); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"build<deploy", "login<build", "test<deploy"}; !slices.Equal(a.asked, want) {
+	if want := []string{"login<build", "build<deploy", "test<deploy"}; !slices.Equal(a.asked, want) {
 		t.Errorf("deploy asked %q, want %q", a.asked, want)
 	}
 }
@@ -318,10 +383,39 @@ func TestRunBlockDependsStale(t *testing.T) {
 	if r, err := s.RunBlock(ctx, 4); err != nil || !r.Ran {
 		t.Fatalf("e: ran=%v err=%v", r.Ran, err)
 	}
-	if want := []string{"d<e", "c<d"}; !slices.Equal(a.asked, want) {
+	if want := []string{"c<d", "d<e"}; !slices.Equal(a.asked, want) {
 		t.Errorf("asked %q, want %q", a.asked, want)
 	}
 	if got := run.Stale(d, s.Results()); slices.Contains(got, true) {
 		t.Errorf("stale after e: %v", got)
+	}
+}
+
+// TestRunBlockDependsStaleOnTheWay checks that a dependency that was
+// current when the chain was worked out, but is made stale by a block
+// run on the way, is asked about after that block runs.
+func TestRunBlockDependsStaleOnTheWay(t *testing.T) {
+	ctx := context.Background()
+	d := parse(t, "```sh {#z always}\necho z\n```\n\n```sh {#x depends=z}\necho x\n```\n\n```sh {#y depends=z}\necho y\n```\n\n```sh {#b depends=x,y}\necho b\n```\n")
+	a := &asker{answers: map[string]run.Answer{"z": run.Go, "x": run.Go, "y": run.Go}}
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: a.depend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for _, i := range []int{0, 2} {
+		if _, err := s.RunBlock(ctx, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a.asked = nil
+	if r, err := s.RunBlock(ctx, 3); err != nil || !r.Ran {
+		t.Fatalf("b: ran=%v err=%v", r.Ran, err)
+	}
+	if want := []string{"z<x", "x<b", "y<b"}; !slices.Equal(a.asked, want) {
+		t.Errorf("asked %q, want %q", a.asked, want)
+	}
+	if got := run.Stale(d, s.Results()); slices.Contains(got, true) {
+		t.Errorf("stale after b: %v", got)
 	}
 }

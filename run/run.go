@@ -62,16 +62,21 @@ type Options struct {
 	// those with the confirm attribute.
 	Step bool
 	// Confirm is asked before each block that has the confirm attribute,
-	// or every block in step mode. Its answer runs the block, skips it
+	// or every block in step mode, right before it runs, after the
+	// blocks its depends= names. Its answer runs the block, skips it
 	// (keeping any output saved in the file) or stops the run there.
 	// If Confirm is nil, the run stops at the first such block with
 	// ErrNoConfirm, since nobody can answer.
 	Confirm func(*doc.Block) Answer
 	// Depend is asked before running dep, a block that b's depends=
 	// names and that hasn't run in this session (or failed when it
-	// did). Go runs dep first, Skip goes on without it, and Stop runs
-	// neither. Answering Go also answers dep's own confirm. If Depend
-	// is nil, the run stops there with ErrNoConfirm, as for Confirm.
+	// did). The whole chain is worked out first; then each dep is
+	// asked about from the top of the chain down, right before it would
+	// run, once the blocks it needs have run. Go runs dep then, Skip
+	// goes on without it, and Stop runs neither it, the rest of the
+	// chain nor b. b's own Confirm comes after. Answering Go also
+	// answers dep's own confirm. If Depend is nil, the run stops there
+	// with ErrNoConfirm, as for Confirm.
 	// A dep with nothing to run, only blank lines and # comments, and
 	// no confirm attribute, runs without asking.
 	Depend func(dep, b *doc.Block) Answer
