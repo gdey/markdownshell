@@ -63,6 +63,14 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The History bar saying History: ⇧⌘H, with the History and Outline buttons' tooltips showing ⇧⌘H and ⇧⌘O](docs/changelog/shortcut-hints-mac.png)
 
+- mdsh-gui's History pane buttons (Stop, Restart, and the open/close
+  chevron) sit on the line between the transcript and the prompt when
+  the pane is open, in a small box the line runs through, rather than
+  at the end of the prompt line. Closed, they stay at the end of the
+  bar.
+
+  ![The open History pane, with Stop, Restart and the chevron on the line above the prompt](docs/changelog/history-buttons.png)
+
 - **Blocks no longer get your whole environment by default.** A file
   without `env.share` in its front matter now passes just the base set
   below. A file that wants everything says so with `share: [...]`

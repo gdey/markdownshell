@@ -597,6 +597,7 @@ figure.diagram[data-lang="cast"] .diagram-image { padding-top: 32px; }
 #history-grip:hover, #history-grip:focus-visible { background: var(--accent); opacity: 0.4; outline: none; }
 body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-term { padding: 4px 8px 0; overflow-x: auto; overflow-y: hidden; }
+#history:not(.closed) #history-term { padding-bottom: 10px; }
 /* Closed, the pane is a status bar: the prompt line, with the status in
    place of the input. Opening slides the transcript up out of it. */
 #history-body { overflow: hidden; transition: height 0.18s ease-out; }
@@ -604,23 +605,30 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history:not(.closed) #history-status { display: none; }
 #history-status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); line-height: 18px; }
 #history .history-controls { flex: none; display: inline-flex; gap: 2px; margin: -2px -4px -2px 4px; }
+/* Open, the line between the transcript and the prompt runs through
+   the middle of the buttons, which sit on it in a box of their own.
+   The transcript leaves room below its last line for their top half. */
+#history-foot { position: relative; }
+#history:not(.closed) #history-foot { border-top: 1px solid var(--border); }
+#history:not(.closed) .history-controls { position: absolute; z-index: 4; top: -0.5px; right: 8px; transform: translateY(-50%); margin: 0; padding: 1px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); }
+#history:not(.closed) #history-prompt-head, #history:not(.closed):has(#history-prompt-head[hidden]) #history-input { padding-right: 80px; }
 #history .history-controls button.icon { color: var(--fg); background: none; padding: 2px 4px; }
 #history .history-controls button.icon:hover:not(:disabled) { background: var(--hover); }
 #history .history-controls button.icon:disabled { opacity: 0.35; }
 #history .history-controls svg { width: 13px; height: 13px; fill: currentColor; }
 #history-toggle svg { transition: transform 0.18s; }
 #history:not(.closed) #history-toggle svg { transform: rotate(180deg); }
-#history.closed .history-line { border-top: 0; padding-top: 3px; padding-bottom: 3px; }
+#history.closed .history-line { padding-top: 3px; padding-bottom: 3px; }
 #history-term :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--bg) !important; }
-#history .history-line { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px 6px; border-top: 1px solid var(--border); font: calc(13px * var(--text-scale)) var(--font-code); }
+#history .history-line { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px 6px; font: calc(13px * var(--text-scale)) var(--font-code); }
 #history .prompt { flex: none; color: var(--ok); font-weight: 700; line-height: 18px; }
 /* The shell's own PS1, in its colors. It ends with its own space, and
    all but its last line goes above the input. */
 #history .prompt.custom { color: var(--fg); font-weight: normal; white-space: pre; }
 #history .history-line:has(.prompt.custom) { gap: 0; }
-#history-prompt-head { padding: 4px 8px 0; border-top: 1px solid var(--border); color: var(--fg); font: calc(13px * var(--text-scale))/18px var(--font-code); white-space: pre; overflow: hidden; }
+#history-prompt-head { padding: 4px 8px 0; color: var(--fg); font: calc(13px * var(--text-scale))/18px var(--font-code); white-space: pre; overflow: hidden; }
 #history-prompt-head[hidden] { display: none; }
-#history:has(#history-prompt-head:not([hidden])):not(.closed) .history-line { border-top: 0; padding-top: 0; }
+#history:has(#history-prompt-head:not([hidden])):not(.closed) .history-line { padding-top: 0; }
 #history-input { flex: 1; resize: none; border: 0; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
 #history-input::placeholder { color: var(--muted); }
 #history-input:disabled { opacity: 0.5; }
