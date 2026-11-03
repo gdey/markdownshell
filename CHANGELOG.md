@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Drag a tab out of mdsh-gui to another app to hand it the file's full
+  path as text, as when dropping it in a terminal or a text editor. A
+  tab showing a document the app carries inside it gives its URL
+  instead. The tab stays where it was.
+
+  ![A tab dragged from mdsh-gui into a text editor, which now shows the file's full path](docs/changelog/tab-drag-out.png)
+
 - A running block shows that it is running, and for how long. In
   mdsh-gui its card gets a spinner and a timer that counts up by tenths
   of a second; with `timeout=` the timer reads `12.3s / 1m` and a bar
