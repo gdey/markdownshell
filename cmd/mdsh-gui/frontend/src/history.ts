@@ -10,6 +10,7 @@ import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
 import { keyHint } from "./keys.js";
 import { terminalLinks } from "./links.js";
+import { readlineKey } from "./readline.js";
 import { typeKeys, wanted } from "./terminal.js";
 import { codeFont, textSize } from "./theme.js";
 
@@ -383,16 +384,39 @@ async function onKey(e: KeyboardEvent) {
     grow();
     return;
   }
+  // The emacs keys of a shell's prompt: ctrl+a, ctrl+w, alt+b and the
+  // rest, ctrl+p and ctrl+n for earlier commands.
+  if (readlineKey(box, e, lineHooks)) {
+    e.preventDefault();
+    return;
+  }
   const first = !box.value.slice(0, box.selectionStart).includes("\n");
   const last = !box.value.slice(box.selectionEnd).includes("\n");
-  if (e.key === "ArrowUp" && first && at > 0) {
-    e.preventDefault();
-    recall(at - 1);
-  } else if (e.key === "ArrowDown" && last && at < typed.length) {
-    e.preventDefault();
-    recall(at + 1);
-  }
+  if (e.key === "ArrowUp" && first && earlier()) e.preventDefault();
+  else if (e.key === "ArrowDown" && last && later()) e.preventDefault();
 }
+
+// earlier and later recall the command before or after the one shown,
+// and report whether there was one.
+function earlier(): boolean {
+  if (at <= 0) return false;
+  recall(at - 1);
+  return true;
+}
+function later(): boolean {
+  if (at >= typed.length) return false;
+  recall(at + 1);
+  return true;
+}
+
+const lineHooks = {
+  prev: earlier,
+  next: later,
+  // ctrl+l clears the transcript, as it clears a terminal.
+  clear: () => term?.clear(),
+  // ctrl+d with nothing typed closes the pane, as it ends a shell.
+  eof: () => hooks.toggle(),
+};
 
 // historyTerminal takes block i's terminal if it was typed here: what
 // it shows goes to the transcript and what you type there goes to it.

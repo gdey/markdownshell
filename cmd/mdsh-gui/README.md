@@ -105,7 +105,12 @@ Each file opens in a tab of its own, with its own shells.
   added as prose, without the `#`; notes typed one after another make
   one paragraph. Shift+enter starts another line, and so does enter on
   an unfinished command, such as one ending in `\` or inside quotes.
-  Up and down recall what you typed, and Tab completes a command, a
+  Up and down recall what you typed, and the input takes a shell's
+  emacs keys: ctrl+a/e to the line's start or end, ctrl+b/f and alt+b/f
+  by character or word, ctrl+w, alt+backspace, alt+d, ctrl+u and ctrl+k
+  to kill, ctrl+y to yank it back, ctrl+d to delete (or close the pane
+  when nothing is typed), ctrl+p/n for earlier commands and ctrl+l to
+  clear the transcript. Tab completes a command, a
   file or a `$` variable, as the shell sees them: in its directory,
   with what blocks set. The prompt is the shell's own `PS1`, expanded
   as the shell would (zsh's `%` escapes and `precmd` hooks, bash's `\`

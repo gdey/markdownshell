@@ -108,3 +108,96 @@ func TestHistoryBackgroundAndComplete(t *testing.T) {
 		t.Errorf("tab: %q", v)
 	}
 }
+
+func TestHistoryReadlineKeys(t *testing.T) {
+	m, _ := newModel(t, "# Log\n", Options{})
+	press(m, "h")
+	h := &m.hist
+	key := func(s string) {
+		t.Helper()
+		var k tea.KeyMsg
+		switch s {
+		case "ctrl+w":
+			k = tea.KeyMsg{Type: tea.KeyCtrlW}
+		case "ctrl+y":
+			k = tea.KeyMsg{Type: tea.KeyCtrlY}
+		case "ctrl+a":
+			k = tea.KeyMsg{Type: tea.KeyCtrlA}
+		case "ctrl+e":
+			k = tea.KeyMsg{Type: tea.KeyCtrlE}
+		case "ctrl+k":
+			k = tea.KeyMsg{Type: tea.KeyCtrlK}
+		case "ctrl+u":
+			k = tea.KeyMsg{Type: tea.KeyCtrlU}
+		case "ctrl+d":
+			k = tea.KeyMsg{Type: tea.KeyCtrlD}
+		case "ctrl+p":
+			k = tea.KeyMsg{Type: tea.KeyCtrlP}
+		case "ctrl+n":
+			k = tea.KeyMsg{Type: tea.KeyCtrlN}
+		case "ctrl+l":
+			k = tea.KeyMsg{Type: tea.KeyCtrlL}
+		case "alt+d":
+			k = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d"), Alt: true}
+		case "alt+b":
+			k = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b"), Alt: true}
+		default:
+			t.Fatalf("no key %q", s)
+		}
+		if k.String() != s {
+			t.Fatalf("key %q is %q", s, k.String())
+		}
+		m.Update(k)
+	}
+	want := func(v string, at int) {
+		t.Helper()
+		if h.input.Value() != v || h.input.Position() != at {
+			t.Errorf("input %q at %d, want %q at %d", h.input.Value(), h.input.Position(), v, at)
+		}
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("echo héllo wörld"), Paste: true})
+	key("ctrl+w")
+	want("echo héllo ", 11)
+	// Kills one after another add up, so ctrl+y brings both back.
+	key("ctrl+w")
+	want("echo ", 5)
+	key("ctrl+y")
+	want("echo héllo wörld", 16)
+	key("ctrl+a")
+	key("alt+d")
+	want(" héllo wörld", 0)
+	key("ctrl+e")
+	key("ctrl+y")
+	want(" héllo wörldecho", 16)
+	key("ctrl+a")
+	key("ctrl+d")
+	want("héllo wörldecho", 0)
+	if !h.focus || !m.hist.open {
+		t.Fatal("ctrl+d with text typed closed the pane")
+	}
+	key("ctrl+e")
+	key("alt+b")
+	key("ctrl+k")
+	want("héllo ", 6)
+	key("ctrl+u")
+	want("", 0)
+	key("ctrl+y")
+	want("héllo wörldecho", 15)
+
+	// ctrl+p and ctrl+n recall commands, as up and down do.
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	typeLine(m, "echo one")
+	pump(t, m)
+	key("ctrl+p")
+	want("echo one", 8)
+	key("ctrl+n")
+	want("", 0)
+	key("ctrl+l")
+	if len(h.log) != 0 {
+		t.Errorf("ctrl+l left %q", h.log)
+	}
+	key("ctrl+d")
+	if m.hist.open {
+		t.Error("ctrl+d with nothing typed didn't close the pane")
+	}
+}

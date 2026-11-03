@@ -44,6 +44,11 @@ type hist struct {
 	// noteEnd is where the last note added ended the file, so the next
 	// note carries on its paragraph; -1 for none.
 	noteEnd int
+	// killed is what the last of ctrl+w, ctrl+u, ctrl+k and alt+d took,
+	// for ctrl+y; killing is set when the last key killed, so the next
+	// kill adds to it, as in readline.
+	killed  string
+	killing bool
 }
 
 // maxLog is the most lines the pane keeps.
@@ -199,15 +204,30 @@ func (m *Model) histLog(lines ...string) {
 // histKey handles a key while the pane has the keys.
 func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 	h := &m.hist
+	appending := h.killing
+	h.killing = false
 	switch k.String() {
 	case "esc":
 		h.focus = false
 		h.input.Blur()
 		return nil
 	case "ctrl+d":
+		// With nothing typed it closes the pane, as it ends a shell;
+		// otherwise it deletes the character under the cursor.
 		if h.input.Value() == "" && len(h.lines) == 0 {
 			m.closeHistory()
+			return nil
 		}
+	case "ctrl+y":
+		if h.killed != "" {
+			v, at := []rune(h.input.Value()), h.input.Position()
+			h.input.SetValue(string(v[:at]) + h.killed + string(v[at:]))
+			h.input.SetCursor(at + len([]rune(h.killed)))
+		}
+		return nil
+	case "ctrl+l":
+		// It clears the pane, as it clears a terminal.
+		h.log = nil
 		return nil
 	case "ctrl+c":
 		if h.input.Value() != "" || len(h.lines) > 0 {
@@ -217,9 +237,9 @@ func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 			m.setPrompt()
 		}
 		return nil
-	case "up", "down":
+	case "up", "down", "ctrl+p", "ctrl+n":
 		by := -1
-		if k.String() == "down" {
+		if k.String() == "down" || k.String() == "ctrl+n" {
 			by = 1
 		}
 		if at := h.recallAt + by; at >= 0 && at <= len(h.recall) {
@@ -244,9 +264,41 @@ func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 		m.entered()
 		return nil
 	}
+	before, at := []rune(h.input.Value()), h.input.Position()
 	var cmd tea.Cmd
 	h.input, cmd = h.input.Update(k)
+	switch k.String() {
+	case "ctrl+w", "alt+backspace", "ctrl+u", "ctrl+k", "alt+d", "alt+delete":
+		h.kill(before, at, appending)
+	}
 	return cmd
+}
+
+// kill keeps what the key just took out of the input, which held before
+// with the cursor at at, for ctrl+y. A kill after a kill adds to what
+// it took: at the end for a kill forward, at the start for one back.
+func (h *hist) kill(before []rune, at int, appending bool) {
+	gone := len(before) - len([]rune(h.input.Value()))
+	if gone <= 0 {
+		h.killing = appending
+		return
+	}
+	var text string
+	backward := h.input.Position() < at
+	if backward {
+		text = string(before[at-gone : at])
+	} else {
+		text = string(before[at : at+gone])
+	}
+	switch {
+	case !appending:
+		h.killed = text
+	case backward:
+		h.killed = text + h.killed
+	default:
+		h.killed += text
+	}
+	h.killing = true
 }
 
 // echo adds what is typed, the lines before line and line, to the log,

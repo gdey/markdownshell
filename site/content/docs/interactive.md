@@ -29,7 +29,7 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   in the block's card. `,` sets the run options: arguments, step mode,
   stop on error.
 - **History**, with `h`: a shell along the bottom with your shell's own
-  prompt and completion. Each command is added to the file as a block,
+  prompt, completion and emacs line keys. Each command is added to the file as a block,
   with its output; a line starting with `#` becomes prose.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
