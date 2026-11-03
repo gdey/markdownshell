@@ -235,6 +235,11 @@ export interface Tab {
      */
     "url"?: string;
     "dirty": boolean;
+
+    /**
+     * Page is the page the tab shows, if not a document's.
+     */
+    "page"?: string;
 }
 
 /**

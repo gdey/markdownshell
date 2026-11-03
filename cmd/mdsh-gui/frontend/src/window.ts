@@ -55,7 +55,9 @@ function draw() {
     seen.add(t.id);
     let f = frames.get(t.id);
     if (!f) {
-      f = el("iframe", { src: "/index.html?tab=" + t.id, title: t.title, id: "panel-" + t.id });
+      // A tab shows a document, or a read-only page such as the
+      // changelog.
+      f = el("iframe", { src: (t.page || "/index.html") + "?tab=" + t.id, title: t.title, id: "panel-" + t.id });
       frames.set(t.id, f);
       $("frames").append(f);
     }
@@ -88,7 +90,7 @@ function tabButton(t: Tab): HTMLElement {
   // between the tabs, and enter or space shows one.
   const b = el(
     "div",
-    { className: "tab" + (active ? " active" : ""), title: t.file || "Start screen", draggable: true, role: "tab", id: "tab-" + t.id, tabIndex: active ? 0 : -1 },
+    { className: "tab" + (active ? " active" : ""), title: t.file || (t.page ? t.title + ", read-only" : "Start screen"), draggable: true, role: "tab", id: "tab-" + t.id, tabIndex: active ? 0 : -1 },
     el("span", { className: "dot", hidden: !t.dirty, title: "Output not saved", ariaHidden: "true" }, "•"),
     el("span", { className: "label" }, t.title),
     close,

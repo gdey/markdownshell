@@ -36,7 +36,7 @@ func build() error {
 	if err := os.RemoveAll("frontend/bundle"); err != nil {
 		return err
 	}
-	res := api.Build(api.BuildOptions{
+	opts := api.BuildOptions{
 		EntryPoints: []string{"frontend/src/app.ts", "frontend/src/settings.ts", "frontend/src/window.ts"},
 		Outdir:      "frontend/bundle",
 		Bundle:      true,
@@ -67,8 +67,15 @@ func build() error {
 		}},
 		Write:    true,
 		LogLevel: api.LogLevelWarning,
-	})
-	if len(res.Errors) > 0 {
+	}
+	if res := api.Build(opts); len(res.Errors) > 0 {
+		return errors.New("esbuild failed")
+	}
+	// The changelog page is bundled whole, on its own: splitting it with
+	// the others would split their shared chunk in two.
+	opts.EntryPoints = []string{"frontend/src/changelog.ts"}
+	opts.Splitting = false
+	if res := api.Build(opts); len(res.Errors) > 0 {
 		return errors.New("esbuild failed")
 	}
 	return nil

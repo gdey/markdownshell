@@ -59,14 +59,16 @@ func (a *App) newFile(w *docWindow, template string) error {
 }
 
 // newFromMenu runs File › New File…: the tab in front asks which
-// template to start from. With no window open there is no page to ask
-// in, so it makes a blank file.
+// template to start from. With no window open, or a page such as the
+// changelog in front, there is no page to ask in, so it makes a blank
+// file.
 func (a *App) newFromMenu() {
-	if t := a.currentTab(); t != nil {
+	w := a.current()
+	if t := a.currentTab(); t != nil && t.page == "" {
 		t.emit("menu", "newfile")
 		return
 	}
-	if err := a.newFile(nil, ""); err != nil {
+	if err := a.newFile(w, ""); err != nil {
 		a.showError(nil, err)
 	}
 }

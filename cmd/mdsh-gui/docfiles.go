@@ -15,12 +15,17 @@ import (
 // their own policy in a meta tag.
 const docCSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
 
-// assets serves the frontend, the app icon, and at notebook.DocPrefix the
+// assets serves the frontend, the app icon, the changelog's
+// screenshots, and at notebook.DocPrefix the
 // files beside the open documents, such as the images their blocks write.
 func (a *App) assets(pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/appicon.svg" {
 			http.ServeFileFS(w, r, frontend, "build/appicon.svg")
+			return
+		}
+		if name, ok := strings.CutPrefix(r.URL.Path, changelogImages); ok {
+			serveChangelogImage(w, r, name)
 			return
 		}
 		if path, ok := strings.CutPrefix(r.URL.Path, notebook.DocPrefix+"/"); ok {

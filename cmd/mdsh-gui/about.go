@@ -125,7 +125,6 @@ const (
 	docsURL    = "https://gdey.github.io/markdownshell/"
 	repoURL    = "https://github.com/gdey/markdownshell"
 	releaseURL = repoURL + "/releases"
-	changesURL = repoURL + "/blob/main/CHANGELOG.md"
 	issueURL   = repoURL + "/issues/new"
 )
 
@@ -149,7 +148,6 @@ func (a *App) About() About {
 			{"Documentation", docsURL},
 			{"Source code", repoURL},
 			{"Releases", releaseURL},
-			{"Changelog", changesURL},
 			{"Report a problem", issueURL},
 		},
 	}

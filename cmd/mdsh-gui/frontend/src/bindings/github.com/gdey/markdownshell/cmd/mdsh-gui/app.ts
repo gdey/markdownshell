@@ -78,6 +78,13 @@ export function Cells(): $CancellablePromise<notebook$0.Cell[] | null> {
 }
 
 /**
+ * Changelog is the app's changelog, rendered, for its tab.
+ */
+export function Changelog(): $CancellablePromise<string> {
+    return $Call.ByName("main.App.Changelog");
+}
+
+/**
  * CheckInfo checks the attributes in a fence's info string.
  */
 export function CheckInfo(info: string): $CancellablePromise<notebook$0.Problem[] | null> {
@@ -693,6 +700,15 @@ export function SetZshWrapper(on: boolean): $CancellablePromise<$models.ZshWrapp
  */
 export function Settings(): $CancellablePromise<settings$0.Settings> {
     return $Call.ByName("main.App.Settings");
+}
+
+/**
+ * ShowChangelog brings the changelog's tab forward, opening one after
+ * the tab in front of the document window in front if there is none.
+ * With no document window open, it opens in a window of its own.
+ */
+export function ShowChangelog(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ShowChangelog");
 }
 
 /**
