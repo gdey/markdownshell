@@ -1,0 +1,122 @@
+name: Swift app
+
+# Builds and tests mdsh-swift, the SwiftUI port of mdsh-gui, and its Go
+# bridge, on macOS. It takes screenshots of the app for the UI parity
+# check and keeps them, and the app, as workflow artifacts.
+
+on:
+  push:
+    branches: [mdsh-swift-main]
+    paths:
+      - cmd/mdsh-swift/**
+      - cmd/mdsh-gui/notebook/**
+      - cmd/mdsh-gui/settings/**
+      - .github/workflows/swift.yml
+  pull_request:
+    paths:
+      - cmd/mdsh-swift/**
+      - .github/workflows/swift.yml
+  workflow_dispatch:
+
+jobs:
+  macos:
+    # On the Neo, the self-hosted Mac set aside for this work. Pull requests
+    # from forks stay on GitHub's runners, so outside code never runs there.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'neo' || 'macos-15' }}
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: cmd/mdsh-swift
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/mdsh-swift/bridge/go.mod
+          cache-dependency-path: cmd/mdsh-swift/bridge/go.sum
+          # A self-hosted runner keeps Go's caches on its own disk.
+          cache: ${{ runner.environment != 'self-hosted' }}
+      - name: Test the bridge
+        working-directory: cmd/mdsh-swift/bridge
+        run: |
+          go vet ./...
+          go test -race ./...
+      - run: swift --version
+      - name: Build the app
+        run: scripts/build-app.sh debug
+      - name: Test MdshKit against the bridge
+        run: MDSH_SWIFT_BRIDGE="$PWD/build/mdsh-swift-bridge" swift test
+      # The screenshots open windows, and threads drive the Neo's desktop
+      # by hand, so take turns. neo-desktop is installed on the Neo.
+      - name: Wait for the desktop
+        if: runner.environment == 'self-hosted'
+        run: neo-desktop acquire "ci-run-$GITHUB_RUN_ID"
+      - name: Screenshots
+        run: scripts/screenshots.sh build/screenshots
+      # Whether the runner may press keys (Accessibility) and see other
+      # apps' windows (Screen Recording), which key-driven scenes need.
+      # It only reports, into the screenshots as permissions.txt.
+      - name: What the desktop allows
+        if: runner.environment == 'self-hosted'
+        continue-on-error: true
+        run: |
+          cat > "$RUNNER_TEMP/perms.swift" <<'EOF'
+          import ApplicationServices
+          import CoreGraphics
+          print("accessibility (AXIsProcessTrusted): \(AXIsProcessTrusted())")
+          print("screen recording (CGPreflightScreenCaptureAccess): \(CGPreflightScreenCaptureAccess())")
+          EOF
+          {
+            swift "$RUNNER_TEMP/perms.swift" 2>&1
+            if osascript -e 'tell application "System Events" to key code 63' 2>&1; then
+              echo "System Events key code: allowed"
+            else
+              echo "System Events key code: refused"
+            fi
+            echo "user: $(id -un), session: $(launchctl managername 2>/dev/null)"
+            # macOS gives a permission to the process at the top of this
+            # chain that isn't launchd, so that is the one to add.
+            echo "process chain:"
+            pid=$$
+            while [ "${pid:-0}" -gt 1 ]; do
+              ps -o pid=,ppid=,command= -p "$pid" | sed 's/^/  /'
+              pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+            done
+          } | tee build/screenshots/permissions.txt
+      - name: Give the desktop back
+        if: always() && runner.environment == 'self-hosted'
+        run: neo-desktop release "ci-run-$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mdsh-swift-screenshots
+          path: cmd/mdsh-swift/build/screenshots
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mdsh-swift-app
+          path: cmd/mdsh-swift/build/mdsh-swift.app
+          if-no-files-found: error
+      # The screenshots also go to the mdsh-swift-screenshots branch,
+      # one folder per commit, where they can be fetched with git.
+      - name: Keep the screenshots on a branch
+        if: github.event_name == 'push'
+        run: |
+          set -eu
+          dir=$RUNNER_TEMP/shots
+          git clone --quiet --depth 1 --branch mdsh-swift-screenshots "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" "$dir" ||
+            { git init --quiet "$dir" && git -C "$dir" checkout --quiet --orphan mdsh-swift-screenshots &&
+              git -C "$dir" remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}"; }
+          mkdir -p "$dir/${{ github.sha }}"
+          cp build/screenshots/* "$dir/${{ github.sha }}/"
+          cd "$dir"
+          git add -A
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit --quiet -m "Screenshots of ${{ github.sha }}"
+          # Another run may have pushed since the clone, and GitHub
+          # sometimes answers a push with a 500: rebase and try again.
+          for wait in 2 4 8 16 0; do
+            git push --quiet origin HEAD:mdsh-swift-screenshots && exit 0
+            [ "$wait" = 0 ] && exit 1
+            sleep "$wait"
+            git pull --quiet --rebase origin mdsh-swift-screenshots || true
+          done
