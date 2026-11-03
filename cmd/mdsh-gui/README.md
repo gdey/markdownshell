@@ -51,7 +51,8 @@ Each file opens in a tab of its own, with its own shells.
 - **Sessions:** New Session on the start screen opens the day's file,
   such as `2026-11-02.md`, in the sessions folder (`~/.mdsh/sessions`
   unless Settings › Files names another), making it the first time as
-  a copy of the session template, or with the date as its heading.
+  a copy of the session template, or with the date as its heading
+  and your login shell (`$SHELL`, if zsh or bash) as its `shell:`.
   Last Session opens the file in that folder changed last. Either one
   opens with the History pane open and the keyboard in it.
 - **File:** New File… (cmd/ctrl+N, or New File… on the start screen)

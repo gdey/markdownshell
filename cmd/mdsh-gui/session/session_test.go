@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/gdey/markdownshell/doc"
 )
 
 func TestDir(t *testing.T) {
@@ -26,7 +28,7 @@ func TestToday(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "sessions") // made as needed
 	day := time.Date(2026, 11, 2, 9, 30, 0, 0, time.Local)
 
-	file, made, err := Today(dir, "", day)
+	file, made, err := Today(dir, "", "", day)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +43,7 @@ func TestToday(t *testing.T) {
 	if err := os.WriteFile(file, []byte("# Notes\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	again, made, err := Today(dir, "", day.Add(8*time.Hour))
+	again, made, err := Today(dir, "", "", day.Add(8*time.Hour))
 	if err != nil || again != file || made {
 		t.Errorf("Today again = %q, %v, %v; want %q, false", again, made, err, file)
 	}
@@ -54,14 +56,14 @@ func TestToday(t *testing.T) {
 	if err := os.WriteFile(tmpl, []byte("# Session\n\n```sh\nuptime\n```\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	next, made, err := Today(dir, tmpl, day.AddDate(0, 0, 1))
+	next, made, err := Today(dir, tmpl, "/bin/zsh", day.AddDate(0, 0, 1))
 	if err != nil || !made || filepath.Base(next) != "2026-11-03.md" {
 		t.Fatalf("Today from a template = %q, %v, %v", next, made, err)
 	}
 	if src, _ := os.ReadFile(next); string(src) != "# Session\n\n```sh\nuptime\n```\n" {
 		t.Errorf("from a template: %q", src)
 	}
-	if _, _, err := Today(dir, filepath.Join(dir, "missing.md"), day.AddDate(0, 0, 2)); err == nil {
+	if _, _, err := Today(dir, filepath.Join(dir, "missing.md"), "", day.AddDate(0, 0, 2)); err == nil {
 		t.Error("Today from a missing template made a file")
 	}
 	if _, err := os.Stat(filepath.Join(dir, "2026-11-04.md")); err == nil {
@@ -103,5 +105,33 @@ func TestLast(t *testing.T) {
 	tie := write("2026-11-02.md", base.Add(time.Hour))
 	if got, _ := Last(dir); got != tie {
 		t.Errorf("Last of a tie = %q; want %q", got, tie)
+	}
+}
+
+func TestTodayShell(t *testing.T) {
+	dir := t.TempDir()
+	file, _, err := Today(dir, "", "/bin/zsh", time.Date(2026, 11, 2, 9, 0, 0, 0, time.Local))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, _ := os.ReadFile(file)
+	want := "---\nmdsh:\n  shell: /bin/zsh\n---\n\n# 2026-11-02\n"
+	if string(src) != want {
+		t.Fatalf("new session holds %q; want %q", src, want)
+	}
+	d, err := doc.Parse(src)
+	if err != nil || d.Options.Shell != "/bin/zsh" {
+		t.Errorf("parsed shell = %q, %v", d.Options.Shell, err)
+	}
+}
+
+func TestLoginShell(t *testing.T) {
+	for sh, want := range map[string]string{
+		"/bin/zsh": "/bin/zsh", "/opt/homebrew/bin/bash": "/opt/homebrew/bin/bash",
+		"/usr/local/bin/fish": "", "/bin/sh": "", "": "",
+	} {
+		if got := LoginShell(func(string) string { return sh }); got != want {
+			t.Errorf("LoginShell with SHELL=%q = %q; want %q", sh, got, want)
+		}
 	}
 }

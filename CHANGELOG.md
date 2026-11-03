@@ -250,7 +250,10 @@ follow [Semantic Versioning](https://semver.org/).
   `sh` or `bash`. Read by macOS's `/bin/sh`, a `.zshrc` that sets up
   zoxide made `cd` fail with `(Ie)__zoxide_hook: syntax error in
   expression`. A `.zshrc` is read only when blocks run in zsh, and a
-  `.bashrc` only in bash.
+  `.bashrc` only in bash. New Session's file, when there's no session
+  template, now starts with front matter setting `shell:` to your login
+  shell (`$SHELL`, if it is zsh or bash), so a session's History pane
+  is the shell you use and reads its rc file.
 
   ![The Shell settings, saying a file named for one shell is read only when blocks run in that shell](docs/changelog/history-rc-shell.png)
 

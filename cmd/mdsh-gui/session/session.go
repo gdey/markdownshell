@@ -35,14 +35,18 @@ func Name(day time.Time) string { return day.Format(time.DateOnly) + ".md" }
 
 // Today is the path of the session for now's day in dir. If it isn't
 // there it is made, with dir, as a copy of template, or a heading for
-// the date when template is "". It reports whether it made the file;
+// the date when template is "", under front matter that sets the shell
+// to shell unless shell is "". It reports whether it made the file;
 // a file already there is left as it is.
-func Today(dir, template string, now time.Time) (file string, made bool, err error) {
+func Today(dir, template, shell string, now time.Time) (file string, made bool, err error) {
 	file = filepath.Join(dir, Name(now))
 	if _, err := os.Stat(file); err == nil {
 		return file, false, nil
 	}
 	src := []byte("# " + now.Format(time.DateOnly) + "\n")
+	if shell != "" {
+		src = append([]byte("---\nmdsh:\n  shell: "+shell+"\n---\n\n"), src...)
+	}
 	if template != "" {
 		if src, err = os.ReadFile(template); err != nil {
 			return "", false, err
@@ -64,6 +68,19 @@ func Today(dir, template string, now time.Time) (file string, made bool, err err
 		return "", false, err
 	}
 	return file, true, f.Close()
+}
+
+// LoginShell is the shell a new session's blocks run in: $SHELL, as
+// environ has it, when it is zsh or bash, so the History pane is the
+// shell you use and reads its rc file. Otherwise it is "", for the
+// default /bin/sh, since mdsh runs only sh-like shells.
+func LoginShell(getenv func(string) string) string {
+	sh := strings.TrimSpace(getenv("SHELL"))
+	switch filepath.Base(sh) {
+	case "zsh", "bash":
+		return sh
+	}
+	return ""
 }
 
 // Last is the markdown file in dir changed last, or "" if dir has none
