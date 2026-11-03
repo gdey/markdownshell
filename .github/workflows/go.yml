@@ -40,6 +40,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          # A self-hosted runner keeps Go's caches on its own disk; saving
+          # them to GitHub's cache from there took 11 minutes a job.
+          cache: ${{ runner.environment != 'self-hosted' }}
       - name: Install zsh
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y zsh
@@ -63,6 +66,9 @@ jobs:
         with:
           go-version-file: cmd/mdsh-gui/go.mod
           cache-dependency-path: cmd/mdsh-gui/go.sum
+          # A self-hosted runner keeps Go's caches on its own disk; saving
+          # them to GitHub's cache from there took 11 minutes a job.
+          cache: ${{ runner.environment != 'self-hosted' }}
       - name: Install GTK and WebKitGTK
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
