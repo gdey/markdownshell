@@ -345,11 +345,14 @@ Each file opens in a tab of its own, with its own shells.
   the History pane's shell reads; and Files for the templates folder
   for New File…. They are kept in
   `mdsh/gui.json` in the user's config folder. Shell has one more,
-  **Give blocks your zsh aliases and functions**, which adds an `mdsh`
-  function to `~/.zshrc` (or `$ZDOTDIR/.zshrc`) between marker
-  comments, and unchecking it takes it out. The function runs the CLI
-  with `--source <(alias -L; typeset -f)`; the app itself isn't started
-  from a shell, so it can't see them. About shows the version and
+  **Give blocks your shell's aliases and functions**, which adds an
+  `mdsh` function to `~/.zshrc` (or `$ZDOTDIR/.zshrc`), and to
+  `~/.bashrc` when there is one, between marker comments, and
+  unchecking it takes it out. The function runs the CLI with
+  `--source <(alias -L; typeset -f)` (in bash,
+  `<(unset -f mdsh _mdsh; alias -p; declare -f)`); the app itself isn't
+  started from a shell, so it can't see them. The same block loads
+  `mdsh`'s tab completion, in zsh once `compinit` has run. About shows the version and
   build, the Go version and platform, where the settings file, `.zshrc`
   and the folders from Settings are, whether `zsh`, `sh`, `mdsh` and the
   shell from Settings are on the app's PATH and their versions, and

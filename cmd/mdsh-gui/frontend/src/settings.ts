@@ -78,6 +78,8 @@ function draw() {
   input("zsh-wrapper").checked = !!zsh?.on;
   input("zsh-wrapper").disabled = !zsh;
   if (zsh) $("zshrc").textContent = tilde(zsh.path, zsh.home);
+  $("bashrc-note").hidden = !zsh?.bashPath;
+  if (zsh?.bashPath) $("bashrc").textContent = tilde(zsh.bashPath, zsh.home);
   drawCLI();
 }
 

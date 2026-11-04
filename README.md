@@ -713,4 +713,7 @@ passes along whatever your shell has defined when you run mdsh:
 mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
 ```
 
-In bash, use `<(alias -p; declare -f)`.
+In bash, use `<(unset -f mdsh _mdsh; alias -p; declare -f)`; leaving out
+the wrapper and its completion function keeps their bash-only syntax from
+stopping a `/bin/sh` that is dash. Settings › Shell in mdsh-gui can add the
+wrapper to `~/.zshrc` and `~/.bashrc`, with a line that loads completion.

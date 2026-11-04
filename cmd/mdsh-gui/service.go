@@ -17,7 +17,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/session"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/zshrc"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/shellrc"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/report"
@@ -625,34 +625,68 @@ func edited(cur *settings.Settings, s settings.Settings) {
 	}
 }
 
-// ZshWrapper is whether the user's .zshrc has the mdsh function that
-// gives blocks the calling shell's aliases and functions.
+// ZshWrapper is whether the user's .zshrc, and .bashrc if they have one,
+// has the mdsh function that gives blocks the calling shell's aliases
+// and functions, and loads mdsh's completion.
 type ZshWrapper struct {
-	Path string `json:"path"` // the .zshrc
-	Home string `json:"home"` // for showing Path as ~/…
-	On   bool   `json:"on"`
+	Path     string `json:"path"`     // the .zshrc
+	BashPath string `json:"bashPath"` // the .bashrc, or "" when there is none
+	Home     string `json:"home"`     // for showing Path as ~/…
+	On       bool   `json:"on"`
 }
 
-// ZshWrapperState reads the user's .zshrc for the mdsh function.
+// ZshWrapperState reads the user's .zshrc and .bashrc for the mdsh
+// function, bringing a block from an older mdsh-gui up to date so it
+// loads completion too.
 func (a *App) ZshWrapperState() (ZshWrapper, error) {
-	path, err := zshrc.Path()
+	zsh, err := shellrc.Zsh.Path()
 	if err != nil {
 		return ZshWrapper{}, err
 	}
-	on, err := zshrc.Installed(path)
 	home, _ := os.UserHomeDir()
-	return ZshWrapper{Path: path, Home: home, On: on}, err
+	w := ZshWrapper{Path: zsh, Home: home}
+	if err := shellrc.Zsh.Update(zsh); err != nil {
+		return w, err
+	}
+	if w.On, err = shellrc.Zsh.Installed(zsh); err != nil {
+		return w, err
+	}
+	bash, err := shellrc.Bash.Path()
+	if err != nil {
+		return w, err
+	}
+	if _, err := os.Stat(bash); err != nil {
+		return w, nil
+	}
+	w.BashPath = bash
+	if err := shellrc.Bash.Update(bash); err != nil {
+		return w, err
+	}
+	on, err := shellrc.Bash.Installed(bash)
+	w.On = w.On || on
+	return w, err
 }
 
-// SetZshWrapper adds the mdsh function to the user's .zshrc, or takes it
-// out, and returns the new state.
+// SetZshWrapper adds the mdsh function to the user's .zshrc, and to
+// their .bashrc if they have one, or takes it out of both, and returns
+// the new state. It doesn't make a .bashrc for someone who doesn't use
+// bash.
 func (a *App) SetZshWrapper(on bool) (ZshWrapper, error) {
-	path, err := zshrc.Path()
+	zsh, err := shellrc.Zsh.Path()
 	if err != nil {
 		return ZshWrapper{}, err
 	}
-	if err := zshrc.Set(path, on); err != nil {
+	if err := shellrc.Zsh.Set(zsh, on); err != nil {
 		return ZshWrapper{}, err
+	}
+	bash, err := shellrc.Bash.Path()
+	if err != nil {
+		return ZshWrapper{}, err
+	}
+	if _, err := os.Stat(bash); err == nil {
+		if err := shellrc.Bash.Set(bash, on); err != nil {
+			return ZshWrapper{}, err
+		}
 	}
 	return a.ZshWrapperState()
 }

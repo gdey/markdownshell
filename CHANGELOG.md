@@ -13,6 +13,14 @@ follow [Semantic Versioning](https://semver.org/).
   `--source …` first, so mdsh took the subcommand for a file and failed
   with `open completion: no such file or directory`. A subcommand may now
   follow `--source` flags.
+- Settings › Shell's **Give blocks your shell's aliases and functions**
+  (was "your zsh aliases") now also turns on tab completion for `mdsh`,
+  in zsh once `compinit` has run, and adds the bash version of the
+  wrapper and completion to `~/.bashrc` when you have one. A `.zshrc`
+  with the older block gets the completion line the next time Settings
+  opens.
+
+  ![Settings › Shell: Give blocks your shell's aliases and functions, which adds an mdsh function to ~/.zshrc and ~/.bashrc and turns on tab completion](docs/changelog/shell-wrapper.png)
 - The Homebrew cask no longer warns that mdsh.app isn't signed and
   suggests `--no-quarantine`: from 1.4.0 the app is signed with a
   Developer ID and notarized, so it opens like any other app.

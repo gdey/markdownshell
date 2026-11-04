@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/zshrc"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/shellrc"
 )
 
 // version is set by release builds with -ldflags "-X main.version=...",
@@ -135,7 +135,7 @@ const (
 func (a *App) About() About {
 	b := thisBuild()
 	home, _ := os.UserHomeDir()
-	zsh, _ := zshrc.Path()
+	zsh, _ := shellrc.Zsh.Path()
 	ab := About{
 		Version:      b.Version,
 		Commit:       b.Commit,

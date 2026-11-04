@@ -732,8 +732,10 @@ export function SetView(v: $models.View): $CancellablePromise<void> {
 }
 
 /**
- * SetZshWrapper adds the mdsh function to the user's .zshrc, or takes it
- * out, and returns the new state.
+ * SetZshWrapper adds the mdsh function to the user's .zshrc, and to
+ * their .bashrc if they have one, or takes it out of both, and returns
+ * the new state. It doesn't make a .bashrc for someone who doesn't use
+ * bash.
  */
 export function SetZshWrapper(on: boolean): $CancellablePromise<$models.ZshWrapper> {
     return $Call.ByName("main.App.SetZshWrapper", on);
@@ -826,7 +828,9 @@ export function UninstallCLI(): $CancellablePromise<$models.CLI> {
 }
 
 /**
- * ZshWrapperState reads the user's .zshrc for the mdsh function.
+ * ZshWrapperState reads the user's .zshrc and .bashrc for the mdsh
+ * function, bringing a block from an older mdsh-gui up to date so it
+ * loads completion too.
  */
 export function ZshWrapperState(): $CancellablePromise<$models.ZshWrapper> {
     return $Call.ByName("main.App.ZshWrapperState");
