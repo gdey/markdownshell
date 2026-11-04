@@ -333,6 +333,8 @@ th { background: var(--code-bg); }
 .block .head button.trash.off:hover { background: none; }
 .block.ran { border-left: 3px solid var(--ok); }
 .block.failed { border-left: 3px solid var(--bad); }
+.block.ran.stale { border-left-color: var(--warn-border); }
+.stale-badge { padding: 0 8px; border: 1px solid var(--warn-border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; background: var(--warn-bg); margin-right: 8px; white-space: nowrap; cursor: help; }
 .block.background { border-left: 3px dashed var(--accent); }
 .block.background .exit { color: var(--muted); background: none; }
 .block .head { display: flex; gap: 4px; align-items: center; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--text-scale)); }

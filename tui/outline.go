@@ -130,6 +130,8 @@ func (m *Model) mark(i int) string {
 		return lipgloss.NewStyle().Foreground(runningCol).Render("?")
 	case r.Ran && (r.Err != nil || r.Failed() || errors.Is(r.Err, context.Canceled)):
 		return lipgloss.NewStyle().Foreground(failCol).Render("✗")
+	case r.Ran && !r.Block.IsInclude() && run.Stale(m.d, m.results)[i]:
+		return lipgloss.NewStyle().Foreground(runningCol).Render("✓")
 	case r.Ran && !r.Block.IsInclude():
 		return lipgloss.NewStyle().Foreground(okCol).Render("✓")
 	case r.Skipped && run.Runnable(r.Block):

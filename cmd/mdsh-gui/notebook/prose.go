@@ -40,6 +40,7 @@ func (n *Notebook) cells() []Cell {
 	// numbers start at its cell's FirstLine, not text in the code.
 	pieces := render.Pieces(d, n.results, render.Options{Env: environ(), PlainIncludes: true})
 	pos := max(d.FrontMatter.End, len(d.Shebang))
+	stale := run.Stale(d, n.results)
 	for i, b := range d.Blocks {
 		l.prose(pos, b.Span.Start)
 		pos = b.Output.End
@@ -108,6 +109,7 @@ func (n *Notebook) cells() []Cell {
 			Ran:             r.Ran,
 			Status:          r.Status,
 			Failed:          r.Failed(),
+			Stale:           stale[i],
 			Running:         n.bg[b],
 			From:            span.Start,
 			To:              span.End,

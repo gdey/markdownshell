@@ -206,7 +206,7 @@ func tagsOf(b *doc.Block) string {
 			tags = append(tags, a+"="+v)
 		}
 	}
-	for _, a := range []string{"background", "tty", "confirm", "skip"} {
+	for _, a := range []string{"background", "tty", "confirm", "skip", "always"} {
 		if b.Attrs.Has(a) {
 			tags = append(tags, a)
 		}
@@ -234,6 +234,9 @@ func (m *Model) state(i int, r *run.Result) string {
 		return lipgloss.NewStyle().Foreground(failCol).Render("✗ " + r.Err.Error())
 	case r.Ran && r.Failed():
 		return lipgloss.NewStyle().Foreground(failCol).Render(fmt.Sprintf("✗ exit %d", r.ExitStatus()))
+	case r.Ran && !r.Block.IsInclude() && run.Stale(m.d, m.results)[i]:
+		// A block it depends on ran again, or was cleared, since.
+		return lipgloss.NewStyle().Foreground(runningCol).Render("✓ stale")
 	case r.Ran && !r.Block.IsInclude():
 		return lipgloss.NewStyle().Foreground(okCol).Render("✓")
 	case r.Skipped && run.Runnable(r.Block):

@@ -596,18 +596,23 @@ function hiddenBadge(why: string): HTMLElement {
   return el("span", { className: "hidden-badge", title: why }, "hidden when printed");
 }
 
+// staleBadge marks a block whose run is out of date: a block it depends
+// on ran again, or had its run cleared, since it ran.
+const staleNote = "A block this depends on ran again or was cleared since this ran. Running a block that depends on this one runs it again first.";
+
 function drawBlock(c: Cell): HTMLElement {
   // The outline names a block by the .name's first child.
   const name = el("span", { className: "name" }, el("span", { className: "id" }, c.name ?? c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
   const exit = el("span", { className: "exit" + (c.failed ? " bad" : "") }, c.running ? backgroundNote : c.ran ? "exit " + c.status : "");
   const block = el(
     "section",
-    { className: "block" + (c.history ? " history" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : ""), id: "block-" + c.block },
+    { className: "block" + (c.history ? " history" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : "") + (c.stale ? " stale" : ""), id: "block-" + c.block },
     el(
       "div",
       { className: "head" },
       name,
       c.hidden ? hiddenBadge(c.hidden) : "",
+      c.stale ? el("span", { className: "stale-badge", title: staleNote }, "stale") : "",
       exit,
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "")),
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),

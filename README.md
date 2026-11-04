@@ -451,7 +451,8 @@ make
 When `deploy` is about to run, mdsh checks `build` and then `login`, in
 that order. A block that has already run in this session (in `mdsh -i`
 or mdsh-gui; in a plain `mdsh` run, earlier in the run) and didn't fail
-is passed over, unless it is marked `always`. For any other, mdsh asks
+is passed over, unless it is marked `always` or is stale. For any other,
+mdsh asks
 `Run build first? [r]un / s[k]ip / [s]top`:
 
 - `r` checks that block's own `depends=` the same way, then runs it. Its
@@ -487,6 +488,15 @@ Each time a block that depends on `login` runs, `login` is asked about
 again, even if it already ran. It runs once on the way to that block,
 even when several of its dependencies need it. `always` doesn't make it
 run without asking; `--yes` still does that.
+
+A block that ran is **stale** once a block it depends on runs again, or
+has its output cleared in mdsh-gui, or is stale itself. A stale
+dependency is asked about again, like one that never ran. Say `c`
+depends on `a`, `d` on `a`, `b` and `c`, and `e` on `a` and `d`, and
+all have run. Run `a` again, and `c`, `d` and `e` are stale; run `e`,
+and mdsh asks about `d`, then, on the way to `d`, `c`, but not `b`.
+mdsh-gui marks a stale block's card with a *stale* badge, and `mdsh -i`
+shows `✓ stale` in its header.
 
 ## Terminal blocks
 

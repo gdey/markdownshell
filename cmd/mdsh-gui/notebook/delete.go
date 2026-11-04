@@ -70,7 +70,8 @@ func (n *Notebook) tryDelete(i int) (Deleted, []byte, error) {
 
 // ClearOutput takes top-level block i's output out of the file, the
 // output fences attached to it, and forgets this session's run of it, so
-// saving doesn't write the output back. The shell keeps what the run
+// saving doesn't write the output back, a block that depends on it asks
+// to run it again, and the blocks that depend on it are stale. The shell keeps what the run
 // did. It is a rendered-view edit, so Undo puts the output back.
 func (n *Notebook) ClearOutput(i int) error {
 	n.mu.Lock()
@@ -99,6 +100,7 @@ func (n *Notebook) ClearOutput(i int) error {
 	}
 	fresh := &run.Result{Block: b}
 	n.results[n.index[b]] = fresh
+	n.sess.SetResult(n.index[b], fresh)
 	n.dirty = true
 	if edited && len(n.undo) > 0 {
 		top := &n.undo[len(n.undo)-1]

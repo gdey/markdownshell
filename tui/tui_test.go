@@ -1295,3 +1295,25 @@ func TestFullEnvBanner(t *testing.T) {
 		t.Errorf("banner on a file without share: [...]")
 	}
 }
+
+// TestStaleDependent checks that a block shows as stale once a block it
+// depends on runs again.
+func TestStaleDependent(t *testing.T) {
+	m, _ := newModel(t, "```sh {#one}\necho one\n```\n\n```sh {#two depends=one}\necho two\n```\n", Options{})
+	press(m, "enter")
+	pump(t, m)
+	press(m, "down")
+	press(m, "enter")
+	pump(t, m)
+	if st := m.state(1, m.results[1]); !strings.Contains(st, "✓") || strings.Contains(st, "stale") {
+		t.Fatalf("two after running in order: %q", st)
+	}
+	press(m, "k", "enter")
+	pump(t, m)
+	if st := m.state(1, m.results[1]); !strings.Contains(st, "stale") {
+		t.Errorf("two after one ran again: %q, want stale", st)
+	}
+	if st := m.state(0, m.results[0]); strings.Contains(st, "stale") {
+		t.Errorf("one: %q", st)
+	}
+}

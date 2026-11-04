@@ -124,6 +124,7 @@ func (n *Notebook) step(from, to *[]change, redo bool) (string, error) {
 		}
 		if i, ok := n.index[rc.b]; ok && n.results[i] == was {
 			n.results[i] = now
+			n.sess.SetResult(i, now)
 		}
 	}
 	*from = (*from)[:len(*from)-1]
