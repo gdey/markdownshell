@@ -45,6 +45,68 @@ func (b *Block) IsChoice() bool { return b.Lang == ChoiceLang && !b.IsInclude() 
 // fills in, not one that runs.
 func (b *Block) IsInput() bool { return b.IsTextbox() || b.IsChoice() }
 
+// NoSave reports whether b carries the nosave attribute: its value lives
+// in the session only. Write-back keeps what the file holds after a
+// runnable block, in its output copies and placeholders, and in a
+// textbox or choice, instead of the run's output or what was typed or
+// picked. See SetValue and OutputNoSave.
+func (b *Block) NoSave() bool { return b.Attrs.Has("nosave") }
+
+// OutputNoSave reports whether write-back keeps the output after b as
+// the file has it: b is nosave, or an output fence attached to it is.
+func (b *Block) OutputNoSave() bool { return b.NoSave() || b.outNoSave }
+
+// SessionValue is the value SetValue gave nosave input b this session,
+// and whether it has one. Without one, b's value is its body.
+func (b *Block) SessionValue() (string, bool) {
+	if b.session == nil {
+		return "", false
+	}
+	return *b.session, true
+}
+
+// SetValue sets the value of nosave input b, and of every copy of it, for
+// this session: a textbox's text, or the labels a choice has checked, one
+// per line. The source is left alone, so saving keeps the body the file
+// holds. It reports false, and sets nothing, when b isn't a nosave input.
+func (d *Document) SetValue(b *Block, value string) bool {
+	if !b.IsInput() || !b.NoSave() {
+		return false
+	}
+	for _, c := range d.Mirrors(b) {
+		v := value
+		c.session = &v
+	}
+	return true
+}
+
+// SetChecks sets the picks of nosave choice b, and of every copy of it,
+// for this session, as SetChoice does in the source: one bool per
+// option. It reports false when b isn't a nosave choice.
+func (d *Document) SetChecks(b *Block, checked []bool) bool {
+	if !b.IsChoice() || !b.NoSave() {
+		return false
+	}
+	var labels []string
+	for i, o := range b.Choice().Options {
+		if i < len(checked) && checked[i] {
+			labels = append(labels, o.Label)
+		}
+	}
+	return d.SetValue(b, strings.Join(labels, "\n"))
+}
+
+// InputFor is the textbox or choice that binds variable name, such as
+// MDSH_VAR_host, with var=, or nil when none does.
+func (d *Document) InputFor(name string) *Block {
+	for _, b := range d.Blocks {
+		if n, _, ok := b.Var(); ok && n == name {
+			return b
+		}
+	}
+	return nil
+}
+
 // VarPrefix starts the name of the variable an input's var= binds.
 const VarPrefix = "MDSH_VAR_"
 
@@ -82,6 +144,8 @@ func controlDiff(a, b *Block) string {
 	switch {
 	case a.Lang != b.Lang:
 		return "it is a " + b.Lang + ", not a " + a.Lang
+	case a.NoSave() != b.NoSave():
+		return "nosave differs"
 	case a.IsTextbox() && a.Textbox().Lines != b.Textbox().Lines:
 		return "lines= differs"
 	case a.IsTextbox():
@@ -182,11 +246,16 @@ type Textbox struct {
 	Placeholder string
 }
 
-// Textbox reads a textbox's attributes and text.
+// Textbox reads a textbox's attributes and text: the session's value for
+// a nosave textbox that has one (see SetValue), else its body.
 func (b *Block) Textbox() Textbox {
 	n, _ := strconv.Atoi(b.Attrs["lines"])
+	text := strings.TrimSuffix(b.Body, "\n")
+	if v, ok := b.SessionValue(); ok {
+		text = v
+	}
 	return Textbox{
-		Text:        strings.TrimSuffix(b.Body, "\n"),
+		Text:        text,
 		Lines:       max(n, 1),
 		Placeholder: b.Attrs["placeholder"],
 	}
@@ -211,15 +280,30 @@ type Option struct {
 
 var optionLine = regexp.MustCompile(`^(\s*[-*+]\s+\[)([ xX])(\]\s+)(.*?)\s*$`)
 
-// Choice reads a choice's attributes and options.
+// Choice reads a choice's attributes and options. A nosave choice with a
+// session value (see SetValue) has the options that value names checked,
+// whatever the body says.
 func (b *Block) Choice() Choice {
 	c := Choice{Mode: b.Attrs["mode"], Placeholder: b.Attrs["placeholder"]}
 	if c.Mode != ChoiceRadio && c.Mode != ChoiceMulti {
 		c.Mode = ChoiceDropdown
 	}
+	var picked map[string]bool
+	if v, ok := b.SessionValue(); ok {
+		picked = map[string]bool{}
+		for _, label := range strings.Split(v, "\n") {
+			if label != "" {
+				picked[label] = true
+			}
+		}
+	}
 	for line := range strings.Lines(b.Body) {
 		if m := optionLine.FindStringSubmatch(strings.TrimSuffix(line, "\n")); m != nil {
-			c.Options = append(c.Options, Option{Label: m[4], Checked: m[2] != " "})
+			checked := m[2] != " "
+			if picked != nil {
+				checked = picked[m[4]]
+			}
+			c.Options = append(c.Options, Option{Label: m[4], Checked: checked})
 		}
 	}
 	return c

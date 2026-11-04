@@ -70,12 +70,12 @@ func (n *Notebook) cells() []Cell {
 		}
 		if b.IsTextbox() {
 			t := b.Textbox()
-			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Placeholder: t.Placeholder, Problem: b.VarTaken}, From: span.Start, To: span.End})
+			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Placeholder: t.Placeholder, Problem: b.VarTaken, NoSave: b.NoSave()}, From: span.Start, To: span.End})
 			continue
 		}
 		if b.IsChoice() {
 			c := b.Choice()
-			l.cells = append(l.cells, Cell{Block: -1, Choice: &ChoiceCell{Block: i, ID: b.ID, Mode: c.Mode, Options: c.Options, Placeholder: c.Placeholder, Problem: b.VarTaken}, From: span.Start, To: span.End})
+			l.cells = append(l.cells, Cell{Block: -1, Choice: &ChoiceCell{Block: i, ID: b.ID, Mode: c.Mode, Options: c.Options, Placeholder: c.Placeholder, Problem: b.VarTaken, NoSave: b.NoSave()}, From: span.Start, To: span.End})
 			continue
 		}
 		if !run.Runnable(b) {
@@ -111,6 +111,7 @@ func (n *Notebook) cells() []Cell {
 			Status:          r.Status,
 			Failed:          r.Failed(),
 			Stale:           stale[i],
+			NoSave:          b.NoSave(),
 			Running:         n.bg[b],
 			Ms:              r.Duration.Milliseconds(),
 			TimedOut:        r.TimedOut,

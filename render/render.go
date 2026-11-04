@@ -127,6 +127,11 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			continue
 		}
 
+		if opts.WriteBack && b.OutputNoSave() {
+			// The run's output lives in the session: the file keeps
+			// what it holds, as for a block that didn't run.
+			r = nil
+		}
 		showCode := !(opts.HideCode && run.Runnable(b)) && shown(b, "show")
 		showOutput := !opts.HideOutput && shown(b, "show-output")
 		if showCode {
@@ -266,6 +271,10 @@ func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run
 				// The caller's environment is never stored in the
 				// file, and a value stored by an older mdsh is dropped.
 				buf.WriteString(ph.Ref.String())
+			case opts.WriteBack && noSave(d, ph):
+				// A nosave block's values, and a nosave input's, stay
+				// as the file has them.
+				buf.Write(d.Src[ph.Span.Start:ph.Span.End])
 			case opts.WriteBack:
 				buf.WriteString(ph.Source(v))
 			case ph.Caller() && caller != nil && !hasKey(caller, ph.Var):
@@ -303,6 +312,9 @@ func copyText(d *doc.Document, c *doc.Copy, results []*run.Result, lookup doc.Lo
 		return string(d.Src[c.Span.Start:c.Span.End]), true
 	}
 	b := d.Blocks[i]
+	if opts.WriteBack && (b.NoSave() || c.NoSave) {
+		return string(d.Src[c.Span.Start:c.Span.End]), true
+	}
 	if cond, ok := b.Cond("show-output"); ok && !opts.WriteBack && !cond.Eval(run.LookupAt(lookup, d, results, b.Output.End)) {
 		return "", false
 	}
@@ -337,6 +349,18 @@ func copyText(d *doc.Document, c *doc.Copy, results []*run.Result, lookup doc.Lo
 		out = strings.TrimSuffix(out, "\n")
 	}
 	return out, true
+}
+
+// noSave reports whether placeholder ph reads a nosave block's variable
+// or status, or the variable a nosave input binds.
+func noSave(d *doc.Document, ph *doc.Placeholder) bool {
+	var b *doc.Block
+	if ph.BlockID != "" {
+		b = d.Block(ph.BlockID)
+	} else if !ph.Fact() {
+		b = d.InputFor(ph.Var)
+	}
+	return b != nil && b.NoSave()
 }
 
 // dropGap drops the blank lines, which may hold only prefix, at the start

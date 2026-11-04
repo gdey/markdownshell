@@ -334,6 +334,8 @@ th { background: var(--code-bg); }
 .block.ran { border-left: 3px solid var(--ok); }
 .block.failed { border-left: 3px solid var(--bad); }
 .block.ran.stale { border-left-color: var(--warn-border); }
+.nosave-badge { padding: 0 8px; border: 1px solid var(--border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; color: var(--muted); margin-right: 8px; white-space: nowrap; cursor: help; }
+.input-cell .nosave-badge { margin-left: 8px; }
 .stale-badge { padding: 0 8px; border: 1px solid var(--warn-border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; background: var(--warn-bg); margin-right: 8px; white-space: nowrap; cursor: help; }
 .block.background { border-left: 3px dashed var(--accent); }
 .block.background .exit { color: var(--muted); background: none; }

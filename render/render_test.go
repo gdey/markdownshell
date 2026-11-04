@@ -213,3 +213,43 @@ func TestTerminalEscapesCode(t *testing.T) {
 		t.Errorf("write-back changed the code: %q", got)
 	}
 }
+
+func TestNoSaveWriteBack(t *testing.T) {
+	src := "```sh {#a nosave}\necho a\n```\n\n```output {for=a exit=0}\nold\n```\n\n" +
+		"Saw {{#a/env(X):\"stored\"}} and {{#b/env(Y):\"was\"}}.\n\n" +
+		"```output {for=a}\nold copy\n```\n\n" +
+		"```sh {#b}\necho b\n```\n\n```output {for=b exit=0 nosave}\nold b\n```\n\n" +
+		"```output {for=b}\nrefilled copy\n```\n\n" +
+		"```sh {#c}\necho c\n```\n\n```output {for=c exit=0}\nold c\n```\n\n" +
+		"```output {for=c nosave}\nkept copy\n```\n\n" +
+		"```output {for=c}\nrefilled copy\n```\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Stdout: []byte("new a\n"), Vars: map[string]string{"X": "fresh"}},
+		{Block: d.Blocks[1], Ran: true, Stdout: []byte("new b\n"), Vars: map[string]string{"Y": "now"}},
+		{Block: d.Blocks[2], Ran: true, Stdout: []byte("new c\n")},
+	}
+	// a is nosave: its output, its copies and its placeholders keep what
+	// the file holds. b's output fence is nosave, so that is kept while
+	// its placeholder is filled; c's copy marked nosave is kept while
+	// the other is refilled.
+	want := "```sh {#a nosave}\necho a\n```\n\n```output {for=a exit=0}\nold\n```\n\n" +
+		"Saw {{#a/env(X):\"stored\"}} and {{#b/env(Y):\"now\"}}.\n\n" +
+		"```output {for=a}\nold copy\n```\n\n" +
+		"```sh {#b}\necho b\n```\n\n```output {for=b exit=0 nosave}\nold b\n```\n\n" +
+		"```output {for=b exit=0}\nnew b\n```\n\n" +
+		"```sh {#c}\necho c\n```\n\n```output {for=c exit=0}\nnew c\n```\n\n" +
+		"```output {for=c nosave}\nkept copy\n```\n\n" +
+		"```output {for=c exit=0}\nnew c\n```\n"
+	if got := string(Markdown(d, results, Options{WriteBack: true})); got != want {
+		t.Errorf("write-back:\ngot  %q\nwant %q", got, want)
+	}
+	// Printing shows the run as it is.
+	printed := string(Markdown(d, results, Options{}))
+	if !strings.Contains(printed, "new a\n") || !strings.Contains(printed, "new b\n") || !strings.Contains(printed, "Saw fresh and now.") || strings.Contains(printed, "old copy") {
+		t.Errorf("printed: %q", printed)
+	}
+}

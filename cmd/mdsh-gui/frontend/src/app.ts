@@ -473,7 +473,7 @@ function drawTextbox(c: Cell): HTMLElement {
   box.onblur = () => {
     if (box.value !== t.text) void save();
   };
-  return inputCell("textbox-cell", t.id, t.problem, box);
+  return inputCell("textbox-cell", t.id, t.problem, box, t.nosave ? "textbox" : "");
 }
 
 // drawChoice draws a choice block as a dropdown, radio buttons or
@@ -507,13 +507,14 @@ function drawChoice(c: Cell): HTMLElement {
   }
   control.dataset.input = String(ch.block);
   control.setAttribute("aria-label", ch.id);
-  return inputCell("choice-cell", ch.id, ch.problem, control);
+  return inputCell("choice-cell", ch.id, ch.problem, control, ch.nosave ? "choice" : "");
 }
 
 // inputCell is the card around a textbox's or choice's control, with
-// its name over it and, when its var= binds nothing, why.
-function inputCell(className: string, id: string, problem: string | undefined, control: HTMLElement): HTMLElement {
-  const cell = el("section", { className: "input-cell " + className + (problem ? " taken" : ""), title: problem || id }, el("span", { className: "name" }, id), control);
+// its name over it, a badge when it is nosave (kind is then its kind),
+// and, when its var= binds nothing, why.
+function inputCell(className: string, id: string, problem: string | undefined, control: HTMLElement, nosave = ""): HTMLElement {
+  const cell = el("section", { className: "input-cell " + className + (problem ? " taken" : "") + (nosave ? " nosave" : ""), title: problem || id }, el("span", { className: "name" }, id), nosave ? nosaveBadge(nosave) : "", control);
   if (problem) {
     const p = el("p", { className: "problem", id: "problem-" + control.dataset.input }, problem);
     control.setAttribute("aria-describedby", p.id);
@@ -590,6 +591,17 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   return true;
 }
 
+// nosaveBadge marks a block whose value stays in the session: saving
+// leaves what the file holds.
+const nosaveNote: Record<string, string> = {
+  block: "Marked nosave: its output lives in this session. Saving keeps what the file holds after it.",
+  textbox: "Marked nosave: what you type lives in this session. Saving keeps the file's text.",
+  choice: "Marked nosave: what you pick lives in this session. Saving keeps the file's marks.",
+};
+function nosaveBadge(kind: string): HTMLElement {
+  return el("span", { className: "nosave-badge", title: nosaveNote[kind] }, "session only");
+}
+
 // hiddenBadge marks a block that printing leaves out but Run all still
 // runs, so a document can't run code its reader never saw.
 function hiddenBadge(why: string): HTMLElement {
@@ -614,6 +626,7 @@ function drawBlock(c: Cell): HTMLElement {
       name,
       c.hidden ? hiddenBadge(c.hidden) : "",
       c.stale ? el("span", { className: "stale-badge", title: staleNote }, "stale") : "",
+      c.nosave ? nosaveBadge("block") : "",
       exit,
       timer,
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "")),
