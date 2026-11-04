@@ -38,6 +38,16 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![Settings › Look with Witchcraft chosen: its description under the menu and its Grimoire switches, Stars and moons and Glow around cards](docs/changelog/looks-settings.png)
 
+- `mdsh-gui` remembers each file's view: whether it shows the source,
+  the rendered view or both, and whether its History pane is open. A
+  file opens as it was left, instead of in whatever view the last tab
+  had, and the History pane starts closed in a file you haven't opened
+  it in, so opening a file no longer starts its shell (and reads its
+  `env.source` files) just because History was open in another one.
+  Settings › General › Open files in now offers "The view the file was
+  left in" as its default; picking a view there still opens every
+  file in it.
+
 ### Fixed
 
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file

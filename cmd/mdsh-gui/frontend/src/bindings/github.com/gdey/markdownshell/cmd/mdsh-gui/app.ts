@@ -569,6 +569,15 @@ export function Reload(): $CancellablePromise<void> {
 }
 
 /**
+ * RememberView notes how file is shown, for the next time it opens:
+ * view is "rendered", "source" or "both", and history is whether the
+ * History pane is open.
+ */
+export function RememberView(file: string, view: string, history: boolean): $CancellablePromise<void> {
+    return $Call.ByName("main.App.RememberView", file, view, history);
+}
+
+/**
  * ReportCommand is the mdsh command that makes the report r describes.
  */
 export function ReportCommand(r: notebook$0.Report): $CancellablePromise<string> {
