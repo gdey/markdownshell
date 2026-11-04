@@ -233,6 +233,7 @@ func (a *App) buildMenu() *application.Menu {
 	if mac {
 		m.AddRole(application.WindowMenu)
 	}
+	a.addHelpMenu(m)
 	a.recentItems()
 	return m
 }
@@ -306,6 +307,13 @@ func (a *App) recentItems() {
 	if a.menu != nil {
 		a.menu.Update()
 	}
+}
+
+// addHelpMenu adds the Help menu, whose Changelog opens the changelog
+// built into the app in a read-only tab.
+func (a *App) addHelpMenu(m *application.Menu) {
+	help := m.AddSubmenu("Help")
+	help.Add("Changelog").OnClick(func(*application.Context) { go a.ShowChangelog() })
 }
 
 // addAppMenu adds macOS's app menu: About, Settings, Hide and Quit.

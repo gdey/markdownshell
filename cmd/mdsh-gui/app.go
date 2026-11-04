@@ -141,6 +141,14 @@ func (a *App) newTab() *docTab {
 	return t
 }
 
+// newPageTab makes a tab showing page, a read-only page such as the
+// changelog in place of a file, in no window yet.
+func (a *App) newPageTab(page string) *docTab {
+	t := a.newTab()
+	t.page = page
+	return t
+}
+
 // newTabIn opens a tab with the start screen in w, after its tab in
 // front.
 func (a *App) newTabIn(w *docWindow) *docTab {
@@ -376,7 +384,7 @@ func (a *App) openIn(w *docWindow, file string) error {
 	}
 	ro := a.runOptions()
 	if w != nil {
-		if t := w.activeTab(); t != nil && t.file() == "" {
+		if t := w.activeTab(); t != nil && t.file() == "" && t.page == "" {
 			if err := t.open(abs, ro); err != nil {
 				return err
 			}

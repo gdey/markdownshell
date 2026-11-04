@@ -65,6 +65,14 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![Settings › Look with the code font menu open on the installed monospace fonts, JetBrainsMono Nerd Font Mono chosen](docs/changelog/settings-fonts.png)
 
+- mdsh-gui has the changelog built in. Help › Changelog, or the
+  Changelog link on Settings › About, opens it in a read-only tab of
+  the document window, screenshots and all, in place of sending you to
+  the website. It is the changelog of the build you're running, and its
+  web links open in the browser.
+
+  ![The changelog open in a read-only tab beside the start screen](docs/changelog/changelog-tab.png)
+
 - mdsh-gui can view and edit a file's front matter from the rendered
   view. The Front matter tab at the top of the page (or Edit › Front
   Matter, cmd/ctrl+shift+M) slides the page down to show a form for the

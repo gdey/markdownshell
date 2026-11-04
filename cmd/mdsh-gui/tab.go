@@ -19,8 +19,12 @@ const watchEvery = 2 * time.Second
 // docTab is one tab and the file open in it, if any. Each tab has its own
 // notebook and shells, which go with it when it moves to another window.
 type docTab struct {
-	app     *App
-	id      int
+	app *App
+	id  int
+	// page is the page the tab shows in place of a document's, such as
+	// changelogPage, or "". It is set before the tab goes in a window
+	// and never changes. A tab with a page has no file and opens none.
+	page    string
 	answers chan run.Answer
 	done    chan struct{} // closed when the tab closes
 
@@ -161,9 +165,14 @@ type Tab struct {
 	// dragged out to another app gives it File, or else URL.
 	URL   string `json:"url,omitempty"`
 	Dirty bool   `json:"dirty"`
+	// Page is the page the tab shows, if not a document's.
+	Page string `json:"page,omitempty"`
 }
 
 func (t *docTab) info() Tab {
+	if t.page == changelogPage {
+		return Tab{ID: t.id, Title: "Changelog", URL: changelogURL, Page: t.page}
+	}
 	n, err := t.notebook()
 	if err != nil {
 		return Tab{ID: t.id, Title: "Start"}

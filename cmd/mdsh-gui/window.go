@@ -91,7 +91,7 @@ func (w *docWindow) changed() {
 	s := w.state()
 	title := "mdsh"
 	for _, t := range s.Tabs {
-		if t.ID == s.Active && t.File != "" {
+		if t.ID == s.Active && (t.File != "" || t.Page != "") {
 			title = t.Title + " — mdsh"
 			if t.Dirty {
 				title = "• " + title
