@@ -45,12 +45,13 @@ func (b *Block) IsChoice() bool { return b.Lang == ChoiceLang && !b.IsInclude() 
 // fills in, not one that runs.
 func (b *Block) IsInput() bool { return b.IsTextbox() || b.IsChoice() }
 
-// NoSave reports whether b carries the nosave attribute: its value lives
-// in the session only. Write-back keeps what the file holds after a
-// runnable block, in its output copies and placeholders, and in a
-// textbox or choice, instead of the run's output or what was typed or
-// picked. See SetValue and OutputNoSave.
-func (b *Block) NoSave() bool { return b.Attrs.Has("nosave") }
+// NoSave reports whether b carries the nosave attribute, or secret,
+// which implies it: its value lives in the session only. Write-back
+// keeps what the file holds after a runnable block, in its output
+// copies and placeholders, and in a textbox or choice, instead of the
+// run's output or what was typed or picked. See SetValue and
+// OutputNoSave.
+func (b *Block) NoSave() bool { return b.Attrs.Has("nosave") || b.Attrs.Has("secret") }
 
 // OutputNoSave reports whether write-back keeps the output after b as
 // the file has it: b is nosave, or an output fence attached to it is.

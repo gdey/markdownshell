@@ -8,6 +8,26 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A copy button on a block's output in mdsh-gui. It sits in the
+  output's top right corner, shows on hover, focus or the selected
+  card, and copies the output as text, without its colors (the text as
+  shown for `out=markdown`), then says Copied for a moment.
+- A `secret` block attribute. mdsh-gui blurs the block's code and
+  output until you show them with the eye button on its card, and masks
+  them again after a minute, or the time set in Settings › Editing ›
+  Show secrets for, or when the window loses focus. Copying still
+  works: a secret copied from the card is marked concealed on macOS, so
+  clipboard managers leave it out of their history, and comes off the
+  clipboard after the same time unless you copied something else. A
+  block whose code names a variable set with `mdsh ctl set --secret`
+  has its output masked the same way. `secret` implies `nosave`, so the
+  block's output isn't saved to the file.
+
+  ![A block's output with its copy button showing Copied, and a block marked secret blurred, with an eye button on its card to show it](docs/changelog/output-copy.png)
+
+  ![Settings › Editing with Show secrets for set to 1 minute](docs/changelog/secret-show-setting.png)
+
+
 - `nosave` on a block, textbox, choice or `output` fence keeps its value
   out of the file. The block still runs and shows its output, and what
   is typed or picked still reaches blocks, conditions and placeholders,

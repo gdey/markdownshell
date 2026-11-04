@@ -58,6 +58,7 @@ hello from a sub-env
 | `show-output=COND` | Print the output only if the condition holds |
 | `show-stderr[=COND]` | Show stderr (by default only when the block fails) |
 | `links` | Make web addresses (`http:`, `https:`, `mailto:`) in the output clickable in mdsh-gui and `mdsh -i`; History adds it to commands typed there |
+| `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, and as with `nosave` the output isn't saved to the file |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |

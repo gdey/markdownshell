@@ -277,3 +277,22 @@ func (s *Session) logVar(b *doc.Block, name string, old ctlOld, now *ctlVar) {
 	}
 	l.Event("var", f)
 }
+
+// SecretVars are the full names, MDSH_VAR_ and the name, of the
+// variables mdsh ctl set --secret has made this session, sorted. A view
+// hides the copy buttons of a block whose code names one.
+func (s *Session) SecretVars() []string {
+	if s == nil || s.ctl == nil {
+		return nil
+	}
+	s.ctl.mu.Lock()
+	defer s.ctl.mu.Unlock()
+	var names []string
+	for name, v := range s.ctl.vars {
+		if v.secret {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}

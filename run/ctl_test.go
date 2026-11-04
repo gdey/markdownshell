@@ -131,3 +131,43 @@ func TestCtlSetNoSaveInput(t *testing.T) {
 		t.Errorf("later: ran %v, printed %q", r.Ran, r.Stdout)
 	}
 }
+
+// TestSecretVars checks that SecretVars names the variables set with
+// --secret, sorted, and not the others.
+func TestSecretVars(t *testing.T) {
+	dir := t.TempDir()
+	d := parse(t, "```sh {#bg background}\nprintf '%s\\n%s\\n' \"$MDSH_SOCK\" \"$MDSH_TOKEN\" > call.tmp && mv call.tmp call\nwhile [ ! -e go ]; do sleep 0.02; done\n```\n")
+	s, err := run.NewSession(d, run.Options{Dir: dir, Environ: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	var sock, token string
+	for deadline := time.Now().Add(5 * time.Second); ; {
+		data, err := os.ReadFile(filepath.Join(dir, "call"))
+		if err == nil {
+			sock, token, _ = strings.Cut(strings.TrimSpace(string(data)), "\n")
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the background block never wrote its token")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for _, a := range []ctl.SetArgs{{Name: "zeta", Value: "z", Secret: true}, {Name: "plain", Value: "p"}, {Name: "alpha", Value: "a", Secret: true}} {
+		if resp, err := ctl.Call(sock, token, "set", a); err != nil || !resp.OK {
+			t.Fatalf("set %s: %+v, %v", a.Name, resp, err)
+		}
+	}
+	os.WriteFile(filepath.Join(dir, "go"), nil, 0o644)
+	if err := s.Wait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(s.SecretVars(), " "); got != "MDSH_VAR_alpha MDSH_VAR_zeta" {
+		t.Errorf("SecretVars = %q", got)
+	}
+}

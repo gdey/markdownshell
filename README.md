@@ -350,6 +350,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
 | `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
 | `nosave` | Keep the value out of the file: the block's output, or what is typed in a textbox or picked in a choice, lives in the session, and saving leaves what the file holds. On an `output` fence, keeps just that fence |
+| `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, and as with `nosave` the output isn't saved to the file |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |

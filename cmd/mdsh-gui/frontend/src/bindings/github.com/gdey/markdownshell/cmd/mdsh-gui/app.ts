@@ -164,6 +164,16 @@ export function CopyCastGIF(cast: string): $CancellablePromise<void> {
 }
 
 /**
+ * CopySecret puts text, which may hold a secret, on the clipboard, kept
+ * out of clipboard history where the system allows, and takes it off
+ * again after the settings' SecretShow unless something else was
+ * copied.
+ */
+export function CopySecret(text: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.CopySecret", text);
+}
+
+/**
  * CreateReport writes the report r describes.
  */
 export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {

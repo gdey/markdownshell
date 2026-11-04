@@ -20,6 +20,30 @@ static int copyGIF(const void *data, int n, const char *path) {
 		return [pb writeObjects:@[item]] ? 1 : 0;
 	}
 }
+
+// copyConcealed puts text on the general pasteboard marked concealed, so
+// clipboard managers that follow nspasteboard.org leave it out of their
+// history, and returns the pasteboard's change count after, or -1.
+static long copyConcealed(const char *text) {
+	@autoreleasepool {
+		NSPasteboard *pb = [NSPasteboard generalPasteboard];
+		[pb clearContents];
+		NSPasteboardItem *item = [[NSPasteboardItem alloc] init];
+		[item setString:[NSString stringWithUTF8String:text] forType:NSPasteboardTypeString];
+		[item setData:[NSData data] forType:@"org.nspasteboard.ConcealedType"];
+		if (![pb writeObjects:@[item]]) return -1;
+		return (long)[pb changeCount];
+	}
+}
+
+// clearIf empties the general pasteboard if nothing has been put on it
+// since change, its change count then.
+static void clearIf(long change) {
+	@autoreleasepool {
+		NSPasteboard *pb = [NSPasteboard generalPasteboard];
+		if ([pb changeCount] == change) [pb clearContents];
+	}
+}
 */
 import "C"
 
@@ -45,5 +69,19 @@ func copyGIF(data []byte) error {
 	if C.copyGIF(p, C.int(len(data)), cpath) == 0 {
 		return errors.New("the clipboard didn't take the GIF")
 	}
+	return nil
+}
+
+// copySecret puts text, a secret, on the clipboard marked concealed, and
+// takes it off again after d unless something else has been copied
+// since.
+func copySecret(text string, _ clipboardText, d time.Duration) error {
+	ctext := C.CString(text)
+	defer C.free(unsafe.Pointer(ctext))
+	change := C.copyConcealed(ctext)
+	if change < 0 {
+		return errors.New("the clipboard didn't take the text")
+	}
+	time.AfterFunc(d, func() { C.clearIf(change) })
 	return nil
 }

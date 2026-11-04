@@ -42,6 +42,7 @@ func (n *Notebook) cells() []Cell {
 	pieces := render.Pieces(d, n.results, render.Options{Env: environ(), PlainIncludes: true})
 	pos := max(d.FrontMatter.End, len(d.Shebang))
 	stale := run.Stale(d, n.results)
+	secrets := n.sess.SecretVars()
 	for i, b := range d.Blocks {
 		l.prose(pos, b.Span.Start)
 		pos = b.Output.End
@@ -107,6 +108,8 @@ func (n *Notebook) cells() []Cell {
 			Output:          n.html(out),
 			OutputTasks:     tasksIn(l.tasks, b.Output),
 			Links:           b.Attrs.Has(weblink.Attr),
+			Secret:          b.Attrs.Has(secretAttr) || namesAny(b.Body, secrets),
+			SecretCode:      b.Attrs.Has(secretAttr),
 			Ran:             r.Ran,
 			Status:          r.Status,
 			Failed:          r.Failed(),
@@ -518,4 +521,30 @@ func timeoutMs(b *doc.Block) int64 {
 		return 0
 	}
 	return d.Milliseconds()
+}
+
+// secretAttr marks a block whose code and output hold a secret.
+const secretAttr = "secret"
+
+// namesAny reports whether code names any of the variables in names, as
+// a whole word: $NAME, ${NAME} and {{$NAME}} all do.
+func namesAny(code string, names []string) bool {
+	word := func(c byte) bool {
+		return c == '_' || '0' <= c && c <= '9' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+	}
+	for _, name := range names {
+		for i := 0; ; {
+			j := strings.Index(code[i:], name)
+			if j < 0 {
+				break
+			}
+			j += i
+			end := j + len(name)
+			if (j == 0 || !word(code[j-1])) && (end == len(code) || !word(code[end])) {
+				return true
+			}
+			i = j + 1
+		}
+	}
+	return false
 }
