@@ -119,6 +119,10 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 	// stop and what it sends no longer reaches the page, which now shows
 	// the new notebook.
 	done := make(chan struct{})
+	abs, err := filepath.Abs(file)
+	if err != nil {
+		return err
+	}
 	n, err := notebook.Open(file, notebook.Options{
 		Run: ro,
 		OnEvent: func(e notebook.Event) {
@@ -134,6 +138,11 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 		Depend: func(block, of int, question string) run.Answer {
 			return t.depend(done, block, of, question)
 		},
+		// Asked once per file, and again when its list changes: the
+		// answer is remembered, in the same file mdsh and mdsh -i use.
+		Sources: t.app.trust.Ask(abs, func(paths []string) run.Answer {
+			return t.ask(done, "sources", map[string]any{"files": paths})
+		}),
 		// A warning an edit fixed goes stale in the console.
 		Resolved: func(file, warning string) { t.app.console.resolve(file, warning) },
 	})
@@ -193,24 +202,25 @@ func (t *docTab) changed() {
 // confirm asks the frontend, from the run's goroutine, and waits for
 // Answer, or for stale to close: the notebook asking was replaced.
 func (t *docTab) confirm(stale <-chan struct{}, block int, question string) run.Answer {
-	return t.ask(stale, map[string]any{"block": block, "question": question})
+	return t.ask(stale, "confirm", map[string]any{"block": block, "question": question})
 }
 
 // depend asks the frontend whether to run block, which block of
 // depends on, first, as confirm does.
 func (t *docTab) depend(stale <-chan struct{}, block, of int, question string) run.Answer {
-	return t.ask(stale, map[string]any{"block": block, "of": of, "question": question})
+	return t.ask(stale, "confirm", map[string]any{"block": block, "of": of, "question": question})
 }
 
-// ask sends the frontend a confirm event and waits for Answer. It
-// answers stop itself once the tab closes or stale closes.
-func (t *docTab) ask(stale <-chan struct{}, q map[string]any) run.Answer {
+// ask sends the frontend a question, as a confirm or sources event
+// called name, and waits for Answer. It answers stop itself once the tab
+// closes or stale closes.
+func (t *docTab) ask(stale <-chan struct{}, name string, q map[string]any) run.Answer {
 	select {
 	case <-stale:
 		return run.Stop
 	default:
 	}
-	t.emit("confirm", q)
+	t.emit(name, q)
 	select {
 	case <-stale:
 		return run.Stop
@@ -218,7 +228,7 @@ func (t *docTab) ask(stale <-chan struct{}, q map[string]any) run.Answer {
 		t.mu.Lock()
 		live := t.live[:0]
 		for _, e := range t.live {
-			if e.Name != "confirm" {
+			if e.Name != name {
 				live = append(live, e)
 			}
 		}

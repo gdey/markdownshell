@@ -302,6 +302,18 @@
       </div>
     </form>
   </dialog>
+  <dialog id="sources-dialog" aria-labelledby="sources-title" aria-describedby="sources-detail">
+    <form method="dialog">
+      <h2 id="sources-title">Read these files into the shell?</h2>
+      <p id="sources-detail" class="muted">This file's front matter (<code>env.source</code>) runs them in its shell as it starts, before any block and before the History pane's prompt. Allow only files you trust. Your answer is remembered for this file, until the list changes.</p>
+      <ul id="sources-list"></ul>
+      <div class="buttons">
+        <button id="sources-cancel" value="stop" formnovalidate>Cancel</button>
+        <button value="skip">Run without them</button>
+        <button value="run" class="primary">Allow</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="clear-dialog" aria-labelledby="clear-title">
     <form method="dialog">
       <h2 id="clear-title">Clear all outputs?</h2>

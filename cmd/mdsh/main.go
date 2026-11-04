@@ -35,6 +35,7 @@ import (
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
+	"github.com/gdey/markdownshell/trust"
 	"github.com/gdey/markdownshell/tui"
 	"github.com/gdey/markdownshell/writable"
 )
@@ -156,7 +157,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	htmlFile := fs.String("html", "", "write what would be printed to this HTML file instead (- for stdout)")
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
 	stop := fs.Bool("stop-on-error", false, "stop at the first failing block")
-	yes := fs.Bool("yes", false, "run blocks marked confirm, and the blocks depends= names, without asking")
+	yes := fs.Bool("yes", false, "run blocks marked confirm, and the blocks depends= names, and read the files env.source names, without asking")
 	step := fs.Bool("step", false, "ask before running each block, as if every block were marked confirm")
 	color := fs.String("color", "auto", "style printed markdown: auto, always or never")
 	noColor := fs.Bool("no-color", false, "same as --color=never")
@@ -422,8 +423,12 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	if *yes {
 		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
 		opts.Depend = func(_, _ *doc.Block) run.Answer { return run.Go }
-	} else if tty != nil {
+		opts.ApproveSources = func([]string) run.Answer { return run.Go }
+	} else if tty == nil {
+		opts.ApproveSources = trust.OpenDefault().Ask(opts.File, nil)
+	} else {
 		p := newPrompter(tty, tty)
+		opts.ApproveSources = trust.OpenDefault().Ask(opts.File, p.sources)
 		p.d = d
 		// The streamed document already shows the code, unless it is
 		// hidden.
@@ -468,6 +473,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	}
 	if errors.Is(runErr, run.ErrNoConfirm) {
 		runErr = fmt.Errorf("%w; no terminal to ask on (use --yes to run it)", runErr)
+	}
+	if errors.Is(runErr, run.ErrSourcesNotApproved) && tty == nil {
+		runErr = fmt.Errorf("%w; no terminal to ask on (use --yes to read them)", runErr)
 	}
 	// Say why the run stopped early, before the rest of the document and
 	// again after it, so it is seen whether or not that scrolls by.
@@ -670,6 +678,7 @@ func interactiveCmd(file string, args []string, source string, expose []string, 
 		style = "notty"
 	}
 	protocol := termimg.Detect(os.Getenv)
+	approvals := trust.OpenDefault()
 	c.Open = func(file string) (*doc.Document, tui.Options, error) {
 		abs, err := filepath.Abs(file)
 		if err != nil {
@@ -700,6 +709,7 @@ func interactiveCmd(file string, args []string, source string, expose []string, 
 			Style:    style,
 			Images:   style != "notty",
 			Protocol: protocol,
+			Trust:    approvals,
 		}, nil
 	}
 	return tui.Run(c)
@@ -751,6 +761,32 @@ func (p *prompter) warnControl(b *doc.Block) {
 
 func newPrompter(in io.Reader, out io.Writer) *prompter {
 	return &prompter{in: bufio.NewReader(in), out: out}
+}
+
+// sources asks whether to read the files env.source names, paths, into
+// the shells. Pressing enter stops, so it is the safe choice. The answer
+// is remembered for the file (see package trust), so say so.
+func (p *prompter) sources(paths []string) run.Answer {
+	fmt.Fprintf(p.out, "\n--- this document reads these files into its shell before any block runs ---\n")
+	for _, path := range paths {
+		fmt.Fprintf(p.out, "  %s\n", termsafe.Visible(path))
+	}
+	fmt.Fprintf(p.out, "---\nmdsh remembers the answer for this document, until the list changes.\n")
+	for {
+		fmt.Fprintf(p.out, "Read them in? [y]es / [n]o, run without them / [s]top: ")
+		line, err := p.in.ReadString('\n')
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes":
+			return run.Go
+		case "n", "no":
+			return run.Skip
+		case "s", "stop", "":
+			return run.Stop
+		}
+		if err != nil {
+			return run.Stop
+		}
+	}
 }
 
 // confirm shows block b and asks whether to run it, skip it or stop.

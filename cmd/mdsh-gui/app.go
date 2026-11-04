@@ -22,6 +22,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/trust"
 )
 
 // App is the service the frontend calls. A call from a tab's page acts on
@@ -33,6 +34,9 @@ type App struct {
 	dir      string // the folder given on the command line, if any
 	source   string // the files given to --source, read at startup
 	console  *console
+	// trust remembers which files' env.source files may be read into
+	// their shells. Nil remembers nothing, so each file asks every time.
+	trust *trust.Store
 
 	menu       *application.Menu
 	viewItems  struct{ split, rendered, outline, history, console, code, output *application.MenuItem }

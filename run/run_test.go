@@ -144,10 +144,19 @@ func TestSource(t *testing.T) {
 	src := "---\nmdsh:\n  env:\n    source: [defs.sh]\n---\n" +
 		"```sh {#a}\ngreet a; flag\n```\n" +
 		"```sh {#b env=sub share=}\ngreet b; flag\n```\n"
+	var asked [][]string
 	_, results := runDoc(t, src, run.Options{
 		File:   filepath.Join(dir, "doc.md"),
 		Source: "flag() { echo flag; }",
+		ApproveSources: func(paths []string) run.Answer {
+			asked = append(asked, paths)
+			return run.Go
+		},
 	})
+	// Asked once, for both envs, with the path that is read.
+	if want := [][]string{{filepath.Join(dir, "defs.sh")}}; !slices.EqualFunc(asked, want, slices.Equal) {
+		t.Errorf("asked %q, want %q", asked, want)
+	}
 	want := map[string]string{"a": "hi a\nflag\n", "b": "hi b\nflag\n"}
 	r := byID(results)
 	for id, w := range want {
@@ -162,8 +171,102 @@ func TestSourceMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := run.Run(context.Background(), d, run.Options{Dir: t.TempDir()}); err == nil || !strings.Contains(err.Error(), "nope.sh") {
+	yes := func([]string) run.Answer { return run.Go }
+	if _, err := run.Run(context.Background(), d, run.Options{Dir: t.TempDir(), ApproveSources: yes}); err == nil || !strings.Contains(err.Error(), "nope.sh") {
 		t.Errorf("err = %v, want one naming nope.sh", err)
+	}
+}
+
+// sourceDoc writes setup.sh, which touches a marker, beside a document
+// that sources it, and returns the document, its options and the marker.
+func sourceDoc(t *testing.T, body string) (*doc.Document, run.Options, string) {
+	t.Helper()
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "SOURCED")
+	if err := os.WriteFile(filepath.Join(dir, "setup.sh"), []byte("touch "+marker+"\ngreet() { echo hi; }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d, err := doc.Parse([]byte("---\nmdsh:\n  env:\n    source: [./setup.sh]\n---\n" + body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d, run.Options{File: filepath.Join(dir, "doc.md"), Environ: []string{"PATH=" + os.Getenv("PATH")}}, marker
+}
+
+func sourced(marker string) bool {
+	_, err := os.Stat(marker)
+	return err == nil
+}
+
+func TestSourceNeedsApproval(t *testing.T) {
+	d, opts, marker := sourceDoc(t, "```sh {#a}\necho a\n```\n```sh {#b}\necho b\n```\n")
+	results, err := run.Run(context.Background(), d, opts)
+	if !errors.Is(err, run.ErrSourcesNotApproved) || !strings.Contains(err.Error(), "setup.sh") {
+		t.Errorf("err = %v, want ErrSourcesNotApproved naming setup.sh", err)
+	}
+	if sourced(marker) {
+		t.Error("setup.sh ran with nobody to approve it")
+	}
+	// The run stops at the first block, rather than failing each.
+	if r := byID(results); r["b"].Ran {
+		t.Errorf("b ran after the shell couldn't start: %+v", r["b"])
+	}
+}
+
+func TestSourceStopAsksAgain(t *testing.T) {
+	d, opts, marker := sourceDoc(t, "```sh {#a}\necho a\n```\n")
+	answers := []run.Answer{run.Stop, run.Go}
+	opts.ApproveSources = func([]string) run.Answer {
+		a := answers[0]
+		answers = answers[1:]
+		return a
+	}
+	s, err := run.NewSession(d, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := s.RunBlock(context.Background(), 0); err != nil {
+		t.Fatal(err)
+	}
+	if r := s.Results()[0]; !errors.Is(r.Err, run.ErrSourcesNotApproved) || sourced(marker) {
+		t.Errorf("after Stop: err %v, sourced %v", r.Err, sourced(marker))
+	}
+	r, err := s.RunBlock(context.Background(), 0)
+	if err != nil || r.Err != nil || string(r.Stdout) != "a\n" || !sourced(marker) {
+		t.Errorf("after Go: %q, err %v %v, sourced %v", r.Stdout, err, r.Err, sourced(marker))
+	}
+}
+
+func TestSourceSkip(t *testing.T) {
+	d, opts, marker := sourceDoc(t, "```sh {#a}\ntype greet >/dev/null 2>&1 || echo no greet\n```\n")
+	opts.ApproveSources = func([]string) run.Answer { return run.Skip }
+	results, err := run.Run(context.Background(), d, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(results[0].Stdout); got != "no greet\n" || sourced(marker) {
+		t.Errorf("stdout %q, sourced %v; want the shell without setup.sh", got, sourced(marker))
+	}
+}
+
+// Asking the shell something, as the History pane does for its prompt,
+// starts it, so it asks first too (security review v1.4.0, finding 1).
+func TestSourceAskNeedsApproval(t *testing.T) {
+	d, opts, marker := sourceDoc(t, "```sh {#a}\necho a\n```\n")
+	s, err := run.NewSession(d, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if sourced(marker) {
+		t.Fatal("NewSession sourced setup.sh")
+	}
+	if _, err := s.Ask(context.Background(), "echo $PS1"); !errors.Is(err, run.ErrSourcesNotApproved) {
+		t.Errorf("Ask err = %v, want ErrSourcesNotApproved", err)
+	}
+	if sourced(marker) {
+		t.Error("Ask sourced setup.sh with nobody to approve it")
 	}
 }
 

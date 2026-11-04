@@ -102,6 +102,10 @@ func (m *Model) openHistory() tea.Cmd {
 		m.status = "a block is running; ctrl+c stops it"
 		return nil
 	}
+	// Opening History starts the shell, to ask for its prompt.
+	if m.askSources(m.openHistory) {
+		return nil
+	}
 	m.hist.open = true
 	if !m.sess.PTY() {
 		sess, err := m.newSession(m.opts.Run)
@@ -374,7 +378,7 @@ func (m *Model) addNote(text string) {
 // runs it on the terminal the pane shows, or, ending in a lone &, in the
 // background.
 func (m *Model) runTyped(text string) {
-	if m.askBeforeRun(func() { m.runTyped(text) }) {
+	if m.askBeforeRun(func() { m.runTyped(text) }) || m.askSources(func() tea.Cmd { m.runTyped(text); return nil }) {
 		return
 	}
 	body, bg := history.Background(text)
