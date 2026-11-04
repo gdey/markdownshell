@@ -25,7 +25,7 @@ release.
 
 A way for an AI assistant to open a document and work with it through
 mdsh, inside the same guard rails a person has. The design is in
-[pull request #155](https://github.com/gdey/markdownshell/pull/155).
+[docs/mcp/design.md](https://github.com/gdey/markdownshell/blob/main/docs/mcp/design.md).
 
 ## Next, in the app
 
