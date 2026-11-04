@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 )
 
 // The console keeps what the app logs, errors from calls the frontend
@@ -22,6 +24,10 @@ import (
 // say where in a file the entry is about. They become the entry's File
 // and Line rather than part of its message, and a click on the entry in
 // a window showing that file takes its source pane to the line.
+//
+// A "fix" attribute on a warning about a file names the fix for it, as
+// notebook.FixWarning makes it, and the console offers it. A warning
+// that later no longer applies stays, struck through: see resolve.
 
 // ConsoleEntry is one line of the console.
 type ConsoleEntry struct {
@@ -31,6 +37,9 @@ type ConsoleEntry struct {
 	Message string    `json:"message"`        // the message, then its attributes as key=value
 	File    string    `json:"file,omitempty"` // the file the entry is about, from a "file" attribute
 	Line    int       `json:"line,omitempty"` // the line in File, from a "line" attribute; 0 if none
+	Fix     string    `json:"fix,omitempty"`  // names the fix for it, from a "fix" attribute
+	// Stale says it no longer applies: an edit fixed what it warned of.
+	Stale bool `json:"stale,omitempty"`
 }
 
 // consoleMax is how many entries the console keeps; older ones go.
@@ -45,10 +54,12 @@ type console struct {
 	// goroutine of their own: an entry can be logged from deep inside
 	// Wails, where sending an event then and there could deadlock.
 	out chan ConsoleEntry
+	// stale is the entries going stale, by Seq, to be sent the same way.
+	stale chan []int
 }
 
 func newConsole() *console {
-	return &console{out: make(chan ConsoleEntry, 256)}
+	return &console{out: make(chan ConsoleEntry, 256), stale: make(chan []int, 64)}
 }
 
 // add adds e, numbering it.
@@ -69,6 +80,29 @@ func (c *console) add(e ConsoleEntry) ConsoleEntry {
 	return e
 }
 
+// resolve marks the entries about file whose message is message stale,
+// as when an edit fixes what a warning warned of, and returns their Seqs.
+func (c *console) resolve(file, message string) []int {
+	c.mu.Lock()
+	var seqs []int
+	for i := range c.entries {
+		e := &c.entries[i]
+		if !e.Stale && e.File == file && e.Message == message {
+			e.Stale = true
+			seqs = append(seqs, e.Seq)
+		}
+	}
+	c.mu.Unlock()
+	if len(seqs) > 0 {
+		select {
+		case c.stale <- seqs:
+		default:
+			// Dropped; the pages read the console again when they open.
+		}
+	}
+	return seqs
+}
+
 // list returns the entries kept.
 func (c *console) list() []ConsoleEntry {
 	c.mu.Lock()
@@ -83,12 +117,15 @@ func (c *console) clear() {
 	c.mu.Unlock()
 }
 
-// send calls emit for each new entry, until the app ends.
-func (c *console) send(ctx context.Context, emit func(ConsoleEntry)) {
+// send calls emit for each new entry, and stale with the Seqs of the
+// entries that go stale, until the app ends.
+func (c *console) send(ctx context.Context, emit func(ConsoleEntry), stale func([]int)) {
 	for {
 		select {
 		case e := <-c.out:
 			emit(e)
+		case seqs := <-c.stale:
+			stale(seqs)
 		case <-ctx.Done():
 			return
 		}
@@ -117,14 +154,15 @@ type consoleHandler struct {
 	where  where  // the file and line from WithAttrs
 }
 
-// where is the place in a file an entry is about.
+// where is the place in a file an entry is about, and its fix.
 type where struct {
 	file string
 	line int
+	fix  string
 }
 
-// take keeps a if it is a top-level "file" or "line" attribute, and
-// reports whether it did.
+// take keeps a if it is a top-level "file", "line" or "fix" attribute,
+// and reports whether it did.
 func (w *where) take(group string, a slog.Attr) bool {
 	if group != "" {
 		return false
@@ -134,6 +172,11 @@ func (w *where) take(group string, a slog.Attr) bool {
 	case "file":
 		if v.Kind() == slog.KindString && v.String() != "" {
 			w.file = v.String()
+			return true
+		}
+	case "fix":
+		if v.Kind() == slog.KindString && v.String() != "" {
+			w.fix = v.String()
 			return true
 		}
 	case "line":
@@ -180,11 +223,16 @@ func (h *consoleHandler) Handle(ctx context.Context, r slog.Record) error {
 			writeAttr(&b, "", slog.Int("line", w.line))
 			w.line = 0
 		}
+		if w.file == "" && w.fix != "" {
+			// Nothing to fix it in.
+			writeAttr(&b, "", slog.String("fix", w.fix))
+			w.fix = ""
+		}
 		t := r.Time
 		if t.IsZero() {
 			t = time.Now()
 		}
-		h.c.add(ConsoleEntry{Time: t, Level: levelName(r.Level), Message: b.String(), File: w.file, Line: w.line})
+		h.c.add(ConsoleEntry{Time: t, Level: levelName(r.Level), Message: b.String(), File: w.file, Line: w.line, Fix: w.fix})
 	}
 	if h.next.Enabled(ctx, r.Level) {
 		return h.next.Handle(ctx, r)
@@ -242,9 +290,33 @@ func writeAttr(b *strings.Builder, group string, a slog.Attr) {
 }
 
 // Console returns what the console holds, oldest first. New entries come
-// as "console" events, and a "console-cleared" event says it was cleared.
+// as "console" events, a "console-stale" event names by Seq the entries
+// that no longer apply, and a "console-cleared" event says it was
+// cleared.
 func (a *App) Console() []ConsoleEntry {
 	return a.console.list()
+}
+
+// DescribeFix says what FixWarning would do for warning, a console
+// entry's message, in the file this window shows.
+func (a *App) DescribeFix(ctx context.Context, warning string) (notebook.Fix, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Fix{}, err
+	}
+	return n.DescribeFix(warning)
+}
+
+// FixWarning makes the fix a console entry offers for warning, its
+// message, in the file this window shows. Undo takes it back.
+func (a *App) FixWarning(ctx context.Context, warning string) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.FixWarning(warning)
+	t.changed()
+	return err
 }
 
 // ClearConsole empties the console, in every window.

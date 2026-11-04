@@ -2552,6 +2552,41 @@ async function deleteBlock(i: number) {
   status("deleted " + d.name);
 }
 
+// fixWarning asks whether to make the fix the console offers for
+// warning, saying what it does, and makes it.
+async function fixWarning(warning: string) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  let f;
+  try {
+    f = await App.DescribeFix(warning);
+  } catch (err) {
+    return fail(err);
+  }
+  const dialog = $<HTMLDialogElement>("fix-dialog");
+  $("fix-title").textContent = f.label + "?";
+  $("fix-detail").textContent = f.detail;
+  $("fix-ok").textContent = f.label;
+  dialog.returnValue = "";
+  dialog.showModal();
+  $("fix-ok").focus();
+  const ok = await new Promise<boolean>((resolve) => (dialog.onclose = () => resolve(dialog.returnValue === "fix")));
+  if (!ok) return;
+  try {
+    await App.FixWarning(warning);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  $("moved-text").textContent = `Fixed: ${warning}.`;
+  $("moved-undo").onclick = () => {
+    $("moved").hidden = true;
+    void undoEdit(false);
+  };
+  $("moved").hidden = false;
+  status("fixed: " + warning);
+}
+
 // confirmDelete asks whether to delete the block named name.
 function confirmDelete(name: string): Promise<boolean> {
   const dialog = $<HTMLDialogElement>("delete-dialog");
@@ -3492,7 +3527,7 @@ initHistory({
   },
 });
 initFrontMatter({ edit });
-initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line) });
+initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line), fix: (warning) => void fixWarning(warning) });
 initReport({
   dirty: () => !$("dirty").hidden,
   before: applySource,

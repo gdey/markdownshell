@@ -147,7 +147,9 @@ export function CloseTab(id: number): $CancellablePromise<void> {
 
 /**
  * Console returns what the console holds, oldest first. New entries come
- * as "console" events, and a "console-cleared" event says it was cleared.
+ * as "console" events, a "console-stale" event names by Seq the entries
+ * that no longer apply, and a "console-cleared" event says it was
+ * cleared.
  */
 export function Console(): $CancellablePromise<$models.ConsoleEntry[] | null> {
     return $Call.ByName("main.App.Console");
@@ -174,6 +176,14 @@ export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
  */
 export function DeleteBlock(i: number): $CancellablePromise<notebook$0.Deleted> {
     return $Call.ByName("main.App.DeleteBlock", i);
+}
+
+/**
+ * DescribeFix says what FixWarning would do for warning, a console
+ * entry's message, in the file this window shows.
+ */
+export function DescribeFix(warning: string): $CancellablePromise<notebook$0.Fix> {
+    return $Call.ByName("main.App.DescribeFix", warning);
 }
 
 /**
@@ -215,6 +225,14 @@ export function DropTab(i: number): $CancellablePromise<void> {
  */
 export function EndDrag(id: number, outside: boolean, x: number, y: number): $CancellablePromise<void> {
     return $Call.ByName("main.App.EndDrag", id, outside, x, y);
+}
+
+/**
+ * FixWarning makes the fix a console entry offers for warning, its
+ * message, in the file this window shows. Undo takes it back.
+ */
+export function FixWarning(warning: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.FixWarning", warning);
 }
 
 /**

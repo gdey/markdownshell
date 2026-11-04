@@ -256,6 +256,21 @@ export interface Deleted {
 }
 
 /**
+ * Fix is an edit that makes a warning go away.
+ */
+export interface Fix {
+    /**
+     * Label names it for a button.
+     */
+    "label": string;
+
+    /**
+     * Detail says what it does, for asking first.
+     */
+    "detail": string;
+}
+
+/**
  * Fold is a fold made by hand in the rendered view, for SetFolds to
  * write to the file.
  */

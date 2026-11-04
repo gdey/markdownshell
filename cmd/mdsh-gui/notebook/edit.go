@@ -139,9 +139,12 @@ var lineRe = regexp.MustCompile(`^line (\d+): `)
 // logWarnings logs, for the console, the document's warnings that are
 // new since it last did, such as a depends= naming no block. One that
 // only moved to another line isn't new. The file and the line go with
-// it as attributes, so the console can take the source pane there.
+// it as attributes, so the console can take the source pane there, and
+// a "fix" attribute names the fix, if it has one (see FixWarning). A
+// logged warning the document no longer has goes to Options.Resolved.
 func (n *Notebook) logWarnings() {
 	now := make(map[string]bool, len(n.d.Warnings))
+	var fixes map[string]string
 	for _, w := range n.d.Warnings {
 		key, line := w, 0
 		if m := lineRe.FindStringSubmatch(w); m != nil {
@@ -152,11 +155,74 @@ func (n *Notebook) logWarnings() {
 		if n.warned[key] {
 			continue
 		}
+		if fixes == nil {
+			fixes = map[string]string{}
+			for _, f := range n.d.Fixes() {
+				fixes[f.Warning] = f.Label
+			}
+		}
+		args := []any{"file", n.file}
 		if line > 0 {
-			slog.Warn(key, "file", n.file, "line", line)
-		} else {
-			slog.Warn(key, "file", n.file)
+			args = append(args, "line", line)
+		}
+		if f := fixes[key]; f != "" {
+			args = append(args, "fix", f)
+		}
+		slog.Warn(key, args...)
+	}
+	if n.opts.Resolved != nil {
+		for key := range n.warned {
+			if !now[key] {
+				n.opts.Resolved(n.file, key)
+			}
 		}
 	}
 	n.warned = now
+}
+
+// Fix is an edit that makes a warning go away.
+type Fix struct {
+	// Label names it for a button.
+	Label string `json:"label"`
+	// Detail says what it does, for asking first.
+	Detail string `json:"detail"`
+}
+
+// errNoFix is what fixing a warning the document doesn't have, or has
+// no fix for, fails with.
+var errNoFix = errors.New("that warning no longer applies, or has no fix")
+
+// fixFor finds the fix for warning, as logged, without its line.
+func (n *Notebook) fixFor(warning string) (doc.Fix, error) {
+	for _, f := range n.d.Fixes() {
+		if f.Warning == warning {
+			return f, nil
+		}
+	}
+	return doc.Fix{}, errNoFix
+}
+
+// DescribeFix says what FixWarning would do for warning, as logged.
+func (n *Notebook) DescribeFix(warning string) (Fix, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	f, err := n.fixFor(warning)
+	return Fix{Label: f.Label, Detail: f.Detail}, err
+}
+
+// FixWarning makes the fix for warning, as logged: it deletes an output
+// copy for a block that isn't there, or takes an id that names no block
+// that runs out of a depends=. It is a rendered-view edit, so Undo takes
+// it back.
+func (n *Notebook) FixWarning(warning string) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return ErrBusy
+	}
+	f, err := n.fixFor(warning)
+	if err != nil {
+		return err
+	}
+	return n.change("fix warning", "", f.Src, nil)
 }

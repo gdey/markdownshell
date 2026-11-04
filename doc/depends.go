@@ -30,6 +30,17 @@ func (d *Document) Dep(id string) *Block {
 	return b
 }
 
+// unknownDepWarning is the warning for b's depends= naming id, which
+// names no block that runs.
+func unknownDepWarning(b *Block, id string) string {
+	return fmt.Sprintf("block %s: depends= names unknown block %q; it is ignored", b.ID, id)
+}
+
+// idleDepWarning is the warning for b's depends= naming dep, an input.
+func idleDepWarning(b, dep *Block) string {
+	return fmt.Sprintf("block %s: depends= names %s, a %s, which never runs; it is ignored", b.ID, dep.ID, dep.Lang)
+}
+
 // checkDepends checks every block's depends=. An id that names no
 // block, or an include, a tape or an input, is a warning, and ignored,
 // so a typo doesn't stop the document opening. No block may depend on
@@ -40,9 +51,9 @@ func checkDepends(d *Document) error {
 			dep := d.Block(id)
 			switch {
 			case dep == nil || dep.IsInclude() || dep.IsTape():
-				d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: block %s: depends= names unknown block %q; it is ignored", lineNo(d.Src, b.Span.Start), b.ID, id))
+				d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(d.Src, b.Span.Start), unknownDepWarning(b, id)))
 			case dep.IsInput():
-				d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: block %s: depends= names %s, a %s, which never runs; it is ignored", lineNo(d.Src, b.Span.Start), b.ID, id, dep.Lang))
+				d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(d.Src, b.Span.Start), idleDepWarning(b, dep)))
 			}
 		}
 	}

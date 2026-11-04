@@ -8,6 +8,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui's Console strikes out a warning once an edit fixes it, and
+  marks it "(fixed)", instead of leaving it looking current. A warning
+  with a plain fix gets a Fix button, which says what it will do and
+  asks first: an output copy whose `for=` names no block is deleted,
+  and an id in a `depends=` that names no block that runs (a typo, or
+  an input) is taken out of it. Edit › Undo takes a fix back.
+
+  ![The Console with the output copy warning struck through and marked fixed, a depends= warning above it still offering Fix, and the Undo banner at the top](docs/changelog/console-fix.png)
+
 - Drag a tab out of mdsh-gui to another app to hand it the file's full
   path as text, as when dropping it in a terminal or a text editor. A
   tab showing a document the app carries inside it gives its URL

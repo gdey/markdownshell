@@ -6,6 +6,9 @@
 // A line about a place in a file shows the file's name and the line.
 // When that file is the one this tab shows, a click on the line takes
 // the source pane (or Neovim, when it is the editor) to it.
+//
+// A warning an edit fixed stays, struck through. One with a fix, about
+// this tab's file, has a Fix button, which asks first.
 
 import { Clipboard, Events } from "/wails/runtime.js";
 import { App, type ConsoleEntry } from "./api.js";
@@ -28,6 +31,9 @@ export interface ConsoleHooks {
   toggle: () => void;
   // jump puts the source pane's cursor on line of the file this tab shows.
   jump: (line: number) => void;
+  // fix offers to make the fix for warning, a line's message, in the
+  // file this tab shows.
+  fix: (warning: string) => void;
 }
 
 let hooks: ConsoleHooks;
@@ -47,7 +53,7 @@ const where = (e: ConsoleEntry) => (e.file ? base(e.file) + (e.line ? `:${e.line
 
 // line is an entry as text, for copying.
 const line = (e: ConsoleEntry) =>
-  `${time(e.time)} ${short[e.level] ?? e.level.toUpperCase()} ${where(e) ? where(e) + " " : ""}${e.message}`;
+  `${time(e.time)} ${short[e.level] ?? e.level.toUpperCase()} ${where(e) ? where(e) + " " : ""}${e.message}${e.stale ? " (fixed)" : ""}`;
 
 // rows holds the entry each drawn row is for.
 const rows = new WeakMap<HTMLElement, ConsoleEntry>();
@@ -55,22 +61,43 @@ const rows = new WeakMap<HTMLElement, ConsoleEntry>();
 function row(e: ConsoleEntry): HTMLElement {
   const r = el(
     "div",
-    { className: "entry " + e.level },
+    { className: "entry " + e.level + (e.stale ? " stale" : "") },
     el("time", {}, time(e.time)),
     el("span", { className: "level" }, short[e.level] ?? e.level),
-    el("span", { className: "message" }, ...(e.file ? [el("span", { className: "where" }, where(e)), " "] : []), e.message),
+    el(
+      "span",
+      { className: "message" },
+      ...(e.file ? [el("span", { className: "where" }, where(e)), " "] : []),
+      e.message,
+      // Said, not only drawn, for a screen reader.
+      ...(e.stale ? [el("span", { className: "gone" }, " (fixed)")] : []),
+    ),
   );
+  if (e.fix && !e.stale) {
+    const b = el("button", { className: "fix", type: "button" }, "Fix");
+    b.title = e.fix;
+    b.setAttribute("aria-label", `Fix: ${e.fix}`);
+    b.onclick = (ev) => {
+      ev.stopPropagation();
+      hooks.fix(e.message);
+    };
+    r.append(b);
+  }
   rows.set(r, e);
   mark(r, e);
   return r;
 }
 
 // canJump reports whether e is about a line of the file this tab shows.
-const canJump = (e: ConsoleEntry) => !!e.file && !!e.line && e.file === here;
+// A fixed warning's line may since have moved, so it is no link.
+const canJump = (e: ConsoleEntry) => !e.stale && !!e.file && !!e.line && e.file === here;
 
-// mark styles r as a link when it is about this tab's file.
+// mark styles r as a link when it is about this tab's file, and shows
+// its Fix button only then.
 function mark(r: HTMLElement, e: ConsoleEntry) {
   const on = canJump(e);
+  const fix = r.querySelector<HTMLElement>(".fix");
+  if (fix) fix.hidden = !e.file || e.file !== here;
   r.classList.toggle("jump", on);
   if (on) r.title = `Show line ${e.line} in the source`;
   else if (e.file) r.title = e.file;
@@ -96,6 +123,18 @@ function click(ev: MouseEvent) {
   const sel = window.getSelection();
   if (sel && !sel.isCollapsed && $("console-log").contains(sel.anchorNode)) return;
   hooks.jump(e.line!);
+}
+
+// stale strikes out the lines with the given seqs: what they warned of
+// is fixed.
+function stale(seqs: number[]) {
+  const set = new Set(seqs);
+  for (const r of [...$("console-log").children] as HTMLElement[]) {
+    const e = rows.get(r);
+    if (!e || !set.has(e.seq) || e.stale) continue;
+    e.stale = true;
+    r.replaceWith(row(e));
+  }
 }
 
 function drawAll() {
@@ -231,6 +270,7 @@ export function initConsole(h: ConsoleHooks) {
     if (ev.data.seq !== lastSeq + 1 && lastSeq !== 0) void load();
     else add(ev.data);
   });
+  Events.On("console-stale", (ev: { data: number[] }) => stale(ev.data ?? []));
   Events.On("console-cleared", () => {
     entries = [];
     unseen = 0;
