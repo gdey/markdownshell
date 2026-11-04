@@ -78,3 +78,6 @@ events as the CLI and TUI. Not designed yet.
 
 - Should vars ever flow up from a sub-env (`export=`)? Dropped for v1.
 - Other block languages (bash, python) through the same runner interface.
+- Running a document from a URL, as an auditable replacement for
+  `curl | sh` install scripts: see [docs/install/design.md](install/design.md)
+  (design, Nov 2, 2026; after v1.3; not built).
