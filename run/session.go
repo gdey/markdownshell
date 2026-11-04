@@ -37,6 +37,7 @@ type Session struct {
 	wanted     map[string][]string
 	tty        bool // whether the shells have terminals of their own
 	jobs       []*bgJob
+	seq        uint64 // the last Result.Seq given out
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -153,6 +154,15 @@ func (s *Session) SetFile(file string) { s.opts.File = file }
 // Results returns one result per block, in order. A block run again gets
 // a new result, so hold on to the slice only while nothing runs.
 func (s *Session) Results() []*Result { return s.results }
+
+// SetResult puts r in as block i's result, as when a notebook clears a
+// block's run or an undo puts it back, so depends= and Stale see it.
+// The shell keeps what the run did. Call it while nothing runs.
+func (s *Session) SetResult(i int, r *Result) {
+	if i >= 0 && i < len(s.results) && r != nil && r.Block == s.d.Blocks[i] {
+		s.results[i] = r
+	}
+}
 
 // ErrRestart is Sync's answer when the document gained the first tty
 // block after the session's shells started without terminals of their
@@ -434,13 +444,20 @@ func (e *depError) Error() string { return fmt.Sprintf("%s didn't run: %s", e.la
 func (e *depError) Unwrap() error { return ErrDependency }
 
 // runDepends readies b to run: in the order b's depends= lists them,
-// each block that hasn't run in this session, or failed when it did, is
-// asked about with Depend, and run if the answer is Go, after its own
+// each block that hasn't run in this session, or failed when it did, or
+// is marked always, or is stale (see Stale), is asked about with Depend, and run if the answer is Go, after its own
 // dependencies. An empty block (see emptyDep) runs without asking. A dependency the answer skips is left as it is. It
 // returns errStopped if an answer was Stop, a *depError if a dependency
 // failed or ended its shell, and ctx's error if ctx ended. ran, if not
 // nil, gets each block it runs.
 func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Block]bool) error {
+	return s.runDeps(ctx, b, ran, map[*doc.Block]bool{})
+}
+
+// runDeps is runDepends; fresh holds the dependencies run on the way to
+// this one block, so an always dependency that two of them share runs
+// once for it, not once for each, and one skipped is asked about once.
+func (s *Session) runDeps(ctx context.Context, b *doc.Block, ran, fresh map[*doc.Block]bool) error {
 	for _, id := range b.Depends() {
 		// A name that isn't a block that can run is ignored: the
 		// document warned about it when it was parsed.
@@ -449,7 +466,7 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 			continue
 		}
 		i := slices.Index(s.d.Blocks, dep)
-		if r := s.results[i]; r != nil && r.Ran && !r.Failed() {
+		if r := s.results[i]; r != nil && r.Ran && !r.Failed() && (fresh[dep] || !dep.Attrs.Has("always")) && !Stale(s.d, s.results)[i] {
 			continue
 		}
 		if !Runnable(dep) {
@@ -466,15 +483,17 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 		case Stop:
 			return errStopped
 		case Skip:
+			fresh[dep] = true
 			continue
 		}
-		if err := s.runDepends(ctx, dep, ran); err != nil {
+		if err := s.runDeps(ctx, dep, ran, fresh); err != nil {
 			return err
 		}
 		s.Reap()
 		r := &Result{Block: dep}
 		s.results[i] = r
 		s.run(ctx, dep, r)
+		fresh[dep] = true
 		if ran != nil {
 			ran[dep] = true
 		}
@@ -579,6 +598,8 @@ func (s *Session) confirm(b *doc.Block) (Answer, error) {
 }
 
 func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
+	s.seq++
+	r.Seq, r.Deps = s.seq, depSeqs(s.d, s.results, b)
 	s.emit(Event{Kind: Started, Block: b})
 	s.logStart(b)
 	if b.Attrs.Has("background") {

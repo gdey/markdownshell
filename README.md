@@ -352,6 +352,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
+| `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run) |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
@@ -450,7 +451,8 @@ make
 When `deploy` is about to run, mdsh checks `build` and then `login`, in
 that order. A block that has already run in this session (in `mdsh -i`
 or mdsh-gui; in a plain `mdsh` run, earlier in the run) and didn't fail
-is passed over. For any other, mdsh asks
+is passed over, unless it is marked `always` or is stale. For any other,
+mdsh asks
 `Run build first? [r]un / s[k]ip / [s]top`:
 
 - `r` checks that block's own `depends=` the same way, then runs it. Its
@@ -472,6 +474,29 @@ A dependency with nothing to run, a body of only blank lines and `#`
 comments, runs without asking, since running it does nothing; its own
 `depends=` are still asked about, so an empty block can name a group of
 steps. Mark it `confirm` to have it asked about anyway, as a checkpoint.
+
+Mark a dependency `always` when what it does doesn't last, such as
+refreshing a token or pulling the latest code:
+
+````markdown
+```sh {#login always}
+./get-token.sh > .token
+```
+````
+
+Each time a block that depends on `login` runs, `login` is asked about
+again, even if it already ran. It runs once on the way to that block,
+even when several of its dependencies need it. `always` doesn't make it
+run without asking; `--yes` still does that.
+
+A block that ran is **stale** once a block it depends on runs again, or
+has its output cleared in mdsh-gui, or is stale itself. A stale
+dependency is asked about again, like one that never ran. Say `c`
+depends on `a`, `d` on `a`, `b` and `c`, and `e` on `a` and `d`, and
+all have run. Run `a` again, and `c`, `d` and `e` are stale; run `e`,
+and mdsh asks about `d`, then, on the way to `d`, `c`, but not `b`.
+mdsh-gui marks a stale block's card with a *stale* badge, and `mdsh -i`
+shows `✓ stale` in its header.
 
 ## Terminal blocks
 

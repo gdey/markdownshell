@@ -91,6 +91,12 @@ export interface Cell {
     "failed": boolean;
 
     /**
+     * Stale is true when the block ran, but a block its depends= names
+     * has run again since, had its run cleared, or is stale itself.
+     */
+    "stale"?: boolean;
+
+    /**
      * Running is true while a background block is still going; its
      * output and status come in when it ends.
      */

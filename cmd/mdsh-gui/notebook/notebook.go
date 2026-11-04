@@ -63,6 +63,9 @@ type Cell struct {
 	Ran    bool `json:"ran"`
 	Status int  `json:"status"`
 	Failed bool `json:"failed"`
+	// Stale is true when the block ran, but a block its depends= names
+	// has run again since, had its run cleared, or is stale itself.
+	Stale bool `json:"stale,omitempty"`
 	// Running is true while a background block is still going; its
 	// output and status come in when it ends.
 	Running bool `json:"running"`

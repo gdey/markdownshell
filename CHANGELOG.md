@@ -8,6 +8,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An `always` block attribute makes a dependency run again each time a
+  block that `depends=` on it runs, even if it already ran in this
+  session, for steps whose effect doesn't last such as logging in.
+  You're still asked before it runs. It runs once on the way to a
+  block, even when several of that block's dependencies share it.
+- Blocks are marked **stale** once a block they depend on runs again or
+  has its output cleared. A stale dependency is asked about and run
+  again, like one that never ran, so running a block brings everything
+  it needs up to date, and leaves what's current alone. mdsh-gui shows a
+  *stale* badge on the card, and `mdsh -i` shows `✓ stale`.
+
+  ![A notebook where block a ran again: c, d and e carry a stale badge and b doesn't](docs/changelog/stale.png)
 - A textbox or choice can appear more than once with the same `var=`.
   A later input with that `var=` that is the same control, differing
   only in what is typed or checked, is a copy of the first: typing or

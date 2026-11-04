@@ -149,6 +149,7 @@
 [data-look="blueprint"] .block { background: transparent; border-color: var(--fg); box-shadow: none; }
 [data-look="blueprint"] .block.selected { outline: 2px dashed var(--accent); outline-offset: 3px; }
 [data-look="blueprint"] .block.ran { border-left-color: var(--ok); }
+[data-look="blueprint"] .block.ran.stale { border-left-color: var(--warn-border); }
 [data-look="blueprint"] :is(.block pre.code, .block .output-part, .block .ask) { border-top-style: dashed; }
 [data-look="blueprint"] .block .head .lang { background: none; border-color: var(--fg); text-transform: uppercase; letter-spacing: 0.06em; }
 [data-look="blueprint"] .block .exit, [data-look="blueprint"] .block .exit.bad { background: none; border: 1px solid currentColor; }

@@ -249,3 +249,79 @@ func TestRunDependsEmpty(t *testing.T) {
 		t.Errorf("started %q, want %q", started, want)
 	}
 }
+
+// TestRunBlockDependsAlways checks that an always dependency is asked
+// about and run again each time, though once for each block run, even
+// when two of that block's dependencies share it.
+func TestRunBlockDependsAlways(t *testing.T) {
+	ctx := context.Background()
+	d := parse(t, "```sh {#login always}\necho login\n```\n\n```sh {#build depends=login}\necho build\n```\n\n```sh {#test depends=login}\necho test\n```\n\n```sh {#deploy depends=build,test}\necho deploy\n```\n")
+	a := &asker{answers: map[string]run.Answer{"login": run.Go, "build": run.Go, "test": run.Go}}
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: a.depend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.RunBlock(ctx, 1); err != nil || !r.Ran {
+		t.Fatalf("build: ran=%v err=%v", r.Ran, err)
+	}
+	if want := []string{"login<build"}; !slices.Equal(a.asked, want) {
+		t.Errorf("build asked %q, want %q", a.asked, want)
+	}
+	// From a new session: deploy asks about login once, for build.
+	a.asked = nil
+	s2, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: a.depend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s2.Close()
+	if _, err := s2.RunBlock(ctx, 3); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"build<deploy", "login<build", "test<deploy"}; !slices.Equal(a.asked, want) {
+		t.Errorf("deploy asked %q, want %q", a.asked, want)
+	}
+}
+
+// staleDoc is c on a, d on a, b and c, and e on a and d.
+const staleDoc = "```sh {#a}\necho a\n```\n\n```sh {#b}\necho b\n```\n\n```sh {#c depends=a}\necho c\n```\n\n```sh {#d depends=a,b,c}\necho d\n```\n\n```sh {#e depends=a,d}\necho e\n```\n"
+
+// TestRunBlockDependsStale checks that when a has run again since the
+// rest ran, running e asks about d and c, which are stale, but not b.
+func TestRunBlockDependsStale(t *testing.T) {
+	ctx := context.Background()
+	a := &asker{answers: map[string]run.Answer{"a": run.Go, "b": run.Go, "c": run.Go, "d": run.Go}}
+	d := parse(t, staleDoc)
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: a.depend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for i := range 5 {
+		if _, err := s.RunBlock(ctx, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := run.Stale(d, s.Results()); slices.Contains(got, true) {
+		t.Fatalf("stale after running in order: %v", got)
+	}
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := run.Stale(d, s.Results()), []bool{false, false, true, true, true}; !slices.Equal(got, want) {
+		t.Errorf("stale after a ran again: %v, want %v", got, want)
+	}
+	a.asked = nil
+	if r, err := s.RunBlock(ctx, 4); err != nil || !r.Ran {
+		t.Fatalf("e: ran=%v err=%v", r.Ran, err)
+	}
+	if want := []string{"d<e", "c<d"}; !slices.Equal(a.asked, want) {
+		t.Errorf("asked %q, want %q", a.asked, want)
+	}
+	if got := run.Stale(d, s.Results()); slices.Contains(got, true) {
+		t.Errorf("stale after e: %v", got)
+	}
+}

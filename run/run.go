@@ -178,6 +178,13 @@ type Result struct {
 	// Declined is true when the block asked for confirmation and the run
 	// stopped there instead.
 	Declined bool
+	// Seq orders the session's runs: each block run gets the next one,
+	// counting from 1. It is 0 for a block that hasn't run.
+	Seq uint64
+	// Deps holds, for each block the block's depends= names, that
+	// block's Seq when this one started, so Stale can tell when one has
+	// run again since, or had its run cleared.
+	Deps map[string]uint64
 }
 
 // Failed reports whether the block ran and did not succeed.
