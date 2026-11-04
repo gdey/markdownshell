@@ -16,8 +16,9 @@ disableKinds = ["taxonomy", "term"]
 [markup.goldmark.renderer]
   unsafe = true
 
-# The changelog page is the repo's CHANGELOG.md, read at build time, so
-# the site never carries a second copy.
+# The changelog page is the repo's CHANGELOG.md, read at build time, and
+# the cheat sheet is docs/cheatsheet.md, mounted into the docs section,
+# so the site never carries a second copy of either.
 [module]
   [[module.mounts]]
     source = "assets"
@@ -25,6 +26,12 @@ disableKinds = ["taxonomy", "term"]
   [[module.mounts]]
     source = "../CHANGELOG.md"
     target = "assets/CHANGELOG.md"
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+  [[module.mounts]]
+    source = "../docs/cheatsheet.md"
+    target = "content/docs/cheatsheet.md"
 
 [menus]
   [[menus.main]]

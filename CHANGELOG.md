@@ -6,6 +6,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A [cheat sheet](docs/cheatsheet.md): every fence attribute, front
+  matter key, command line flag, `mdsh -i` key and desktop app shortcut
+  and menu item on one page, in the repo and on the site's docs section.
+
+  ![The cheat sheet on the site: the docs section with Cheat sheet last in the sidebar, and the Command line table](docs/changelog/cheatsheet.png)
+
 ### Fixed
 
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
