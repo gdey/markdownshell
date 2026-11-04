@@ -37,6 +37,10 @@ type App struct {
 	menu       *application.Menu
 	viewItems  struct{ split, rendered, outline, history, console, code, output *application.MenuItem }
 	recentMenu *application.Menu
+	// cli is the bundled mdsh's install, and cliItem the app menu's
+	// item for it, which says Install or Uninstall.
+	cli     *cliHost
+	cliItem *application.MenuItem
 
 	mu        sync.Mutex
 	windows   map[uint]*docWindow

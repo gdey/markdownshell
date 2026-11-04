@@ -100,6 +100,11 @@ cask "mdsh" do
   depends_on macos: ">= :ventura"
 
   app "mdsh.app"
+  binary "#{appdir}/mdsh.app/Contents/MacOS/mdsh"
+
+  # The app carries the mdsh command line tool, which the formula
+  # installs to the same folder.
+  conflicts_with formula: "mdsh"
 
   zap trash: [
     "~/Library/Application Support/mdsh",

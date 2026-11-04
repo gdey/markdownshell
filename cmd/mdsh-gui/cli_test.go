@@ -1,0 +1,225 @@
+package main
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// fakeApp makes an mdsh.app with a helper under dir, and returns the
+// helper's path.
+func fakeApp(t *testing.T, dir string) string {
+	t.Helper()
+	p := filepath.Join(dir, "mdsh.app", "Contents", "MacOS", "mdsh")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("#!/bin/sh\necho mdsh 1.4.0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestCLILink(t *testing.T) {
+	tmp := t.TempDir()
+	bin := filepath.Join(tmp, "usr-local-bin")
+	h := &cliHost{bundled: fakeApp(t, filepath.Join(tmp, "Applications")), link: filepath.Join(bin, "mdsh"), pathDirs: []string{bin}}
+	if c := h.state(); c.Installed || c.Other != "" || c.Broken != "" || !c.InPath {
+		t.Fatalf("before install: %+v", c)
+	}
+	unq := 0
+	h.unquarantine = func() error { unq++; return nil }
+	if err := h.install(); err != nil {
+		t.Fatal(err)
+	}
+	if target, _ := os.Readlink(h.link); target != h.bundled {
+		t.Errorf("link points at %q, want %q", target, h.bundled)
+	}
+	if !h.state().Installed {
+		t.Error("not installed after install")
+	}
+	if unq != 1 {
+		t.Errorf("unquarantine ran %d times, want 1", unq)
+	}
+	if err := h.uninstall(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(h.link); !os.IsNotExist(err) {
+		t.Errorf("link still there after uninstall: %v", err)
+	}
+}
+
+func TestCLIMovedApp(t *testing.T) {
+	tmp := t.TempDir()
+	bin := filepath.Join(tmp, "bin")
+	os.MkdirAll(bin, 0o755)
+	old := filepath.Join(tmp, "Downloads", "mdsh.app", "Contents", "MacOS", "mdsh")
+	h := &cliHost{bundled: fakeApp(t, filepath.Join(tmp, "Applications")), link: filepath.Join(bin, "mdsh"), pathDirs: []string{bin}}
+	if err := os.Symlink(old, h.link); err != nil {
+		t.Fatal(err)
+	}
+	if c := h.state(); c.Broken != old || c.Installed || c.Other != "" {
+		t.Fatalf("moved app: %+v", c)
+	}
+	if err := h.repair(); err != nil {
+		t.Fatal(err)
+	}
+	if !h.state().Installed {
+		t.Error("repair didn't point the link at this app")
+	}
+}
+
+func TestCLIOtherOnPath(t *testing.T) {
+	tmp := t.TempDir()
+	brew, bin := filepath.Join(tmp, "homebrew"), filepath.Join(tmp, "bin")
+	os.MkdirAll(brew, 0o755)
+	formula := filepath.Join(brew, "mdsh")
+	os.WriteFile(formula, []byte("#!/bin/sh\n"), 0o755)
+	h := &cliHost{bundled: fakeApp(t, tmp), link: filepath.Join(bin, "mdsh"), pathDirs: []string{brew, bin}}
+	if c := h.state(); c.Other != formula {
+		t.Fatalf("Other = %q, want the formula's %q", c.Other, formula)
+	}
+	if err := h.install(); err == nil || !strings.Contains(err.Error(), formula) {
+		t.Errorf("install beside the formula: %v, want an error naming it", err)
+	}
+	if _, err := os.Lstat(h.link); !os.IsNotExist(err) {
+		t.Error("install linked anyway")
+	}
+	// A plain file at the link is someone else's too, and uninstall
+	// leaves it be.
+	os.Remove(formula)
+	os.MkdirAll(bin, 0o755)
+	os.WriteFile(h.link, []byte("#!/bin/sh\n"), 0o755)
+	if c := h.state(); c.Other != h.link || c.Installed {
+		t.Errorf("a file at the link: %+v", c)
+	}
+	if err := h.uninstall(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(h.link); err != nil {
+		t.Error("uninstall removed a file that wasn't this app's")
+	}
+}
+
+// The Homebrew cask links its own mdsh into Homebrew's bin, which
+// comes first on PATH: install has nothing to do.
+func TestCLICaskLink(t *testing.T) {
+	tmp := t.TempDir()
+	brew, bin := filepath.Join(tmp, "homebrew"), filepath.Join(tmp, "bin")
+	os.MkdirAll(brew, 0o755)
+	h := &cliHost{bundled: fakeApp(t, tmp), link: filepath.Join(bin, "mdsh"), pathDirs: []string{brew, bin}}
+	cask := filepath.Join(brew, "mdsh")
+	os.Symlink(h.bundled, cask)
+	if c := h.state(); c.Linked != cask || c.Other != "" {
+		t.Fatalf("cask: %+v", c)
+	}
+	if err := h.install(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(h.link); !os.IsNotExist(err) {
+		t.Error("install linked a second one beside the cask's")
+	}
+}
+
+func TestCLICopy(t *testing.T) {
+	tmp := t.TempDir()
+	bundled := filepath.Join(tmp, "appdir", "usr", "bin", "mdsh")
+	os.MkdirAll(filepath.Dir(bundled), 0o755)
+	os.WriteFile(bundled, []byte("v1"), 0o755)
+	bin := filepath.Join(tmp, "home", ".local", "bin")
+	h := &cliHost{bundled: bundled, link: filepath.Join(bin, "mdsh"), copy: true, version: "1.4.0"}
+	if c := h.state(); c.InPath || c.Installed {
+		t.Fatalf("before install: %+v", c)
+	}
+	if err := h.install(); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(h.link); string(b) != "v1" {
+		t.Errorf("copy holds %q", b)
+	}
+	if fi, _ := os.Stat(h.link); fi.Mode()&0o111 == 0 {
+		t.Errorf("copy isn't executable: %v", fi.Mode())
+	}
+	if m, _ := os.ReadFile(h.marker()); strings.TrimSpace(string(m)) != "1.4.0" {
+		t.Errorf("marker holds %q", m)
+	}
+	if !h.state().Installed {
+		t.Error("not installed after install")
+	}
+
+	// The same version: repair leaves it. A new one: repair copies.
+	os.WriteFile(bundled, []byte("v2"), 0o755)
+	h.repair()
+	if b, _ := os.ReadFile(h.link); string(b) != "v1" {
+		t.Errorf("repair at the same version copied: %q", b)
+	}
+	h.version = "1.5.0"
+	if err := h.repair(); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(h.link); string(b) != "v2" {
+		t.Errorf("repair at a new version left %q", b)
+	}
+	if left, _ := filepath.Glob(filepath.Join(bin, ".mdsh.tmp*")); len(left) != 0 {
+		t.Errorf("temporary files left: %v", left)
+	}
+
+	if err := h.uninstall(); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{h.link, h.marker()} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("%s still there after uninstall", p)
+		}
+	}
+
+	// An mdsh there without the marker isn't this app's.
+	os.WriteFile(h.link, []byte("mine"), 0o755)
+	if c := h.state(); c.Installed || c.Other != h.link {
+		t.Errorf("unmarked copy: %+v", c)
+	}
+	if err := h.install(); err == nil {
+		t.Error("install overwrote an mdsh that isn't this app's")
+	}
+}
+
+func TestCLINoneBundled(t *testing.T) {
+	h := &cliHost{link: filepath.Join(t.TempDir(), "mdsh")}
+	if err := h.install(); err != errNoCLI {
+		t.Errorf("install = %v, want errNoCLI", err)
+	}
+}
+
+// adminScript's command runs as root, so a path with spaces, quotes and
+// backslashes must reach sh as one word, through AppleScript's string.
+func TestAdminScript(t *testing.T) {
+	path := `/Users/j/My "Apps"/it's \here/mdsh.app/Contents/MacOS/mdsh`
+	script := adminScript("printf %s " + shellQuote(path))
+	const pre, post = `do shell script "`, `" with administrator privileges`
+	if !strings.HasPrefix(script, pre) || !strings.HasSuffix(script, post) {
+		t.Fatalf("script = %s", script)
+	}
+	// Read the string literal back as AppleScript does.
+	lit := strings.TrimSuffix(strings.TrimPrefix(script, pre), post)
+	var cmd strings.Builder
+	for i := 0; i < len(lit); i++ {
+		switch c := lit[i]; {
+		case c == '\\':
+			i++
+			cmd.WriteByte(lit[i])
+		case c == '"':
+			t.Fatalf("unescaped quote in %s", lit)
+		default:
+			cmd.WriteByte(c)
+		}
+	}
+	out, err := exec.Command("sh", "-c", cmd.String()).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != path {
+		t.Errorf("sh saw %q, want %q", out, path)
+	}
+}

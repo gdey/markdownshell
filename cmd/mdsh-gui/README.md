@@ -531,7 +531,12 @@ About tab with the version, build, paths and tools.
 
 Releases have an unsigned universal macOS app (`.dmg` and `.zip`) and a
 Linux AppImage; see [Desktop app](../../site/content/docs/desktop.md)
-for how to open the unsigned app the first time.
+for how to open the unsigned app the first time. Both carry the `mdsh`
+command line tool, built from the same commit: `mdsh.app` at
+`Contents/MacOS/mdsh`, the AppImage at `usr/bin/mdsh`. Settings › Shell
+puts it on `PATH` (a symlink in `/usr/local/bin` on macOS, a copy in
+`~/.local/bin` from an AppImage); see
+[docs/design/cli-in-app.md](../../docs/design/cli-in-app.md).
 
 ## Building
 
@@ -594,8 +599,11 @@ release workflow gets them. The
 with [dmgbuild](https://github.com/dmgbuild/dmgbuild) by
 `build/darwin/dmg/settings.py`, over a background drawn from
 `build/darwin/dmg/background.svg` by `build/darwin/dmg/render.sh`.
+`app.sh` also builds `cmd/mdsh` for both architectures into
+`Contents/MacOS/mdsh` and signs it before the app.
 `build/linux/appimage.sh VERSION OUTDIR`, on Linux, builds the
 AppImage with `wails3 generate appimage`, which bundles GTK and WebKit's
-helper processes. The icon is `build/appicon.png`, drawn from
+helper processes, then adds `mdsh` and `build/linux/AppRun`, which runs
+it for `--cli` or a link named `mdsh`, and packs the image again. The icon is `build/appicon.png`, drawn from
 `build/appicon.svg`. `.github/workflows/gui-packages.yml` runs both;
 the release workflow adds their files to the release.

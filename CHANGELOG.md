@@ -8,6 +8,20 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The desktop app carries the `mdsh` command line tool, at the same
+  version, so one download gives both. Settings › Shell has a Command
+  line tool row with Install and Remove: on macOS it links
+  `/usr/local/bin/mdsh` to the `mdsh` inside `mdsh.app` (asking for an
+  administrator password when it must), and the app menu has Install
+  Command Line Tool… too; from the Linux AppImage it copies `mdsh` to
+  `~/.local/bin` and keeps the copy at the app's version. The AppImage
+  also runs `mdsh` itself with `--cli` first, or through a link to it
+  named `mdsh`. Turning on the zsh wrapper offers to install it first,
+  and the About tab says when `mdsh` is only inside the app. The
+  Homebrew cask now links the app's `mdsh` and conflicts with the
+  `mdsh` formula: on a Mac, install one or the other.
+
+  ![Settings › Shell's Command line tool row with Install, and the zsh wrapper offering to install the command line tool first](docs/changelog/cli-install.png)
 - `mdsh-gui`: a Bubble Gum look in Settings › Look: Hubba Bubba pink
   paper with bubbles blown across the page, puffy cards and pill
   buttons on a chunky shadow, and bubble-lettered headings, or the

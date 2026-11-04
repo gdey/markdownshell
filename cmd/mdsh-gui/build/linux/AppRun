@@ -1,0 +1,20 @@
+#!/bin/sh
+# The AppImage's entry point. It runs the mdsh command line tool inside
+# the image when the image is run by the name mdsh (a link named mdsh
+# to it: the AppImage runtime sets ARGV0 to the name it was run by), or
+# with --cli first, and the app otherwise:
+#
+#	mdsh-gui_VERSION_linux_ARCH.AppImage --cli runbook.md
+#
+# The app's own start, which sets up its bundled GTK and WebKit, is
+# AppRun.wails, which wails3 generate appimage wrote.
+set -e
+APPDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+if [ "${ARGV0##*/}" = mdsh ]; then
+	exec "$APPDIR/usr/bin/mdsh" "$@"
+fi
+if [ "${1-}" = --cli ]; then
+	shift
+	exec "$APPDIR/usr/bin/mdsh" "$@"
+fi
+exec "$APPDIR/AppRun.wails" "$@"

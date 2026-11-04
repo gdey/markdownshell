@@ -1,6 +1,7 @@
 # The CLI inside the desktop app
 
-Status: design, Nov 2, 2026. Not built. Asked for by j after the v1.3.0
+Status: built, Nov 4, 2026.
+Designed Nov 2, 2026. Asked for by j after the v1.3.0
 release: "can we include the cli in the app bundle for the desktop app,
 is there a convention for macOS apps to do that?"
 
@@ -98,9 +99,10 @@ developer cannot be verified" block as double-clicking an app. With a
 notarized app this is a non-issue. With today's ad hoc signature:
 
 - Approving the app with Open Anyway in System Settings is per bundle.
-  Whether that approval also lets a symlinked `mdsh` run from a terminal
-  is not confirmed here; the design assumes it does not, and must be
-  checked on a Mac before the feature ships.
+  Checked on j's Mac on Nov 4 with a CI build downloaded in the browser:
+  after Open Anyway on the app, a symlink to the helper ran from
+  Terminal (`mdsh --version`) with no prompt. The approval covers the
+  helper too.
 - What does work: `brew install --cask --no-quarantine mdsh`, and
   `xattr -dr com.apple.quarantine /Applications/mdsh.app`, which the
   desktop page already documents. The app's install step (below) runs
@@ -239,6 +241,12 @@ comes first on `PATH`, so its link wins; the install step's check in
 item 1 above sees it and does nothing, and the Settings row shows it as
 the one in use.
 
+As built, the Settings › Shell row in its states (installed on macOS,
+the same in dark, behind the formula's `mdsh`, and an AppImage's copy
+in a folder that isn't on `PATH`):
+
+![The Command line tool row: installed, installed in dark, another mdsh on PATH, and the Linux copy with the PATH line to add](cli-in-app-states.png)
+
 ## Changes, by file
 
 | Where | What |
@@ -259,11 +267,10 @@ reaches a release.
 
 ## Open questions
 
-- **Open Anyway and the helper.** Whether approving the app also
-  approves running its helper from a terminal (see Signing). Check on a
-  Mac with a quarantined build before shipping; if it doesn't, the
-  quarantine-clearing step in the install is what makes the ad hoc
-  build usable, and the desktop page should say so.
+- **Open Anyway and the helper.** Answered Nov 4: approving the app
+  with Open Anyway also lets its helper run from a terminal (see
+  Signing). The install still clears the quarantine flag, for someone
+  who installs the CLI from the menu before Gatekeeper has asked.
 - **Linux.** Decided Nov 4: the AppImage carries it; see [Linux](#linux).
 - **`mdsh-gui --lsp`.** Decided Nov 4: the Neovim pane keeps running
   `mdsh-gui --lsp`, not the helper's `mdsh lsp`. The GUI's language

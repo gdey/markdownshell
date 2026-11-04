@@ -163,7 +163,14 @@ func mdshGUI(o options) error {
 	cons := newConsole()
 	logger := slog.New(newConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
 	slog.SetDefault(logger)
-	a := &App{console: cons, settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	a := &App{console: cons, settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}, cli: newCLIHost()}
+	// A link left by a moved app is pointed back here, and an
+	// AppImage's copy brought up to this version, quietly.
+	go func() {
+		if err := a.cli.repair(); err != nil {
+			slog.Warn("updating the mdsh command line tool", "err", err)
+		}
+	}()
 	app := application.New(application.Options{
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
