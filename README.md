@@ -468,6 +468,11 @@ underlines it in the source and notes it in the Console. A block that depends on
 are errors when the file is read. mdsh-gui and `mdsh -i` ask the same
 question in their own way.
 
+A dependency with nothing to run, a body of only blank lines and `#`
+comments, runs without asking, since running it does nothing; its own
+`depends=` are still asked about, so an empty block can name a group of
+steps. Mark it `confirm` to have it asked about anyway, as a checkpoint.
+
 ## Terminal blocks
 
 Some commands need a terminal: `docker run -it`, `ssh`, `sudo`, an

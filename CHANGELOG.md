@@ -71,6 +71,11 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The open History pane, with Stop, Restart and the chevron on the line above the prompt](docs/changelog/history-buttons.png)
 
+- An empty dependency, a block whose body is only blank lines and `#`
+  comments, now runs without asking when a block that depends on it
+  runs, in `mdsh`, `mdsh -i` and mdsh-gui alike. Its own `depends=` are
+  still asked about. An empty block marked `confirm` is still asked
+  about, so it can serve as a checkpoint.
 - **Blocks no longer get your whole environment by default.** A file
   without `env.share` in its front matter now passes just the base set
   below. A file that wants everything says so with `share: [...]`

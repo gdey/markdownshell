@@ -177,3 +177,75 @@ func TestRunDependsUnknown(t *testing.T) {
 		t.Errorf("asked %d times, b's stdout %q, ran %q; want a asked about and run, then b", asked, r.Stdout, got)
 	}
 }
+
+// An empty dependency, with no commands, only blank lines and #
+// comments, runs without asking, even with no asker; its own
+// dependencies are still asked about. An empty confirm block is still
+// asked about.
+func TestRunBlockDependsEmpty(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name  string
+		doc   string
+		ask   bool // whether there is an asker
+		asked []string
+		ran   []string
+	}{
+		{"blank", "```sh {#a}\n```\n\n```sh {#b depends=a}\necho b\n```\n", true, nil, []string{"a", "b"}},
+		{"whitespace", "```sh {#a}\n  \n\t\n```\n\n```sh {#b depends=a}\necho b\n```\n", true, nil, []string{"a", "b"}},
+		{"comments", "```sh {#a}\n#!/bin/sh\n# a group of steps\n  # indented\n```\n\n```sh {#b depends=a}\necho b\n```\n", true, nil, []string{"a", "b"}},
+		{"no asker", "```sh {#a}\n# nothing\n```\n\n```sh {#b depends=a}\necho b\n```\n", false, nil, []string{"a", "b"}},
+		{"group", "```sh {#x}\necho x\n```\n\n```sh {#a depends=x}\n# setup\n```\n\n```sh {#b depends=a}\necho b\n```\n", true, []string{"x<a"}, []string{"x", "a", "b"}},
+		{"command", "```sh {#a}\n# say it\necho a # here\n```\n\n```sh {#b depends=a}\necho b\n```\n", true, []string{"a<b"}, []string{"a", "b"}},
+		{"confirm", "```sh {#a confirm}\n```\n\n```sh {#b depends=a}\necho b\n```\n", true, []string{"a<b"}, []string{"a", "b"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := parse(t, tc.doc)
+			a := &asker{answers: map[string]run.Answer{"a": run.Go, "x": run.Go}}
+			opts := run.Options{Environ: []string{}}
+			if tc.ask {
+				opts.Depend = a.depend
+			}
+			s, err := run.NewSession(d, opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			if _, err := s.RunBlock(ctx, len(d.Blocks)-1); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(a.asked, tc.asked) {
+				t.Errorf("asked %q, want %q", a.asked, tc.asked)
+			}
+			if got := ran(s); !slices.Equal(got, tc.ran) {
+				t.Errorf("ran %q, want %q", got, tc.ran)
+			}
+		})
+	}
+}
+
+// In a whole run, an empty dependency later in the file runs first
+// without asking, and only once.
+func TestRunDependsEmpty(t *testing.T) {
+	d := parse(t, "```sh {#b depends=a}\necho b\n```\n\n```sh {#a}\n# marker\n```\n")
+	a := &asker{answers: map[string]run.Answer{}}
+	var started []string
+	_, err := run.Run(context.Background(), d, run.Options{
+		Environ: []string{},
+		Depend:  a.depend,
+		OnEvent: func(e run.Event) {
+			if e.Kind == run.Started {
+				started = append(started, e.Block.ID)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.asked) != 0 {
+		t.Errorf("asked %q", a.asked)
+	}
+	if want := []string{"a", "b"}; !slices.Equal(started, want) {
+		t.Errorf("started %q, want %q", started, want)
+	}
+}
