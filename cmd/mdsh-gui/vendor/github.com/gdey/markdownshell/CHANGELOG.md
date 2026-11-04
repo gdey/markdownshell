@@ -62,6 +62,40 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![Settings in a tab beside hello.md, at its General tab](docs/changelog/settings-tab.png)
 
+- mdsh-gui's outline keeps the selected block or heading in sight.
+  Selecting one in the rendered view, by clicking it, moving to it with
+  j and k, or moving the source view's cursor into it, scrolls the
+  outline just enough to show its entry. Scrolling the rendered view
+  leaves the outline where it is, so the entry stays there to go back
+  to, and an outline scrolled by hand stays put until something else is
+  selected. Marking the selected entry also no longer goes through
+  every entry of the outline, which made each move of the selection
+  slow on documents of 100,000 lines with the outline open.
+
+  ![The rendered view scrolled back to the top, the outline still showing the selected block, step61, near its bottom](docs/changelog/outline-follows-selection.png)
+
+### Security
+
+- mdsh asks before it reads a document's `env.source` files into its
+  shells, and remembers the answer for the file. The files ran with no
+  question as soon as a shell started, and opening the History pane in
+  mdsh-gui, which was on for every file once left on, or pressing `h`
+  in `mdsh -i`, starts one to ask for its prompt: so opening a file
+  could run its setup script before you had read a line (finding 1 of
+  the v1.4.0 security review). Now the first shell waits for an answer:
+  mdsh-gui shows a dialog listing the files, `mdsh -i` lists them over
+  the document, and `mdsh` asks on the terminal. **Allow** sources them,
+  **Run without them** starts the shells without them, and Cancel or
+  stop starts nothing. Allow and Run without them are remembered for
+  the document, in `mdsh/sources.json` in your config folder, shared by
+  all three, and asked again when the list of files changes. **This
+  can stop an unattended run:** `mdsh` with no terminal and a document
+  never approved now stops with "env.source files not approved"; pass
+  `--yes`, or approve it once on a terminal. Files given to `--source`
+  are yours and aren't asked about.
+
+  ![mdsh-gui asking whether to read ~/ops/setup.sh and ~/.aliases into the shell, with Cancel, Run without them and Allow](docs/changelog/source-prompt.png)
+
 ### Fixed
 
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file

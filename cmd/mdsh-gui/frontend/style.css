@@ -532,6 +532,9 @@ button.gear svg { width: 14px; height: 14px; display: block; }
 .chead button.gear { color: var(--fg); opacity: 0.75; }
 .chead button.gear:hover, .chead button.gear:focus-visible { opacity: 1; }
 #folder-dialog { width: min(480px, 92vw); }
+#sources-dialog { width: min(520px, 92vw); }
+#sources-list { margin: 0 0 4px; padding-left: 20px; max-height: 40vh; overflow: auto; font-size: calc(13px * var(--text-scale)); }
+#sources-list li { margin: 2px 0; overflow-wrap: anywhere; }
 #folder-dialog .hint { display: block; margin-top: 3px; font-size: calc(12px * var(--text-scale)); }
 .fs-color { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0; }
 .fs-color label { flex: 1; margin: 0; }

@@ -31,6 +31,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/lsp"
+	"github.com/gdey/markdownshell/trust"
 )
 
 // The frontend is TypeScript in frontend/src, bundled into frontend/bundle.
@@ -180,7 +181,7 @@ func mdshGUI(o options) error {
 	cons := newConsole()
 	logger := slog.New(newConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
 	slog.SetDefault(logger)
-	a := &App{console: cons, settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}, cli: newCLIHost()}
+	a := &App{console: cons, settings: store, trust: trust.OpenDefault(), cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}, cli: newCLIHost()}
 	// A link left by a moved app is pointed back here, and an
 	// AppImage's copy brought up to this version, quietly.
 	go func() {

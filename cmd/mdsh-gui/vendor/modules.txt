@@ -96,6 +96,7 @@ github.com/gdey/markdownshell/tape
 github.com/gdey/markdownshell/termrec
 github.com/gdey/markdownshell/termsafe
 github.com/gdey/markdownshell/textimg
+github.com/gdey/markdownshell/trust
 github.com/gdey/markdownshell/weblink
 github.com/gdey/markdownshell/writable
 # github.com/go-ole/go-ole v1.3.0

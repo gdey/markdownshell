@@ -58,6 +58,17 @@ type Options struct {
 	Only string
 	// OnEvent, if set, is called as blocks start, write and finish.
 	OnEvent func(Event)
+	// ApproveSources is asked, right before the first shell starts,
+	// whether to read in the files the front matter's env.source names:
+	// paths are the files that would be read, each made absolute. Go
+	// sources them into every shell; Skip starts the shells without
+	// them; Stop starts no shell, and what needed one fails with
+	// ErrSourcesNotApproved, which stops a run. If ApproveSources is
+	// nil, a document with env.source stops that way, since nobody can
+	// say yes. A shell that only answers a question, as the History
+	// pane's prompt does, asks too. Source, the caller's own, is not
+	// asked about. See package trust for remembering the answer.
+	ApproveSources func(paths []string) Answer
 	// Step asks Confirm before every block that would run, not just
 	// those with the confirm attribute.
 	Step bool
@@ -139,6 +150,11 @@ const (
 // ErrNoConfirm is returned when a block needs confirming and the run has
 // no way to ask.
 var ErrNoConfirm = errors.New("block needs confirmation")
+
+// ErrSourcesNotApproved is the error when a shell would start for a
+// document whose env.source files nobody approved; see
+// Options.ApproveSources.
+var ErrSourcesNotApproved = errors.New("env.source files not approved")
 
 // ErrDependency is a block's error when a block its depends= names
 // failed, so it didn't run.
