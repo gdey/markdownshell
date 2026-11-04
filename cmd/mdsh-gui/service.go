@@ -776,6 +776,20 @@ func (a *App) SetCastFrame(ctx context.Context, i int, body string, frame int) e
 	return err
 }
 
+// clipboardText is the text clipboard, as Wails gives it.
+type clipboardText interface {
+	SetText(string) bool
+	Text() (string, bool)
+}
+
+// CopySecret puts text, which may hold a secret, on the clipboard, kept
+// out of clipboard history where the system allows, and takes it off
+// again after the settings' SecretShow unless something else was
+// copied.
+func (a *App) CopySecret(text string) error {
+	return copySecret(text, a.app.Clipboard, a.settings.Get().SecretShow())
+}
+
 // CopyCastGIF puts an animated GIF of cast, an asciicast v2 recording, on
 // the clipboard.
 func (a *App) CopyCastGIF(cast string) error {

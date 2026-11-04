@@ -115,6 +115,13 @@ export interface Settings {
     "historyFocus": string;
 
     /**
+     * SecretShowSeconds is how long a block's secret stays shown after
+     * its eye button shows it, and on the clipboard after it is copied.
+     * 0 is SecretShowDefault.
+     */
+    "secretShowSeconds": number;
+
+    /**
      * Shell, if set, overrides the front matter's shell for every file.
      */
     "shell": string;

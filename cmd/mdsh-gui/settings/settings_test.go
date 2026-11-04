@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 )
 
 func TestStore(t *testing.T) {
@@ -157,5 +158,13 @@ func TestPin(t *testing.T) {
 	}
 	if !slices.Equal(s.Pinned, []string{"/d/b.md"}) {
 		t.Errorf("Pinned = %v", s.Pinned)
+	}
+}
+
+func TestSecretShow(t *testing.T) {
+	for secs, want := range map[int]time.Duration{0: SecretShowDefault, -5: SecretShowDefault, 15: 15 * time.Second, 300: 5 * time.Minute} {
+		if got := (Settings{SecretShowSeconds: secs}).SecretShow(); got != want {
+			t.Errorf("SecretShow with %d = %v, want %v", secs, got, want)
+		}
 	}
 }

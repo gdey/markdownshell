@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"time"
 )
 
 // MaxRecent is how many files Open Recent remembers.
@@ -85,6 +86,10 @@ type Settings struct {
 	// keyboard: "cursor" for a blinking block cursor where you type,
 	// in place of the outline around the field. Empty is the outline.
 	HistoryFocus string `json:"historyFocus"`
+	// SecretShowSeconds is how long a block's secret stays shown after
+	// its eye button shows it, and on the clipboard after it is copied.
+	// 0 is SecretShowDefault.
+	SecretShowSeconds int `json:"secretShowSeconds"`
 	// Shell, if set, overrides the front matter's shell for every file.
 	Shell string `json:"shell"`
 	// HistoryRC is a file, such as ~/.zshrc, the shells read while the
@@ -268,4 +273,16 @@ func isDir(path string) bool {
 	}
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()
+}
+
+// SecretShowDefault is how long a secret stays shown, or on the
+// clipboard, unless the settings say otherwise.
+const SecretShowDefault = 60 * time.Second
+
+// SecretShow is how long a secret stays shown, or on the clipboard.
+func (s Settings) SecretShow() time.Duration {
+	if s.SecretShowSeconds <= 0 {
+		return SecretShowDefault
+	}
+	return time.Duration(s.SecretShowSeconds) * time.Second
 }

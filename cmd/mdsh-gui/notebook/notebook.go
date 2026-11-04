@@ -58,6 +58,13 @@ type Cell struct {
 	// Links is true when the block has the links attribute, so the web
 	// addresses in Output are made clickable.
 	Links bool `json:"links,omitempty"`
+	// Secret is set when the block's output may hold a secret: it is
+	// marked secret, or its code names a variable mdsh ctl set --secret
+	// made. The view masks the output until asked to show it, and with
+	// SecretCode, set for the secret attribute, the code too, since only
+	// there may the code itself hold one. Copying still works.
+	Secret     bool `json:"secret,omitempty"`
+	SecretCode bool `json:"secretCode,omitempty"`
 	// Ran is true when the block ran this session; Status and Failed say
 	// how it went.
 	Ran    bool `json:"ran"`

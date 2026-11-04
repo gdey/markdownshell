@@ -679,3 +679,39 @@ func TestCellTimes(t *testing.T) {
 		t.Errorf("late: ms %d, timed out %v", c.Ms, c.TimedOut)
 	}
 }
+
+// TestSecretCells checks that a block marked secret has its code and
+// output masked, and others don't.
+func TestSecretCells(t *testing.T) {
+	n, err := Open(write(t, "# T\n\n```sh {#login secret}\necho hunter2\n```\n\n```sh {#open}\necho hi\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	got := map[string][2]bool{}
+	for _, c := range n.Cells() {
+		if c.Block >= 0 {
+			got[c.ID] = [2]bool{c.Secret, c.SecretCode}
+		}
+	}
+	if got["login"] != [2]bool{true, true} || got["open"] != [2]bool{} {
+		t.Errorf("secret, secretCode by block = %v", got)
+	}
+}
+
+func TestNamesAny(t *testing.T) {
+	names := []string{"MDSH_VAR_token"}
+	for code, want := range map[string]bool{
+		"curl -H \"$MDSH_VAR_token\"":            true,
+		"echo ${MDSH_VAR_token}":                 true,
+		"echo {{$MDSH_VAR_token}}":               true,
+		"echo $MDSH_VAR_token_hint":              false,
+		"echo $XMDSH_VAR_token":                  false,
+		"echo $MDSH_VAR_tok":                     false,
+		"echo $MDSH_VAR_token_x $MDSH_VAR_token": true,
+	} {
+		if got := namesAny(code, names); got != want {
+			t.Errorf("namesAny(%q) = %v, want %v", code, got, want)
+		}
+	}
+}

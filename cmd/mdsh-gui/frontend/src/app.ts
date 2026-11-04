@@ -386,16 +386,111 @@ function preText(pre: HTMLElement): string {
 
 // copyCode puts a fenced block's code on the clipboard, as written in the
 // file, and says so in the status line.
-async function copyCode(code: string, name: string) {
+async function copyCode(code: string, name: string, secret = false) {
   const text = code.endsWith("\n") ? code.slice(0, -1) : code;
   try {
-    await Clipboard.SetText(text);
+    await setClipboard(text, secret);
   } catch (err) {
     return status("couldn't copy: " + message(err));
   }
   const n = text ? text.split("\n").length : 0;
-  status("Copied " + (name ? name + ", " : "") + n + (n === 1 ? " line" : " lines"));
+  status("Copied " + (name ? name + ", " : "") + n + (n === 1 ? " line" : " lines") + (secret ? secretNote() : ""));
 }
+
+// copyOutputButton copies the block's output as text.
+function copyOutputButton(block: HTMLElement, c: Cell): HTMLButtonElement {
+  const b = iconButton("copy", "Copy this block's output", () => void copyOutput(block, c));
+  b.classList.add("copy-output");
+  return b;
+}
+
+// copyOutput puts a block's output on the clipboard as text: the text
+// the block printed, without the colors, or, for out=markdown, the text
+// as shown. The button says Copied for a moment, and the status line
+// says how much.
+async function copyOutput(block: HTMLElement, c: Cell) {
+  const out = block.querySelector<HTMLElement>(".output")!;
+  const text = outputText(out).replace(/\n$/, "");
+  const name = c.name ?? c.id ?? "";
+  if (!text) return status("no text output to copy");
+  try {
+    await setClipboard(text, !!c.secret);
+  } catch (err) {
+    return status("couldn't copy: " + message(err));
+  }
+  const n = text.split("\n").length;
+  status("Copied the output of " + (name ? name + ", " : "") + n + (n === 1 ? " line" : " lines") + (c.secret ? secretNote() : ""));
+  const b = block.querySelector<HTMLElement>(".copy-output");
+  if (!b) return;
+  b.classList.add("copied");
+  clearTimeout(copiedTimers.get(b));
+  copiedTimers.set(b, setTimeout(() => b.classList.remove("copied"), 1500));
+}
+
+const copiedTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+
+// outputText is the text of a block's output, out. Output a block
+// printed is in pre elements, one for each stream, whose text is what it
+// printed; other output, such as out=markdown's, is taken as shown.
+function outputText(out: HTMLElement): string {
+  const kids = [...out.children];
+  if (kids.length && kids.every((k) => k.tagName === "PRE")) return kids.map((k) => k.textContent ?? "").join("");
+  return out.innerText;
+}
+
+// secretNote ends the status line after copying a secret.
+const secretNote = () => "; it comes off the clipboard in " + aWhile(revealFor());
+
+// aWhile says how long ms is, in whole seconds or minutes.
+function aWhile(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60 || s % 60) return s + "s";
+  return s / 60 + (s === 60 ? " minute" : " minutes");
+}
+
+// setClipboard puts text on the clipboard. A secret goes on marked
+// concealed, so clipboard managers and history leave it out, and comes
+// off again after a while if it is still there.
+async function setClipboard(text: string, secret: boolean) {
+  if (secret) await App.CopySecret(text);
+  else await Clipboard.SetText(text);
+}
+
+// revealed holds the blocks whose secret code and output are shown. A
+// block marked secret, or whose code names a secret variable, is masked
+// until its eye button shows it, and masked again when the window loses
+// focus or after revealFor, which the settings set.
+const revealed = new Set<number>();
+const revealFor = () => (settings.secretShowSeconds > 0 ? settings.secretShowSeconds : 60) * 1000;
+let revealTimer = 0;
+
+function revealButton(c: Cell): HTMLButtonElement {
+  const shown = revealed.has(c.block);
+  const b = iconButton(shown ? "eyeOff" : "eye", shown ? "Hide the secret" : "Show the secret", () => showSecret(c.block, !revealed.has(c.block)));
+  b.classList.add("reveal");
+  b.setAttribute("aria-pressed", String(shown));
+  return b;
+}
+
+// showSecret shows or masks block i's secret, redrawing just its eye
+// button.
+function showSecret(i: number, on: boolean) {
+  if (on) revealed.add(i);
+  else revealed.delete(i);
+  const block = document.getElementById("block-" + i);
+  const c = cells.find((c) => c.block === i);
+  if (block && c) {
+    block.classList.toggle("masked", !on);
+    block.querySelector(".head .reveal")?.replaceWith(revealButton(c));
+  }
+  clearTimeout(revealTimer);
+  if (revealed.size) revealTimer = window.setTimeout(maskAll, revealFor());
+}
+
+function maskAll() {
+  for (const i of [...revealed]) showSecret(i, false);
+}
+window.addEventListener("blur", maskAll);
 
 // shownAsCode holds the source of the diagrams switched to their code,
 // so a redraw keeps them that way.
@@ -619,7 +714,7 @@ function drawBlock(c: Cell): HTMLElement {
   const timer = el("span", { className: "timer" });
   const block = el(
     "section",
-    { className: "block" + (c.history ? " history" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : "") + (c.stale ? " stale" : ""), id: "block-" + c.block },
+    { className: "block" + (c.history ? " history" : "") + (c.secret && !revealed.has(c.block) ? " masked" : "") + (c.secretCode ? " secret-code" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : "") + (c.stale ? " stale" : ""), id: "block-" + c.block },
     el(
       "div",
       { className: "head" },
@@ -629,7 +724,8 @@ function drawBlock(c: Cell): HTMLElement {
       c.nosave ? nosaveBadge("block") : "",
       exit,
       timer,
-      iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "")),
+      c.secret ? revealButton(c) : "",
+      iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "", !!c.secretCode)),
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
       iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block)),
       iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
@@ -639,7 +735,11 @@ function drawBlock(c: Cell): HTMLElement {
     el("div", { className: "ask", hidden: true }),
     foldPart("output", el("div", { className: "output", innerHTML: c.output ?? "" }), () => foldBlock(block, "output")),
   );
-  if (c.movable) block.querySelector(".output-part")!.append(clearOutputButton(c));
+  // The output's buttons sit in its top right corner: copy, and on the
+  // selected card the trash.
+  const tools = el("div", { className: "output-tools" }, copyOutputButton(block, c));
+  if (c.movable) tools.append(clearOutputButton(c));
+  block.querySelector(".output-part")!.append(tools);
   colorOutput(block.querySelector(".output")!);
   if (c.links) linkify(block.querySelector<HTMLElement>(".output")!);
   markOutput(block.querySelector<HTMLElement>(".output")!);
@@ -3607,7 +3707,7 @@ document.addEventListener("keydown", (e) => {
     case "c":
       if (selected >= 0) {
         const c = cells.find((c) => c.block === current());
-        if (c) void copyCode(c.body ?? "", c.name ?? c.id ?? "");
+        if (c) void copyCode(c.body ?? "", c.name ?? c.id ?? "", !!c.secretCode);
       }
       break;
     case "d":

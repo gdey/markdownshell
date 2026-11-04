@@ -296,7 +296,17 @@ Each file opens in a tab of its own, with its own shells.
 - **Copy:** the copy button on a block's card (or `c`) puts its code on
   the clipboard, as written in the file, without the fences or output.
   Other fenced code in the document shows the same button in its corner
-  when the pointer is over it.
+  when the pointer is over it. A block's output has one too, in its
+  corner, which copies the output as text, without its colors; it says
+  Copied for a moment.
+- **Secrets:** a block marked `secret` has its code and output blurred
+  until you press the eye on its card; they blur again after a minute
+  (Settings › Editing › Show secrets for) or when the window loses
+  focus. A block whose code names a variable
+  set with `mdsh ctl set --secret` has its output blurred the same way.
+  Copying a secret still works: on macOS the clipboard marks it
+  concealed so clipboard managers skip it, and it comes off the
+  clipboard after the same time unless something else was copied.
 - **Screen readers and the keyboard:** every button, pane, tab and
   field has a name, and the toolbar's buttons say whether they are on.
   Each block's card is a tab stop, named for the block, its language,
