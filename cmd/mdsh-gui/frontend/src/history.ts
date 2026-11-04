@@ -679,9 +679,19 @@ export function initHistory(h: HistoryHooks) {
   // Clicking the closed bar opens it.
   $("history-status").onclick = () => hooks.toggle();
   historyStatus("");
-  $("history-term").onclick = () => {
+  // A click anywhere in the open pane puts the keyboard in it: the
+  // transcript, the lines of a prompt above the input, and the padding
+  // around them, not only the transcript's lines. While a command typed
+  // here runs, the keys go to the transcript, which sends them on.
+  $("history").addEventListener("click", (e) => {
+    if ($("history").classList.contains("closed")) return;
+    const at = e.target as Element;
+    if (at.closest("button, textarea, a, #history-grip")) return;
+    // Dragging over the prompt's lines selects them; leave that be.
+    if (!$("history-term").contains(at) && !document.getSelection()?.isCollapsed) return;
     if (block < 0) input().focus();
-  };
+    else if (!$("history-term").contains(at)) term?.focus();
+  });
   // Edit › Copy, or the copy key where the menu takes it first, copies
   // the transcript's selection while the keys are in the pane and the
   // input has none of its own.

@@ -259,6 +259,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Clicking anywhere in mdsh-gui's open History pane puts the keyboard
+  in it. With a prompt of more than one line, a click on the lines
+  above the input, between the transcript and the last line, did
+  nothing. Dragging over those lines still selects them.
+
+  ![The History pane with a two-line prompt, clicked on the prompt's first line, and the input below it focused](docs/changelog/history-click.png)
 - tmux runs in the History pane, in `mdsh-gui` and `mdsh -i`, and in
   `tty` blocks. On macOS it stopped with "open terminal failed: can't
   use /dev/tty", since a command's terminal was opened as /dev/tty and
