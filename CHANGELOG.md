@@ -6,6 +6,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- `mdsh-gui` remembers each file's view: whether it shows the source,
+  the rendered view or both, and whether its History pane is open. A
+  file opens as it was left, instead of in whatever view the last tab
+  had, and the History pane starts closed in a file you haven't opened
+  it in, so opening a file no longer starts its shell (and reads its
+  `env.source` files) just because History was open in another one.
+  Settings › General › Open files in now offers "The view the file was
+  left in" as its default; picking a view there still opens every
+  file in it.
+
 ## [1.4.1] - 2026-11-07
 
 mdsh-gui keeps up with long documents. Scrolling is smoother, typing in

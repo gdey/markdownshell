@@ -110,6 +110,35 @@ func TestPlaced(t *testing.T) {
 	}
 }
 
+func TestViewed(t *testing.T) {
+	var s Settings
+	if _, ok := s.FileView("/d/a.md"); ok {
+		t.Error("a file never shown has a view")
+	}
+	for i := range MaxFileViews + 2 {
+		s.Viewed(FileView{File: fmt.Sprintf("/d/%d.md", i), View: "rendered"})
+	}
+	v := FileView{File: "/d/5.md", View: "both", History: true}
+	if !s.Viewed(v) {
+		t.Error("changing /d/5.md's view changed nothing")
+	}
+	if s.Viewed(v) {
+		t.Error("viewing /d/5.md as it was changed something")
+	}
+	if len(s.FileViews) != MaxFileViews {
+		t.Fatalf("len(FileViews) = %d", len(s.FileViews))
+	}
+	if got, ok := s.FileView("/d/5.md"); !ok || got != v {
+		t.Errorf("FileView(/d/5.md) = %+v, %v", got, ok)
+	}
+	if _, ok := s.FileView("/d/0.md"); ok {
+		t.Error("/d/0.md is still remembered past MaxFileViews")
+	}
+	if got, _ := s.FileView("/d/6.md"); got.History {
+		t.Error("History is open for a file it was never opened in")
+	}
+}
+
 func TestStorePlaces(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gui.json")
 	st, err := Open(path)

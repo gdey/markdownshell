@@ -29,7 +29,7 @@ import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "" };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "", lastView: "", lastHistory: false };
 let cells: Cell[] = [];
 let running = false;
 let ranHere = false; // the run going on was started from this page
@@ -41,9 +41,11 @@ let settings: Settings;
 let attrs: AttrSpec[] = [];
 let known: Names = { ids: [], envs: [], assets: [], files: [], assetsDir: "" }; // for completion in the source pane
 
-// The view: what each tab shows. It starts as the last tab left it.
-// split shows the source pane and rendered the rendered view; at least
-// one is always on.
+// The view: what each tab shows. split shows the source pane and
+// rendered the rendered view; at least one is always on. Those two and
+// history are each file's own: a file opens as it was last shown, and
+// with the History pane closed the first time (fileView). The rest
+// start as the last tab left them.
 interface View {
   split: boolean;
   rendered: boolean;
@@ -57,10 +59,33 @@ let view: View = { split: false, rendered: true, outline: false, code: true, out
 
 function loadView(): Partial<View> {
   try {
-    return JSON.parse(localStorage.getItem("mdsh-view") ?? "{}");
+    const { split: _s, rendered: _r, history: _h, ...rest } = JSON.parse(localStorage.getItem("mdsh-view") ?? "{}") as Partial<View>;
+    return rest;
   } catch {
     return {};
   }
+}
+
+// viewFile is the file whose own view the page shows, "" until fileView
+// has shown one.
+let viewFile = "";
+
+// fileView takes the file's own view: the view the settings open files
+// in when the file has just opened, else how the file was last shown,
+// else the rendered view; and the History pane only if it was open when
+// the file was last shown, or a session just opened.
+function fileView() {
+  viewFile = doc.file;
+  const pick = (doc.fresh && settings.view) || doc.lastView || "rendered";
+  const v = pick === "source" || pick === "both" ? pick : "rendered";
+  view = { ...view, split: v !== "rendered", rendered: v !== "source", history: doc.lastHistory || doc.openHistory };
+}
+
+// rememberView keeps the file's own view for the next time it opens.
+function rememberView() {
+  if (!doc.file || viewFile !== doc.file) return;
+  const v = view.split && view.rendered ? "both" : view.split ? "source" : "rendered";
+  void App.RememberView(doc.file, v, view.history).catch(() => {});
 }
 
 function mine<T>(handler: (data: T) => void) {
@@ -110,8 +135,13 @@ let eventsFile: string | null = null;
 // refresh reads the document's state and draws whichever screen fits.
 async function refresh() {
   doc = await App.Doc();
-  // A session opens with the History pane open, to type in.
-  if (doc.openHistory) view = { ...view, history: true };
+  // A file opened in the tab, or a page taking over a tab, shows the
+  // file's own view. A session opens with the History pane open, to
+  // type in.
+  const opened = doc.file !== "" && doc.file !== viewFile;
+  if (!doc.file) viewFile = "";
+  else if (opened) fileView();
+  else if (doc.openHistory) view = { ...view, history: true };
   wantTerminalSize(doc.termCols, doc.termRows);
   fitHistory();
   const open = doc.file !== "";
@@ -139,7 +169,7 @@ async function refresh() {
   cells = (await App.Cells()) ?? [];
   drawDoc();
   await loadFrontMatter();
-  if (doc.fresh) openView();
+  if (opened) applyView();
   if (doc.running && !ranHere) await catchUp();
   known = await names();
   await loadSource();
@@ -2822,7 +2852,8 @@ function drawRunning() {
   list.hidden = list.childElementCount === 0;
 }
 
-// applyView shows what view says, and keeps it for the next window.
+// applyView shows what view says, and keeps it for the next window and,
+// for the file's own part, the next time the file opens.
 function applyView() {
   $("outline").hidden = !view.outline;
   if (!view.split) view.rendered = true;
@@ -2848,6 +2879,7 @@ function applyView() {
   } catch {
     // Only a convenience: the next tab starts with the default view.
   }
+  rememberView();
   void App.SetView(view).catch(() => {});
 }
 
@@ -2875,14 +2907,6 @@ function syncHistory() {
   const had = doc.history;
   doc.history = view.history;
   void showHistory(view.history, had);
-}
-
-// openView shows the view the settings open files in, if they name one.
-function openView() {
-  const v = settings.view;
-  if (v !== "rendered" && v !== "source" && v !== "both") return;
-  view = { ...view, split: v !== "rendered", rendered: v !== "source" };
-  applyView();
 }
 
 function toggle(key: keyof View, on = !view[key]) {
@@ -4111,8 +4135,14 @@ Events.On("audit", mine(addEvent));
 Events.On(
   "saved",
   mine<string>((file) => {
-    // Save As saves to a new file, so name it.
+    // Save As saves to a new file, so name it. The new file keeps the
+    // view the tab shows.
+    const moved = doc.file !== file;
     doc = { ...doc, file, dirty: false, changed: false };
+    if (moved && viewFile !== "") {
+      viewFile = file;
+      rememberView();
+    }
     showFile(file);
     $("changed").hidden = true;
     $("dirty").hidden = true;
