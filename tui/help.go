@@ -57,6 +57,15 @@ var helpItems = []helpItem{
 
 	{group: "Edit", keys: "e", key: runeKey("e"), what: says("edit the block in $EDITOR"), off: noEdit},
 	{group: "Edit", keys: "y", key: runeKey("y"), what: says("copy the block's code to the clipboard"), off: noBlocks},
+	{group: "Edit", keys: "V", key: runeKey("V"), what: says("select lines of History to copy (shift+↑ in the pane)"), off: func(m *Model) string {
+		switch {
+		case !m.hist.open:
+			return "History is closed"
+		case len(m.hist.log) == 0:
+			return "History is empty"
+		}
+		return ""
+	}},
 	{group: "Edit", keys: "E", key: runeKey("E"), what: says("edit the whole file in $EDITOR"), off: busy},
 	{group: "Edit", keys: "J/K alt+↓/↑", key: runeKey("J"), what: says("move the block down (K: up)"), off: noMove},
 	{group: "Edit", keys: "u", key: runeKey("u"), what: says("undo the last move"), off: noUndo},

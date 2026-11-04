@@ -30,7 +30,8 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   stop on error.
 - **History**, with `h`: a shell along the bottom with your shell's own
   prompt, completion and emacs line keys. Each command is added to the file as a block,
-  with its output; a line starting with `#` becomes prose.
+  with its output; a line starting with `#` becomes prose. Shift+↑ in
+  the pane, or `V`, selects lines of its output, and `y` copies them.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
   `i` types a new block at a prompt.
@@ -64,6 +65,7 @@ with the reason.
 | ctrl+] | stop a `tty` block running in its card |
 | `e` / `E` | edit the block, or the whole file, in `$EDITOR` |
 | `y` | copy the block's code to the clipboard |
+| `V` | select lines of History's output; `y` copies them |
 | `J`/`K`, alt+↓/↑ | move the block down or up |
 | `u` | undo the last move |
 | `w`, ctrl+s / `W` | save / save as |

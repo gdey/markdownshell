@@ -130,6 +130,17 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![A block card with its copy button, and a YAML fence in the prose with the same button in its corner](docs/changelog/copy-code.png)
 
+- Select and copy lines of the History pane's output. In mdsh-gui, drag
+  over the transcript and press cmd+c (ctrl+c elsewhere), use Edit ›
+  Copy, or right-click for Copy and Select All; with lines selected,
+  ctrl+c copies them rather than stopping a command that runs there.
+  In `mdsh -i`, shift+↑ in the pane (or `V` in the file) selects the
+  last line, ↑/↓ or `j`/`k` take in more, and `y` copies them, through
+  OSC 52 and the system clipboard as `y` does for a block. Lines are
+  copied as text, without colors or links.
+
+  ![mdsh-gui's History pane with three lines of kubectl output selected and the status saying they were copied, and mdsh -i's History pane with the same lines selected](docs/changelog/history-select.png)
+
 ### Changed
 
 - mdsh-gui's shortcut hints name the one shortcut for your platform, as
