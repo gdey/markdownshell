@@ -47,6 +47,10 @@ Events.On("settings-tab", (ev: { data: string }) => {
 
 function draw() {
   input("autosave").checked = s.autosave;
+  // A time set by hand in the file that the menu doesn't list shows as
+  // the default.
+  select("secret-show").value = String(s.secretShowSeconds || 0);
+  if (select("secret-show").selectedIndex < 0) select("secret-show").value = "0";
   input("vim").checked = s.vim;
   input("spellcheck").checked = !s.noSpellCheck;
   input("neovim").checked = s.neovim;
@@ -105,6 +109,7 @@ async function choose() {
 }
 
 input("autosave").onchange = () => ((s.autosave = input("autosave").checked), save());
+select("secret-show").onchange = () => ((s.secretShowSeconds = Number(select("secret-show").value)), save());
 input("vim").onchange = () => ((s.vim = input("vim").checked), save().then(draw));
 input("spellcheck").onchange = () => ((s.noSpellCheck = !input("spellcheck").checked), save());
 input("neovim").onchange = () => ((s.neovim = input("neovim").checked), save());

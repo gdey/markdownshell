@@ -168,6 +168,19 @@
       </div>
       <div class="setting">
         <div class="text">
+          <label for="secret-show">Show secrets for</label>
+          <p class="muted">How long a block marked secret stays shown after you press its eye button, and how long a secret you copy stays on the clipboard.</p>
+        </div>
+        <select id="secret-show">
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="0">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
           <label for="vim">Vim key bindings in the code editor</label>
           <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
         </div>

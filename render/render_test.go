@@ -253,3 +253,22 @@ func TestNoSaveWriteBack(t *testing.T) {
 		t.Errorf("printed: %q", printed)
 	}
 }
+
+// TestSecretWriteBack checks that secret implies nosave: write-back
+// keeps what the file holds after a secret block, and adds no output
+// where it had none.
+func TestSecretWriteBack(t *testing.T) {
+	src := "```sh {#token secret}\necho hunter2\n```\n\n```sh {#plain}\necho hi\n```\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Stdout: []byte("hunter2\n")},
+		{Block: d.Blocks[1], Ran: true, Stdout: []byte("hi\n")},
+	}
+	want := src + "\n```output {for=plain exit=0}\nhi\n```\n"
+	if got := string(Markdown(d, results, Options{WriteBack: true})); got != want {
+		t.Errorf("write-back:\ngot  %q\nwant %q", got, want)
+	}
+}

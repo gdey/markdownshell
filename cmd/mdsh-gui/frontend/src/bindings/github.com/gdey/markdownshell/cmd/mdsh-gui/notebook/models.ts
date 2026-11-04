@@ -83,6 +83,16 @@ export interface Cell {
     "links"?: boolean;
 
     /**
+     * Secret is set when the block's output may hold a secret: it is
+     * marked secret, or its code names a variable mdsh ctl set --secret
+     * made. The view masks the output until asked to show it, and with
+     * SecretCode, set for the secret attribute, the code too, since only
+     * there may the code itself hold one. Copying still works.
+     */
+    "secret"?: boolean;
+    "secretCode"?: boolean;
+
+    /**
      * Ran is true when the block ran this session; Status and Failed say
      * how it went.
      */

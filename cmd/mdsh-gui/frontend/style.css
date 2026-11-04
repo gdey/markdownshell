@@ -325,9 +325,22 @@ th { background: var(--code-bg); }
    miss it. */
 .block .head button.trash { visibility: hidden; }
 .block.selected .head button.trash, .block.history .head button.trash { visibility: visible; }
-.block .output-part > button.clear-output { position: absolute; top: 2px; right: 6px; display: none; }
-.block.selected .output-part > button.clear-output, .block.history .output-part > button.clear-output { display: inline-block; }
-.block .part > button.trash:hover:not(:disabled) { color: var(--bad); }
+/* The output's corner holds its copy button, shown on hover, focus or
+   the selected card, and the selected card's trash. "Copied" shows
+   beside the copy button for a moment after it copies. */
+.block .output-tools { position: absolute; top: 2px; right: 6px; z-index: 1; display: flex; align-items: center; gap: 2px; }
+.block .output-tools > button { background: var(--bg); }
+.block .output-tools > button.clear-output { display: none; }
+.block.selected .output-tools > button.clear-output, .block.history .output-tools > button.clear-output { display: inline-block; }
+.block .output-tools > button.copy-output { opacity: 0; display: inline-flex; align-items: center; gap: 4px; }
+.block .output-part:hover button.copy-output, .block.selected button.copy-output, .block button.copy-output:focus-visible, .block button.copy-output.copied { opacity: 1; }
+.block button.copy-output.copied::before { content: "Copied"; color: var(--ok); font: calc(12px * var(--text-scale)) var(--font-ui); }
+.block .output-tools > button.trash:hover:not(:disabled) { color: var(--bad); }
+/* A secret is blurred until its eye button shows it, and can't be
+   selected meanwhile; copy still takes the real text. */
+.block.masked .output-part > :is(.output, .fold-summary), .block.masked.secret-code .code-part > :is(pre.code, .fold-summary) { filter: blur(6px); user-select: none; -webkit-user-select: none; }
+.block.masked .output-part, .block.masked.secret-code .code-part { overflow: hidden; }
+.block .head button.reveal[aria-pressed="true"] { color: var(--accent); }
 .block .head button.trash:hover:not(:disabled):not(.off) { color: var(--bad); }
 .block .head button.trash.off { opacity: 0.4; cursor: not-allowed; }
 .block .head button.trash.off:hover { background: none; }
