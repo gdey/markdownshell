@@ -110,13 +110,6 @@ cask "mdsh" do
     "~/Library/Application Support/mdsh",
     "~/Library/Saved Application State/com.gdey.mdsh.savedState",
   ]
-
-  caveats <<~EOS
-    mdsh.app is not signed with an Apple Developer ID. The first time it
-    opens, macOS says it can't check it: choose Open Anyway in
-    System Settings › Privacy & Security, or install with
-      brew install --cask --no-quarantine mdsh
-  EOS
 end
 RUBY
 

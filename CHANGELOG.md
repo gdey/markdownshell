@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The Homebrew cask no longer warns that mdsh.app isn't signed and
+  suggests `--no-quarantine`: from 1.4.0 the app is signed with a
+  Developer ID and notarized, so it opens like any other app.
+
 ## [1.4.0] - 2026-11-04
 
 Running a runbook gets easier to follow and to trust. Blocks show a
