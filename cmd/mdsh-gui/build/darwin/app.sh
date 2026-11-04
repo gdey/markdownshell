@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds mdsh-gui as a universal (arm64 and amd64) macOS app, mdsh.app,
-# in a .dmg and a .zip:
+# carrying the mdsh command line tool, in a .dmg and a .zip:
 #
 #	build/darwin/app.sh VERSION OUTDIR
 #
@@ -71,9 +71,18 @@ for arch in arm64 amd64; do
 		-ldflags "-s -w -X main.version=$version" -o "$work/mdsh-gui-$arch" .
 done
 
+# The mdsh command line tool, which the app carries beside mdsh-gui for
+# Settings › Shell to put on PATH (docs/design/cli-in-app.md). It is the
+# release archives' mdsh, from the same checkout: static, without cgo.
+for arch in arm64 amd64; do
+	(cd ../.. && CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath \
+		-ldflags "-s -w -X main.version=$version" -o "$work/mdsh-$arch" ./cmd/mdsh)
+done
+
 app=$work/mdsh.app
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 lipo -create -output "$app/Contents/MacOS/mdsh-gui" "$work/mdsh-gui-arm64" "$work/mdsh-gui-amd64"
+lipo -create -output "$app/Contents/MacOS/mdsh" "$work/mdsh-arm64" "$work/mdsh-amd64"
 sed "s/VERSION/$version/g" build/darwin/Info.plist > "$app/Contents/Info.plist"
 
 # The icon, at every size macOS asks for.
@@ -85,8 +94,18 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns -o "$app/Contents/Resources/icons.icns" "$icons"
 
+# The helper first, then the app around it.
+sign "$app/Contents/MacOS/mdsh"
 sign "$app"
 codesign --verify --strict --verbose=2 "$app"
+codesign --verify --strict --verbose=2 "$app/Contents/MacOS/mdsh"
+case $("$app/Contents/MacOS/mdsh" --version) in
+*"$version"*) ;;
+*)
+	echo "the bundled mdsh doesn't say it is $version" >&2
+	exit 1
+	;;
+esac
 
 name=mdsh-gui_${version}_macos_universal
 

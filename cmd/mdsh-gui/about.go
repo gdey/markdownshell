@@ -112,6 +112,9 @@ type Tool struct {
 	Note    string `json:"note"`    // what it's for
 	Path    string `json:"path"`    // where it was found, or ""
 	Version string `json:"version"` // what --version said, or ""
+	// Bundled is set when Path is the mdsh inside the app, which isn't
+	// on PATH.
+	Bundled bool `json:"bundled"`
 }
 
 // Link is a place to read more.
@@ -160,6 +163,10 @@ func (a *App) About() About {
 		tools = append([]Tool{{Name: shell, Note: "the shell for every file, from Settings"}}, tools...)
 	}
 	for _, t := range tools {
+		if t.Name == "mdsh" && a.cli != nil {
+			ab.Tools = append(ab.Tools, lookCLI(t, a.cli.state()))
+			continue
+		}
 		ab.Tools = append(ab.Tools, lookTool(t))
 	}
 	return ab
@@ -173,6 +180,27 @@ func lookTool(t Tool) Tool {
 	}
 	t.Path = path
 	t.Version = toolVersion(path)
+	return t
+}
+
+// lookCLI finds mdsh where a terminal would: the app's own PATH, from
+// the Finder, is too short on macOS to have /usr/local/bin. When it's
+// nowhere but inside the app, it says so.
+func lookCLI(t Tool, c CLI) Tool {
+	switch {
+	case c.Linked != "":
+		t.Path = c.Linked
+	case c.Installed && c.InPath:
+		t.Path = c.Link
+	case c.Other != "":
+		t.Path = c.Other
+	default:
+		if t = lookTool(t); t.Path != "" || c.Bundled == "" {
+			return t
+		}
+		t.Path, t.Bundled = c.Bundled, true
+	}
+	t.Version = toolVersion(t.Path)
 	return t
 }
 

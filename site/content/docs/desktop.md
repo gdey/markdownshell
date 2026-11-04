@@ -31,7 +31,8 @@ The macOS app isn't signed with an Apple Developer ID, so the first time
 you open it macOS says it can't check it. Open it once, then choose Open
 Anyway in System Settings › Privacy & Security; before macOS 15 you can
 instead right-click the app and choose Open. From a terminal, `xattr -dr com.apple.quarantine
-/Applications/mdsh.app` does the same.
+/Applications/mdsh.app` does the same. Once the app is allowed, the
+`mdsh` inside it runs from a terminal too.
 
 On Linux:
 
@@ -39,6 +40,35 @@ On Linux:
 chmod +x mdsh-gui_*_linux_x86_64.AppImage
 ./mdsh-gui_*_linux_x86_64.AppImage notes.md
 ```
+
+### The command line tool
+
+The app carries `mdsh`, the command line tool, at the same version, so
+the one download gives both. Settings › Shell has a Command line tool
+row that puts it on your `PATH`:
+
+- **macOS.** Install links `/usr/local/bin/mdsh` to the `mdsh` inside
+  the app, so it updates with the app and goes away with it. It asks for
+  an administrator password when you can't write `/usr/local/bin`. The
+  app menu has the same step, as Install Command Line Tool…. If the app
+  moves, it points the link at its new place the next time it opens.
+  The Homebrew cask links it for you, into Homebrew's `bin`, and so
+  conflicts with the `mdsh` formula: install one or the other.
+- **Linux.** Install copies `mdsh` out of the AppImage to
+  `~/.local/bin/mdsh`, with a `.mdsh-from-appimage` file beside it that
+  says the app put it there. When you run a newer AppImage, it copies
+  the new `mdsh` over it. If `~/.local/bin` isn't on your `PATH`, the
+  row shows the line to add to your shell's startup file. Without
+  installing, the image runs `mdsh` itself when started with `--cli`
+  first, or through a link to it named `mdsh`:
+
+  ```sh
+  ./mdsh-gui_*_linux_x86_64.AppImage --cli runbook.md
+  ```
+
+Install does nothing when another `mdsh` is already on your `PATH`,
+such as the formula's or a `.deb`'s, and says where it is. Remove takes
+away only the link or copy the app made.
 
 ## Using it
 

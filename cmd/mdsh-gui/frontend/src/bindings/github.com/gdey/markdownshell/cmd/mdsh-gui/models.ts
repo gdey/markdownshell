@@ -42,6 +42,62 @@ export interface About {
 }
 
 /**
+ * CLI is where the command line tool stands, for Settings › Shell.
+ */
+export interface CLI {
+    /**
+     * Bundled is the mdsh this app carries, or "" when this build
+     * carries none (go run, go install, a .deb, Windows).
+     */
+    "bundled": string;
+
+    /**
+     * Link is where Install puts it.
+     */
+    "link": string;
+
+    /**
+     * Copy is whether Install copies Bundled to Link (an AppImage)
+     * rather than linking to it (macOS).
+     */
+    "copy": boolean;
+
+    /**
+     * Installed is whether Link is this app's: a symlink to Bundled, or
+     * a copy with the marker beside it.
+     */
+    "installed": boolean;
+
+    /**
+     * Broken is where Link points when it's a symlink into an mdsh.app
+     * that isn't this one, such as after the app moved.
+     */
+    "broken": string;
+
+    /**
+     * Linked is another mdsh on PATH that is this app's, such as the
+     * Homebrew cask's link, which comes first on PATH.
+     */
+    "linked": string;
+
+    /**
+     * Other is an mdsh on PATH that isn't this app's, such as the
+     * formula's. Install won't put a second one beside it.
+     */
+    "other": string;
+
+    /**
+     * InPath is whether Link's folder is on PATH.
+     */
+    "inPath": boolean;
+
+    /**
+     * Home is for showing paths as ~/….
+     */
+    "home": string;
+}
+
+/**
  * ConsoleEntry is one line of the console.
  */
 export interface ConsoleEntry {
@@ -280,6 +336,12 @@ export interface Tool {
      * what --version said, or ""
      */
     "version": string;
+
+    /**
+     * Bundled is set when Path is the mdsh inside the app, which isn't
+     * on PATH.
+     */
+    "bundled": boolean;
 }
 
 /**

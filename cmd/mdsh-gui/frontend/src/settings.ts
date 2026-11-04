@@ -2,10 +2,11 @@ import { App, type Settings, message } from "./api.js";
 import { $, el } from "./dom.js";
 import { applyTheme } from "./theme.js";
 import { Events } from "/wails/runtime.js";
-import type { About, Tool } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/models.js";
+import type { About, CLI, Tool } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/models.js";
 
 let s: Settings = await App.Settings();
 let zsh = await App.ZshWrapperState().catch(() => null);
+let cli: CLI | null = await App.CLIState().catch(() => null);
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const select = (id: string) => $<HTMLSelectElement>(id);
@@ -77,6 +78,59 @@ function draw() {
   input("zsh-wrapper").checked = !!zsh?.on;
   input("zsh-wrapper").disabled = !zsh;
   if (zsh) $("zshrc").textContent = tilde(zsh.path, zsh.home);
+  drawCLI();
+}
+
+// drawCLI shows where the mdsh this app carries stands: on PATH, not,
+// or behind another mdsh. Builds without one show no row.
+function drawCLI() {
+  const c = cli;
+  $("cli-row").hidden = !c?.bundled;
+  if (!c?.bundled) return;
+  const link = tilde(c.link, c.home);
+  const status = $("cli-status");
+  const code = (t: string) => el("code", { textContent: t });
+  let install = true;
+  let remove = false;
+  if (c.linked) {
+    status.replaceChildren(code(tilde(c.linked, c.home)), " runs this app's mdsh.");
+    install = false;
+  } else if (c.other) {
+    status.replaceChildren("Another mdsh is on PATH at ", code(tilde(c.other, c.home)), ". Remove it to use this app's.");
+    install = false;
+  } else if (c.broken) {
+    status.replaceChildren(code(link), " is broken: it points at ", code(c.broken), ". Install points it here.");
+  } else if (c.installed && !c.inPath) {
+    status.replaceChildren("Installed at ", code(link), ", but that folder isn't on PATH. Add ", code(`export PATH="${tilde(c.link, c.home).replace(/\/mdsh$/, "").replace(/^~/, "$HOME")}:$PATH"`), " to your shell's startup file.");
+    install = false;
+    remove = true;
+  } else if (c.installed) {
+    status.replaceChildren("Installed at ", code(link), c.copy ? ", a copy from this AppImage, kept at the app's version." : ", a link to this app, so it updates with the app.");
+    install = false;
+    remove = true;
+  } else {
+    status.replaceChildren("Not on PATH. Install ", c.copy ? "copies mdsh to " : "links ", code(link), c.copy ? "." : " to the one inside this app.");
+  }
+  $("cli-install").hidden = !install;
+  $("cli-remove").hidden = !remove;
+}
+
+// cliOnPath is whether a terminal would find an mdsh, this app's or
+// another, or there's no bundled one to offer.
+const cliOnPath = () => !cli?.bundled || cli.installed || !!cli.linked || !!cli.other;
+
+async function setCLI(install: boolean): Promise<boolean> {
+  try {
+    cli = await (install ? App.InstallCLI() : App.UninstallCLI());
+    $("error").hidden = true;
+    return true;
+  } catch (err) {
+    if (message(err) !== "canceled") showError(err);
+    cli = await App.CLIState().catch(() => cli);
+    return false;
+  } finally {
+    draw();
+  }
 }
 
 // tilde shows a path under home as ~/….
@@ -278,7 +332,23 @@ $("clear-session-template").onclick = async () => {
   await save();
   draw();
 };
+$("cli-install").onclick = () => setCLI(true);
+$("cli-remove").onclick = () => setCLI(false);
+// The app menu's item changes it too.
+Events.On("cli", (ev: { data: CLI }) => {
+  cli = ev.data;
+  draw();
+});
+
 input("zsh-wrapper").onchange = async () => {
+  // A function that calls an mdsh that isn't there would only fail:
+  // offer the one in the app first.
+  if (input("zsh-wrapper").checked && !cliOnPath()) {
+    input("zsh-wrapper").checked = false;
+    $("wrapper-needs-cli").hidden = false;
+    $("wrapper-install").focus();
+    return;
+  }
   try {
     zsh = await App.SetZshWrapper(input("zsh-wrapper").checked);
     $("error").hidden = true;
@@ -286,6 +356,17 @@ input("zsh-wrapper").onchange = async () => {
     showError(err);
   }
   draw();
+};
+
+$("wrapper-cancel").onclick = () => {
+  $("wrapper-needs-cli").hidden = true;
+  input("zsh-wrapper").focus();
+};
+$("wrapper-install").onclick = async () => {
+  $("wrapper-needs-cli").hidden = true;
+  if (!(await setCLI(true))) return;
+  input("zsh-wrapper").checked = true;
+  input("zsh-wrapper").dispatchEvent(new Event("change"));
 };
 
 // The About tab: the version and build, where things are, the programs
@@ -327,6 +408,7 @@ async function drawAbout() {
     const dd = el("dd", {});
     if (t.path) {
       dd.append(el("span", { className: "value", textContent: t.path }));
+      if (t.bundled) dd.append(el("span", { className: "missing", textContent: "bundled, not on PATH" }));
       if (t.version) dd.append(el("span", { className: "muted", textContent: t.version }));
     } else {
       dd.append(el("span", { className: "missing", textContent: "Not found" }));

@@ -71,6 +71,13 @@ export function BlockAttrs(): $CancellablePromise<doc$0.AttrSpec[] | null> {
 }
 
 /**
+ * CLIState says where the command line tool stands.
+ */
+export function CLIState(): $CancellablePromise<$models.CLI> {
+    return $Call.ByName("main.App.CLIState");
+}
+
+/**
  * Cells is the document laid out for drawing.
  */
 export function Cells(): $CancellablePromise<notebook$0.Cell[] | null> {
@@ -308,6 +315,14 @@ export function HistoryEnter(input: string): $CancellablePromise<void> {
  */
 export function HistoryPrompt(cols: number, rows: number): $CancellablePromise<notebook$0.Prompt> {
     return $Call.ByName("main.App.HistoryPrompt", cols, rows);
+}
+
+/**
+ * InstallCLI puts the command line tool on PATH, and returns where it
+ * stands after.
+ */
+export function InstallCLI(): $CancellablePromise<$models.CLI> {
+    return $Call.ByName("main.App.InstallCLI");
 }
 
 /**
@@ -800,6 +815,14 @@ export function Type(keys: string): $CancellablePromise<void> {
  */
 export function Undo(): $CancellablePromise<string> {
     return $Call.ByName("main.App.Undo");
+}
+
+/**
+ * UninstallCLI takes the command line tool off PATH, when it's this
+ * app's, and returns where it stands after.
+ */
+export function UninstallCLI(): $CancellablePromise<$models.CLI> {
+    return $Call.ByName("main.App.UninstallCLI");
 }
 
 /**

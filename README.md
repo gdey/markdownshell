@@ -150,8 +150,11 @@ With Homebrew, on macOS or Linux:
 
 ```sh
 brew install gdey/tap/mdsh          # the command line and mdsh -i
-brew install --cask gdey/tap/mdsh   # the desktop app, macOS only
+brew install --cask gdey/tap/mdsh   # the desktop app and the command line, macOS only
 ```
+
+The cask's app carries `mdsh` and links it for you, so it conflicts with
+the formula: on a Mac, install one or the other.
 
 On Debian, Ubuntu, Fedora and the like, each release has a `.deb` and an
 `.rpm` for `mdsh`.
@@ -176,7 +179,8 @@ on Windows, set `shell:` under `mdsh:` in the front matter to a POSIX shell
 such as Git Bash's `bash.exe`. The Windows builds are not well tested yet.
 
 The releases also have `mdsh-gui`, a desktop app for macOS (a universal
-`.dmg`) and Linux (an AppImage); see [cmd/mdsh-gui](cmd/mdsh-gui).
+`.dmg`) and Linux (an AppImage), each carrying the same `mdsh`, which
+Settings › Shell puts on your `PATH`; see [cmd/mdsh-gui](cmd/mdsh-gui).
 
 With Go 1.27 or newer you can build it instead:
 

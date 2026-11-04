@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -331,10 +332,74 @@ func (a *App) addAppMenu(m *application.Menu) {
 	app.Add("About mdsh").OnClick(func(*application.Context) { a.openSettingsTab("about") })
 	app.AddSeparator()
 	app.Add("Settings…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { a.openSettings() })
+	if a.cli != nil && a.cli.bundled != "" {
+		a.cliItem = app.Add(cliMenuLabel(a.cli.state())).OnClick(func(*application.Context) { go a.cliFromMenu() })
+	}
 	app.AddSeparator()
 	app.AddRole(application.Hide)
 	app.AddRole(application.HideOthers)
 	app.AddRole(application.ShowAll)
 	app.AddSeparator()
 	app.AddRole(application.Quit)
+}
+
+// cliMenuLabel is the app menu's item for the command line tool.
+func cliMenuLabel(c CLI) string {
+	if c.Installed {
+		return "Uninstall Command Line Tool…"
+	}
+	return "Install Command Line Tool…"
+}
+
+// updateCLIMenu makes the app menu's item match where the command line
+// tool stands.
+func (a *App) updateCLIMenu() {
+	if a.cliItem == nil {
+		return
+	}
+	label := cliMenuLabel(a.cli.state())
+	a.onMain(func() {
+		a.cliItem.SetLabel(label)
+		if a.menu != nil {
+			a.menu.Update()
+		}
+	})
+}
+
+// cliFromMenu installs the command line tool, or uninstalls it, from
+// the app menu, and says what happened.
+func (a *App) cliFromMenu() {
+	var (
+		c   CLI
+		err error
+	)
+	if a.cli.state().Installed {
+		c, err = a.UninstallCLI()
+	} else {
+		c, err = a.InstallCLI()
+	}
+	if err != nil {
+		if errors.Is(err, errCanceled) {
+			return
+		}
+		a.showError(nil, err)
+		return
+	}
+	a.app.Event.Emit("cli", c)
+	a.app.Dialog.Info().SetTitle("mdsh").SetMessage(cliMessage(c)).Show()
+}
+
+// cliMessage says where the command line tool stands, after Install or
+// Uninstall.
+func cliMessage(c CLI) string {
+	switch {
+	case c.Linked != "":
+		return "mdsh is on your PATH at " + c.Linked + ", which runs this app's copy."
+	case c.Installed && !c.InPath:
+		return "mdsh is installed at " + c.Link + ", but that folder isn't on your PATH. Add it in your shell's startup file: export PATH=\"" + filepath.Dir(c.Link) + ":$PATH\""
+	case c.Installed:
+		return "mdsh is installed at " + c.Link + ". Terminals open now find it after rehash, or in a new window."
+	default:
+		return "mdsh is no longer at " + c.Link + "."
+	}
 }

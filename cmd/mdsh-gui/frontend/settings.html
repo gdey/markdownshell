@@ -245,12 +245,25 @@
       <div class="setting path">
         <input id="history-rc" type="text" spellcheck="false" placeholder="None, or a file such as ~/.zshrc">
       </div>
+      <div class="setting" id="cli-row" hidden>
+        <div class="text">
+          <span class="label-text" id="cli-label">Command line tool</span>
+          <p class="muted" id="cli-status"></p>
+        </div>
+        <button id="cli-install">Install</button>
+        <button id="cli-remove" hidden>Remove</button>
+      </div>
       <div class="setting">
         <div class="text">
           <label for="zsh-wrapper">Give blocks your zsh aliases and functions</label>
           <p class="muted">Adds an <code>mdsh</code> function to <span id="zshrc">~/.zshrc</span> that passes them to <code>mdsh</code> in a terminal with <code>--source</code>. New terminals pick it up. This app isn't started from your shell, so it can't see them.</p>
         </div>
         <input id="zsh-wrapper" type="checkbox">
+      </div>
+      <div class="setting" id="wrapper-needs-cli" role="alert" hidden>
+        <div class="text"><p class="muted">The function calls <code>mdsh</code>, which isn't on your PATH yet. Install the command line tool first?</p></div>
+        <button id="wrapper-install" class="primary">Install and Turn On</button>
+        <button id="wrapper-cancel">Cancel</button>
       </div>
     </section>
 
