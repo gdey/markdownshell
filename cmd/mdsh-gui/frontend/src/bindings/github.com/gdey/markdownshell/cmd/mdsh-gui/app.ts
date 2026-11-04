@@ -358,7 +358,8 @@ export function NewFile(template: string): $CancellablePromise<void> {
 /**
  * NewSession opens the day's session, from the start screen: a file
  * named for the date in the sessions folder, made from the session
- * template if it isn't there yet. It opens with the History pane open
+ * template if it isn't there yet, or else set to run in your login
+ * shell. It opens with the History pane open
  * and focused.
  */
 export function NewSession(): $CancellablePromise<void> {

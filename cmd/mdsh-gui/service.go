@@ -281,11 +281,12 @@ func (a *App) Templates() ([]library.File, error) {
 
 // NewSession opens the day's session, from the start screen: a file
 // named for the date in the sessions folder, made from the session
-// template if it isn't there yet. It opens with the History pane open
+// template if it isn't there yet, or else set to run in your login
+// shell. It opens with the History pane open
 // and focused.
 func (a *App) NewSession(ctx context.Context) error {
 	s := a.settings.Get()
-	file, _, err := session.Today(a.sessionDir(), s.SessionTemplate, time.Now())
+	file, _, err := session.Today(a.sessionDir(), s.SessionTemplate, session.LoginShell(os.Getenv), time.Now())
 	if err != nil {
 		return fmt.Errorf("new session: %w", err)
 	}

@@ -42,10 +42,10 @@ func (n *Notebook) SetHistory(on bool) (restarted bool, err error) {
 	}
 	if n.sess.PTY() {
 		// The shells have terminals; they only need the rc file.
-		if rc := n.opts.Run.HistoryRC; rc != "" {
+		if rc := rcScript(n.opts.Run.HistoryRC, n.shell()); rc != "" {
 			n.running = true
 			n.mu.Unlock()
-			_, err := n.sess.Ask(context.Background(), rcScript(rc))
+			_, err := n.sess.Ask(context.Background(), rc)
 			n.mu.Lock()
 			n.running = false
 			return false, err
@@ -92,22 +92,46 @@ func (n *Notebook) SetHistoryRC(path string) {
 // source is what the shells read as they start: ro.Source, and the rc
 // file while the History pane is on.
 func (n *Notebook) source(ro RunOptions) string {
-	if !n.history || ro.HistoryRC == "" {
+	rc := rcScript(ro.HistoryRC, n.shellFor(ro))
+	if !n.history || rc == "" {
 		return ro.Source
 	}
-	return ro.Source + "\n" + rcScript(ro.HistoryRC)
+	return ro.Source + "\n" + rc
 }
 
 // rcScript reads the file at path, if there is one, in the shell, as an
 // interactive shell reads its rc file. A leading ~/ is the home folder.
 // What it prints is dropped, along with any errors, since an rc file
-// often does things only an interactive shell can.
-func rcScript(path string) string {
+// often does things only an interactive shell can. It is empty when
+// there is no file, or the file is for another shell than sh: a .zshrc
+// read by /bin/sh defines functions, such as zoxide's cd, in zsh's
+// syntax, which fail when they are called.
+func rcScript(path, sh string) string {
+	if path == "" {
+		return ""
+	}
+	if want := rcShell(path); want != "" && want != filepath.Base(sh) {
+		return ""
+	}
 	p := quote(path)
 	if rest, ok := strings.CutPrefix(path, "~/"); ok {
 		p = `"$HOME"/` + quote(rest)
 	}
 	return "if [ -r " + p + " ]; then . " + p + " </dev/null >/dev/null 2>&1; fi\n"
+}
+
+// rcShell is the shell an rc file is for, from its name: zsh for
+// .zshrc, .zshenv, .zprofile and .zlogin, bash for .bashrc and
+// .bash_profile. Empty is any shell.
+func rcShell(path string) string {
+	name := strings.TrimPrefix(filepath.Base(path), ".")
+	switch {
+	case strings.HasPrefix(name, "zsh"), name == "zprofile", name == "zlogin":
+		return "zsh"
+	case strings.HasPrefix(name, "bash"):
+		return "bash"
+	}
+	return ""
 }
 
 // Prompt is the shell's prompts, PS1 and PS2, expanded as the shell
@@ -345,9 +369,12 @@ func (n *Notebook) addNote(text string) error {
 func (n *Notebook) nextHistoryID() string { return history.NextID(n.d) }
 
 // shell is the shell blocks run in, with n.mu held.
-func (n *Notebook) shell() string {
-	if n.opts.Run.Shell != "" {
-		return n.opts.Run.Shell
+func (n *Notebook) shell() string { return n.shellFor(n.opts.Run) }
+
+// shellFor is the shell blocks run in with ro.
+func (n *Notebook) shellFor(ro RunOptions) string {
+	if ro.Shell != "" {
+		return ro.Shell
 	}
 	if sh := run.Shell(n.d); sh != "" {
 		return sh

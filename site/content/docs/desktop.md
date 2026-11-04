@@ -64,7 +64,8 @@ This page is the reference.
 - **Sessions.** New Session opens the day's file, such as
   `2026-11-02.md`, in the sessions folder (`~/.mdsh/sessions` unless
   Settings › Files names another), made from the session template the
-  first time, with the History pane open. Last Session opens the file
+  first time (with no template, it runs in your login shell, zsh or
+  bash), with the History pane open. Last Session opens the file
   there changed last.
 - **Tabs and windows.** Each file opens in a tab with shells of its own.
   Drag a tab to reorder it, onto another window to move it there, or
