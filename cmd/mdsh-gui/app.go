@@ -59,6 +59,9 @@ type App struct {
 	startFolders map[string]string
 
 	started atomic.Bool // the app is running, so menus change on its main thread
+	// finderOpens holds the files Finder asks to open (Open With, a
+	// double click, a drop on the Dock icon) until the app has started.
+	finderOpens openQueue
 }
 
 // runOptions are the options a file opens with: the shell and History
@@ -500,6 +503,70 @@ func (a *App) openFromMenu() {
 		if err := a.openIn(w, f); err != nil {
 			a.showError(win, err)
 		}
+	}
+}
+
+// openQueue holds the files the system asks the app to open until it is
+// ready for them. On macOS, Finder's Open With sends the file in an Apple
+// Event, not on the command line, and on a cold launch that event comes
+// before the app has finished starting.
+type openQueue struct {
+	mu      sync.Mutex
+	ready   bool
+	pending []string
+}
+
+// add reports whether file can be opened now; if not, it is held for
+// start.
+func (q *openQueue) add(file string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if !q.ready {
+		q.pending = append(q.pending, file)
+	}
+	return q.ready
+}
+
+// start marks the queue ready and returns the files held until now.
+func (q *openQueue) start() []string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.ready = true
+	files := q.pending
+	q.pending = nil
+	return files
+}
+
+// openFromSystem opens a file the system asked the app to open, such as
+// from Finder's Open With, in the window in front, and brings it forward.
+// Before the app has started it waits, then opens in the first window.
+func (a *App) openFromSystem(file string) {
+	if file != "" && a.finderOpens.add(file) {
+		a.openSystemFile(file)
+	}
+}
+
+// openSystemFile opens file in the window in front and brings it forward.
+func (a *App) openSystemFile(file string) {
+	w := a.current()
+	var win application.Window
+	if w != nil {
+		win = w.win
+	}
+	if err := a.openIn(w, file); err != nil {
+		a.showError(win, err)
+		return
+	}
+	if t := a.openTab(file); t != nil {
+		a.focusTab(t)
+	}
+}
+
+// systemOpensReady opens the files the system asked for before the app
+// started.
+func (a *App) systemOpensReady() {
+	for _, f := range a.finderOpens.start() {
+		a.openSystemFile(f)
 	}
 }
 

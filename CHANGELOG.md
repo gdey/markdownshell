@@ -20,6 +20,17 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
 
+### Fixed
+
+- On macOS, **Open With › mdsh** in Finder (and a double click on a file
+  mdsh is the default app for, or a file dropped on mdsh's Dock icon)
+  opens the file. Before, mdsh started but showed only the start screen,
+  and an mdsh already running ignored the file. A file opened while mdsh
+  starts fills the first window; one opened later opens in a new tab of
+  the window in front.
+
+  ![mdsh opened from Finder's Open With, showing the file in its window rather than the start screen](docs/changelog/open-with.png)
+
 ## [1.4.1] - 2026-11-07
 
 mdsh-gui keeps up with long documents. Scrolling is smoother, typing in
