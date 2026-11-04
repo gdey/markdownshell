@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An `always` block attribute makes a dependency run again each time a
+  block that `depends=` on it runs, even if it already ran in this
+  session, for steps whose effect doesn't last such as logging in.
+  You're still asked before it runs. It runs once on the way to a
+  block, even when several of that block's dependencies share it.
 - A textbox or choice can appear more than once with the same `var=`.
   A later input with that `var=` that is the same control, differing
   only in what is typed or checked, is a copy of the first: typing or

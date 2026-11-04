@@ -249,3 +249,49 @@ func TestRunDependsEmpty(t *testing.T) {
 		t.Errorf("started %q, want %q", started, want)
 	}
 }
+
+// TestRunBlockDependsAlways checks that an always dependency is asked
+// about and run again each time, though once for each block run, even
+// when two of that block's dependencies share it.
+func TestRunBlockDependsAlways(t *testing.T) {
+	ctx := context.Background()
+	d := parse(t, "```sh {#login always}\necho login\n```\n\n```sh {#build depends=login}\necho build\n```\n\n```sh {#test depends=login}\necho test\n```\n\n```sh {#deploy depends=build,test}\necho deploy\n```\n")
+	a := &asker{answers: map[string]run.Answer{"login": run.Go, "build": run.Go, "test": run.Go}}
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: a.depend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.RunBlock(ctx, 1); err != nil || !r.Ran {
+		t.Fatalf("build: ran=%v err=%v", r.Ran, err)
+	}
+	if want := []string{"login<build"}; !slices.Equal(a.asked, want) {
+		t.Errorf("asked %q, want %q", a.asked, want)
+	}
+	// build and test have run, but login is asked about again, once.
+	a.asked = nil
+	s.RunBlock(ctx, 2)
+	a.asked = nil
+	if r, err := s.RunBlock(ctx, 3); err != nil || !r.Ran {
+		t.Fatalf("deploy: ran=%v err=%v", r.Ran, err)
+	}
+	if !slices.Equal(a.asked, []string(nil)) {
+		t.Errorf("asked %q, want nothing: build and test ran and aren't always", a.asked)
+	}
+	// Run fresh: deploy asks about build, login, test, and login once.
+	a.asked = nil
+	s2, err := run.NewSession(d, run.Options{Environ: []string{}, Depend: a.depend})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s2.Close()
+	if _, err := s2.RunBlock(ctx, 3); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"build<deploy", "login<build", "test<deploy"}; !slices.Equal(a.asked, want) {
+		t.Errorf("asked %q, want %q", a.asked, want)
+	}
+}

@@ -62,6 +62,7 @@ hello from a sub-env
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
+| `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run) |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
@@ -157,7 +158,7 @@ make
 When `deploy` is about to run, mdsh checks `build` and then `login`, in
 that order. A block that has already run in this session (in `mdsh -i`
 or mdsh-gui; in a plain `mdsh` run, earlier in the run) and didn't fail
-is passed over. For any other, mdsh asks
+is passed over, unless it is marked `always`. For any other, mdsh asks
 `Run build first? [r]un / s[k]ip / [s]top`:
 
 - `r` checks that block's own `depends=` the same way, then runs it. Its
@@ -172,6 +173,20 @@ terminal the run stops with an error, unless you pass `--yes`, which runs
 dependencies without asking. An id that names no block, a block that
 depends on itself and a cycle are errors when the file is read. mdsh-gui
 and `mdsh -i` ask the same question in their own way.
+
+Mark a dependency `always` when what it does doesn't last, such as
+refreshing a token or pulling the latest code:
+
+````markdown
+```sh {#login always}
+./get-token.sh > .token
+```
+````
+
+Each time a block that depends on `login` runs, `login` is asked about
+again, even if it already ran. It runs once on the way to that block,
+even when several of its dependencies need it. `always` doesn't make it
+run without asking; `--yes` still does that.
 
 ## Terminal blocks
 
