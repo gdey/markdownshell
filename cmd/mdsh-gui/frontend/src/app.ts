@@ -159,6 +159,9 @@ function drawDoc() {
   sizeTerminal();
   restore();
   setDeps(cells);
+  // Every card is new, which can leave the view blank as a long jump
+  // does.
+  repaint($("doc-scroll"));
 }
 
 // anchor notes where the block being followed is in the rendered view,
@@ -213,7 +216,44 @@ function showEnd(block: HTMLElement, up: boolean) {
   const r = block.getBoundingClientRect();
   const toTop = r.top - p.top - followMargin;
   const d = up && toTop < 0 ? toTop : Math.max(0, Math.min(r.bottom - p.bottom + followMargin, toTop));
-  if (Math.abs(d) > 1) pane.scrollTo({ top: pane.scrollTop + d, behavior: scrollBehavior() });
+  if (Math.abs(d) > 1) jump(d, scrollBehavior(), (behavior) => pane.scrollTo({ top: pane.scrollTop + d, behavior }));
+}
+
+// jump scrolls the rendered view by about distance with move. WebKit on
+// macOS can leave the view blank after a long jump, until it is scrolled
+// again by hand, so a jump further than the view is tall goes at once,
+// not smoothly, and the view is then painted again.
+function jump(distance: number, behavior: ScrollBehavior, move: (behavior: ScrollBehavior) => void) {
+  const pane = $("doc-scroll");
+  const far = Math.abs(distance) > pane.clientHeight;
+  move(far ? "auto" : behavior);
+  if (far) repaint(pane);
+}
+
+// repaint has WebKit paint the rendered view afresh, as scrolling it a
+// little by hand does: once the jump has been drawn, the view scrolls a
+// pixel and back, and its content gets a layer of its own for that
+// frame, which draws all of it again. nudging keeps the source pane
+// from following the pixel.
+let repaintFrame = 0;
+let nudging = false;
+function repaint(pane: HTMLElement) {
+  cancelAnimationFrame(repaintFrame);
+  repaintFrame = requestAnimationFrame(() => {
+    const top = pane.scrollTop;
+    const by = top > 0 ? -1 : 1;
+    nudging = true;
+    pane.classList.add("repaint");
+    pane.scrollTop = top + by;
+    repaintFrame = requestAnimationFrame(() => {
+      pane.classList.remove("repaint");
+      if (Math.abs(pane.scrollTop - (top + by)) < 1) pane.scrollTop = top;
+      repaintFrame = requestAnimationFrame(() => {
+        repaintFrame = 0;
+        nudging = false;
+      });
+    });
+  });
 }
 
 // scrolledByHand says the rendered view was scrolled by hand since the
@@ -246,8 +286,11 @@ function centerAsk(ask: HTMLElement, behavior: ScrollBehavior = "auto") {
     askTimer = window.setTimeout(() => centerAsk(ask, behavior), wait);
     return;
   }
-  if (!ask.isConnected || ask.hidden || $("doc-scroll").hidden) return;
-  ask.scrollIntoView({ block: "center", behavior });
+  const pane = $("doc-scroll");
+  if (!ask.isConnected || ask.hidden || pane.hidden) return;
+  const p = pane.getBoundingClientRect();
+  const r = ask.getBoundingClientRect();
+  jump(r.top + r.height / 2 - (p.top + p.height / 2), behavior, (behavior) => ask.scrollIntoView({ block: "center", behavior }));
 }
 
 function drawCell(c: Cell): HTMLElement {
@@ -1257,7 +1300,7 @@ function goHome(card: HTMLElement, offset: number | null) {
   const bottom = top + r.height;
   const at = top - (offset ?? followMargin);
   const to = Math.max(at, Math.min(bottom + followMargin - p.height, top - followMargin));
-  if (Math.abs(to - pane.scrollTop) > 1) pane.scrollTo({ top: to, behavior: scrollBehavior() });
+  if (Math.abs(to - pane.scrollTop) > 1) jump(to - pane.scrollTop, scrollBehavior(), (behavior) => pane.scrollTo({ top: to, behavior }));
 }
 
 // Editing happens in the source pane. The pencil and a click on prose
@@ -1853,6 +1896,7 @@ function leadFrom(pane: "source" | "doc") {
 
 // For Neovim, nvimTop is the source pane's top line, when it scrolled.
 function syncScroll(from: "source" | "doc", nvimTop?: number) {
+  if (from === "doc" && nudging) return;
   if (!(source || nvimDoc) || !view.split || (scrolling && scrolling !== from)) return;
   if (source && from !== lead) return;
   scrolling = from;
@@ -2062,7 +2106,10 @@ function jumpTo(target: HTMLElement) {
   if (ask && !ask.hidden) {
     handScrollAt = 0;
     centerAsk(ask, scrollBehavior());
-  } else target.scrollIntoView({ block: "start", behavior: scrollBehavior() });
+  } else {
+    const d = target.getBoundingClientRect().top - $("doc-scroll").getBoundingClientRect().top;
+    jump(d, scrollBehavior(), (behavior) => target.scrollIntoView({ block: "start", behavior }));
+  }
   const i = blocks().indexOf(target);
   if (i >= 0) select(i, false);
   const heading = target.closest<HTMLElement>("#doc > .heading-cell");
