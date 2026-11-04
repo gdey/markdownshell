@@ -333,9 +333,10 @@ Each file opens in a tab of its own, with its own shells.
   Linux) has tabs: General for the
   view files open in (rendered, source or both; by default the view
   the last tab had) and the start folder; Look for the theme (System,
-  Light or Dark), the look (Plain, or Teletype: the site's typewriter
+  Light or Dark), the look (Plain; Teletype: the site's typewriter
   face on fan-fold paper in the light theme and green phosphor in the
-  dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts (any installed; the code font any of one width), line spacing,
+  dark; Blueprint: white lines on blue paper; Bubble Gum: Hubba Bubba
+  pink with bubbles across the page, or berry in the dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts (any installed; the code font any of one width), line spacing,
   an accent color, the History pane's colors (the window's, inverted,
   or always dark) and, for Teletype, the paper's sprocket strips,
   ruled lines and card shadows; Editing for autosave after
@@ -517,6 +518,14 @@ About tab with the version, build, paths and tools.
 ![The Blueprint look with the History pane open under the document](../../site/static/images/gui/blueprint-history.png)
 
 ![Settings › Look with Blueprint chosen: the sheet's grid can be turned off](../../site/static/images/gui/blueprint-settings-look.png)
+
+![The deploy runbook in the Bubble Gum look: pink paper with bubbles, puffy cards and bubble-lettered headings, with push asking to run](../../site/static/images/gui/bubblegum-light.png)
+
+![The Bubble Gum look with the dark theme, in berry](../../site/static/images/gui/bubblegum-dark.png)
+
+![The Bubble Gum look with the History pane open under the document, its command added to the file as a block](../../site/static/images/gui/bubblegum-history.png)
+
+![Settings › Look with Bubble Gum chosen: the bubbles and the shadows under cards can be turned off](../../site/static/images/gui/bubblegum-settings-look.png)
 
 ## Install
 

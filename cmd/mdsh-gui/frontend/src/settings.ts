@@ -182,12 +182,14 @@ function drawLook() {
   select("history-pane").value = s.historyPane;
   select("history-focus").value = s.historyFocus;
   // Teletype's paper has sprockets, rules and shadows; Blueprint's
-  // sheet only its grid.
+  // sheet only its grid; Bubble Gum's wrapper has bubbles and shadows.
   const tty = s.look === "tty";
-  $("paper").hidden = !tty && s.look !== "blueprint";
-  $("paper-label").textContent = tty ? "Teletype paper" : "Blueprint sheet";
-  $("sprockets-check").hidden = $("shadows-check").hidden = !tty;
-  $("rules-label").textContent = tty ? "Ruled lines" : "Grid";
+  const gum = s.look === "gum";
+  $("paper").hidden = !tty && !gum && s.look !== "blueprint";
+  $("paper-label").textContent = tty ? "Teletype paper" : gum ? "Bubble gum wrapper" : "Blueprint sheet";
+  $("sprockets-check").hidden = !tty;
+  $("shadows-check").hidden = !tty && !gum;
+  $("rules-label").textContent = tty ? "Ruled lines" : gum ? "Bubbles" : "Grid";
   input("sprockets").checked = !s.noSprockets;
   input("rules").checked = !s.noRules;
   input("shadows").checked = !s.noShadows;

@@ -80,7 +80,7 @@ report, for CI.
 ## Make it yours
 
 Settings has tabs for General, Look, Editing, Shell, Files and About.
-**Look** picks Plain, Teletype or Blueprint, each in light and dark, and
+**Look** picks Plain, Teletype, Blueprint or Bubble Gum, each in light and dark, and
 tunes the text size, fonts, line spacing, accent color and the History
 pane's colors. About shows the build, the paths it uses and the tools
 on your `PATH`, with Copy for a bug report.

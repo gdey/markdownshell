@@ -1,0 +1,201 @@
+/* The Bubble Gum look (Settings › Look): Hubba Bubba pink. The light
+   theme is a fresh stick of gum: pale pink paper with a hot pink accent
+   and bubbles blown across the page; the dark theme is the same pink
+   gone to berry, deep plum with pink chalk lettering. It sets the same
+   tokens style.css does, plus a few of its own (--gum-*), and adds
+   texture rules: everything is rounded, the cards and buttons are
+   puffy with a chunky shadow, and the headings are bubble-lettered.
+   Like Teletype it changes paint, not layout. theme_test.go checks
+   that every token the plain look defines is defined here too. */
+
+:root[data-look="gum"],
+:root[data-look="gum"][data-history-scheme="light"] #history {
+  --bg: #ffc6dc;
+  --fg: #4a0f33;
+  --muted: #8c3a68;
+  --border: #e879b1;
+  --code-bg: #ffe1ec;
+  --hover: #ffb3d1;
+  --accent: #d8006f;
+  --accent-fg: #ffffff;
+  --link: #b3005c;
+  --ok: #0a6a3e;
+  --bad: #b3102f;
+  --bad-fg: #ffffff;
+  --control: #7338c6;
+  --warn-bg: #fff0b3;
+  --warn-border: #c48f0f;
+  --selection: rgb(216 0 111 / 0.25);
+  --active-line: rgb(216 0 111 / 0.07);
+  --dep-1: #7338c6; --dep-2: #c2186b; --dep-3: #136b4f; --dep-4: #b04a00; --dep-more: #86587a;
+  --syn-keyword: #c21d6a;
+  --syn-string: #1f5e9a;
+  --syn-number: #8a3d00;
+  --syn-comment: #86587a;
+  --syn-variable: #7d2d00;
+  --syn-function: #6c2bd9;
+  --syn-type: #136b4f;
+  --syn-punct: #4a3340;
+  --syn-heading: #b8005f;
+  --syn-link: #b8005f;
+  --syn-meta: #4a0f33;
+  --ansi-0: #4a0f33; --ansi-1: #b3102f; --ansi-2: #136b4f; --ansi-3: #7a4d00;
+  --ansi-4: #1f5e9a; --ansi-5: #7338c6; --ansi-6: #0e6f7a; --ansi-7: #6b4a5c;
+  --ansi-8: #7d5068; --ansi-9: #a90e2f; --ansi-10: #0a6a3e; --ansi-11: #8a5600;
+  --ansi-12: #0a5fb0; --ansi-13: #7a3bd0; --ansi-14: #126f7a; --ansi-15: #7d5068;
+  --term-bg: #ffe1ec;
+  --term-fg: #4a0f33;
+  /* The gum's own: the wrapper the tab bar and outline sit on, the
+     bubbles on the page, the chunky shadow under cards and buttons,
+     the pop behind the headings' lettering, and the card's fill. */
+  --gum-side: #ffb6d2;
+  --gum-bubble: rgb(255 255 255 / 0.4);
+  --gum-shadow: #e879b1;
+  --gum-pop: #ff8ac4;
+  --gum-card: #fff0f6;
+  color-scheme: light;
+}
+
+/* Bubble lettering: a rounded sans for the interface and headings, the
+   code in the plain look's monospace. */
+:root[data-look="gum"] {
+  --font-ui: "Nunito", "Varela Round", "Quicksand", "Arial Rounded MT Bold", "Helvetica Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --text-scale: 1;
+}
+
+/* Berry, when the theme is dark, for the window or the History pane
+   (see style.css). */
+:root[data-look="gum"][data-scheme="dark"],
+:root[data-look="gum"][data-history-scheme="dark"] #history {
+  --bg: #2b0a1f;
+  --fg: #ffd1e3;
+  --muted: #d690b7;
+  --border: #8a3b6c;
+  --code-bg: #3a1130;
+  --hover: #4a1a3e;
+  --accent: #ff5fae;
+  --accent-fg: #2b0a1f;
+  --link: #ff8fc6;
+  --ok: #6fe3a4;
+  --bad: #ff7f94;
+  --bad-fg: #2b0a1f;
+  --control: #cfa6ff;
+  --warn-bg: #3f2c12;
+  --warn-border: #d9a73a;
+  --selection: rgb(255 95 174 / 0.3);
+  --active-line: rgb(255 95 174 / 0.07);
+  --dep-1: #cfa6ff; --dep-2: #ff7fbf; --dep-3: #7ee3e8; --dep-4: #ffb57f; --dep-more: #b57a9c;
+  --syn-keyword: #ff7fbf;
+  --syn-string: #9fd3ff;
+  --syn-number: #ffb57f;
+  --syn-comment: #b57a9c;
+  --syn-variable: #ffc29a;
+  --syn-function: #d6b4ff;
+  --syn-type: #8ae8c3;
+  --syn-punct: #e3b9cf;
+  --syn-heading: #ffffff;
+  --syn-link: #ff8fc6;
+  --syn-meta: #ffd1e3;
+  --ansi-0: #4a1a3e; --ansi-1: #ff7f94; --ansi-2: #6fe3a4; --ansi-3: #ffd166;
+  --ansi-4: #8fcaff; --ansi-5: #cfa6ff; --ansi-6: #7ee3e8; --ansi-7: #ffd1e3;
+  --ansi-8: #b57a9c; --ansi-9: #ffa5b4; --ansi-10: #9af0c4; --ansi-11: #ffe29a;
+  --ansi-12: #b3dcff; --ansi-13: #e3cbff; --ansi-14: #a8f0f3; --ansi-15: #ffffff;
+  --term-bg: #3a1130;
+  --term-fg: #ffd1e3;
+  --gum-side: #230818;
+  --gum-bubble: rgb(255 95 174 / 0.09);
+  --gum-shadow: #15040e;
+  --gum-pop: #b0005a;
+  --gum-card: #331029;
+  color-scheme: dark;
+}
+
+/* Round everything: gum has no corners. Buttons and chips are pills,
+   cards and menus are soft, and the terminal gets the card's curve. */
+[data-look="gum"] :is(button, .block .head .lang, .block .exit, .textbox, .choice-select, input[type="text"], input[type="number"], select) { border-radius: 999px; }
+[data-look="gum"] :is(.block, .coll, dialog, .md-menu, ul.files, #fm-form textarea, .block .output .terminal, .cast-player) { border-radius: 16px; }
+[data-look="gum"] ul.files li:first-child, [data-look="gum"] ul.files li:first-child button.file { border-radius: 16px 16px 0 0; }
+[data-look="gum"] ul.files li:last-child button.file { border-radius: 0 0 16px 16px; }
+[data-look="gum"] header .seg { border-radius: 999px; overflow: hidden; }
+[data-look="gum"] header .seg button.icon { border-radius: 0; }
+
+/* The chrome is the wrapper: the tab bar, the outline and Settings'
+   tabs sit on a deeper pink. */
+[data-look="gum"] #tabbar, [data-look="gum"] #outline, [data-look="gum"] .tabs { background: var(--gum-side); }
+[data-look="gum"] .tab.active { font-weight: 800; }
+[data-look="gum"] #outline .item.heading { font-weight: 800; }
+
+/* The rendered view is the stick of gum, with bubbles blown across it:
+   big ones and small ones, painted behind the cards and scrolling with
+   them. Settings › Look can take the bubbles off (data-no-rules). */
+[data-look="gum"] #doc-scroll {
+  background:
+    radial-gradient(circle at 34px 38px, var(--gum-bubble) 0 14px, transparent 15px) 0 0 / 140px 140px repeat local,
+    radial-gradient(circle at 104px 102px, var(--gum-bubble) 0 9px, transparent 10px) 0 0 / 140px 140px repeat local,
+    radial-gradient(circle at 118px 30px, var(--gum-bubble) 0 5px, transparent 6px) 0 0 / 140px 140px repeat local,
+    radial-gradient(circle at 60px 110px, var(--gum-bubble) 0 4px, transparent 5px) 0 0 / 140px 140px repeat local,
+    var(--bg);
+}
+[data-look="gum"][data-no-rules] #doc-scroll { background: var(--bg); }
+
+/* Headings are bubble letters: fat and rounded, with a pop of pink
+   behind them. */
+[data-look="gum"] #doc > .heading-cell :is(h1, h2, h3) { font-weight: 900; letter-spacing: 0.01em; text-shadow: 2px 2px 0 var(--gum-pop); }
+[data-look="gum"] #doc > .heading-cell :is(h4, h5, h6) { font-weight: 800; }
+[data-look="gum"] #doc > .heading-cell h1 { border-bottom: 0; }
+[data-look="gum"] .heading-cell > button.fold { background: none; }
+[data-look="gum"] hr { border: 0; border-top: 3px dotted var(--border); }
+[data-look="gum"] blockquote { border-left: 4px solid var(--gum-pop); }
+[data-look="gum"] #doc > .heading-cell h2 { border-bottom-color: var(--border); }
+
+/* Block cards are puffy: a pale pink fill, a two-pixel edge and a
+   chunky shadow underneath, like a wrapped piece. The selected card is
+   ringed in the accent. Settings › Look can take the shadows off
+   (data-no-shadows). */
+[data-look="gum"] .block { background: var(--gum-card); border: 2px solid var(--border); box-shadow: 0 4px 0 var(--gum-shadow); }
+[data-look="gum"] .block.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+[data-look="gum"] .block.ran { border-left: 4px solid var(--ok); }
+[data-look="gum"] .block.ran.stale { border-left-color: var(--warn-border); }
+[data-look="gum"] .block.timing { border-left-color: var(--accent); }
+[data-look="gum"] .block .head .lang { background: var(--gum-side); border-color: transparent; color: var(--fg); font-weight: 800; }
+[data-look="gum"] .block .exit { font-weight: 800; }
+[data-look="gum"] .block pre.numbered .line::before { border-right-style: dotted; }
+[data-look="gum"] :is(.block pre.code, .block .output-part, .block .ask) { border-top: 2px dotted var(--border); }
+/* The confirm prompt is a bubble in the accent's pink. */
+[data-look="gum"] .block .ask { background: var(--hover); color: var(--fg); }
+[data-look="gum"] .block .output .terminal { border: 2px solid var(--border); }
+[data-look="gum"] #doc > .block.dep-target { outline-color: var(--gum-pop); }
+[data-look="gum"][data-no-shadows] :is(.block, .coll, dialog, .md-menu, button.primary, button.danger, .block .ask button) { box-shadow: none; }
+
+/* Buttons are gumballs: pills, bold, and the Run All and confirm
+   buttons filled with the hot pink and sat on a shadow that they sink
+   into when pressed. */
+[data-look="gum"] button { font-weight: 700; border-width: 2px; }
+[data-look="gum"] button.icon { border-width: 1px; }
+[data-look="gum"] :is(button.primary, .block .ask button) { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); box-shadow: 0 3px 0 var(--gum-shadow); font-weight: 800; }
+[data-look="gum"] :is(button.primary, button.danger, .block .ask button):active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+[data-look="gum"] :is(button.primary.stop, button.danger) { background: var(--bad); color: var(--bad-fg); border-color: var(--bad); box-shadow: 0 3px 0 var(--gum-shadow); }
+[data-look="gum"] button.chip { border-style: dotted; }
+[data-look="gum"] button.tag { border-width: 2px; }
+[data-look="gum"] #console-toggle .badge { background: var(--accent); color: var(--accent-fg); }
+
+/* Inputs, menus and dialogs: soft pink fills with a two-pixel edge. */
+[data-look="gum"] :is(.textbox, .choice-select, input[type="text"], input[type="number"], #fm-form textarea, select) { border: 2px solid var(--border); background-color: var(--gum-card); color: var(--fg); }
+[data-look="gum"] .textbox:focus { outline-color: var(--accent); }
+[data-look="gum"] :is(dialog, .md-menu) { border: 2px solid var(--border); box-shadow: 0 6px 0 var(--gum-shadow); }
+[data-look="gum"] :is(input, select, textarea, button, a, [tabindex]):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* The start screen and Settings: the same gum. */
+[data-look="gum"] #start h1 { font-weight: 900; text-shadow: 2px 2px 0 var(--gum-pop); }
+[data-look="gum"] ul.files { border: 2px solid var(--border); background: var(--gum-card); }
+[data-look="gum"] ul.files li + li { border-top: 2px dotted var(--border); }
+[data-look="gum"] .coll { border: 2px solid var(--border); background: var(--gum-card); box-shadow: 0 4px 0 var(--gum-shadow); }
+[data-look="gum"] .tabs button[aria-selected="true"] { font-weight: 800; border-bottom-color: var(--accent); }
+[data-look="gum"] .setting { border-bottom: 2px dotted var(--border); }
+[data-look="gum"] dl.info :is(dt, dd) { border-top-style: dotted; }
+[data-look="gum"] header { border-bottom: 2px dotted var(--border); }
+[data-look="gum"] #source { border-right: 2px dotted var(--border); }
+[data-look="gum"] #history { border-top: 2px dotted var(--border); }
+[data-look="gum"] #history-timer .label { font-weight: 800; }
+[data-look="gum"] #console .console-bar { border-bottom: 2px dotted var(--border); }

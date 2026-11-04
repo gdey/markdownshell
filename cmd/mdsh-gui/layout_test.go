@@ -82,7 +82,7 @@ func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
 // mouseup landed elsewhere, and the first click only selected the card.
 func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
 	layout := []string{"display", "width", "min-width", "max-width", "padding", "padding-left", "padding-right", "margin", "margin-left", "margin-right", "border", "border-width", "gap", "font-size", "flex", "order", "position"}
-	for _, file := range []string{"style.css", "blueprint.css", "teletype.css"} {
+	for _, file := range []string{"style.css", "blueprint.css", "bubblegum.css", "teletype.css"} {
 		for sel, props := range cssProps(t, "frontend/"+file) {
 			if !strings.Contains(sel, ".selected") || !strings.Contains(sel, ".block") || !strings.Contains(sel, ".head") {
 				continue
@@ -102,7 +102,7 @@ func TestSelectingABlockKeepsItsHeadInPlace(t *testing.T) {
 // hidden until the run ended and the card was drawn again. The part
 // carries an empty class instead, which setOutput keeps up to date.
 func TestOutputPartHidesByClassNotHasEmpty(t *testing.T) {
-	for _, file := range []string{"style.css", "blueprint.css", "teletype.css"} {
+	for _, file := range []string{"style.css", "blueprint.css", "bubblegum.css", "teletype.css"} {
 		for sel := range cssProps(t, "frontend/"+file) {
 			if strings.Contains(sel, ":has(") && strings.Contains(sel, ":empty") {
 				t.Errorf("%s: %q tests :empty inside :has(), which WebKit doesn't update as content comes in; toggle a class instead", file, sel)
