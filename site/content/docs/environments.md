@@ -58,9 +58,13 @@ included, before their first block:
   ```
 
   The desktop app's Settings window can add it for you: check **Give
-  blocks your zsh aliases and functions**. It goes between marker
-  comments at the end of `~/.zshrc`, and unchecking it takes it out.
-  In bash, use `<(alias -p; declare -f)`. Bash only expands aliases in a
+  blocks your shell's aliases and functions**. It goes between marker
+  comments at the end of `~/.zshrc`, and of `~/.bashrc` if you have
+  one, with a line that turns on tab completion for `mdsh`; unchecking
+  it takes both out. In bash, use
+  `<(unset -f mdsh _mdsh; alias -p; declare -f)`: leaving out the
+  wrapper and the completion function keeps their bash-only syntax
+  from stopping a `/bin/sh` that is dash. Bash only expands aliases in a
   script after `shopt -s expand_aliases`.
 
 `typeset -f` lists every function, including a plugin manager's own, so a

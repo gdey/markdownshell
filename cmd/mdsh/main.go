@@ -61,20 +61,48 @@ func versionString() string {
 // errFailed means a block failed; its output already says why.
 var errFailed = errors.New("a block failed")
 
+// leadingSources returns how many of args are --source flags (with their
+// files) before anything else. The zsh wrapper from Settings › Shell and
+// the README puts them first, ahead of a subcommand:
+//
+//	command mdsh --source <(alias -L; typeset -f) completion zsh
+func leadingSources(args []string) int {
+	i := 0
+	for i < len(args) {
+		switch a := args[i]; {
+		case a == "--source" || a == "-source":
+			if i+1 >= len(args) {
+				return i
+			}
+			i += 2
+		case strings.HasPrefix(a, "--source=") || strings.HasPrefix(a, "-source="):
+			i++
+		default:
+			return i
+		}
+	}
+	return i
+}
+
 func mdsh(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) > 0 && args[0] == "ctl" {
-		return ctlCmd(args[1:], stdin, stdout, stderr)
+	// A subcommand may come after --source flags; only run uses them.
+	sources, cmd, rest := args, "", args
+	if n := leadingSources(args); n < len(args) {
+		sources, cmd, rest = args[:n], args[n], args[n+1:]
+	}
+	if cmd == "ctl" {
+		return ctlCmd(rest, stdin, stdout, stderr)
 	}
 	var err error
-	switch {
-	case len(args) > 0 && args[0] == "completion":
-		err = completionCmd(args[1:], stdout)
-	case len(args) > 0 && args[0] == "__blocks":
-		err = blocksCmd(args[1:], stdout)
-	case len(args) > 0 && args[0] == "lsp":
-		err = lspCmd(args[1:], stdin, stdout, stderr)
-	case len(args) > 0 && args[0] == "run":
-		err = runCmd(args[1:], stdin, stdout, stderr)
+	switch cmd {
+	case "completion":
+		err = completionCmd(rest, stdout)
+	case "__blocks":
+		err = blocksCmd(rest, stdout)
+	case "lsp":
+		err = lspCmd(rest, stdin, stdout, stderr)
+	case "run":
+		err = runCmd(append(append([]string{}, sources...), rest...), stdin, stdout, stderr)
 	default:
 		err = runCmd(args, stdin, stdout, stderr)
 	}

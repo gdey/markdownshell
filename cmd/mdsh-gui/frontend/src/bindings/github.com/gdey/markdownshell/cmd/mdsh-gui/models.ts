@@ -373,14 +373,20 @@ export interface View {
 }
 
 /**
- * ZshWrapper is whether the user's .zshrc has the mdsh function that
- * gives blocks the calling shell's aliases and functions.
+ * ZshWrapper is whether the user's .zshrc, and .bashrc if they have one,
+ * has the mdsh function that gives blocks the calling shell's aliases
+ * and functions, and loads mdsh's completion.
  */
 export interface ZshWrapper {
     /**
      * the .zshrc
      */
     "path": string;
+
+    /**
+     * the .bashrc, or "" when there is none
+     */
+    "bashPath": string;
 
     /**
      * for showing Path as ~/…
