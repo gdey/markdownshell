@@ -37,3 +37,4 @@ func (*ptyConn) started(string)           {}
 func (*ptyConn) wait(int)                 {}
 func (*ptyConn) drain(string, int)        {}
 func (*ptyConn) close()                   {}
+func (*ptyConn) name() string             { return "" }

@@ -129,6 +129,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- tmux runs in the History pane, in `mdsh-gui` and `mdsh -i`, and in
+  `tty` blocks. On macOS it stopped with "open terminal failed: can't
+  use /dev/tty", since a command's terminal was opened as /dev/tty and
+  named itself that; it is now opened by its own name, such as
+  /dev/ttys003, which `tty` prints too.
+
 - In `mdsh-gui`, the History pane's prompt follows the pane's width. A
   prompt drawn to fit the terminal, such as one with a rule or a
   right-aligned part, kept the width of the last command run there (or
