@@ -576,7 +576,11 @@ npx --package typescript tsc -p frontend
 ## Packages
 
 `build/darwin/app.sh VERSION OUTDIR`, on macOS, builds the universal
-`mdsh.app`, signed ad hoc, and puts it in a `.dmg` and a `.zip`. The
+`mdsh.app` and puts it in a `.dmg` and a `.zip`. It signs the app ad
+hoc, or with a Developer ID and notarizes it when `MDSH_SIGN_IDENTITY`
+and the `MDSH_NOTARY_*` variables are set; see
+[docs/signing.md](../../docs/signing.md), which also says how the
+release workflow gets them. The
 `.dmg` window shows an arrow from mdsh to Applications; it is laid out
 with [dmgbuild](https://github.com/dmgbuild/dmgbuild) by
 `build/darwin/dmg/settings.py`, over a background drawn from
