@@ -30,6 +30,13 @@ type Stack struct {
 	// Base set. It is for documents loaded from a URL, which must not get
 	// even PATH or HOME unless they ask (see FilterStrict).
 	Strict bool
+	// Prepare, if set, is called before the stack starts its first
+	// shell, with the Config every shell starts with, to change, such as
+	// to set Init once someone has said it may run. If it fails, no
+	// shell starts, Get returns its error, and the next Get calls it
+	// again.
+	Prepare  func(cfg *Config) error
+	prepared bool
 }
 
 // NewStack returns a stack whose top-level env starts with cfg.
@@ -51,6 +58,12 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 		delete(s.envs, name)
 	}
 	if name == TopLevel {
+		if s.Prepare != nil && !s.prepared {
+			if err := s.Prepare(&s.cfg); err != nil {
+				return nil, err
+			}
+			s.prepared = true
+		}
 		sh, err := Start(s.cfg)
 		if err != nil {
 			return nil, err

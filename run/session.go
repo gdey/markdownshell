@@ -63,10 +63,6 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	init, err := sources(d, opts)
-	if err != nil {
-		return nil, err
-	}
 	s := &Session{
 		d:        d,
 		opts:     opts,
@@ -77,11 +73,11 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Dir:  opts.Dir,
 			Args: opts.Args,
 			TTY:  hasTTY(d) || opts.PTY,
-			Init: init,
 		}),
 		tty: hasTTY(d) || opts.PTY,
 	}
 	s.stack.Strict = opts.Remote
+	s.stack.Prepare = s.prepare
 	if opts.Audit != nil {
 		s.stack.OnStart = s.logEnv
 	}
@@ -93,31 +89,78 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 	return s, nil
 }
 
-// sources reads the files the front matter's env.source names into one
-// script, followed by opts.Source.
-func sources(d *doc.Document, opts Options) (string, error) {
+// sourceError is the error a shell can't start with: env.source wasn't
+// approved, or a file it names can't be read. It stops a run, since
+// every later block would fail the same way, after asking again.
+type sourceError struct{ err error }
+
+func (e *sourceError) Error() string { return e.err.Error() }
+func (e *sourceError) Unwrap() error { return e.err }
+
+// isSourceError reports whether err is a sourceError.
+func isSourceError(err error) bool {
+	var se *sourceError
+	return errors.As(err, &se)
+}
+
+// prepare readies the shells' Init before the first one starts: the
+// env.source files, if ApproveSources lets them in, then opts.Source.
+func (s *Session) prepare(cfg *env.Config) error {
+	paths, err := SourcePaths(s.d, s.opts)
+	if err != nil {
+		return &sourceError{err}
+	}
+	if len(paths) > 0 {
+		a := Stop
+		if s.opts.ApproveSources != nil {
+			a = s.opts.ApproveSources(paths)
+		}
+		switch a {
+		case Stop:
+			return &sourceError{fmt.Errorf("%w: %s", ErrSourcesNotApproved, strings.Join(paths, ", "))}
+		case Skip:
+			paths = nil
+		}
+	}
+	scripts := make([]string, 0, len(paths)+1)
+	for _, p := range paths {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return &sourceError{fmt.Errorf("env.source: %w", err)}
+		}
+		scripts = append(scripts, string(src))
+	}
+	cfg.Init = joinScripts(append(scripts, s.opts.Source)...)
+	return nil
+}
+
+// SourcePaths is the files the front matter's env.source names, as the
+// shells would read them: a leading ~/ is the home folder, and other
+// relative paths are relative to the document's folder (opts.File's,
+// else opts.Dir). Each is made absolute and cleaned.
+func SourcePaths(d *doc.Document, opts Options) ([]string, error) {
 	base := opts.Dir
 	if opts.File != "" {
 		base = filepath.Dir(opts.File)
 	}
-	var scripts []string
+	var paths []string
 	for _, p := range d.Options.Env.Source {
 		if rest, ok := strings.CutPrefix(p, "~/"); ok {
 			home, err := os.UserHomeDir()
 			if err != nil {
-				return "", fmt.Errorf("env.source %s: %w", p, err)
+				return nil, fmt.Errorf("env.source %s: %w", p, err)
 			}
 			p = filepath.Join(home, rest)
 		} else if !filepath.IsAbs(p) && base != "" {
 			p = filepath.Join(base, p)
 		}
-		src, err := os.ReadFile(p)
+		abs, err := filepath.Abs(p)
 		if err != nil {
-			return "", fmt.Errorf("env.source: %w", err)
+			return nil, fmt.Errorf("env.source %s: %w", p, err)
 		}
-		scripts = append(scripts, string(src))
+		paths = append(paths, abs)
 	}
-	return joinScripts(append(scripts, opts.Source)...), nil
+	return paths, nil
 }
 
 // joinScripts joins scripts, ending each with a newline.
@@ -404,6 +447,10 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		if isSourceError(r.Err) {
+			s.Wait(ctx)
+			return r.Err
+		}
 		if r.Exited || (r.Failed() && stopOnError(d, b, opts)) {
 			break
 		}
@@ -523,6 +570,9 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 			}
 			if err := ctx.Err(); err != nil {
 				return err
+			}
+			if isSourceError(r.Err) {
+				return r.Err
 			}
 			if r.Failed() {
 				return &depError{dep: st.dep, label: s.d.Label(st.of)}

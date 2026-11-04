@@ -6,8 +6,87 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- mdsh asks before it reads a document's `env.source` files into its
+  shells, and remembers the answer for the file. The files ran with no
+  question as soon as a shell started, and opening the History pane in
+  mdsh-gui, which was on for every file once left on, or pressing `h`
+  in `mdsh -i`, starts one to ask for its prompt: so opening a file
+  could run its setup script before you had read a line (finding 1 of
+  the v1.4.0 security review). Now the first shell waits for an answer:
+  mdsh-gui shows a dialog listing the files, `mdsh -i` lists them over
+  the document, and `mdsh` asks on the terminal. **Allow** sources them,
+  **Run without them** starts the shells without them, and Cancel or
+  stop starts nothing. Allow and Run without them are remembered for
+  the document, in `mdsh/sources.json` in your config folder, shared by
+  all three, and asked again when the list of files changes. **This
+  can stop an unattended run:** `mdsh` with no terminal and a document
+  never approved now stops with "env.source files not approved"; pass
+  `--yes`, or approve it once on a terminal. Files given to `--source`
+  are yours and aren't asked about.
+
+  ![mdsh-gui asking whether to read ~/ops/setup.sh and ~/.aliases into the shell, with Cancel, Run without them and Allow](docs/changelog/source-prompt.png)
+
+### Fixed
+
+- `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
+  the zsh wrapper from Settings › Shell and the README. The wrapper puts
+  `--source …` first, so mdsh took the subcommand for a file and failed
+  with `open completion: no such file or directory`. A subcommand may now
+  follow `--source` flags.
+- Settings › Shell's **Give blocks your shell's aliases and functions**
+  (was "your zsh aliases") now also turns on tab completion for `mdsh`,
+  in zsh once `compinit` has run, and adds the bash version of the
+  wrapper and completion to `~/.bashrc` when you have one. A `.zshrc`
+  with the older block gets the completion line the next time Settings
+  opens.
+
+  ![Settings › Shell: Give blocks your shell's aliases and functions, which adds an mdsh function to ~/.zshrc and ~/.bashrc and turns on tab completion](docs/changelog/shell-wrapper.png)
+- The Homebrew cask no longer warns that mdsh.app isn't signed and
+  suggests `--no-quarantine`: from 1.4.0 the app is signed with a
+  Developer ID and notarized, so it opens like any other app.
+
+## [1.4.0] - 2026-11-04
+
+Running a runbook gets easier to follow and to trust. Blocks show a
+timer while they run and keep how long they took, a dependency that has
+gone stale since it ran is run again, `always` reruns steps such as a
+login every time, `nosave` keeps a value out of the file, and `secret`
+blurs a block until you ask to see it. mdsh-gui gains a front matter
+form, the changelog built in, copy buttons for code, output and History
+lines, Console warnings that fix themselves, tabs that drag out to
+other apps, and a fourth look, Bubble Gum; the History pane gets
+readline keys, a timer and tmux. The macOS app is now signed with a
+Developer ID and notarized by Apple, so it opens without the Gatekeeper
+workaround that earlier releases needed. The desktop app also carries
+the `mdsh` command line tool, which Settings › Shell installs.
+
+**Two changes reach into existing files.** Blocks no longer get your
+whole environment: a file without `env.share` in its front matter now
+passes only a base set (`PATH`, `HOME`, `USER`, `LANG` and the like),
+so a document that relies on `GOPATH`, `AWS_PROFILE` or similar needs
+`share: [...]`. And a `tty` block's output is now an asciinema `.cast`
+file played in place rather than an animated GIF; give `out=recording:`
+a path ending in `.gif` to keep a GIF. Both are described in full under
+Changed.
+
 ### Added
 
+- The desktop app carries the `mdsh` command line tool, at the same
+  version, so one download gives both. Settings › Shell has a Command
+  line tool row with Install and Remove: on macOS it links
+  `/usr/local/bin/mdsh` to the `mdsh` inside `mdsh.app` (asking for an
+  administrator password when it must), and the app menu has Install
+  Command Line Tool… too; from the Linux AppImage it copies `mdsh` to
+  `~/.local/bin` and keeps the copy at the app's version. The AppImage
+  also runs `mdsh` itself with `--cli` first, or through a link to it
+  named `mdsh`. Turning on the zsh wrapper offers to install it first,
+  and the About tab says when `mdsh` is only inside the app. The
+  Homebrew cask now links the app's `mdsh` and conflicts with the
+  `mdsh` formula: on a Mac, install one or the other.
+
+  ![Settings › Shell's Command line tool row with Install, and the zsh wrapper offering to install the command line tool first](docs/changelog/cli-install.png)
 - `mdsh-gui`: a Bubble Gum look in Settings › Look: Hubba Bubba pink
   paper with bubbles blown across the page, puffy cards and pill
   buttons on a chunky shadow, and bubble-lettered headings, or the
@@ -156,6 +235,9 @@ follow [Semantic Versioning](https://semver.org/).
   they open in the browser or mail app. Commands typed in the History
   pane are added with `links`, and the addresses they print are
   clickable in the pane too. Take `links` off a block to turn it off.
+
+  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
+
 - Copy a fenced block's code to the clipboard. In mdsh-gui each block's
   card has a copy button (or press `c` on the selected block), and other
   fenced code in the document shows one in its corner on hover; the
@@ -254,8 +336,6 @@ follow [Semantic Versioning](https://semver.org/).
 - Commands typed in the History pane, in mdsh-gui and `mdsh -i`, are
   added with `skip`, so running the whole file doesn't run them again.
   Running one by hand still does.
-
-  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
 
 ### Fixed
 
@@ -1127,7 +1207,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/gdey/markdownshell/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/gdey/markdownshell/compare/v1.1.0...v1.2.0

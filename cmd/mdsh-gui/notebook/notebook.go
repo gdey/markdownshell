@@ -186,6 +186,12 @@ type Options struct {
 	// and which hasn't run in this session. If it is nil, block of
 	// doesn't run.
 	Depend func(block, of int, question string) run.Answer
+	// Sources is asked before the first shell starts, whether a run's
+	// or one started to ask the shell something, as the History pane's
+	// prompt is, whether to read in the files the front matter's
+	// env.source names (see run.Options.ApproveSources). If it is nil,
+	// no shell starts for a document that names any.
+	Sources func(paths []string) run.Answer
 	// Resolved, if set, is told of each warning logged for the console
 	// that the document no longer has, as logged, after an edit fixes
 	// it.
@@ -318,6 +324,8 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		TakeTTY:     n.takeTTY,
 		Mode:        run.ModeInteractive,
 		PTY:         n.history,
+		// Nil stays nil: run treats that as nobody to ask.
+		ApproveSources: n.opts.Sources,
 	})
 }
 

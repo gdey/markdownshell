@@ -151,7 +151,18 @@ mdsh:
     source: [~/.zsh_aliases, lib/helpers.sh]
 ```
 
-Files given with `--source` are sourced after these. See
+Since these files run code before any block, and before any `confirm`,
+mdsh asks first, the first time a shell would start: it lists the files,
+and you allow them, run without them, or stop. mdsh, `mdsh -i` and
+mdsh-gui share the answer, which is kept for the document in
+`mdsh/sources.json` in your config folder (`~/.config` on Linux,
+`~/Library/Application Support` on macOS), and asked again when the list
+of files changes. With no terminal to ask on, `mdsh` stops unless the
+document was approved before or `--yes` is given. To be asked again,
+delete the document's entry from that file.
+
+Files given with `--source` are sourced after these, without asking:
+they are yours. See
 [Aliases and functions]({{< relref "environments#aliases-and-functions" >}}).
 
 ## Unknown keys
