@@ -118,11 +118,17 @@ function tabButton(t: Tab): HTMLElement {
   };
   b.onclick = () => void App.SelectTab(t.id);
   b.ondragstart = (e) => {
-
     dragging = t.id;
     e.dataTransfer?.setData("application/x-mdsh-tab", String(t.id));
-    e.dataTransfer?.setData("text/plain", t.title);
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    // Another app the tab is dropped on gets the file's full path as
+    // text, or the URL of a document the app carries inside it. Other
+    // windows of this app look for text/plain to see a tab coming, since
+    // they may not see the type above, so a tab with neither gives its
+    // title. There is no text/uri-list: a file drop takes the place of
+    // the tab drop in this app's own windows.
+    e.dataTransfer?.setData("text/plain", t.file || t.url || t.title);
+    // Copy too, for apps that only take a copy of the text.
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
     b.classList.add("dragging");
     void App.DragTab(t.id);
   };
@@ -130,7 +136,10 @@ function tabButton(t: Tab): HTMLElement {
     b.classList.remove("dragging");
     const id = dragging;
     dragging = 0;
-    const outside = e.screenX < window.screenX || e.screenX > window.screenX + window.outerWidth || e.screenY < window.screenY || e.screenY > window.screenY + window.outerHeight;
+    // Dropped out of every window, the tab gets a window of its own,
+    // unless another app took it.
+    const taken = e.dataTransfer?.dropEffect !== undefined && e.dataTransfer.dropEffect !== "none";
+    const outside = !taken && (e.screenX < window.screenX || e.screenX > window.screenX + window.outerWidth || e.screenY < window.screenY || e.screenY > window.screenY + window.outerHeight);
     // A window it was dropped on may still be taking it.
     setTimeout(() => void App.EndDrag(id, outside, Math.round(e.screenX), Math.round(e.screenY)), 250);
   };

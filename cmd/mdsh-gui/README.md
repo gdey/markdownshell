@@ -35,7 +35,10 @@ Each file opens in a tab of its own, with its own shells.
   start screen; Open…, Open Recent and dropped files open in a new tab.
   Drag a tab to reorder it, onto another window's tab bar or page to
   move it there, or onto its own page, or out of every window, for a
-  window of its own. A block running in it carries on. Close Tab
+  window of its own. Dropped on another app that takes text, such as a
+  terminal or an editor, it gives the file's full path (or, for a
+  document built into the app, its URL) and stays where it is. A block
+  running in it carries on. Close Tab
   (cmd/ctrl+W, the ×, or a middle click) closes it, and the window goes
   with its last tab. View › Show Next Tab and Show Previous Tab
   (cmd/ctrl+shift+] and [) move between them.

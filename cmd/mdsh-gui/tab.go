@@ -137,6 +137,10 @@ type Tab struct {
 	ID    int    `json:"id"`
 	Title string `json:"title"`
 	File  string `json:"file"`
+	// URL is the address of a document the app carries inside it, such
+	// as the changelog, for a tab that shows one and has no File. A tab
+	// dragged out to another app gives it File, or else URL.
+	URL   string `json:"url,omitempty"`
 	Dirty bool   `json:"dirty"`
 }
 

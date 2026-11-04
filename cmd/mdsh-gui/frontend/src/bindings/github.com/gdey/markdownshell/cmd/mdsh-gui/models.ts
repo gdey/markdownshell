@@ -227,6 +227,13 @@ export interface Tab {
     "id": number;
     "title": string;
     "file": string;
+
+    /**
+     * URL is the address of a document the app carries inside it, such
+     * as the changelog, for a tab that shows one and has no File. A tab
+     * dragged out to another app gives it File, or else URL.
+     */
+    "url"?: string;
     "dirty": boolean;
 }
 
