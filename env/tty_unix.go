@@ -312,3 +312,9 @@ func (p *ptyConn) close() {
 	p.pts.Close()
 	p.ptm.Close()
 }
+
+// name is the path of the shell's end of the pseudo-terminal, such as
+// /dev/pts/3 or /dev/ttys003.
+func (p *ptyConn) name() string {
+	return p.pts.Name()
+}

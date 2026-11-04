@@ -232,6 +232,10 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		// the read fails, and the reply, coming in once the terminal
 		// echoes again, shows up in the block's output.
 		//
+		// It is opened by its own name, not as /dev/tty: on macOS a
+		// descriptor opened through /dev/tty names itself /dev/tty, so
+		// tty prints that and tmux refuses it ("can't use /dev/tty").
+		//
 		// A marker on the terminal too tells when all the block wrote
 		// there has been read.
 		s.ttyRun++
@@ -239,7 +243,7 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		if jobs && s.jobControl() {
 			before, after = s.jobsOn(), "set +m\ntrap - TSTP TTIN TTOU\n"
 		}
-		cmd = fmt.Sprintf("trap : INT\n%s. %s 0<>/dev/tty 1>&0 2>&0\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\n%sprintf '%%s0\\n' '%s' >&2\n", before, quote(f), s.mark, s.mark, s.ttyRun, after, s.mark)
+		cmd = fmt.Sprintf("trap : INT\n%s. %s 0<>%s 1>&0 2>&0\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\n%sprintf '%%s0\\n' '%s' >&2\n", before, quote(f), quote(s.pty.name()), s.mark, s.mark, s.ttyRun, after, s.mark)
 	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited

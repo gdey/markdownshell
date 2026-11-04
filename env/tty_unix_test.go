@@ -347,6 +347,35 @@ func TestRunTerminalReadsStdout(t *testing.T) {
 	}
 }
 
+// TestRunTerminalTTYName: a block's terminal names itself by its own
+// path, as tty prints it, not /dev/tty. On macOS a descriptor opened
+// through /dev/tty names itself /dev/tty, and tmux won't run on that
+// ("open terminal failed: can't use /dev/tty").
+func TestRunTerminalTTYName(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Skip("no pseudo-terminals:", err)
+	}
+	defer sh.Close()
+	var rec bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	status, _, err := sh.RunTerminal(ctx, "tty; tty <&1; tty <&2", Terminal{Out: io.Discard}, &rec)
+	if err != nil || status != 0 {
+		t.Fatalf("status %d, err %v, recorded %q", status, err, rec.String())
+	}
+	want := sh.pty.name()
+	got := strings.Fields(rec.String())
+	if len(got) != 3 {
+		t.Fatalf("recorded %q, want three names", rec.String())
+	}
+	for _, g := range got {
+		if g != want {
+			t.Errorf("tty printed %q, want %q", g, want)
+		}
+	}
+}
+
 // TestRunTerminalSuspend: ctrl+z, and a program that stops itself as
 // vim does on ctrl+z, have no shell with job control to come back to, so
 // the stop signals are ignored rather than stopping the block for good.
