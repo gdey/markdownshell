@@ -24,6 +24,9 @@ type TextboxCell struct {
 	Placeholder string `json:"placeholder,omitempty"`
 	// Problem is why its var= binds nothing, if it doesn't.
 	Problem string `json:"problem,omitempty"`
+	// NoSave is true for a nosave textbox: what is typed is kept for
+	// the session, and saving leaves the file's text as it is.
+	NoSave bool `json:"nosave,omitempty"`
 }
 
 // ChoiceCell is a choice, as the frontend draws it.
@@ -36,6 +39,9 @@ type ChoiceCell struct {
 	Placeholder string       `json:"placeholder,omitempty"`
 	// Problem is why its var= binds nothing, if it doesn't.
 	Problem string `json:"problem,omitempty"`
+	// NoSave is true for a nosave choice: the picks are kept for the
+	// session, and saving leaves the file's marks as they are.
+	NoSave bool `json:"nosave,omitempty"`
 }
 
 // taskMarks are the offsets in the source of the [ ] of every task list
@@ -151,6 +157,11 @@ func (n *Notebook) SetTextbox(i int, text string) error {
 		return fmt.Errorf("block %d isn't a textbox", i)
 	}
 	b := n.d.Blocks[i]
+	if n.d.SetValue(b, text) {
+		// A nosave textbox: the session holds the text, the file
+		// keeps its body, so there is nothing to undo or save.
+		return nil
+	}
 	return n.change("edit textbox", "textbox:"+b.ID, n.d.SetText(b, text), nil)
 }
 
@@ -164,6 +175,9 @@ func (n *Notebook) SetChoice(i int, checked []bool) error {
 	}
 	if i < 0 || i >= len(n.d.Blocks) || !n.d.Blocks[i].IsChoice() {
 		return fmt.Errorf("block %d isn't a choice", i)
+	}
+	if n.d.SetChecks(n.d.Blocks[i], checked) {
+		return nil
 	}
 	return n.change("pick choice", "", n.d.SetChoice(n.d.Blocks[i], checked), nil)
 }

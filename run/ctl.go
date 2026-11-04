@@ -117,14 +117,10 @@ func (s *Session) ctlLookup(lookup doc.Lookup) doc.Lookup {
 }
 
 // inputBinds reports whether a textbox or choice binds name with var=.
-func (s *Session) inputBinds(name string) bool {
-	for _, b := range s.d.Blocks {
-		if n, _, ok := b.Var(); ok && n == name {
-			return true
-		}
-	}
-	return false
-}
+func (s *Session) inputBinds(name string) bool { return s.inputFor(name) != nil }
+
+// inputFor is the textbox or choice that binds name with var=, or nil.
+func (s *Session) inputFor(name string) *doc.Block { return s.d.InputFor(name) }
 
 // handleCtl answers a call from a block.
 func (s *Session) handleCtl(caller any, req ctl.Request) ctl.Response {
@@ -139,8 +135,16 @@ func (s *Session) handleCtl(caller any, req ctl.Request) ctl.Response {
 		if !ok {
 			return resp
 		}
-		if s.inputBinds(name) {
-			return ctl.Refuse("set: $%s belongs to an input in the document; change the input instead", name)
+		if in := s.inputFor(name); in != nil {
+			if !in.NoSave() {
+				return ctl.Refuse("set: $%s belongs to an input in the document; change the input instead", name)
+			}
+			// A nosave input's value is the session's, so a block may
+			// fill it; the file keeps the input's body.
+			old := s.varNow(name)
+			s.d.SetValue(in, a.Value)
+			s.logVar(b, name, old, &ctlVar{value: a.Value, secret: a.Secret})
+			return ctl.Done("")
 		}
 		old := s.varNow(name)
 		s.ctl.mu.Lock()

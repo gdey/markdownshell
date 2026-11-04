@@ -97,6 +97,12 @@ export interface Cell {
     "stale"?: boolean;
 
     /**
+     * NoSave is true for a block marked nosave: its output lives in
+     * the session, and saving keeps what the file holds after it.
+     */
+    "nosave"?: boolean;
+
+    /**
      * Running is true while a background block is still going; its
      * output and status come in when it ends.
      */
@@ -228,6 +234,12 @@ export interface ChoiceCell {
      * Problem is why its var= binds nothing, if it doesn't.
      */
     "problem"?: string;
+
+    /**
+     * NoSave is true for a nosave choice: the picks are kept for the
+     * session, and saving leaves the file's marks as they are.
+     */
+    "nosave"?: boolean;
 }
 
 /**
@@ -512,4 +524,10 @@ export interface TextboxCell {
      * Problem is why its var= binds nothing, if it doesn't.
      */
     "problem"?: string;
+
+    /**
+     * NoSave is true for a nosave textbox: what is typed is kept for
+     * the session, and saving leaves the file's text as it is.
+     */
+    "nosave"?: boolean;
 }

@@ -8,6 +8,19 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `nosave` on a block, textbox, choice or `output` fence keeps its value
+  out of the file. The block still runs and shows its output, and what
+  is typed or picked still reaches blocks, conditions and placeholders,
+  but saving (`mdsh -w`, `-o`, `-i` and mdsh-gui) leaves the fence as
+  the file has it: the output, output copies and placeholders of a
+  `nosave` block keep what they hold, and a `nosave` textbox or choice
+  keeps the body it was written with, which is its value until something
+  changes it. On an `output` fence, `nosave` keeps just that fence. In
+  mdsh-gui a `nosave` card carries a *session only* badge, typing in a
+  `nosave` input doesn't mark the file changed, and `mdsh ctl set` may
+  fill a `nosave` input from a block.
+
+  ![mdsh-gui showing a nosave textbox and a nosave block, each with a session only badge, with the source pane keeping the file's text](docs/changelog/nosave.png)
 - mdsh-gui's History pane can show that its prompt has the keyboard
   with a blinking block cursor where you type, as a terminal does,
   in place of the outline around the field. Pick it in Settings › Look

@@ -50,10 +50,18 @@ type Block struct {
 	// (see SetText and SetChoice). Empty otherwise.
 	MirrorOf string
 
+	// session is a nosave input's value for this session, set by
+	// SetValue, when it differs from the body the file holds. Nil until
+	// then.
+	session *string
+
 	quote, col int // the container: block quote depth and list content column
 	// outMain and outErr are set once Output holds a stdout part (a
 	// fence or region) and a stderr fence. Another one is a copy.
 	outMain, outErr bool
+	// outNoSave is set when a fence in Output is marked nosave: the
+	// output is kept as the file has it, as if the block were.
+	outNoSave bool
 }
 
 // Document is a parsed markdown file.
@@ -96,6 +104,9 @@ type Copy struct {
 	Span Span
 	// Prefix and Lead are as for Block.
 	Prefix, Lead string
+	// NoSave is set for a copy fence marked nosave: write-back keeps
+	// what it holds, whatever its block does.
+	NoSave bool
 }
 
 // HasOutput reports whether output is already saved after b in the file.
@@ -156,6 +167,9 @@ func Parse(src []byte) (*Document, error) {
 			if last != nil && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) && !last.hasPart(b.Attrs["stream"] == "stderr") {
 				last.Output.End = next
 				last.addPart(b.Attrs["stream"] == "stderr")
+				if b.Attrs.Has("nosave") {
+					last.outNoSave = true
+				}
 				pos = next
 				continue
 			}
@@ -163,7 +177,7 @@ func Parse(src []byte) (*Document, error) {
 				// Output away from its block is a copy, part of the
 				// prose. An unclosed one is just prose.
 				if b.BodySpan.End < b.Span.End && b.Attrs["for"] != "" {
-					d.Copies = append(d.Copies, &Copy{For: b.Attrs["for"], Stream: b.Attrs["stream"], Span: b.Span, Prefix: b.Prefix, Lead: b.Lead})
+					d.Copies = append(d.Copies, &Copy{For: b.Attrs["for"], Stream: b.Attrs["stream"], Span: b.Span, Prefix: b.Prefix, Lead: b.Lead, NoSave: b.Attrs.Has("nosave")})
 				}
 				last = nil
 				pos = next

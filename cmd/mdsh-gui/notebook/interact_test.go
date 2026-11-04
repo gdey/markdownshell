@@ -338,3 +338,103 @@ func TestRunOnce(t *testing.T) {
 		t.Errorf("after Run: %q", saved)
 	}
 }
+
+// TestNoSaveInputs checks that typing in a nosave textbox and picking in
+// a nosave choice change the session, not the file: the cells show the
+// value, blocks and prose see it, and saving writes the file as it was.
+func TestNoSaveInputs(t *testing.T) {
+	src := "```textbox {#host var=host nosave}\ndefault\n```\n\n" +
+		"```choice {#env mode=radio var=env nosave}\n- [x] staging\n- [ ] prod\n```\n\n" +
+		"Deploying to {{$MDSH_VAR_env}} on {{$MDSH_VAR_host}}.\n\n" +
+		"```sh {#show}\necho \"$MDSH_VAR_host $MDSH_VAR_env\"\n```\n"
+	file := write(t, src)
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	cells := func() (box TextboxCell, choice ChoiceCell, html string) {
+		for _, c := range n.Cells() {
+			switch {
+			case c.Textbox != nil:
+				box = *c.Textbox
+			case c.Choice != nil:
+				choice = *c.Choice
+			}
+			html += c.HTML
+		}
+		return
+	}
+	box, choice, _ := cells()
+	if !box.NoSave || !choice.NoSave || box.Text != "default" {
+		t.Fatalf("cells: %+v %+v", box, choice)
+	}
+	if err := n.SetTextbox(0, "db1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.SetChoice(1, []bool{false, true}); err != nil {
+		t.Fatal(err)
+	}
+	box, choice, html := cells()
+	if box.Text != "db1" || choice.Options[0].Checked || !choice.Options[1].Checked {
+		t.Errorf("after: %+v %+v", box, choice)
+	}
+	if !strings.Contains(html, "Deploying to prod on db1.") {
+		t.Errorf("prose: %s", html)
+	}
+	if n.Text() != src {
+		t.Errorf("source changed: %q", n.Text())
+	}
+	if n.Dirty() {
+		t.Error("typing in a nosave input made the file dirty")
+	}
+	if what, err := n.Undo(); err != nil || what != "" {
+		t.Errorf("undo = %q, %v; a nosave edit isn't a source edit", what, err)
+	}
+	if err := n.RunBlock(2); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(n.results[2].Stdout); got != "db1 prod\n" {
+		t.Errorf("show printed %q", got)
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(file); !strings.HasPrefix(string(data), src) {
+		t.Errorf("saved: %q", data)
+	}
+	for _, c := range n.Cells() {
+		if c.Block == 2 && !c.Ran {
+			t.Error("the run was lost")
+		}
+	}
+}
+
+// TestNoSaveBlock checks that a nosave block's run shows in its card but
+// not in the file.
+func TestNoSaveBlock(t *testing.T) {
+	src := "```sh {#now nosave}\necho ran\n```\n\n```output {for=now exit=0}\nold\n```\n"
+	file := write(t, src)
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if n.Dirty() {
+		t.Error("running a nosave block made the file dirty")
+	}
+	for _, c := range n.Cells() {
+		if c.Block == 0 && (!c.NoSave || !c.Ran || !strings.Contains(c.Output, "ran")) {
+			t.Errorf("cell: %+v", c)
+		}
+	}
+	if err := n.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(file); string(data) != src {
+		t.Errorf("saved: %q", data)
+	}
+}

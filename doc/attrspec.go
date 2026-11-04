@@ -57,6 +57,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "show-stderr", Kind: AttrCond, Bare: true, Default: "front matter show_stderr, else only when the block fails", Help: "Show stderr, or only if the condition holds"},
 	{Name: "collapse", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the code folded to one line, or only if the condition holds"},
 	{Name: "collapse-output", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the output folded to one line, or only if the condition holds"},
+	{Name: "nosave", Kind: AttrFlag, Default: "off", Help: "Saving keeps what the file holds: the block's output, or a textbox's text or a choice's picks, lives in the session only"},
 	{Name: "links", Kind: AttrFlag, Default: "off", Help: "Make web addresses in the output clickable, in mdsh-gui and mdsh -i; History adds it to the commands typed there"},
 	{Name: "env", Kind: AttrText, Default: "top-level env", Help: "Run in a named sub-env; a/b stacks b on a"},
 	{Name: "share", Kind: AttrList, Default: "front matter env.share, else all", Help: "Exported variables a new sub-env gets from its parent, besides PATH, HOME, USER and the rest of the base set; empty for just the base set"},

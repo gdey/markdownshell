@@ -5,11 +5,19 @@ package doc
 // are unchanged keeps its identity, wherever it moved, with its spans
 // moved to match src, so results that point at it stay valid. Edited and
 // new blocks are new *Blocks, and blocks no longer in src are dropped.
-// If src doesn't parse, d is left as it was.
+// A nosave input's session value (see SetValue) is kept by id, so what
+// was typed survives an edit elsewhere in the file. If src doesn't
+// parse, d is left as it was.
 func (d *Document) SetSource(src []byte) error {
 	nd, err := Parse(src)
 	if err != nil {
 		return err
+	}
+	session := map[string]*string{}
+	for _, b := range d.Blocks {
+		if b.session != nil {
+			session[b.ID] = b.session
+		}
 	}
 	// Equal blocks are matched in order, so duplicates keep theirs.
 	old := map[string][]*Block{}
@@ -24,6 +32,11 @@ func (d *Document) SetSource(src []byte) error {
 			old[k] = bs[1:]
 			*b = *nb
 			nd.Blocks[i] = b
+		}
+	}
+	for _, nb := range nd.Blocks {
+		if v, ok := session[nb.ID]; ok && nb.IsInput() && nb.NoSave() {
+			nb.session = v
 		}
 	}
 	*d = *nd

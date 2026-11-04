@@ -66,6 +66,9 @@ type Cell struct {
 	// Stale is true when the block ran, but a block its depends= names
 	// has run again since, had its run cleared, or is stale itself.
 	Stale bool `json:"stale,omitempty"`
+	// NoSave is true for a block marked nosave: its output lives in
+	// the session, and saving keeps what the file holds after it.
+	NoSave bool `json:"nosave,omitempty"`
 	// Running is true while a background block is still going; its
 	// output and status come in when it ends.
 	Running bool `json:"running"`
@@ -750,7 +753,9 @@ func (n *Notebook) event(e run.Event) {
 	switch {
 	case e.Kind == run.Done:
 		n.results[i] = e.Result
-		n.dirty = true
+		if !e.Block.NoSave() {
+			n.dirty = true
+		}
 		delete(n.bg, e.Block)
 	case e.Kind == run.Started && background:
 		n.bg[e.Block] = true
