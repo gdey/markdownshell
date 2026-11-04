@@ -55,7 +55,7 @@ export const editorLook: Extension = [look, syntaxHighlighting(highlight)];
 // look's options from Settings › Look.
 export type LookSettings = Pick<
   Settings,
-  "theme" | "look" | "textSize" | "uiFont" | "codeFont" | "lineSpacing" | "noSprockets" | "noRules" | "noShadows" | "accent" | "historyPane"
+  "theme" | "look" | "textSize" | "uiFont" | "codeFont" | "lineSpacing" | "noSprockets" | "noRules" | "noShadows" | "accent" | "historyPane" | "historyFocus"
 >;
 
 let current: LookSettings | null = null;
@@ -65,7 +65,8 @@ systemDark.addEventListener("change", () => current && applyTheme(current));
 // applyTheme sets the page's theme and look from s, on the root element:
 // data-theme ("light", "dark" or none to follow the system), data-scheme
 // (the light or dark the page shows), data-look ("tty" for Teletype,
-// "blueprint", none for plain), data-history-scheme for the History pane, the texture
+// "blueprint", none for plain), data-history-scheme for the History pane,
+// data-history-focus ("cursor" or none) for how its prompt shows focus, the texture
 // switches, and the options as variables. Then it fires "mdsh-look" on
 // window, for what draws on a canvas, such as the terminals.
 export function applyTheme(s: LookSettings) {
@@ -80,6 +81,7 @@ export function applyTheme(s: LookSettings) {
   set("look", !!look, look);
   const pane = s.historyPane || (look ? "match" : "dark");
   root.dataset.historyScheme = pane === "match" ? scheme : pane === "invert" ? (scheme === "dark" ? "light" : "dark") : "dark";
+  set("historyFocus", s.historyFocus === "cursor", "cursor");
   set("noSprockets", s.noSprockets);
   set("noRules", s.noRules);
   set("noShadows", s.noShadows);

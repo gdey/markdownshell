@@ -108,6 +108,13 @@ export interface Settings {
     "historyPane": string;
 
     /**
+     * HistoryFocus is how the History pane's prompt shows it has the
+     * keyboard: "cursor" for a blinking block cursor where you type,
+     * in place of the outline around the field. Empty is the outline.
+     */
+    "historyFocus": string;
+
+    /**
      * Shell, if set, overrides the front matter's shell for every file.
      */
     "shell": string;

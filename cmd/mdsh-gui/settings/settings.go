@@ -81,6 +81,10 @@ type Settings struct {
 	// or "dark" always. Empty is the look's own: dark for plain, match
 	// for Teletype.
 	HistoryPane string `json:"historyPane"`
+	// HistoryFocus is how the History pane's prompt shows it has the
+	// keyboard: "cursor" for a blinking block cursor where you type,
+	// in place of the outline around the field. Empty is the outline.
+	HistoryFocus string `json:"historyFocus"`
 	// Shell, if set, overrides the front matter's shell for every file.
 	Shell string `json:"shell"`
 	// HistoryRC is a file, such as ~/.zshrc, the shells read while the
