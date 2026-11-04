@@ -8,14 +8,17 @@ lede: "Two programs: `mdsh-gui`, the desktop app, and `mdsh`, the command line w
 ## Homebrew, on macOS and Linux
 
 ```sh
-brew install --cask gdey/tap/mdsh   # the desktop app, macOS
-brew install gdey/tap/mdsh          # mdsh and mdsh -i
+brew install --cask gdey/tap/mdsh   # the desktop app with mdsh, macOS
+brew install gdey/tap/mdsh          # just mdsh and mdsh -i
 ```
 
-The macOS app isn't signed with an Apple Developer ID yet, so the first
-time you open it macOS says it can't check it. Open it once, then
-choose **Open Anyway** in System Settings › Privacy & Security. Or add
-`--no-quarantine` to the `brew install --cask` line.
+Pick one: the desktop app carries `mdsh` and the cask puts it on your
+`PATH`, so the two don't install side by side. The macOS app is signed
+with an Apple Developer ID and notarized, so it opens like any other
+app.
+
+Downloaded the app instead? Settings › Shell › Command line tool puts
+its `mdsh` on your `PATH`, on macOS and from the Linux AppImage.
 
 ## Linux packages
 

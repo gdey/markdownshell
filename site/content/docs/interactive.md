@@ -82,6 +82,10 @@ Blocks keep their shells between runs, the same as in one `mdsh` run,
 so running a block again runs it in the shell as the earlier runs left
 it, and replaces its output. Stopping a block starts its shell over.
 
+A running block's header counts up how long it has run, against its
+`timeout=` when it has one (`running… 12s / 1m`), and keeps the time
+once it ends (`✓ 1.4s`). The time is for this session; it isn't saved.
+
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` and `s` honor both.
 

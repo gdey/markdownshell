@@ -27,9 +27,9 @@ A way for an AI assistant to open a document and work with it through
 mdsh, inside the same guard rails a person has. The design is in
 [pull request #155](https://github.com/gdey/markdownshell/pull/155).
 
-## After 1.3, in the app
+## Next, in the app
 
-A Welcome document that explains the window, a Help menu with the
-shortcuts, What's new in Settings › About, one icon set, and the
-accessibility work that continues past the 1.3 pass. The full list is
+A Welcome document that explains the window, the shortcuts in the Help
+menu, one icon set, and the accessibility work that continues past the
+1.3 pass. What's new shipped in 1.4, as Help › Changelog. The full list is
 in [docs/release/v1.3.md](https://github.com/gdey/markdownshell/pull/106).

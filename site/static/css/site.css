@@ -108,7 +108,7 @@ figure.shot figcaption, .caption { font-size: 14px; color: var(--muted); margin-
 .wow p code { color: var(--fg); }
 .num { font: 600 13px var(--mono); color: var(--accent); display: block; margin-bottom: 6px; }
 
-.looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.looks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .looks figure { margin: 0; }
 
 .fronts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; list-style: none; padding: 0; margin: 0; }
@@ -116,6 +116,9 @@ figure.shot figcaption, .caption { font-size: 14px; color: var(--muted); margin-
 .fronts h3 { margin: 0 0 6px; font-size: 18px; }
 .fronts p { margin: 0 0 10px; color: var(--muted); font-size: 15px; }
 .fronts pre { margin: 0; font-size: 13px; }
+.news { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; list-style: none; padding: 0; margin: 0 0 16px; }
+.news li { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; color: var(--muted); font-size: 15px; }
+.news strong { display: block; color: var(--fg); font-size: 17px; margin-bottom: 4px; }
 .tag { display: inline-block; font: 600 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ok); border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px; margin-bottom: 8px; }
 .tag.soon { color: var(--soon); }
 
@@ -176,7 +179,7 @@ pre code { background: none; padding: 0; font-size: 14px; }
 @media (max-width: 860px) {
   .hero-grid, .wow, .wow:nth-child(even), .same-file, .cols { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .wow:nth-child(even) .wow-text { order: 0; }
-  .fronts, .looks { grid-template-columns: minmax(0, 1fr); }
+  .fronts, .looks, .news { grid-template-columns: minmax(0, 1fr); }
   .buyers li { grid-template-columns: 36px minmax(0, 1fr); }
   .buyers li p { grid-column: 2; }
 }
