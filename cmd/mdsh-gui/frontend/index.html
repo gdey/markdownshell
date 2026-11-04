@@ -155,6 +155,7 @@
       <div class="history-line">
         <span id="history-prompt" class="prompt" aria-hidden="true">$</span>
         <textarea id="history-input" rows="1" spellcheck="false" autocomplete="off" aria-label="Command to run and add to the file, or a note starting with #" placeholder="A command to run and add to the file, or # a note"></textarea>
+        <span id="history-timer" role="timer" aria-label="Time the command has run" hidden><span class="label">running</span> <span id="history-time">0.0s</span></span>
         <span id="history-status" role="status"></span>
         <span class="history-controls">
           <button id="history-stop" class="icon" title="Stop: {key} for a command typed here" data-key="Ctrl-C" aria-label="Stop" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg></button>
