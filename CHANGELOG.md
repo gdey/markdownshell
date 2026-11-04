@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
+  the zsh wrapper from Settings › Shell and the README. The wrapper puts
+  `--source …` first, so mdsh took the subcommand for a file and failed
+  with `open completion: no such file or directory`. A subcommand may now
+  follow `--source` flags.
 - The Homebrew cask no longer warns that mdsh.app isn't signed and
   suggests `--no-quarantine`: from 1.4.0 the app is signed with a
   Developer ID and notarized, so it opens like any other app.
