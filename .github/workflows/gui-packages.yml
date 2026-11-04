@@ -67,9 +67,13 @@ jobs:
           security import "$RUNNER_TEMP/certificate.p12" -P "$MACOS_CERTIFICATE_PASSWORD" \
             -A -t cert -f pkcs12 -k "$KEYCHAIN"
           # Apple's intermediate, so the certificate's chain checks out
-          # even when the .p12 was exported without it.
+          # even when the .p12 was exported without it. A .p12 exported
+          # with its chain already carries it, and importing it again
+          # fails with "already exists", so that failure is fine: the
+          # find-identity check below catches a chain that's really
+          # missing (the identity isn't valid without it).
           curl -sSfL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
-          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -t cert -k "$KEYCHAIN"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -t cert -k "$KEYCHAIN" || true
           security set-key-partition-list -S apple-tool:,apple: -k "$password" "$KEYCHAIN" >/dev/null
           security list-keychain -d user -s "$KEYCHAIN"
           rm "$RUNNER_TEMP/certificate.p12"
