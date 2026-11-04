@@ -328,19 +328,15 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 				continue
 			}
 		}
-		if b.Attrs.Has("confirm") || opts.Step || d.Options.Step {
-			a, err := s.confirm(b)
-			if err != nil || a == Stop {
-				s.results[i].Declined = true
-				s.logSkip(b, "stop", nil)
-				return err
-			}
-			if a == Skip {
-				r.Skipped = true
-				s.results[i] = r
-				s.logSkip(b, "confirm", nil)
-				continue
-			}
+		// b's own confirm comes after its dependencies, right
+		// before it runs; with nobody to ask, the run stops before
+		// any of them run.
+		ask := b.Attrs.Has("confirm") || opts.Step || d.Options.Step
+		if ask && opts.Confirm == nil {
+			s.results[i].Declined = true
+			s.logSkip(b, "stop", nil)
+			_, err := s.confirm(b)
+			return err
 		}
 		if err := s.runDepends(ctx, b, ran); err != nil {
 			var de *depError
@@ -366,6 +362,20 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 			}
 			return err
 		}
+		if ask {
+			a, err := s.confirm(b)
+			if err != nil || a == Stop {
+				s.results[i].Declined = true
+				s.logSkip(b, "stop", nil)
+				return err
+			}
+			if a == Skip {
+				r.Skipped = true
+				s.results[i] = r
+				s.logSkip(b, "confirm", nil)
+				continue
+			}
+		}
 		s.results[i] = r
 		s.run(ctx, b, r)
 		if ctx.Err() != nil {
@@ -387,11 +397,12 @@ func (s *Session) hasOutput(i int) bool {
 
 // RunBlock runs block i alone and returns its new result. It runs the
 // block even if it is marked skip, its run= condition is false or Only
-// leaves it out, since running it is what was asked for. A confirm block
-// is still confirmed first; if the answer is not Go, the old result
-// stays and RunBlock returns it. Then the blocks its depends= names are
-// asked about and run, as Options.Depend says; a Stop there keeps the old
-// result too, and a failed dependency returns ErrDependency. An include
+// leaves it out, since running it is what was asked for. First the
+// blocks its depends= needs are asked about and run, from the top of the
+// chain down, as Options.Depend says; a Stop there keeps the old result,
+// and a failed dependency returns ErrDependency. Then a confirm block is
+// confirmed, right before it runs; if the answer is not Go, the old
+// result stays and RunBlock returns it. An include
 // block reads its file again.
 // It returns an error if the block can't run at all.
 func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
@@ -410,20 +421,19 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 	case !Runnable(b):
 		return s.results[i], fmt.Errorf("mdsh can't run %s blocks", b.Lang)
 	}
-	if b.Attrs.Has("confirm") {
-		a, err := s.confirm(b)
-		if err != nil {
-			return s.results[i], err
-		}
-		if a != Go {
-			return s.results[i], nil
-		}
+	confirm := b.Attrs.Has("confirm")
+	if confirm && s.opts.Confirm == nil {
+		_, err := s.confirm(b)
+		return s.results[i], err
 	}
 	if err := s.runDepends(ctx, b, nil); err != nil {
 		if errors.Is(err, errStopped) {
 			err = nil
 		}
 		return s.results[i], err
+	}
+	if confirm && s.opts.Confirm(b) != Go {
+		return s.results[i], nil
 	}
 	s.results[i] = r
 	s.run(ctx, b, r)
@@ -443,68 +453,97 @@ type depError struct {
 func (e *depError) Error() string { return fmt.Sprintf("%s didn't run: %s", e.label, ErrDependency) }
 func (e *depError) Unwrap() error { return ErrDependency }
 
-// runDepends readies b to run: in the order b's depends= lists them,
-// each block that hasn't run in this session, or failed when it did, or
-// is marked always, or is stale (see Stale), is asked about with Depend, and run if the answer is Go, after its own
-// dependencies. An empty block (see emptyDep) runs without asking. A dependency the answer skips is left as it is. It
-// returns errStopped if an answer was Stop, a *depError if a dependency
-// failed or ended its shell, and ctx's error if ctx ended. ran, if not
-// nil, gets each block it runs.
+// runDepends readies b to run. It first works out every block b needs:
+// the blocks b's depends= names, in the order it lists them, each after
+// the blocks it needs in turn, all the way up the chain. A block is
+// needed unless it has run in this session and didn't fail, isn't marked
+// always and isn't stale (see Stale); a block that isn't needed isn't
+// followed further. Then it walks back down that list from the top,
+// asking about each block with Depend right before running it (an empty
+// block, see emptyDep, runs without asking), so a block's own
+// dependencies have all been dealt with by the time it is asked about,
+// and an answer of Go runs the block then. A dependency the answer skips
+// is left as it is, and the blocks below it are still asked about. Each
+// block is asked about at most once on the way to b, always or not. If
+// what ran made a block that was passed over stale, it works the chain
+// out again and goes on. It returns errStopped if an answer was Stop, a
+// *depError if a dependency failed or ended its shell, and ctx's error
+// if ctx ended. ran, if not nil, gets each block it runs.
 func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Block]bool) error {
-	return s.runDeps(ctx, b, ran, map[*doc.Block]bool{})
-}
-
-// runDeps is runDepends; fresh holds the dependencies run on the way to
-// this one block, so an always dependency that two of them share runs
-// once for it, not once for each, and one skipped is asked about once.
-func (s *Session) runDeps(ctx context.Context, b *doc.Block, ran, fresh map[*doc.Block]bool) error {
-	for _, id := range b.Depends() {
-		// A name that isn't a block that can run is ignored: the
-		// document warned about it when it was parsed.
-		dep := s.d.Dep(id)
-		if dep == nil {
-			continue
+	// done holds the blocks run or skipped on the way to b.
+	done := map[*doc.Block]bool{}
+	for {
+		steps, err := s.depChain(b, done)
+		if err != nil || len(steps) == 0 {
+			return err
 		}
-		i := slices.Index(s.d.Blocks, dep)
-		if r := s.results[i]; r != nil && r.Ran && !r.Failed() && (fresh[dep] || !dep.Attrs.Has("always")) && !Stale(s.d, s.results)[i] {
-			continue
-		}
-		if !Runnable(dep) {
-			return fmt.Errorf("%s depends on %s, but mdsh can't run %s blocks", s.d.Label(b), s.d.Label(dep), dep.Lang)
-		}
-		a := Go
-		if !emptyDep(dep) {
-			var err error
-			if a, err = s.depend(dep, b); err != nil {
+		for _, st := range steps {
+			a := Go
+			if !emptyDep(st.dep) {
+				if a, err = s.depend(st.dep, st.of); err != nil {
+					return err
+				}
+			}
+			done[st.dep] = true
+			switch a {
+			case Stop:
+				return errStopped
+			case Skip:
+				continue
+			}
+			s.Reap()
+			r := &Result{Block: st.dep}
+			s.results[slices.Index(s.d.Blocks, st.dep)] = r
+			s.run(ctx, st.dep, r)
+			if ran != nil {
+				ran[st.dep] = true
+			}
+			if err := ctx.Err(); err != nil {
 				return err
 			}
-		}
-		switch a {
-		case Stop:
-			return errStopped
-		case Skip:
-			fresh[dep] = true
-			continue
-		}
-		if err := s.runDeps(ctx, dep, ran, fresh); err != nil {
-			return err
-		}
-		s.Reap()
-		r := &Result{Block: dep}
-		s.results[i] = r
-		s.run(ctx, dep, r)
-		fresh[dep] = true
-		if ran != nil {
-			ran[dep] = true
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if r.Failed() {
-			return &depError{dep: dep, label: s.d.Label(b)}
+			if r.Failed() {
+				return &depError{dep: st.dep, label: s.d.Label(st.of)}
+			}
 		}
 	}
-	return nil
+}
+
+// depStep is a block to ask about and run on the way to running another:
+// dep, which of's depends= names.
+type depStep struct{ dep, of *doc.Block }
+
+// depChain lists the blocks b needs, as runDepends works them out, each
+// after the blocks it needs and each once. done holds blocks already
+// dealt with, which aren't needed again.
+func (s *Session) depChain(b *doc.Block, done map[*doc.Block]bool) ([]depStep, error) {
+	stale := Stale(s.d, s.results)
+	seen := map[*doc.Block]bool{b: true}
+	var steps []depStep
+	var walk func(b *doc.Block) error
+	walk = func(b *doc.Block) error {
+		for _, id := range b.Depends() {
+			// A name that isn't a block that can run is ignored: the
+			// document warned about it when it was parsed.
+			dep := s.d.Dep(id)
+			if dep == nil || seen[dep] || done[dep] {
+				continue
+			}
+			seen[dep] = true
+			i := slices.Index(s.d.Blocks, dep)
+			if r := s.results[i]; r != nil && r.Ran && !r.Failed() && !dep.Attrs.Has("always") && !stale[i] {
+				continue
+			}
+			if !Runnable(dep) {
+				return fmt.Errorf("%s depends on %s, but mdsh can't run %s blocks", s.d.Label(b), s.d.Label(dep), dep.Lang)
+			}
+			if err := walk(dep); err != nil {
+				return err
+			}
+			steps = append(steps, depStep{dep: dep, of: b})
+		}
+		return nil
+	}
+	return steps, walk(b)
 }
 
 // emptyDep reports whether dep can run as a dependency without asking:
