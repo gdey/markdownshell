@@ -6,6 +6,30 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-04
+
+Running a runbook gets easier to follow and to trust. Blocks show a
+timer while they run and keep how long they took, a dependency that has
+gone stale since it ran is run again, `always` reruns steps such as a
+login every time, `nosave` keeps a value out of the file, and `secret`
+blurs a block until you ask to see it. mdsh-gui gains a front matter
+form, the changelog built in, copy buttons for code, output and History
+lines, Console warnings that fix themselves, tabs that drag out to
+other apps, and a fourth look, Bubble Gum; the History pane gets
+readline keys, a timer and tmux. The macOS app is now signed with a
+Developer ID and notarized by Apple, so it opens without the Gatekeeper
+workaround that earlier releases needed. The desktop app also carries
+the `mdsh` command line tool, which Settings › Shell installs.
+
+**Two changes reach into existing files.** Blocks no longer get your
+whole environment: a file without `env.share` in its front matter now
+passes only a base set (`PATH`, `HOME`, `USER`, `LANG` and the like),
+so a document that relies on `GOPATH`, `AWS_PROFILE` or similar needs
+`share: [...]`. And a `tty` block's output is now an asciinema `.cast`
+file played in place rather than an animated GIF; give `out=recording:`
+a path ending in `.gif` to keep a GIF. Both are described in full under
+Changed.
+
 ### Added
 
 - The desktop app carries the `mdsh` command line tool, at the same
@@ -170,6 +194,9 @@ follow [Semantic Versioning](https://semver.org/).
   they open in the browser or mail app. Commands typed in the History
   pane are added with `links`, and the addresses they print are
   clickable in the pane too. Take `links` off a block to turn it off.
+
+  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
+
 - Copy a fenced block's code to the clipboard. In mdsh-gui each block's
   card has a copy button (or press `c` on the selected block), and other
   fenced code in the document shows one in its corner on hover; the
@@ -268,8 +295,6 @@ follow [Semantic Versioning](https://semver.org/).
 - Commands typed in the History pane, in mdsh-gui and `mdsh -i`, are
   added with `skip`, so running the whole file doesn't run them again.
   Running one by hand still does.
-
-  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
 
 ### Fixed
 
@@ -1141,7 +1166,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/gdey/markdownshell/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/gdey/markdownshell/compare/v1.1.0...v1.2.0
