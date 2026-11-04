@@ -183,6 +183,7 @@
 [data-look="tty"] .block.selected { outline: none; box-shadow: 5px 5px 0 var(--fg); }
 [data-look="tty"] .block.ran { border-left-color: var(--ok); }
 [data-look="tty"] .block.ran.stale { border-left-color: var(--warn-border); }
+[data-look="tty"] .block.timing { border-left-color: var(--accent); }
 [data-look="tty"] :is(.block pre.code, .block .output-part, .block .ask) { border-top-style: dashed; }
 [data-look="tty"] .block .head .lang { padding: 0; border: 0; background: none; font-size: calc(13px * var(--text-scale)); }
 [data-look="tty"] .block .head .lang::before, [data-look="tty"] .block .head .attrs::before { content: "["; }

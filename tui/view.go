@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -223,9 +224,9 @@ func tagsOf(b *doc.Block) string {
 func (m *Model) state(i int, r *run.Result) string {
 	switch {
 	case m.active == i:
-		return lipgloss.NewStyle().Foreground(runningCol).Render("running…")
+		return lipgloss.NewStyle().Foreground(runningCol).Render("running… " + m.elapsed(i))
 	case m.bg[i]:
-		return lipgloss.NewStyle().Foreground(runningCol).Render("running in the background…")
+		return lipgloss.NewStyle().Foreground(runningCol).Render("running in the background… " + m.elapsed(i))
 	case m.prompt != nil && m.index[m.prompt.block] == i:
 		return lipgloss.NewStyle().Foreground(runningCol).Render("waiting for an answer")
 	case r.Ran && errors.Is(r.Err, context.Canceled):
@@ -233,12 +234,12 @@ func (m *Model) state(i int, r *run.Result) string {
 	case r.Ran && r.Err != nil:
 		return lipgloss.NewStyle().Foreground(failCol).Render("✗ " + r.Err.Error())
 	case r.Ran && r.Failed():
-		return lipgloss.NewStyle().Foreground(failCol).Render(fmt.Sprintf("✗ exit %d", r.ExitStatus()))
+		return lipgloss.NewStyle().Foreground(failCol).Render(fmt.Sprintf("✗ exit %d", r.ExitStatus())) + took(r)
 	case r.Ran && !r.Block.IsInclude() && run.Stale(m.d, m.results)[i]:
 		// A block it depends on ran again, or was cleared, since.
-		return lipgloss.NewStyle().Foreground(runningCol).Render("✓ stale")
+		return lipgloss.NewStyle().Foreground(runningCol).Render("✓ stale") + took(r)
 	case r.Ran && !r.Block.IsInclude():
-		return lipgloss.NewStyle().Foreground(okCol).Render("✓")
+		return lipgloss.NewStyle().Foreground(okCol).Render("✓") + took(r)
 	case r.Skipped && run.Runnable(r.Block):
 		return tagStyle.Render("skipped")
 	}
@@ -393,4 +394,44 @@ func clean(s string) string {
 		}
 		return r
 	}, strings.ReplaceAll(s, "\t", "    "))
+}
+
+// elapsed is how long running block i has run, to the second, and its
+// timeout= when it has one: 12s, or 12s / 1m.
+func (m *Model) elapsed(i int) string {
+	t, ok := m.started[i]
+	if !ok {
+		return ""
+	}
+	s := runTime(time.Since(t).Truncate(time.Second))
+	if v, ok := m.d.Blocks[i].Attrs["timeout"]; ok {
+		s += " / " + v
+	}
+	return s
+}
+
+// took is how long a block that ran took, after its state, or "" when
+// that isn't known.
+func took(r *run.Result) string {
+	if r.Duration <= 0 {
+		return ""
+	}
+	return tagStyle.Render(" " + runTime(r.Duration))
+}
+
+// runTime says d to a tenth of a second under a minute, as 12.3s or,
+// to the second, 12s, and to the second past it, as 1m 05s or
+// 1h 02m 05s.
+func runTime(d time.Duration) string {
+	if d < time.Minute {
+		if d%time.Second == 0 {
+			return fmt.Sprintf("%ds", d/time.Second)
+		}
+		return fmt.Sprintf("%.1fs", float64(d.Truncate(100*time.Millisecond))/float64(time.Second))
+	}
+	s := int(d / time.Second)
+	if s < 3600 {
+		return fmt.Sprintf("%dm %02ds", s/60, s%60)
+	}
+	return fmt.Sprintf("%dh %02dm %02ds", s/3600, s/60%60, s%60)
 }

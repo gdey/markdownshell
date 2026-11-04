@@ -86,6 +86,9 @@ func TestBackgroundTimeout(t *testing.T) {
 	if bg.Exited || bg.Status != -1 || bg.Err == nil || !strings.Contains(bg.Err.Error(), "timed out after 500ms") {
 		t.Errorf("bg: exited %v, status %d, err %v", bg.Exited, bg.Status, bg.Err)
 	}
+	if !bg.TimedOut || bg.Duration < 500*time.Millisecond || bg.Duration > 5*time.Second {
+		t.Errorf("bg: timed out %v after %s, want true after about 500ms", bg.TimedOut, bg.Duration)
+	}
 	wantStdout(t, r, "b", "b\n")
 	wantStdout(t, r, "c", "gone\n")
 }

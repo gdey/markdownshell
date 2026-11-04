@@ -655,3 +655,27 @@ func TestIncludeNumbered(t *testing.T) {
 		t.Errorf("include from line 1: FirstLine %d, HTML %q", c.FirstLine, c.HTML)
 	}
 }
+
+// A block's cell says its timeout=, and once it runs, how long it took
+// and whether the timeout ended it.
+func TestCellTimes(t *testing.T) {
+	n, err := Open(write(t, "```sh {#slow timeout=1m30s}\nsleep 0.2\n```\n\n```sh {#late timeout=100ms}\nsleep 5\n```\n\n```sh {#plain}\ntrue\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	before := n.Cells()
+	if before[0].Timeout != 90_000 || before[1].Timeout != 100 || before[2].Timeout != 0 || before[0].Ms != 0 {
+		t.Errorf("before running: %+v", before)
+	}
+	if err := n.RunFrom(0); err != nil {
+		t.Fatal(err)
+	}
+	cells := n.Cells()
+	if c := cells[0]; c.Ms < 200 || c.Ms > 3000 || c.TimedOut {
+		t.Errorf("slow: ms %d, timed out %v", c.Ms, c.TimedOut)
+	}
+	if c := cells[1]; c.Ms < 100 || c.Ms > 3000 || !c.TimedOut {
+		t.Errorf("late: ms %d, timed out %v", c.Ms, c.TimedOut)
+	}
+}

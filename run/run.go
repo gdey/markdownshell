@@ -190,6 +190,12 @@ type Result struct {
 	// block's Seq when this one started, so Stale can tell when one has
 	// run again since, or had its run cleared.
 	Deps map[string]uint64
+	// Duration is how long the block ran, from its Started event to its
+	// Done, for a block that ran in a Session. A background block's runs
+	// until Reap sees it end.
+	Duration time.Duration
+	// TimedOut is true when the block's timeout= ended it.
+	TimedOut bool
 }
 
 // Failed reports whether the block ran and did not succeed.
@@ -454,6 +460,7 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	r.Stdout, r.Stderr = stdout.Bytes(), stderr.Bytes()
 	if err != nil && !errors.Is(err, env.ErrExited) {
 		if errors.Is(err, context.DeadlineExceeded) {
+			r.TimedOut = true
 			err = fmt.Errorf("timed out after %s", b.Attrs["timeout"])
 		}
 		r.Err = err

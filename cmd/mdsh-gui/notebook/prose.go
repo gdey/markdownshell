@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
@@ -111,6 +112,9 @@ func (n *Notebook) cells() []Cell {
 			Failed:          r.Failed(),
 			Stale:           stale[i],
 			Running:         n.bg[b],
+			Ms:              r.Duration.Milliseconds(),
+			TimedOut:        r.TimedOut,
+			Timeout:         timeoutMs(b),
 			From:            span.Start,
 			To:              span.End,
 		})
@@ -499,4 +503,18 @@ func tasksIn(marks []int, span doc.Span) []int {
 		}
 	}
 	return tasks
+}
+
+// timeoutMs is b's timeout= in milliseconds, or 0 when it has none or
+// it doesn't parse.
+func timeoutMs(b *doc.Block) int64 {
+	t, ok := b.Attrs["timeout"]
+	if !ok {
+		return 0
+	}
+	d, err := time.ParseDuration(t)
+	if err != nil || d <= 0 {
+		return 0
+	}
+	return d.Milliseconds()
 }

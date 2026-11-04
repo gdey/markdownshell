@@ -720,3 +720,24 @@ func TestInputVars(t *testing.T) {
 		t.Errorf("prod ran %v, staging ran %v", r["prod"].Ran, r["staging"].Ran)
 	}
 }
+
+// Each block that runs gets how long it took, and timeout= says when
+// it ended the block.
+func TestDuration(t *testing.T) {
+	_, r := runDoc(t, "```sh {#quick}\ntrue\n```\n```sh {#slow}\nsleep 0.3\n```\n```sh {#late timeout=200ms}\nsleep 5\n```\n```sh {#skipped skip}\ntrue\n```\n", run.Options{})
+	if d := r[0].Duration; d <= 0 || d > 2*time.Second {
+		t.Errorf("quick took %s", d)
+	}
+	if d := r[1].Duration; d < 300*time.Millisecond || d > 3*time.Second {
+		t.Errorf("slow took %s, want about 300ms", d)
+	}
+	if d := r[2].Duration; !r[2].TimedOut || d < 200*time.Millisecond || d > 3*time.Second {
+		t.Errorf("late: timed out %v after %s, want true after about 200ms", r[2].TimedOut, d)
+	}
+	if r[1].TimedOut {
+		t.Error("slow timed out")
+	}
+	if r[3].Duration != 0 {
+		t.Errorf("skipped took %s", r[3].Duration)
+	}
+}

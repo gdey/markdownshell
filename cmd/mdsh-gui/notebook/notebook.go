@@ -69,6 +69,13 @@ type Cell struct {
 	// Running is true while a background block is still going; its
 	// output and status come in when it ends.
 	Running bool `json:"running"`
+	// Ms is how long the block's last run this session took, in
+	// milliseconds, and TimedOut is true when its timeout= ended it.
+	Ms       int64 `json:"ms,omitempty"`
+	TimedOut bool  `json:"timedOut,omitempty"`
+	// Timeout is the block's timeout=, in milliseconds, or 0 when it has
+	// none, so a running block can show how close it is.
+	Timeout int64 `json:"timeout,omitempty"`
 	// Heading is the level of a prose cell that is a heading, 1 to 6;
 	// its section runs to the next heading of the same or a higher level.
 	Heading int `json:"heading,omitempty"`

@@ -350,6 +350,23 @@ th { background: var(--code-bg); }
 .block .exit { padding: 0 8px; border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 18px; color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); margin-right: 8px; }
 .block .exit:empty { display: none; }
 .block .exit.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+/* The run timer: how long a running block has run, ticking, with a
+   spinner before it; then, muted, how long it took. A block with
+   timeout= gets a bar under its head that fills toward the timeout,
+   turning amber at three quarters and red at nine tenths. */
+.block .timer { font-family: var(--font-code); font-size: calc(12px * var(--text-scale)); line-height: 18px; color: var(--muted); margin-right: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
+.block .timer:empty { display: none; }
+.block .timer.bad { color: var(--bad); }
+.block.timing { border-left: 3px solid var(--accent); }
+.block.timing .timer { color: var(--accent); font-weight: 600; }
+.block.timing .timer::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; animation: timer-spin 0.8s linear infinite; }
+.block.timing.late .timer { color: var(--warn-border); }
+.block.timing.later .timer { color: var(--bad); }
+.block.timing[data-timeout] .head { position: relative; }
+.block.timing[data-timeout] .head::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: calc(var(--timeout-done, 0) * 100%); background: var(--accent); transition: width 0.1s linear; }
+.block.timing.late .head::after { background: var(--warn-border); }
+.block.timing.later .head::after { background: var(--bad); }
+@keyframes timer-spin { to { transform: rotate(360deg); } }
 .block pre { margin: 0; border-radius: 0; }
 .block pre.code { border-top: 1px solid var(--border); }
 .block .ask { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--warn-bg); font-size: calc(14px * var(--text-scale)); }

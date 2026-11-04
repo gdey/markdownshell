@@ -85,7 +85,11 @@ type Model struct {
 	// a tick checks for those that ended.
 	bg      map[int]bool
 	ticking bool
-	prompt  *confirmMsg
+	// started holds when each running block started. While there are
+	// any, a clock ticks each second, so their headers count up.
+	started  map[int]time.Time
+	clocking bool
+	prompt   *confirmMsg
 	// input is the prompt for a new block, while typing is set.
 	input  textinput.Model
 	typing bool
@@ -201,6 +205,12 @@ type reapMsg struct{ m *Model }
 // nothing else runs.
 const reapEvery = 250 * time.Millisecond
 
+// clockMsg is the tick that counts up a running block's time.
+type clockMsg struct{ m *Model }
+
+// clockEvery is how often a running block's time is drawn again.
+const clockEvery = time.Second
+
 type ttyBackMsg struct{}
 
 // viewer shows an image full screen, with the terminal released, until
@@ -256,6 +266,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		termBlock: -1,
 		live:      map[int][]chunk{},
 		bg:        map[int]bool{},
+		started:   map[int]time.Time{},
 		md:        map[string]string{},
 		images:    map[string]string{},
 	}
@@ -396,6 +407,16 @@ func (m *Model) tick() tea.Cmd {
 	return tea.Tick(reapEvery, func(time.Time) tea.Msg { return reapMsg{m} })
 }
 
+// clock schedules a tick of the running blocks' times, if any are
+// running and none is scheduled.
+func (m *Model) clock() tea.Cmd {
+	if len(m.started) == 0 || m.clocking {
+		return nil
+	}
+	m.clocking = true
+	return tea.Tick(clockEvery, func(time.Time) tea.Msg { return clockMsg{m} })
+}
+
 // Init starts listening for run events, and watching the file.
 func (m *Model) Init() tea.Cmd { return tea.Batch(m.wait, m.check(), m.watchPane) }
 
@@ -409,7 +430,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	case eventMsg:
 		m.event(run.Event(msg))
-		return m, tea.Batch(m.wait, m.tick())
+		return m, tea.Batch(m.wait, m.tick(), m.clock())
 	case checkMsg:
 		if msg.m != m {
 			return m, nil
@@ -419,6 +440,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refresh()
 		}
 		return m, m.check()
+	case clockMsg:
+		if msg.m != m {
+			return m, nil
+		}
+		m.clocking = false
+		if len(m.started) > 0 {
+			m.refresh()
+		}
+		return m, m.clock()
 	case reapMsg:
 		if msg.m != m {
 			return m, nil
@@ -513,6 +543,7 @@ func (m *Model) event(e run.Event) {
 	i := m.index[e.Block]
 	switch e.Kind {
 	case run.Started:
+		m.started[i] = time.Now()
 		if e.Block.Attrs.Has("background") {
 			// The run goes straight on; Done comes when the block ends.
 			m.bg[i] = true
@@ -525,6 +556,7 @@ func (m *Model) event(e run.Event) {
 	case run.Stdout, run.Stderr:
 		m.live[i] = append(m.live[i], chunk{stderr: e.Kind == run.Stderr, data: string(e.Data)})
 	case run.Done:
+		delete(m.started, i)
 		delete(m.live, i)
 		delete(m.bg, i)
 		m.results[i] = e.Result
