@@ -58,7 +58,7 @@ is the GUI's design, and the accessibility audit lives in the project's
 | History shell | no | `h` pane | cmd/ctrl+shift+H pane |
 | Outline | no | `o` | cmd/ctrl+shift+O, sidebar icon |
 | Help | `-h`, `mdsh ctl help` | `?` panel, grouped, greyed with a reason when a key does nothing | menus with accelerators; tooltips name the key |
-| Themes | terminal colors | light and dark adaptive colors | System / Light / Dark, Looks: Plain, Blueprint, Teletype; text size, fonts, accent |
+| Themes | terminal colors | light and dark adaptive colors | System / Light / Dark, Looks: Plain, Blueprint, Teletype, Bubble Gum; text size, fonts, accent |
 
 ## Errors, warnings and status
 
@@ -194,7 +194,7 @@ must have before it merges.
   prints the words beside the mark. Color alone never carries meaning.
 - **Contrast.** 4.5:1 for text and 3:1 for control edges and focus rings,
   in light and dark, in every Look. Measure a new Look or token before it
-  ships; the harness has the check. Primary buttons pick black or white
+  ships; `TestLookContrast` in `cmd/mdsh-gui` has the check. Primary buttons pick black or white
   text by the accent's luminance (`--accent-fg`, `--bad-fg`).
 - **Focus is visible** on every focusable thing (`:focus-visible` ring in
   the accent, dashed in Blueprint), including focus set by code.
@@ -245,7 +245,7 @@ messages and the changelog.
 | save, Save As…, autosave, "output not saved" | write, dirty, modified | saving |
 | report | export | a PDF, HTML or markdown copy of a run |
 | session | daily note | a file named for the day in the sessions folder |
-| Look | theme, skin | Plain, Blueprint, Teletype; "theme" is System, Light, Dark |
+| Look | theme, skin | Plain, Blueprint, Teletype, Bubble Gum; "theme" is System, Light, Dark |
 | depends on | requires, needs | the `depends=` attribute |
 | collection | folder, workspace | a folder with an `.mdsh.yaml` |
 

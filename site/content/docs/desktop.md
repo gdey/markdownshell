@@ -129,7 +129,7 @@ six tabs:
 | Tab | Holds |
 | --- | --- |
 | General | the view a file opens in, the start folder |
-| Look | Plain, Teletype or Blueprint; light, dark or the system's; text size, fonts (any installed), line spacing, accent, the History pane's colors, and the Teletype paper's sprockets, rules and shadows |
+| Look | Plain, Teletype, Blueprint or Bubble Gum; light, dark or the system's; text size, fonts (any installed), line spacing, accent, the History pane's colors, and the Teletype paper's sprockets, rules and shadows |
 | Editing | autosave after each run, Vim keys, spell checking, the Neovim pane (experimental) |
 | Shell | a shell for every file, the file the History shell reads, and a switch that gives blocks your zsh aliases and functions |
 | Files | the templates folder for New File…, the sessions folder and template |

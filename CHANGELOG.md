@@ -8,6 +8,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a Bubble Gum look in Settings › Look: Hubba Bubba pink
+  paper with bubbles blown across the page, puffy cards and pill
+  buttons on a chunky shadow, and bubble-lettered headings, or the
+  same pink gone to berry when the theme is dark. The bubbles and the
+  shadows can be turned off. The look's text, code, output and History
+  pane all measure at least 4.5:1, and a new test checks that the
+  plain and Bubble Gum palettes keep that ratio.
+
+  ![The deploy runbook in the Bubble Gum look: pink paper with bubbles, puffy cards and bubble-lettered headings, with push asking to run](docs/changelog/bubblegum.png)
 - A copy button on a block's output in mdsh-gui. It sits in the
   output's top right corner, shows on hover, focus or the selected
   card, and copies the output as text, without its colors (the text as
