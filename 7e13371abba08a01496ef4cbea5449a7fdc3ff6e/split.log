@@ -1,0 +1,3 @@
+mdsh-swift: snapshot: SwiftUI showed no window; drawing one
+2026-11-04 08:48:31.228 mdsh-swift[3989:16652] NSSpellServer dataFromCheckingString timed out, index is 1
+2026-11-04 08:48:31.288 mdsh-swift[3989:16652] NSSpellServer dataFromCheckingString succeeded, index is 0
