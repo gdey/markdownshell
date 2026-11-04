@@ -273,6 +273,8 @@ to use the key; choose Always Allow.
 - `site/content/install.md` and `site/content/docs/desktop.md` say the
   app isn't signed yet and how to get past Gatekeeper; cut that to a
   line, and the `--no-quarantine` tip goes.
+- `.github/scripts/tap.sh` writes a caveat into the Homebrew cask
+  saying the app isn't signed; it goes.
 - `cmd/mdsh-gui/README.md` › Install and Packages say "unsigned" and
   "signed ad hoc".
 - `CHANGELOG.md`: say the app is now signed and notarized, under
