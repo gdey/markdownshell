@@ -201,6 +201,8 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 .cm-run:hover { background: var(--hover); }
 .cm-run svg { width: 11px; height: 11px; fill: currentColor; }
 #doc-scroll { flex: 1; overflow: auto; min-width: 0; position: relative; isolation: isolate; }
+/* For a frame after a long jump, so WebKit paints the view afresh. */
+#doc-scroll.repaint :is(#doc, #deps, #deps-ui) { transform: translateZ(0); }
 /* Dependency lines: an SVG layer behind the cards, over the page, in
    the margin, and a clear one over everything for what is clicked or
    dragged: the dots where lines attach, the rings to drag new lines

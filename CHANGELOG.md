@@ -135,6 +135,13 @@ follow [Semantic Versioning](https://semver.org/).
   named itself that; it is now opened by its own name, such as
   /dev/ttys003, which `tty` prints too.
 
+- In `mdsh-gui` on macOS, the rendered view no longer goes blank,
+  until it is scrolled by hand, after a run jumps a long way down it,
+  to a question or the next block, or when the page is drawn anew, as
+  when a run ends. A jump further than the view is tall now goes at
+  once rather than smoothly, and the view is painted again after it
+  and after each redraw.
+
 - In `mdsh-gui`, the History pane's prompt follows the pane's width. A
   prompt drawn to fit the terminal, such as one with a rule or a
   right-aligned part, kept the width of the last command run there (or
