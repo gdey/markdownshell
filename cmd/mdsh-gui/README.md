@@ -529,9 +529,9 @@ About tab with the version, build, paths and tools.
 
 ## Install
 
-Releases have an unsigned universal macOS app (`.dmg` and `.zip`) and a
-Linux AppImage; see [Desktop app](../../site/content/docs/desktop.md)
-for how to open the unsigned app the first time. Both carry the `mdsh`
+Releases have a universal macOS app (`.dmg` and `.zip`), signed with a
+Developer ID and notarized from 1.4 on, and a Linux AppImage; see
+[Desktop app](../../site/content/docs/desktop.md). Both carry the `mdsh`
 command line tool, built from the same commit: `mdsh.app` at
 `Contents/MacOS/mdsh`, the AppImage at `usr/bin/mdsh`. Settings › Shell
 puts it on `PATH` (a symlink in `/usr/local/bin` on macOS, a copy in

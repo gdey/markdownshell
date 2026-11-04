@@ -58,6 +58,7 @@ hello from a sub-env
 | `show-output=COND` | Print the output only if the condition holds |
 | `show-stderr[=COND]` | Show stderr (by default only when the block fails) |
 | `links` | Make web addresses (`http:`, `https:`, `mailto:`) in the output clickable in mdsh-gui and `mdsh -i`; History adds it to commands typed there |
+| `nosave` | Keep the value out of the file: the block runs and shows its output, but saving leaves what the file holds. Works on textboxes, choices and `output` fences too |
 | `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, and as with `nosave` the output isn't saved to the file |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
@@ -65,7 +66,7 @@ hello from a sub-env
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
-| `timeout=30s` | Kill the block's shell after this long (stops the run) |
+| `timeout=30s` | Kill the block's shell after this long (stops the run); mdsh-gui and `mdsh -i` show the time against it while the block runs |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
 | `frame=N` | With `tty`, the frame a PDF shows (default the last) |
 | `out=markdown` | Insert output as raw markdown |
@@ -109,6 +110,29 @@ found. `stream=stderr` copies the stderr fence. A copy keeps what it holds
 when its block doesn't run, `--hide-output` and `show-output=` hide copies
 too, and a copy for a block that doesn't exist is left alone with a
 warning.
+
+### Keeping values out of the file
+
+Mark a block `nosave` when its output shouldn't be committed, such as a
+token it prints or a listing that changes every run. It runs and shows
+its output as usual, but saving (`mdsh -w`, `-o`, `mdsh -i` and
+mdsh-gui) leaves the fence as the file has it. A `nosave` textbox or
+choice works the same way: what you type reaches the blocks as
+`$MDSH_VAR_name`, and the file keeps the body it was written with, as
+a default. On an `output` fence, `nosave` keeps just that fence.
+mdsh-gui gives a `nosave` card a *session only* badge.
+
+`secret` goes one step further: it implies `nosave`, and mdsh-gui blurs
+the block's code and output until you press the eye on its card, then
+masks them again after a minute (Settings › Editing › Show secrets
+for) or when the window loses focus. Copying still works, and on macOS
+the copy is marked concealed, so clipboard managers leave it out.
+
+````markdown
+```sh {#token secret}
+vault read -field=token secret/deploy
+```
+````
 
 ## Confirming blocks
 

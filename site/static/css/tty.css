@@ -111,7 +111,7 @@
 [data-theme="tty"] .hero .window { transform: rotate(1.2deg); }
 [data-theme="tty"] .window .bar { background: var(--side); }
 [data-theme="tty"] .window.term .bar { background: #1c2129; }
-[data-theme="tty"] pre, [data-theme="tty"] .fronts li, [data-theme="tty"] .cards a { border-style: dashed; border-color: var(--frame); }
+[data-theme="tty"] pre, [data-theme="tty"] .fronts li, [data-theme="tty"] .news li, [data-theme="tty"] .cards a { border-style: dashed; border-color: var(--frame); }
 [data-theme="tty"] code { border-radius: 0; }
 [data-theme="tty"] .steps > li::before { border-radius: 0; }
 [data-theme="tty"] .tag { border-radius: 0; }

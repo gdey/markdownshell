@@ -17,9 +17,8 @@ On macOS with Homebrew:
 brew install --cask gdey/tap/mdsh
 ```
 
-Add `--no-quarantine` to skip the Gatekeeper step below. Otherwise, each
-[release](https://github.com/gdey/markdownshell/releases) has the
-desktop app beside the command line archives:
+Otherwise, each [release](https://github.com/gdey/markdownshell/releases)
+has the desktop app beside the command line archives:
 
 | File | For |
 | --- | --- |
@@ -27,12 +26,10 @@ desktop app beside the command line archives:
 | `mdsh-gui_VERSION_macos_universal.zip` | The same app, zipped. |
 | `mdsh-gui_VERSION_linux_x86_64.AppImage` | Linux on x86-64. Make it executable and run it; it carries its own GTK and WebKit. |
 
-The macOS app isn't signed with an Apple Developer ID, so the first time
-you open it macOS says it can't check it. Open it once, then choose Open
-Anyway in System Settings › Privacy & Security; before macOS 15 you can
-instead right-click the app and choose Open. From a terminal, `xattr -dr com.apple.quarantine
-/Applications/mdsh.app` does the same. Once the app is allowed, the
-`mdsh` inside it runs from a terminal too.
+The macOS app is signed with an Apple Developer ID and notarized, so
+Gatekeeper opens it without asking, and the `mdsh` inside it runs from a
+terminal too. Releases before 1.4 aren't: open one once, then choose
+Open Anyway in System Settings › Privacy & Security.
 
 On Linux:
 
@@ -100,16 +97,32 @@ This page is the reference.
 - **Tabs and windows.** Each file opens in a tab with shells of its own.
   Drag a tab to reorder it, onto another window to move it there, or
   away from the tab bar for a window of its own; a block running in it
-  carries on. Each file remembers its window size.
+  carries on. Drop a tab on another app, such as a terminal, to hand it
+  the file's full path. Each file remembers its window size.
 - **Running.** Every block has run and run-from-here buttons, every
   heading a play button for its section, and Run all runs the document.
   Run Current Block is cmd/ctrl+enter, Run Section cmd/ctrl+shift+enter,
   Run All cmd/ctrl+R and Stop cmd/ctrl+. . Output streams in under the
-  block, with ANSI colors. Running blocks are listed in the toolbar, and
-  a run returns focus to the block it started from. Run › Clear All
+  block, with ANSI colors. A running block's card shows a spinner and a
+  timer, `12.3s / 1m` with a bar that fills toward its `timeout=`, and
+  keeps how long it took once it ends. Running blocks are listed in the
+  toolbar, and a run returns focus to the block it started from. Run › Clear All
   Outputs (cmd/ctrl+alt+K, or the eraser in the toolbar) takes all
   output out of the document, as if nothing had run.
-- **Questions.** A `confirm` block asks in its card. A block whose
+- **Copying.** Each block's card has a copy button for its code (or
+  press `c`), its output has one in its top right corner, and other
+  fenced code shows one on hover. Output is copied as text, without
+  its colors. Drag over the History pane's output to copy lines of it.
+- **Secrets.** A `secret` block's code and output are blurred until you
+  press the eye on its card, and masked again after a minute or when
+  the window loses focus. A `nosave` card carries a *session only*
+  badge: it runs, but its output isn't saved to the file.
+- **Front matter.** The Front matter tab at the top of the page (Edit ›
+  Front Matter, cmd/ctrl+shift+M) opens a form for the title,
+  description, tags, the `mdsh:` options and `env:`, with any other
+  keys as YAML. Each change is one edit Undo takes back.
+- **Questions.** A `confirm` block asks in its card, scrolled to the
+  middle of the view. A block whose
   `depends=` names one that hasn't run asks to run it first. A `tty`
   block runs in a terminal in its card and is recorded; a `background`
   block runs on, with a dashed edge, while the next ones do.
@@ -138,16 +151,21 @@ This page is the reference.
   block once moved.
 - **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from
   the app, with a count on the toolbar; a line about a place in a file
-  jumps to it.
+  jumps to it. A warning an edit fixed is struck out, and one with a
+  plain fix, such as a `depends=` naming no block, has a Fix button.
 - **Outline** (cmd/ctrl+shift+O). Headings, blocks and controls, with a
   play button on the selected block.
 - **Pictures.** Images, screenshots and recordings show in the block.
   `d2` fences draw diagrams, `svg` fences pictures, and `cast` fences
-  (asciinema recordings) play in the cast player. Images from other
+  (asciinema recordings) play in the cast player, as do `tty` blocks'
+  recordings: play, pause, step a frame, select text and copy it, or
+  copy the recording as a GIF. Images from other
   sites are never loaded.
 - **Reports.** Save writes the output into the file, and File › Create
   Report… makes a PDF, HTML or markdown report, and shows the `mdsh`
   command that makes the same one.
+- **Changelog.** Help › Changelog opens the changelog of the build
+  you're running in a read-only tab, with its screenshots.
 
 {{< shot name="outline" title="deploy.md · outline" >}}The outline beside the notebook.{{< /shot >}}
 
@@ -160,10 +178,10 @@ six tabs:
 | --- | --- |
 | General | the view a file opens in, the start folder |
 | Look | Plain, Teletype, Blueprint or Bubble Gum; light, dark or the system's; text size, fonts (any installed), line spacing, accent, the History pane's colors, and the Teletype paper's sprockets, rules and shadows |
-| Editing | autosave after each run, Vim keys, spell checking, the Neovim pane (experimental) |
-| Shell | a shell for every file, the file the History shell reads, and a switch that gives blocks your zsh aliases and functions |
+| Editing | autosave after each run, Vim keys, spell checking, how long a secret stays shown, the Neovim pane (experimental) |
+| Shell | a shell for every file, the file the History shell reads, a switch that gives blocks your zsh aliases and functions, and Install for the command line tool |
 | Files | the templates folder for New File…, the sessions folder and template |
-| About | the build, the paths it uses and the tools on your `PATH`, with Copy for a bug report |
+| About | the build, the paths it uses and the tools on your `PATH`, with Copy for a bug report, and a link to the changelog |
 
 {{< shot src="settings-look-paper.png" title="Settings" >}}Settings › Look, in the Teletype look.{{< /shot >}}
 

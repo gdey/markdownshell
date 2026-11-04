@@ -22,6 +22,21 @@
 
 <section class="band">
   <div class="wrap">
+    <h2>New in 1.4</h2>
+    <ul class="news">
+      <li><strong><code>secret</code> and <code>nosave</code>.</strong> Blur a block until you look, and keep output, typed values and picks out of the file.</li>
+      <li><strong>Run timers.</strong> A running block counts up against its <code>timeout=</code>, in the app and in <code>mdsh -i</code>, and keeps how long it took.</li>
+      <li><strong>Copy buttons.</strong> On a block's code, its output, any fence in the prose, and lines of the History pane.</li>
+      <li><strong>A front matter form.</strong> Title, tags, <code>mdsh:</code> options and <code>env:</code>, edited from the page, with Undo.</li>
+      <li><strong>Terminal recordings as casts.</strong> <code>tty</code> blocks play in the card, with a scrubber, frame steps and text you can select.</li>
+      <li><strong>A smaller default environment.</strong> Blocks get a base set of variables unless the file asks for more with <code>env.share</code>.</li>
+    </ul>
+    <p class="caption">Plus a macOS app signed with a Developer ID and notarized that carries <code>mdsh</code> inside it (one download gives you both), the Bubble Gum look, the changelog in Help › Changelog, stale and <code>always</code> dependencies, and a Console that offers fixes. Every change is in the <a href="{{ "changelog/" | relURL }}">changelog</a>.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
     <h2>It is still just markdown.</h2>
     <p class="sub">No new file format, no kernel, no server. The window above is this file. It renders on GitHub, diffs cleanly in review, and runs from a terminal or CI with no app at all.</p>
     <div class="same-file">
@@ -69,6 +84,15 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
       <div class="wow">
         <div class="wow-text">
           <span class="num">03</span>
+          <h3>Secrets stay out of the file.</h3>
+          <p>Mark a block <code>secret</code> and the app blurs its code and output until you press the eye, then masks them again after a minute. Mark it <code>nosave</code> and it runs as usual, but its output is never written to the file, so it never reaches git.</p>
+          <p>A running block counts up against its <code>timeout=</code>, and every block keeps how long it took.</p>
+        </div>
+        {{ partial "shot.html" (dict "src" "secrets-light.png" "dark" "secrets-dark.png" "title" "rotate.md · running" "alt" "A secret block blurred with a session only badge, a nosave block with its output and a session only badge, and a rollout block running with a timer reading 9.5s / 1m") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">04</span>
           <h3>Your terminal session becomes a document.</h3>
           <p>Open the History pane and work as you would in a terminal, with your shell's own prompt and completion. Every command lands in the file as a block, with its output. A line that starts with <code>#</code> becomes a note.</p>
           <p>New Session opens a file for the day. When you're done, delete what didn't matter, write a sentence above what did, and the investigation is a runbook.</p>
@@ -77,7 +101,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
       </div>
       <div class="wow">
         <div class="wow-text">
-          <span class="num">04</span>
+          <span class="num">05</span>
           <h3>A form, written in markdown.</h3>
           <p><code>textbox</code> and <code>choice</code> blocks become a text field, radio buttons and checkboxes. Pick the environment, type the host, press Run section. What you picked is saved in the file and reaches the blocks as <code>$MDSH_VAR_env</code>.</p>
           <p>The author controls the choices; the person running it never edits code.</p>
@@ -86,7 +110,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
       </div>
       <div class="wow">
         <div class="wow-text">
-          <span class="num">05</span>
+          <span class="num">06</span>
           <h3>Diagrams, tables and pictures, inline.</h3>
           <p>A <code>d2</code> fence draws a diagram, an <code>svg</code> fence a picture. <code>out=markdown</code> turns a block's output into a table, <code>out=image</code> keeps the chart it printed, and <code>tty</code> blocks run on a real terminal and keep a recording.</p>
           <p>Nothing is fetched from the network to draw them.</p>
@@ -95,7 +119,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
       </div>
       <div class="wow">
         <div class="wow-text">
-          <span class="num">06</span>
+          <span class="num">07</span>
           <h3>One click to the report.</h3>
           <p>Create Report makes a PDF, a standalone HTML page or a markdown copy of the run, with or without the code, and shows the <code>mdsh</code> command that makes the same one, so CI can make it next week.</p>
           <p>The change ticket asked what you ran and what happened. This is that, with exit codes.</p>
@@ -108,12 +132,13 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
 
 <section class="band">
   <div class="wrap">
-    <h2>Three looks. Light and dark.</h2>
+    <h2>Four looks. Light and dark.</h2>
     <p class="sub">Plain for every day, Teletype for fan-fold paper and green phosphor, Blueprint for white lines on drafting blue, Bubble Gum for Hubba Bubba pink. Settings › Look tunes the type, spacing and accent.</p>
     <div class="looks">
       <figure>{{ partial "shot.html" (dict "src" "hero-light.png" "dark" "hero-dark.png" "title" "Plain" "alt" "The Plain look") }}</figure>
       <figure>{{ partial "shot.html" (dict "src" "hero-paper.png" "dark" "hero-phosphor.png" "title" "Teletype" "alt" "The Teletype look") }}</figure>
       <figure>{{ partial "shot.html" (dict "src" "hero-blueprint.png" "dark" "hero-blueprint-dark.png" "title" "Blueprint" "alt" "The Blueprint look") }}</figure>
+      <figure>{{ partial "shot.html" (dict "src" "hero-bubblegum.png" "dark" "hero-bubblegum-dark.png" "title" "Bubble Gum" "alt" "The Bubble Gum look: pink paper with bubbles, puffy cards and pill buttons") }}</figure>
     </div>
   </div>
 </section>
@@ -169,8 +194,8 @@ cd markdownshell/examples` "sh" "" }}</div></li>
     <div>
       <h2>Install</h2>
       <p class="sub">Homebrew on macOS and Linux, packages for Debian and Fedora, or one binary from the releases page.</p>
-{{ highlight `brew install --cask gdey/tap/mdsh   # the desktop app (macOS)
-brew install gdey/tap/mdsh          # mdsh and mdsh -i` "sh" "" }}
+{{ highlight `brew install --cask gdey/tap/mdsh   # the desktop app and mdsh (macOS)
+brew install gdey/tap/mdsh          # or just mdsh and mdsh -i` "sh" "" }}
       <p><a class="button" href="{{ "install/" | relURL }}">All the ways to install</a></p>
     </div>
     <div>
