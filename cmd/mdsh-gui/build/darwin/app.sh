@@ -30,6 +30,10 @@ notarize=
 if [ -n "$identity" ] && [ -n "${MDSH_NOTARY_KEY:-}" ]; then
 	notarize=1
 	: "${MDSH_NOTARY_KEY_ID:?set with MDSH_NOTARY_KEY}" "${MDSH_NOTARY_ISSUER:?set with MDSH_NOTARY_KEY}"
+	# IDs pasted into CI secrets tend to carry a trailing newline, which
+	# notarytool rejects ("must be a valid UUID"), so trim them.
+	MDSH_NOTARY_KEY_ID=$(printf '%s' "$MDSH_NOTARY_KEY_ID" | tr -d '[:space:]')
+	MDSH_NOTARY_ISSUER=$(printf '%s' "$MDSH_NOTARY_ISSUER" | tr -d '[:space:]')
 fi
 
 # sign PATH signs one piece of code: Developer ID with the hardened
