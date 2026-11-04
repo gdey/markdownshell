@@ -1,0 +1,693 @@
+package run
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gdey/markdownshell/audit"
+	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/termrec"
+)
+
+// Session runs a document's blocks, keeping each env's shell alive from
+// one run to the next. Run uses one to run the whole document; an
+// interactive front end uses one to run blocks as they are picked.
+//
+// A Session runs one thing at a time: don't call RunFrom or RunBlock
+// while another call is running.
+type Session struct {
+	d        *doc.Document
+	opts     Options
+	stack    *env.Stack
+	selected map[*doc.Block]bool
+	results  []*Result
+	lookup   doc.Lookup
+	// baseLookup is lookup without the variables mdsh ctl set made.
+	baseLookup doc.Lookup
+	ctl        *ctlState
+	wanted     map[string][]string
+	tty        bool // whether the shells have terminals of their own
+	jobs       []*bgJob
+	seq        uint64 // the last Result.Seq given out
+	// started holds when each running block started, for its
+	// Result.Duration.
+	startMu sync.Mutex
+	started map[*doc.Block]time.Time
+}
+
+// NewSession reads d's include blocks and readies its envs. No shell is
+// started until a block runs in it. Close the session when done.
+func NewSession(d *doc.Document, opts Options) (*Session, error) {
+	if opts.Environ == nil {
+		opts.Environ = os.Environ()
+	}
+	opts.Environ = WithMode(opts.Environ, mode(opts.Mode))
+	if opts.Dir == "" && opts.File != "" {
+		opts.Dir = filepath.Dir(opts.File)
+	}
+	shell := opts.Shell
+	if shell == "" {
+		shell = Shell(d)
+	}
+	selected, err := selectBlocks(d, opts.Only)
+	if err != nil {
+		return nil, err
+	}
+	init, err := sources(d, opts)
+	if err != nil {
+		return nil, err
+	}
+	s := &Session{
+		d:        d,
+		opts:     opts,
+		selected: selected,
+		stack: env.NewStack(env.Config{
+			Path: shell,
+			Env:  TopEnv(d, opts),
+			Dir:  opts.Dir,
+			Args: opts.Args,
+			TTY:  hasTTY(d) || opts.PTY,
+			Init: init,
+		}),
+		tty: hasTTY(d) || opts.PTY,
+	}
+	s.stack.Strict = opts.Remote
+	if opts.Audit != nil {
+		s.stack.OnStart = s.logEnv
+	}
+	// Includes are part of the document, not steps of the run, so they
+	// are read whatever runs.
+	s.results = Includes(d, opts)
+	s.startCtl()
+	s.refs()
+	return s, nil
+}
+
+// sources reads the files the front matter's env.source names into one
+// script, followed by opts.Source.
+func sources(d *doc.Document, opts Options) (string, error) {
+	base := opts.Dir
+	if opts.File != "" {
+		base = filepath.Dir(opts.File)
+	}
+	var scripts []string
+	for _, p := range d.Options.Env.Source {
+		if rest, ok := strings.CutPrefix(p, "~/"); ok {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("env.source %s: %w", p, err)
+			}
+			p = filepath.Join(home, rest)
+		} else if !filepath.IsAbs(p) && base != "" {
+			p = filepath.Join(base, p)
+		}
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return "", fmt.Errorf("env.source: %w", err)
+		}
+		scripts = append(scripts, string(src))
+	}
+	return joinScripts(append(scripts, opts.Source)...), nil
+}
+
+// joinScripts joins scripts, ending each with a newline.
+func joinScripts(scripts ...string) string {
+	var b strings.Builder
+	for _, s := range scripts {
+		b.WriteString(s)
+		if s != "" && !strings.HasSuffix(s, "\n") {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
+// refs notes the variables other blocks read from each block and readies
+// the lookup for them.
+func (s *Session) refs() {
+	refs := s.d.Refs()
+	for _, r := range s.results {
+		if r.Block.IsTape() && r.Ran {
+			refs = append(refs, doc.TextRefs(string(r.Stdout))...)
+		}
+	}
+	s.wanted = map[string][]string{}
+	for _, ref := range refs {
+		if ref.BlockID != "" && !ref.Fact() {
+			s.wanted[ref.BlockID] = append(s.wanted[ref.BlockID], ref.Var)
+		}
+	}
+	s.baseLookup = NewLookup(s.d, s.results, s.opts.Environ)
+	s.lookup = s.ctlLookup(s.baseLookup)
+}
+
+// SetFile renames the document the session runs: blocks run from now on
+// see file as MDSH_FILE and save their assets in <file>.assets. The
+// shells and their working directory stay as they are.
+func (s *Session) SetFile(file string) { s.opts.File = file }
+
+// Results returns one result per block, in order. A block run again gets
+// a new result, so hold on to the slice only while nothing runs.
+func (s *Session) Results() []*Result { return s.results }
+
+// SetResult puts r in as block i's result, as when a notebook clears a
+// block's run or an undo puts it back, so depends= and Stale see it.
+// The shell keeps what the run did. Call it while nothing runs.
+func (s *Session) SetResult(i int, r *Result) {
+	if i >= 0 && i < len(s.results) && r != nil && r.Block == s.d.Blocks[i] {
+		s.results[i] = r
+	}
+}
+
+// ErrRestart is Sync's answer when the document gained the first tty
+// block after the session's shells started without terminals of their
+// own.
+var ErrRestart = errors.New("the first tty block needs mdsh to start again")
+
+// Sync catches the session up with changes to the document since it
+// started: blocks appended, as by doc.AppendBlock, blocks edited in
+// place, as by doc.Document.SetBlock, and a new source, as by
+// doc.Document.SetSource. A block that kept its identity keeps its
+// result, wherever it moved; a new block starts with none, except that
+// a new include block is read. Call it
+// while nothing runs.
+func (s *Session) Sync() error {
+	byBlock := make(map[*doc.Block]*Result, len(s.results))
+	for _, r := range s.results {
+		byBlock[r.Block] = r
+	}
+	results := make([]*Result, len(s.d.Blocks))
+	for i, b := range s.d.Blocks {
+		if r, ok := byBlock[b]; ok {
+			results[i] = r
+			continue
+		}
+		results[i] = &Result{Block: b}
+		if _, ok := s.selected[b]; !ok {
+			s.selected[b] = true
+		}
+		if b.IsInclude() {
+			results[i] = s.readInclude(b)
+		}
+	}
+	s.results = results
+	s.refs()
+	if hasTTY(s.d) && !s.tty {
+		return ErrRestart
+	}
+	return nil
+}
+
+// ReadIncludes reads every include block's file again, as after a run
+// whose blocks may have written them. Call it while nothing runs.
+func (s *Session) ReadIncludes() {
+	for i, b := range s.d.Blocks {
+		if b.IsInclude() {
+			s.results[i] = s.readInclude(b)
+		}
+	}
+}
+
+// readInclude reads include block b's file, or skips it with skip.
+func (s *Session) readInclude(b *doc.Block) *Result {
+	r := &Result{Block: b}
+	if b.Attrs.Has("skip") {
+		r.Skipped = true
+		return r
+	}
+	includeBlock(b, r, s.opts)
+	return r
+}
+
+// Ask runs script in the shell of the document's top-level env, where
+// blocks with no env= run, and returns what it printed. It sees what
+// blocks left there, such as the directory and variables, and should
+// change none of it, so put it in a subshell. Call it while nothing
+// runs; ending ctx ends the shell.
+func (s *Session) Ask(ctx context.Context, script string) (string, error) {
+	return s.AskSized(ctx, script, 0, 0)
+}
+
+// AskSized is Ask with the shell's terminal, if it has one, sized cols
+// by rows first. Zero leaves it as it is.
+func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (string, error) {
+	e, err := s.stack.Get(ctx, "", s.d.Options.Env.Share)
+	if err != nil {
+		return "", err
+	}
+	e.Shell.SetSize(cols, rows)
+	var out bytes.Buffer
+	if _, _, err := e.Shell.Run(ctx, script, &out, io.Discard); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+// PTY reports whether the session's shells have terminals of their own,
+// which RunTyped needs.
+func (s *Session) PTY() bool { return s.tty }
+
+// Close ends the session's shells, and any background block still
+// running, which it reports as killed, and removes the control socket.
+func (s *Session) Close() {
+	for _, j := range s.jobs {
+		j.job.Kill()
+	}
+	s.Reap()
+	s.stack.Close()
+	s.closeCtl()
+}
+
+func (s *Session) emit(e Event) {
+	switch e.Kind {
+	case Started:
+		s.startMu.Lock()
+		if s.started == nil {
+			s.started = map[*doc.Block]time.Time{}
+		}
+		s.started[e.Block] = time.Now()
+		s.startMu.Unlock()
+	case Done:
+		s.startMu.Lock()
+		if t, ok := s.started[e.Block]; ok {
+			delete(s.started, e.Block)
+			if e.Result != nil {
+				e.Result.Duration = time.Since(t)
+			}
+		}
+		s.startMu.Unlock()
+	}
+	if s.opts.OnEvent != nil {
+		s.opts.OnEvent(e)
+	}
+}
+
+// RunFrom runs the blocks from index from to the end, the way Run does:
+// it honors skip, run= (once included), Only, confirm, depends= and step mode, and stops when a
+// block ends its shell or fails with on_error stop. Blocks it runs again
+// get new results.
+func (s *Session) RunFrom(ctx context.Context, from int) error {
+	return s.RunRange(ctx, from, len(s.d.Blocks))
+}
+
+// RunRange runs blocks from up to but not including to, as RunFrom
+// runs them: confirm, run=, skip, depends= and on_error all apply, and
+// a block's dependencies run first even when they are outside the
+// range. mdsh-gui uses it to run a section.
+func (s *Session) RunRange(ctx context.Context, from, to int) error {
+	d, opts := s.d, s.opts
+	// ran holds the blocks already run as dependencies on the way, so
+	// they don't run twice.
+	ran := map[*doc.Block]bool{}
+	for i := max(from, 0); i < min(to, len(d.Blocks)); i++ {
+		s.Reap()
+		b := d.Blocks[i]
+		if ran[b] {
+			continue
+		}
+		if b.IsInclude() {
+			// Read it again: a block above may have just written it.
+			r := s.readInclude(b)
+			s.results[i] = r
+			if r.Ran {
+				s.emit(Event{Kind: Done, Block: b, Result: r})
+			}
+			continue
+		}
+		r := &Result{Block: b}
+		if !Runnable(b) || b.Attrs.Has("skip") || !s.selected[b] {
+			r.Skipped = true
+			s.results[i] = r
+			switch {
+			case !Runnable(b):
+			case b.Attrs.Has("skip"):
+				s.logSkip(b, "skip", nil)
+			default:
+				s.logSkip(b, "--only", nil)
+			}
+			continue
+		}
+		if c, ok := b.Cond("run"); ok {
+			lookup := LookupAt(s.lookup, d, s.results, b.Span.Start)
+			once := c.Once && s.hasOutput(i)
+			if once || !c.Eval(lookup) {
+				r.Skipped = true
+				s.results[i] = r
+				if once {
+					s.logSkip(b, "once", nil)
+				} else {
+					s.logSkip(b, "run=", s.condSaw(c, lookup))
+				}
+				continue
+			}
+		}
+		// b's own confirm comes after its dependencies, right
+		// before it runs; with nobody to ask, the run stops before
+		// any of them run.
+		ask := b.Attrs.Has("confirm") || opts.Step || d.Options.Step
+		if ask && opts.Confirm == nil {
+			s.results[i].Declined = true
+			s.logSkip(b, "stop", nil)
+			_, err := s.confirm(b)
+			return err
+		}
+		if err := s.runDepends(ctx, b, ran); err != nil {
+			var de *depError
+			switch {
+			case errors.Is(err, errStopped):
+				s.results[i].Declined = true
+				s.logSkip(b, "stop", nil)
+				return s.Wait(ctx)
+			case errors.As(err, &de):
+				// As if the dependency had failed in place: the
+				// block doesn't run, and on_error says whether the
+				// run goes on.
+				r.Skipped = true
+				s.results[i] = r
+				s.logSkip(b, "depends", audit.Fields{"failed": de.dep.ID})
+				if stopOnError(d, de.dep, opts) {
+					return s.Wait(ctx)
+				}
+				continue
+			}
+			if ctx.Err() == nil {
+				s.results[i].Declined = true
+			}
+			return err
+		}
+		if ask {
+			a, err := s.confirm(b)
+			if err != nil || a == Stop {
+				s.results[i].Declined = true
+				s.logSkip(b, "stop", nil)
+				return err
+			}
+			if a == Skip {
+				r.Skipped = true
+				s.results[i] = r
+				s.logSkip(b, "confirm", nil)
+				continue
+			}
+		}
+		s.results[i] = r
+		s.run(ctx, b, r)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if r.Exited || (r.Failed() && stopOnError(d, b, opts)) {
+			break
+		}
+	}
+	return s.Wait(ctx)
+}
+
+// hasOutput reports whether block i has output, for run=once: saved
+// after it in the file, or from running earlier in this session.
+func (s *Session) hasOutput(i int) bool {
+	r := s.results[i]
+	return s.d.Blocks[i].HasOutput() || r != nil && r.Ran
+}
+
+// RunBlock runs block i alone and returns its new result. It runs the
+// block even if it is marked skip, its run= condition is false or Only
+// leaves it out, since running it is what was asked for. First the
+// blocks its depends= needs are asked about and run, from the top of the
+// chain down, as Options.Depend says; a Stop there keeps the old result,
+// and a failed dependency returns ErrDependency. Then a confirm block is
+// confirmed, right before it runs; if the answer is not Go, the old
+// result stays and RunBlock returns it. An include
+// block reads its file again.
+// It returns an error if the block can't run at all.
+func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
+	if i < 0 || i >= len(s.d.Blocks) {
+		return nil, fmt.Errorf("no block %d", i)
+	}
+	s.Reap()
+	b := s.d.Blocks[i]
+	r := &Result{Block: b}
+	switch {
+	case b.IsInclude():
+		includeBlock(b, r, s.opts)
+		s.results[i] = r
+		s.emit(Event{Kind: Done, Block: b, Result: r})
+		return r, nil
+	case !Runnable(b):
+		return s.results[i], fmt.Errorf("mdsh can't run %s blocks", b.Lang)
+	}
+	confirm := b.Attrs.Has("confirm")
+	if confirm && s.opts.Confirm == nil {
+		_, err := s.confirm(b)
+		return s.results[i], err
+	}
+	if err := s.runDepends(ctx, b, nil); err != nil {
+		if errors.Is(err, errStopped) {
+			err = nil
+		}
+		return s.results[i], err
+	}
+	if confirm && s.opts.Confirm(b) != Go {
+		return s.results[i], nil
+	}
+	s.results[i] = r
+	s.run(ctx, b, r)
+	return r, ctx.Err()
+}
+
+// errStopped is runDepends' error when the answer for a dependency was
+// Stop.
+var errStopped = errors.New("stopped")
+
+// depError is runDepends' error when a dependency failed.
+type depError struct {
+	dep   *doc.Block
+	label string // the block that didn't run
+}
+
+func (e *depError) Error() string { return fmt.Sprintf("%s didn't run: %s", e.label, ErrDependency) }
+func (e *depError) Unwrap() error { return ErrDependency }
+
+// runDepends readies b to run. It first works out every block b needs:
+// the blocks b's depends= names, in the order it lists them, each after
+// the blocks it needs in turn, all the way up the chain. A block is
+// needed unless it has run in this session and didn't fail, isn't marked
+// always and isn't stale (see Stale); a block that isn't needed isn't
+// followed further. Then it walks back down that list from the top,
+// asking about each block with Depend right before running it (an empty
+// block, see emptyDep, runs without asking), so a block's own
+// dependencies have all been dealt with by the time it is asked about,
+// and an answer of Go runs the block then. A dependency the answer skips
+// is left as it is, and the blocks below it are still asked about. Each
+// block is asked about at most once on the way to b, always or not. If
+// what ran made a block that was passed over stale, it works the chain
+// out again and goes on. It returns errStopped if an answer was Stop, a
+// *depError if a dependency failed or ended its shell, and ctx's error
+// if ctx ended. ran, if not nil, gets each block it runs.
+func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Block]bool) error {
+	// done holds the blocks run or skipped on the way to b.
+	done := map[*doc.Block]bool{}
+	for {
+		steps, err := s.depChain(b, done)
+		if err != nil || len(steps) == 0 {
+			return err
+		}
+		for _, st := range steps {
+			a := Go
+			if !emptyDep(st.dep) {
+				if a, err = s.depend(st.dep, st.of); err != nil {
+					return err
+				}
+			}
+			done[st.dep] = true
+			switch a {
+			case Stop:
+				return errStopped
+			case Skip:
+				continue
+			}
+			s.Reap()
+			r := &Result{Block: st.dep}
+			s.results[slices.Index(s.d.Blocks, st.dep)] = r
+			s.run(ctx, st.dep, r)
+			if ran != nil {
+				ran[st.dep] = true
+			}
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if r.Failed() {
+				return &depError{dep: st.dep, label: s.d.Label(st.of)}
+			}
+		}
+	}
+}
+
+// depStep is a block to ask about and run on the way to running another:
+// dep, which of's depends= names.
+type depStep struct{ dep, of *doc.Block }
+
+// depChain lists the blocks b needs, as runDepends works them out, each
+// after the blocks it needs and each once. done holds blocks already
+// dealt with, which aren't needed again.
+func (s *Session) depChain(b *doc.Block, done map[*doc.Block]bool) ([]depStep, error) {
+	stale := Stale(s.d, s.results)
+	seen := map[*doc.Block]bool{b: true}
+	var steps []depStep
+	var walk func(b *doc.Block) error
+	walk = func(b *doc.Block) error {
+		for _, id := range b.Depends() {
+			// A name that isn't a block that can run is ignored: the
+			// document warned about it when it was parsed.
+			dep := s.d.Dep(id)
+			if dep == nil || seen[dep] || done[dep] {
+				continue
+			}
+			seen[dep] = true
+			i := slices.Index(s.d.Blocks, dep)
+			if r := s.results[i]; r != nil && r.Ran && !r.Failed() && !dep.Attrs.Has("always") && !stale[i] {
+				continue
+			}
+			if !Runnable(dep) {
+				return fmt.Errorf("%s depends on %s, but mdsh can't run %s blocks", s.d.Label(b), s.d.Label(dep), dep.Lang)
+			}
+			if err := walk(dep); err != nil {
+				return err
+			}
+			steps = append(steps, depStep{dep: dep, of: b})
+		}
+		return nil
+	}
+	return steps, walk(b)
+}
+
+// emptyDep reports whether dep can run as a dependency without asking:
+// its body has no commands, only blank lines and # comments, and it
+// isn't marked confirm. Running it does nothing in the shell, so there
+// is nothing to ask about, though its own dependencies are still asked
+// about. A confirm block is still asked about, since an empty one is a
+// way to make a run stop and ask.
+func emptyDep(dep *doc.Block) bool {
+	if dep.Attrs.Has("confirm") {
+		return false
+	}
+	for line := range strings.Lines(dep.Body) {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Session) depend(dep, b *doc.Block) (Answer, error) {
+	if s.opts.Depend == nil {
+		return Stop, fmt.Errorf("%w: %s depends on %s, which hasn't run", ErrNoConfirm, s.d.Label(b), s.d.Label(dep))
+	}
+	return s.opts.Depend(dep, b), nil
+}
+
+// RunTyped runs block i on Terminal, as if it had been typed there: what
+// is typed in the terminal goes to it, and it shows what it writes. A
+// block that switched to the terminal's alternate screen, as vim or top
+// do, gets its session as a recording, the way a tty block does, and
+// RunTyped reports it as full screen. Any other block gets the text it
+// showed as its stdout. It runs with the shell's job control on, where
+// the shell has it, so ctrl+z stops it, ending the run with status 128 plus SIGTSTP,
+// and fg in a later RunTyped brings it back. The session needs
+// Options.PTY, or a tty block, and Options.Terminal.
+func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bool, err error) {
+	if i < 0 || i >= len(s.d.Blocks) {
+		return nil, false, fmt.Errorf("no block %d", i)
+	}
+	b := s.d.Blocks[i]
+	if !Runnable(b) {
+		return s.results[i], false, fmt.Errorf("mdsh can't run %s blocks", b.Lang)
+	}
+	if s.opts.Terminal == nil {
+		return s.results[i], false, ErrNoTTY
+	}
+	s.Reap()
+	r = &Result{Block: b, Ran: true}
+	s.results[i] = r
+	s.emit(Event{Kind: Started, Block: b})
+	defer func() { s.emit(Event{Kind: Done, Block: b, Result: r}) }()
+	e, err := envFor(ctx, s.stack, s.d, b)
+	if err != nil {
+		r.Err = err
+		return r, false, nil
+	}
+	t := *s.opts.Terminal
+	// Typed at a prompt, it gets the shell's job control: ctrl+z stops
+	// it, and jobs, fg and bg in a later block see it.
+	t.JobControl = true
+	rec := termrec.NewRecorder(t.Dims())
+	pre, revoke := s.issue(b)
+	s.logStart(b)
+	defer s.logEnd(b, r, time.Now())
+	giveBack := takeTTY(b, s.opts)
+	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, pre+b.Body, t, rec)
+	giveBack()
+	revoke()
+	if err != nil && !errors.Is(err, env.ErrExited) {
+		r.Err = err
+	}
+	shown := rec.Recording()
+	if !shown.FullScreen() {
+		r.Stdout = []byte(shown.Text())
+		return r, false, ctx.Err()
+	}
+	img, err := saveRecording(b, shown, s.opts)
+	r.Image = img
+	if r.Err == nil {
+		r.Err = err
+	}
+	return r, true, ctx.Err()
+}
+
+func (s *Session) confirm(b *doc.Block) (Answer, error) {
+	if s.opts.Confirm == nil {
+		return Stop, fmt.Errorf("%w: %s", ErrNoConfirm, s.d.Label(b))
+	}
+	return s.opts.Confirm(b), nil
+}
+
+func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
+	s.seq++
+	r.Seq, r.Deps = s.seq, depSeqs(s.d, s.results, b)
+	s.emit(Event{Kind: Started, Block: b})
+	s.logStart(b)
+	if b.Attrs.Has("background") {
+		s.background(ctx, b, r)
+		return
+	}
+	defer s.logEnd(b, r, time.Now())
+	pre, revoke := s.issue(b)
+	runBlock(ctx, s.stack, s.d, b, pre, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
+	revoke()
+	s.emit(Event{Kind: Done, Block: b, Result: r})
+}
+
+// TopEnv is the environment of d's top-level shell: opts.Environ as the
+// front matter's env.share filters it. A local document gets env.Base
+// and the names its env.share gives, or everything when the list has
+// "..." (doc.Options.FullEnv). A remote document (opts.Remote) gets only
+// the names it gives: no base set, and nothing when it names nothing.
+func TopEnv(d *doc.Document, opts Options) []string {
+	vars := env.Vars(opts.Environ)
+	share := d.Options.Env.Share
+	if share == nil {
+		share = []string{}
+	}
+	if opts.Remote {
+		return env.Environ(env.FilterStrict(vars, share))
+	}
+	return env.Environ(env.Filter(vars, share))
+}

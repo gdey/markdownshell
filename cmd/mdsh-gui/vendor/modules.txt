@@ -1,0 +1,291 @@
+# github.com/PuerkitoBio/goquery v1.10.0
+## explicit; go 1.23
+github.com/PuerkitoBio/goquery
+# github.com/adrg/xdg v0.5.3
+## explicit; go 1.19
+github.com/adrg/xdg
+github.com/adrg/xdg/internal/pathutil
+github.com/adrg/xdg/internal/userdirs
+# github.com/alecthomas/chroma/v2 v2.23.1
+## explicit; go 1.22
+github.com/alecthomas/chroma/v2
+github.com/alecthomas/chroma/v2/formatters
+github.com/alecthomas/chroma/v2/formatters/html
+github.com/alecthomas/chroma/v2/formatters/svg
+github.com/alecthomas/chroma/v2/lexers
+github.com/alecthomas/chroma/v2/styles
+# github.com/andybalholm/brotli v1.2.0
+## explicit; go 1.22
+github.com/andybalholm/brotli
+github.com/andybalholm/brotli/matchfinder
+# github.com/andybalholm/cascadia v1.3.2
+## explicit; go 1.16
+github.com/andybalholm/cascadia
+# github.com/coder/websocket v1.8.14
+## explicit; go 1.23
+github.com/coder/websocket
+github.com/coder/websocket/internal/bpool
+github.com/coder/websocket/internal/errd
+github.com/coder/websocket/internal/util
+github.com/coder/websocket/internal/wsjs
+github.com/coder/websocket/wsjson
+# github.com/creack/pty v1.1.24
+## explicit; go 1.18
+github.com/creack/pty
+# github.com/dlclark/regexp2 v1.11.5
+## explicit; go 1.13
+github.com/dlclark/regexp2
+github.com/dlclark/regexp2/syntax
+# github.com/dop251/goja v0.0.0-20240927123429-241b342198c2
+## explicit; go 1.20
+github.com/dop251/goja
+github.com/dop251/goja/ast
+github.com/dop251/goja/file
+github.com/dop251/goja/ftoa
+github.com/dop251/goja/ftoa/internal/fast
+github.com/dop251/goja/parser
+github.com/dop251/goja/token
+github.com/dop251/goja/unistring
+# github.com/evanw/esbuild v0.28.2
+## explicit; go 1.13
+github.com/evanw/esbuild/internal/api_helpers
+github.com/evanw/esbuild/internal/ast
+github.com/evanw/esbuild/internal/bundler
+github.com/evanw/esbuild/internal/cache
+github.com/evanw/esbuild/internal/compat
+github.com/evanw/esbuild/internal/config
+github.com/evanw/esbuild/internal/css_ast
+github.com/evanw/esbuild/internal/css_lexer
+github.com/evanw/esbuild/internal/css_parser
+github.com/evanw/esbuild/internal/css_printer
+github.com/evanw/esbuild/internal/fs
+github.com/evanw/esbuild/internal/graph
+github.com/evanw/esbuild/internal/helpers
+github.com/evanw/esbuild/internal/js_ast
+github.com/evanw/esbuild/internal/js_lexer
+github.com/evanw/esbuild/internal/js_parser
+github.com/evanw/esbuild/internal/js_printer
+github.com/evanw/esbuild/internal/linker
+github.com/evanw/esbuild/internal/logger
+github.com/evanw/esbuild/internal/renamer
+github.com/evanw/esbuild/internal/resolver
+github.com/evanw/esbuild/internal/runtime
+github.com/evanw/esbuild/internal/sourcemap
+github.com/evanw/esbuild/internal/xxhash
+github.com/evanw/esbuild/pkg/api
+# github.com/gdey/markdownshell v0.0.0 => ../..
+## explicit; go 1.27
+github.com/gdey/markdownshell
+github.com/gdey/markdownshell/audit
+github.com/gdey/markdownshell/collection
+github.com/gdey/markdownshell/ctl
+github.com/gdey/markdownshell/doc
+github.com/gdey/markdownshell/env
+github.com/gdey/markdownshell/history
+github.com/gdey/markdownshell/library
+github.com/gdey/markdownshell/lsp
+github.com/gdey/markdownshell/pdf
+github.com/gdey/markdownshell/render
+github.com/gdey/markdownshell/report
+github.com/gdey/markdownshell/run
+github.com/gdey/markdownshell/tape
+github.com/gdey/markdownshell/termrec
+github.com/gdey/markdownshell/termsafe
+github.com/gdey/markdownshell/textimg
+github.com/gdey/markdownshell/weblink
+github.com/gdey/markdownshell/writable
+# github.com/go-ole/go-ole v1.3.0
+## explicit; go 1.12
+github.com/go-ole/go-ole
+# github.com/go-pdf/fpdf v0.9.0
+## explicit; go 1.20
+github.com/go-pdf/fpdf
+# github.com/go-sourcemap/sourcemap v2.1.4+incompatible
+## explicit
+github.com/go-sourcemap/sourcemap
+github.com/go-sourcemap/sourcemap/internal/base64vlq
+# github.com/godbus/dbus/v5 v5.2.2
+## explicit; go 1.20
+github.com/godbus/dbus/v5
+github.com/godbus/dbus/v5/introspect
+github.com/godbus/dbus/v5/prop
+# github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
+## explicit
+github.com/golang/freetype/raster
+github.com/golang/freetype/truetype
+# github.com/google/pprof v0.0.0-20240927180334-d43a67379298
+## explicit; go 1.22
+github.com/google/pprof/profile
+# github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02
+## explicit; go 1.14
+github.com/hinshun/vt10x
+# github.com/kr/pretty v0.3.1
+## explicit; go 1.12
+# github.com/lucasb-eyer/go-colorful v1.3.0
+## explicit; go 1.12
+github.com/lucasb-eyer/go-colorful
+# github.com/mattn/go-colorable v0.1.14
+## explicit; go 1.18
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.20
+## explicit; go 1.15
+github.com/mattn/go-isatty
+# github.com/mazznoer/csscolorparser v0.1.5
+## explicit; go 1.12
+github.com/mazznoer/csscolorparser
+# github.com/neovim/go-client v1.2.1
+## explicit; go 1.15
+github.com/neovim/go-client/msgpack
+github.com/neovim/go-client/msgpack/rpc
+github.com/neovim/go-client/nvim
+# github.com/rivo/uniseg v0.4.7
+## explicit; go 1.18
+github.com/rivo/uniseg
+# github.com/rogpeppe/go-internal v1.11.0
+## explicit; go 1.19
+# github.com/wailsapp/wails/v3 v3.0.0
+## explicit; go 1.26.0
+github.com/wailsapp/wails/v3/internal/assetserver
+github.com/wailsapp/wails/v3/internal/assetserver/bundledassets
+github.com/wailsapp/wails/v3/internal/assetserver/webview
+github.com/wailsapp/wails/v3/internal/browser
+github.com/wailsapp/wails/v3/internal/capabilities
+github.com/wailsapp/wails/v3/internal/dbus/menu
+github.com/wailsapp/wails/v3/internal/dbus/notifier
+github.com/wailsapp/wails/v3/internal/debounce
+github.com/wailsapp/wails/v3/internal/debug
+github.com/wailsapp/wails/v3/internal/fileexplorer
+github.com/wailsapp/wails/v3/internal/git
+github.com/wailsapp/wails/v3/internal/go-common-file-dialog/cfd
+github.com/wailsapp/wails/v3/internal/hash
+github.com/wailsapp/wails/v3/internal/lo
+github.com/wailsapp/wails/v3/internal/mailbox
+github.com/wailsapp/wails/v3/internal/operatingsystem
+github.com/wailsapp/wails/v3/internal/optional
+github.com/wailsapp/wails/v3/internal/runtime
+github.com/wailsapp/wails/v3/internal/signal
+github.com/wailsapp/wails/v3/internal/sliceutil
+github.com/wailsapp/wails/v3/internal/tint
+github.com/wailsapp/wails/v3/internal/uuid
+github.com/wailsapp/wails/v3/internal/version
+github.com/wailsapp/wails/v3/internal/webview2/internal/w32
+github.com/wailsapp/wails/v3/internal/webview2/pkg/combridge
+github.com/wailsapp/wails/v3/internal/webview2/pkg/doublecall
+github.com/wailsapp/wails/v3/internal/webview2/pkg/edge
+github.com/wailsapp/wails/v3/internal/webview2/webviewloader
+github.com/wailsapp/wails/v3/pkg/application
+github.com/wailsapp/wails/v3/pkg/errs
+github.com/wailsapp/wails/v3/pkg/events
+github.com/wailsapp/wails/v3/pkg/icons
+github.com/wailsapp/wails/v3/pkg/mac
+github.com/wailsapp/wails/v3/pkg/updater
+github.com/wailsapp/wails/v3/pkg/w32
+# github.com/yuin/goldmark v1.7.17
+## explicit; go 1.22
+github.com/yuin/goldmark
+github.com/yuin/goldmark/ast
+github.com/yuin/goldmark/extension
+github.com/yuin/goldmark/extension/ast
+github.com/yuin/goldmark/parser
+github.com/yuin/goldmark/renderer
+github.com/yuin/goldmark/renderer/html
+github.com/yuin/goldmark/text
+github.com/yuin/goldmark/util
+# golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
+## explicit; go 1.25.0
+golang.org/x/exp/constraints
+# golang.org/x/image v0.45.0
+## explicit; go 1.25.0
+golang.org/x/image/font
+golang.org/x/image/font/gofont/gobold
+golang.org/x/image/font/gofont/gobolditalic
+golang.org/x/image/font/gofont/goitalic
+golang.org/x/image/font/gofont/gomono
+golang.org/x/image/font/gofont/gomonobold
+golang.org/x/image/font/gofont/goregular
+golang.org/x/image/font/opentype
+golang.org/x/image/font/sfnt
+golang.org/x/image/math/fixed
+golang.org/x/image/vector
+# golang.org/x/net v0.60.0
+## explicit; go 1.26.0
+golang.org/x/net/html
+golang.org/x/net/html/atom
+# golang.org/x/sys v0.48.0
+## explicit; go 1.26.0
+golang.org/x/sys/cpu
+golang.org/x/sys/plan9
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+golang.org/x/sys/windows/registry
+# golang.org/x/term v0.46.0
+## explicit; go 1.26.0
+golang.org/x/term
+# golang.org/x/text v0.42.0
+## explicit; go 1.26.0
+golang.org/x/text/cases
+golang.org/x/text/collate
+golang.org/x/text/encoding
+golang.org/x/text/encoding/charmap
+golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/unicode
+golang.org/x/text/internal
+golang.org/x/text/internal/colltab
+golang.org/x/text/internal/language
+golang.org/x/text/internal/language/compact
+golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
+golang.org/x/text/language
+golang.org/x/text/runes
+golang.org/x/text/transform
+golang.org/x/text/unicode/norm
+golang.org/x/text/unicode/rangetable
+# golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
+## explicit; go 1.18
+golang.org/x/xerrors
+golang.org/x/xerrors/internal
+# gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+## explicit; go 1.11
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
+gopkg.in/yaml.v3
+# oss.terrastruct.com/d2 v0.7.2
+## explicit; go 1.24
+oss.terrastruct.com/d2/d2ast
+oss.terrastruct.com/d2/d2compiler
+oss.terrastruct.com/d2/d2exporter
+oss.terrastruct.com/d2/d2format
+oss.terrastruct.com/d2/d2graph
+oss.terrastruct.com/d2/d2ir
+oss.terrastruct.com/d2/d2layouts
+oss.terrastruct.com/d2/d2layouts/d2dagrelayout
+oss.terrastruct.com/d2/d2layouts/d2grid
+oss.terrastruct.com/d2/d2layouts/d2near
+oss.terrastruct.com/d2/d2layouts/d2sequence
+oss.terrastruct.com/d2/d2lib
+oss.terrastruct.com/d2/d2parser
+oss.terrastruct.com/d2/d2renderers/d2fonts
+oss.terrastruct.com/d2/d2renderers/d2latex
+oss.terrastruct.com/d2/d2renderers/d2sketch
+oss.terrastruct.com/d2/d2renderers/d2svg
+oss.terrastruct.com/d2/d2target
+oss.terrastruct.com/d2/d2themes
+oss.terrastruct.com/d2/d2themes/d2themescatalog
+oss.terrastruct.com/d2/lib/color
+oss.terrastruct.com/d2/lib/compression
+oss.terrastruct.com/d2/lib/font
+oss.terrastruct.com/d2/lib/geo
+oss.terrastruct.com/d2/lib/jsrunner
+oss.terrastruct.com/d2/lib/label
+oss.terrastruct.com/d2/lib/log
+oss.terrastruct.com/d2/lib/shape
+oss.terrastruct.com/d2/lib/svg
+oss.terrastruct.com/d2/lib/syncmap
+oss.terrastruct.com/d2/lib/textmeasure
+oss.terrastruct.com/d2/lib/version
+# oss.terrastruct.com/util-go v0.0.0-20250213174338-243d8661088a
+## explicit; go 1.18
+oss.terrastruct.com/util-go/go2
+oss.terrastruct.com/util-go/xdefer
+# github.com/gdey/markdownshell => ../..
