@@ -26,6 +26,7 @@ type docTab struct {
 
 	mu      sync.Mutex
 	n       *notebook.Notebook // nil while the start screen shows
+	nDone   chan struct{}      // closed when n is replaced or closed
 	closing bool               // the user chose to close it
 	warned  bool               // file-changed was sent for the file on disk
 	fresh   bool               // a file opened and its page hasn't asked about it
@@ -109,20 +110,38 @@ func (t *docTab) file() string {
 
 // open opens file in this tab, closing the file open in it.
 func (t *docTab) open(file string, ro notebook.RunOptions) error {
+	// A run of the notebook this one replaces may still be going, or
+	// waiting on a question. Once done closes, its questions are answered
+	// stop and what it sends no longer reaches the page, which now shows
+	// the new notebook.
+	done := make(chan struct{})
 	n, err := notebook.Open(file, notebook.Options{
-		Run:     ro,
-		OnEvent: func(e notebook.Event) { t.emit("block", e) },
-		Confirm: t.confirm,
-		Depend:  t.depend,
+		Run: ro,
+		OnEvent: func(e notebook.Event) {
+			select {
+			case <-done:
+			default:
+				t.emit("block", e)
+			}
+		},
+		Confirm: func(block int, question string) run.Answer {
+			return t.confirm(done, block, question)
+		},
+		Depend: func(block, of int, question string) run.Answer {
+			return t.depend(done, block, of, question)
+		},
 	})
 	if err != nil {
 		return err
 	}
 	t.mu.Lock()
-	old := t.n
-	t.n, t.warned = n, false
+	old, oldDone := t.n, t.nDone
+	t.n, t.nDone, t.warned = n, done, false
 	t.fresh = old == nil || old.File() != n.File()
 	t.mu.Unlock()
+	if oldDone != nil {
+		close(oldDone)
+	}
 	if old != nil {
 		old.Close()
 	}
@@ -161,21 +180,29 @@ func (t *docTab) changed() {
 }
 
 // confirm asks the frontend, from the run's goroutine, and waits for
-// Answer.
-func (t *docTab) confirm(block int, question string) run.Answer {
-	return t.ask(map[string]any{"block": block, "question": question})
+// Answer, or for stale to close: the notebook asking was replaced.
+func (t *docTab) confirm(stale <-chan struct{}, block int, question string) run.Answer {
+	return t.ask(stale, map[string]any{"block": block, "question": question})
 }
 
 // depend asks the frontend whether to run block, which block of
 // depends on, first, as confirm does.
-func (t *docTab) depend(block, of int, question string) run.Answer {
-	return t.ask(map[string]any{"block": block, "of": of, "question": question})
+func (t *docTab) depend(stale <-chan struct{}, block, of int, question string) run.Answer {
+	return t.ask(stale, map[string]any{"block": block, "of": of, "question": question})
 }
 
-// ask sends the frontend a confirm event and waits for Answer.
-func (t *docTab) ask(q map[string]any) run.Answer {
+// ask sends the frontend a confirm event and waits for Answer. It
+// answers stop itself once the tab closes or stale closes.
+func (t *docTab) ask(stale <-chan struct{}, q map[string]any) run.Answer {
+	select {
+	case <-stale:
+		return run.Stop
+	default:
+	}
 	t.emit("confirm", q)
 	select {
+	case <-stale:
+		return run.Stop
 	case a := <-t.answers:
 		t.mu.Lock()
 		live := t.live[:0]
