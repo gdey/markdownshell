@@ -223,7 +223,19 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 				return fmt.Errorf("-%s can't be used with --serve", name)
 			}
 		}
-		return serveCmd(serveOn.addr, fs.Arg(0), fs.Args()[min(1, fs.NArg()):], sources.String(), stderr)
+		if serveOn.stdio() {
+			for _, name := range []string{"serve-cert", "serve-key", "serve-client-ca"} {
+				if set[name] {
+					return fmt.Errorf("--%s can't be used with --serve=stdio", name)
+				}
+			}
+		}
+		return serveCmd(serveOn, fs.Arg(0), fs.Args()[min(1, fs.NArg()):], sources.String(), stderr)
+	}
+	for _, name := range []string{"serve-cert", "serve-key", "serve-client-ca"} {
+		if set[name] {
+			return fmt.Errorf("--%s is only for --serve", name)
+		}
 	}
 	if fs.NArg() < 1 && !*interactive {
 		fs.Usage()

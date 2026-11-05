@@ -66,6 +66,11 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![Settings › Shell with Interactive shell, marked experimental, turned on, and Start it as a login shell below it](docs/changelog/interactive-shell-setting.png)
 
+- `mdsh --serve` speaks only HTTPS on an address other machines can
+  reach: with `--serve-cert` and `--serve-key`, or a self-signed
+  certificate it keeps and prints the fingerprint of. `--serve-client-ca`
+  requires a client certificate that CA signed (mutual TLS).
+
 ### Changed
 
 - The `.dmg` window shows the newest look, Green Tea, in the app rising

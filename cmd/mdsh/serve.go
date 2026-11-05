@@ -29,6 +29,9 @@ const serveBuilt = true
 func addServeFlag(fs *flag.FlagSet) *serveFlag {
 	f := &serveFlag{}
 	fs.Var(f, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"), or with =stdio to the program that started mdsh, as JSON lines on stdin and stdout; anyone who can reach it with its token can run commands as you")
+	fs.StringVar(&f.tls.Cert, "serve-cert", "", "with --serve, the PEM certificate `file` to serve HTTPS with; without it, an address other machines can reach gets a self-signed one")
+	fs.StringVar(&f.tls.Key, "serve-key", "", "with --serve-cert, its PEM private key `file`")
+	fs.StringVar(&f.tls.ClientCA, "serve-client-ca", "", "with --serve, require a client certificate signed by a CA in this PEM `file` (mutual TLS)")
 	return f
 }
 
@@ -39,7 +42,12 @@ func addServeFlag(fs *flag.FlagSet) *serveFlag {
 type serveFlag struct {
 	on   bool
 	addr string
+	// tls is --serve-cert, --serve-key and --serve-client-ca.
+	tls serve.TLS
 }
+
+// stdio is whether it is --serve=stdio.
+func (f *serveFlag) stdio() bool { return f.addr == serve.Stdio }
 
 func (f *serveFlag) String() string   { return f.addr }
 func (f *serveFlag) IsBoolFlag() bool { return true }
@@ -59,7 +67,8 @@ func (f *serveFlag) Set(v string) error {
 // serveCmd serves the notebook to a browser until interrupted: with file
 // open, run with args, or with the start screen listing the markdown
 // files under the current folder, or under file if it is a folder.
-func serveCmd(addr, file string, args []string, source string, stderr io.Writer) error {
+func serveCmd(f *serveFlag, file string, args []string, source string, stderr io.Writer) error {
+	addr, tlsOpts := f.addr, f.tls
 	if file == "-" {
 		return errors.New("--serve needs a file or folder, not stdin")
 	}
@@ -73,7 +82,10 @@ func serveCmd(addr, file string, args []string, source string, stderr io.Writer)
 	}
 	cwd, _ := os.Getwd()
 	bi, _ := debug.ReadBuildInfo()
-	opts := serve.Options{Addr: addr, Settings: store, Cwd: cwd, File: file, Args: args, Source: source, Log: stderr, Build: ui.BuildInfo(version, bi), Trust: trust.OpenDefault()}
+	// A self-signed certificate is kept beside the settings, so a browser
+	// told to trust it once keeps trusting it.
+	tlsOpts.CertDir = filepath.Dir(path)
+	opts := serve.Options{Addr: addr, Settings: store, Cwd: cwd, File: file, Args: args, Source: source, Log: stderr, Build: ui.BuildInfo(version, bi), TLS: tlsOpts, Trust: trust.OpenDefault()}
 	// The Neovim pane's language server is mdsh lsp.
 	if exe, err := os.Executable(); err == nil {
 		opts.LSP = func(string) []string { return []string{exe, "lsp"} }
