@@ -656,6 +656,7 @@ figure.diagram[data-lang="cast"] .diagram-image { padding-top: 32px; }
 .cast-player.loading .cast-screen, .cast-player.failed .cast-screen { display: none; }
 .cast-controls { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--bg); border-top: 1px solid var(--border); color: var(--fg); }
 .cast-controls button.icon svg { width: 14px; height: 14px; fill: currentColor; }
+.cast-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
 .cast-scrub { flex: 1; min-width: 80px; margin: 0 6px; accent-color: var(--accent, #4a90e2); }
 .cast-status { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: calc(12px * var(--text-scale, 1)); }
 .cast-note { margin-right: 8px; white-space: nowrap; font-size: calc(12px * var(--text-scale, 1)); color: var(--accent); }

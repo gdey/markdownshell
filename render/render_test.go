@@ -306,3 +306,20 @@ func TestTerminalCastFence(t *testing.T) {
 		}
 	}
 }
+
+// A tty block's result whose recording was swapped for the text of a
+// frame writes that text as its output, not nothing.
+func TestRecordingAsText(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a tty}\ntop\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &run.Result{Block: d.Blocks[0], Ran: true, Stdout: []byte("load 1.0")}
+	if got, want := Output(r, false), "```output {for=a exit=0}\nload 1.0\n```\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	r.Image = "a.gif"
+	if got, want := Output(r, false), "<!-- mdsh:output for=\"a\" -->\n![a](a.gif)\n<!-- /mdsh:output -->\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

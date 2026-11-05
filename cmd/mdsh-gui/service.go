@@ -863,6 +863,19 @@ func (a *App) SetCastFrame(ctx context.Context, i int, body string, frame int) e
 	return err
 }
 
+// ReplaceCast swaps tty block i's recording, in its output, for the
+// text of frame n (as "text") or an animated GIF of it (as "gif"). Undo
+// puts the recording back.
+func (a *App) ReplaceCast(ctx context.Context, i int, as string, frame int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.ReplaceCast(i, as, frame)
+	t.changed()
+	return err
+}
+
 // clipboardText is the text clipboard, as Wails gives it.
 type clipboardText interface {
 	SetText(string) bool

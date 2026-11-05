@@ -74,6 +74,14 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The rendered view scrolled back to the top, the outline still showing the selected block, step61, near its bottom](docs/changelog/outline-follows-selection.png)
 
+- mdsh-gui: a tty block's recording player has two more buttons. One
+  replaces the recording in the file with the text of the frame shown,
+  as an ordinary output block; the other replaces it with an animated
+  GIF, saved beside the cast. Undo puts the recording back, and running
+  the block again records a new one.
+
+  ![A tty block's recording player, with the new buttons at the right: replace with this frame's text, and replace with an animated GIF](docs/changelog/cast-replace.png)
+
 ### Security
 
 - mdsh asks before it reads a document's `env.source` files into its
