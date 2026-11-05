@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `cast` block, a recording kept in the document, no longer prints as
+  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
+  frame) as a picture, HTML reports play it as a GIF, and the terminal,
+  as with `mdsh -n`, shows that frame's text.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

@@ -175,6 +175,36 @@ func Still(rec Recording, n int) (image.Image, error) {
 	return p.paint(frames[n-1].screen[:used], 0, used-1), nil
 }
 
+// StillText is frame n of rec, counting from 1, as plain text: the
+// characters on the screen, without colors or the cursor, with no
+// trailing spaces on a line and no blank lines at the end. n <= 0, or
+// past the end, is the last frame.
+func StillText(rec Recording, n int) (string, error) {
+	if len(rec.Events) == 0 {
+		return "", ErrEmpty
+	}
+	frames, _, _ := shots(rec)
+	if n <= 0 || n > len(frames) {
+		n = len(frames)
+	}
+	lines := make([]string, 0, len(frames[n-1].screen))
+	for _, row := range frames[n-1].screen {
+		var b strings.Builder
+		for _, c := range row {
+			if c.r == 0 {
+				b.WriteByte(' ')
+			} else {
+				b.WriteRune(c.r)
+			}
+		}
+		lines = append(lines, strings.TrimRight(b.String(), " \t"))
+	}
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
 // delay converts d to GIF hundredths of a second, capped at maxDelay.
 func delay(d time.Duration) int {
 	d = min(d, maxDelay)

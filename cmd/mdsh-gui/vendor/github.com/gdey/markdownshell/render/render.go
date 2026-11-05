@@ -10,6 +10,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/termsafe"
 )
 
@@ -137,7 +138,7 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 		if showCode {
 			code := src[b.Span.Start:b.Span.End]
 			if opts.Terminal && !opts.WriteBack {
-				code = []byte(termsafe.Visible(string(code)))
+				code = []byte(termsafe.Visible(string(castFrame(src, b, code))))
 			}
 			buf.Write(code)
 		}
@@ -186,6 +187,29 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 		out[i] = bufs[i].Bytes()
 	}
 	return out
+}
+
+// castFrame is code, block b's fence, with a cast fence's recording,
+// which a terminal would show as JSON, swapped for the text of the frame
+// its frame= names, or the last: what the screen showed. Any other
+// block's code is returned as it is.
+func castFrame(src []byte, b *doc.Block, code []byte) []byte {
+	if b.Lang != "cast" || !termrec.IsCast([]byte(b.Body)) {
+		return code
+	}
+	rec, err := termrec.ReadCast(strings.NewReader(b.Body))
+	if err != nil {
+		return code
+	}
+	n, _ := strconv.Atoi(b.Attrs["frame"])
+	text, err := termrec.StillText(rec, n)
+	if err != nil {
+		return code
+	}
+	var out []byte
+	out = append(out, src[b.Span.Start:b.BodySpan.Start]...)
+	out = append(out, indent(withNewline(text), b.Prefix)...)
+	return append(out, src[b.BodySpan.End:b.Span.End]...)
 }
 
 // showStderr decides whether a block's stderr is shown: its show-stderr=

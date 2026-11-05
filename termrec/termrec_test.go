@@ -133,3 +133,24 @@ func TestStill(t *testing.T) {
 		t.Errorf("empty: err = %v, want ErrEmpty", err)
 	}
 }
+
+// StillText is the screen of a frame as text, counting frames as Still
+// does.
+func TestStillText(t *testing.T) {
+	r := rec("one  \r\n", "t\x1b[31mwo\x1b[0m\r\n", "\x1b[2J\x1b[Hgone")
+	for _, tt := range []struct {
+		n    int
+		want string
+	}{{1, "one"}, {2, "one\ntwo"}, {3, "gone"}, {0, "gone"}, {9, "gone"}} {
+		got, err := StillText(r, tt.n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != tt.want {
+			t.Errorf("frame %d: %q, want %q", tt.n, got, tt.want)
+		}
+	}
+	if _, err := StillText(Recording{}, 0); err != ErrEmpty {
+		t.Errorf("empty: err = %v, want ErrEmpty", err)
+	}
+}
