@@ -1986,12 +1986,51 @@ function blockAtLine(text: string, line: number): Cell | undefined {
 
 // cellAt is the drawn cell holding line, or the last one before it.
 function cellAt(line: number): HTMLElement | null {
-  let found: HTMLElement | null = null;
-  for (const e of document.querySelectorAll<HTMLElement>("#doc > [data-line]")) {
-    if (Number(e.dataset.line) > line) break;
-    found = e;
+  const kids = $("doc").children;
+  // The last cell at or before line is the one before the first after it.
+  let i = firstCell((e) => Number(e.dataset.line) > line, false) - 1;
+  while (i >= 0 && !kids[i].hasAttribute("data-line")) i--;
+  return i >= 0 ? (kids[i] as HTMLElement) : null;
+}
+
+// cellBelow is the first of the rendered view's cells whose bottom is
+// below top, in the pane's content coordinates, or undefined. A cell
+// that isn't shown, as in a folded section, has no box and is never it.
+function cellBelow(top: number): HTMLElement | undefined {
+  const kids = $("doc").children;
+  let i = firstCell((e) => e.offsetTop + e.offsetHeight > top, true);
+  while (i < kids.length && !shownCell(kids[i])) i++;
+  return kids[i] as HTMLElement | undefined;
+}
+
+// shownCell is whether e is a cell that starts on a line of the file and
+// has a box.
+function shownCell(e: Element): boolean {
+  return e.hasAttribute("data-line") && (e as HTMLElement).offsetParent !== null;
+}
+
+// firstCell is the index, among the rendered view's children, of the
+// first cell that starts on a line of the file (and, if shown is set, is
+// shown) for which past holds, or an index at or before it with no such
+// cell between, or the number of children when none does.
+// The cells are in order, of their lines and down the page, so past is
+// false up to some cell and true from there on, and the search halves
+// the children each step. Going through every one instead, as each
+// scroll of the split view does, is too slow on a long document.
+function firstCell(past: (e: HTMLElement) => boolean, shown: boolean): number {
+  const kids = $("doc").children;
+  const counts = (e: Element) => (shown ? shownCell(e) : e.hasAttribute("data-line"));
+  let lo = 0;
+  let hi = kids.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    let j = mid;
+    while (j < hi && !counts(kids[j])) j++;
+    if (j === hi) hi = mid;
+    else if (past(kids[j] as HTMLElement)) hi = j;
+    else lo = j + 1;
   }
-  return found;
+  return lo;
 }
 
 // markCurrent marks the cell the source pane's cursor is in. A block
@@ -2040,7 +2079,7 @@ function syncScroll(from: "source" | "doc", nvimTop?: number) {
       if (cell) pane.scrollTop = cell.offsetTop - 8;
       return;
     }
-    const cell = [...document.querySelectorAll<HTMLElement>("#doc > [data-line]")].find((e) => e.offsetTop + e.offsetHeight > pane.scrollTop);
+    const cell = cellBelow(pane.scrollTop);
     if (cell) void nvimCall("jump", Number(cell.dataset.line), 0, false, 0).catch(() => {});
     return;
   }
@@ -2054,7 +2093,7 @@ function syncScroll(from: "source" | "doc", nvimTop?: number) {
     return;
   }
   const top = pane.scrollTop;
-  const cell = [...document.querySelectorAll<HTMLElement>("#doc > [data-line]")].find((e) => e.offsetTop + e.offsetHeight > top);
+  const cell = cellBelow(top);
   if (!cell) return;
   const line = Math.min(Number(cell.dataset.line), cm.state.doc.lines);
   cm.scrollDOM.scrollTop = cm.lineBlockAt(cm.state.doc.line(line).from).top;

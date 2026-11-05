@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- mdsh-gui scrolls long documents more smoothly. Moving the pointer
+  over a card no longer lays the whole document out again, each frame
+  paints much less of the page, the dependency lines redraw several
+  times faster when the page changes size, and the source view finds
+  the matching cell without measuring every cell above it.
+  Nothing on screen changes:
+
+  ![A runbook in mdsh-gui with dependency lines, fold buttons and an output's copy button shown on hover, drawn as before](docs/changelog/long-documents.png)
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

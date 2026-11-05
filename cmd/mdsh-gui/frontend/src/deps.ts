@@ -357,25 +357,62 @@ function draw() {
   // its bottom, where lines arrive (the last card has nothing below it
   // to depend on it).
   const rings: SVGElement[] = [];
+  const ax = String(edge + dir * 6);
+  // Every card is measured before any anchor moves, since moving one
+  // would have the next measure lay the page out again.
+  const at = cards.map((card, i) => [i > 0 ? headY(card, top) : 0, i < cards.length - 1 ? footY(card, top) : 0]);
   cards.forEach((card, i) => {
-    const block = Number(card.dataset.block);
-    if (i > 0) {
-      const ring = make("circle", { class: "handle", cx: edge + dir * 6, cy: headY(card, top), r: 4.5 });
-      const hint = make("title", {});
-      hint.textContent = `Drag onto a block above to make ${name(card)} depend on it`;
-      ring.append(hint);
-      ring.onpointerdown = (ev) => startDrag(ev, block, dependencies(block).length, card);
-      rings.push(ring);
+    let a = anchors.get(card);
+    if (!a) {
+      a = { ring: makeRing(card), port: make("circle", { class: "port", r: 3 }) };
+      anchors.set(card, a);
     }
-    if (i < cards.length - 1) {
-      const port = make("circle", { class: "port", cx: edge + dir * 6, cy: footY(card, top), r: 3 });
-      port.dataset.block = String(block);
-      rings.push(port);
-    }
+    if (a.port.dataset.block !== card.dataset.block) a.port.dataset.block = card.dataset.block;
+    if (i > 0) rings.push(place(a.ring, ax, at[i][0]));
+    if (i < cards.length - 1) rings.push(place(a.port, ax, at[i][1]));
   });
+  // The anchors stay in the layer from one draw to the next, and only
+  // move: on a long document, making them again each time the page
+  // changes size is most of the work of a draw.
+  if (rings.length !== anchorList.length || rings.some((r, i) => r !== anchorList[i])) {
+    anchorList = rings;
+    anchorLayer.replaceChildren(...rings);
+  }
   svg.replaceChildren(...out);
-  ui.replaceChildren(...hits, ...dots, ...rings, ...(ghost ? [ghost] : []));
+  ui.replaceChildren(...hits, ...dots, anchorLayer, ...(ghost ? [ghost] : []));
   redrawGhost?.();
+}
+
+// The anchors drawn for each card, made once and moved after: a ring
+// at its top and a port at its bottom. They are kept in a group of
+// their own, over the lines' dots.
+const anchors = new WeakMap<HTMLElement, { ring: SVGCircleElement; port: SVGCircleElement }>();
+const anchorLayer = make("g", {});
+let anchorList: SVGElement[] = [];
+
+// makeRing is the ring at card's top, to drag a new dependency from.
+function makeRing(card: HTMLElement): SVGCircleElement {
+  const ring = make("circle", { class: "handle", r: 4.5 });
+  // Its hint is named on the way in, not as the layer is drawn: looking
+  // up every card's name each time is slow on a long document, and the
+  // tooltip waits for the pointer anyway.
+  ring.onpointerenter = () => {
+    const hint = ring.querySelector("title") ?? ring.appendChild(make("title", {}));
+    hint.textContent = `Drag onto a block above to make ${name(card)} depend on it`;
+  };
+  ring.onpointerdown = (ev) => {
+    const block = Number(card.dataset.block);
+    startDrag(ev, block, dependencies(block).length, card);
+  };
+  return ring;
+}
+
+// place moves an anchor to x, y, touching it only when it moved.
+function place(e: SVGElement, x: string, y: number): SVGElement {
+  const cy = String(y);
+  if (e.getAttribute("cx") !== x) e.setAttribute("cx", x);
+  if (e.getAttribute("cy") !== cy) e.setAttribute("cy", cy);
+  return e;
 }
 
 // elbow is a line's path: out from the cards' edge at y1 to lane x, along
