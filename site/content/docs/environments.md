@@ -85,7 +85,7 @@ arguments as `$1`, `$2` and so on. `$MDSH_MODE` is `running` for a run from
 the command line, `interactive` in `mdsh -i` and mdsh-gui, and `report` for
 `--pdf` and `--html`, and conditions read it as `{{$MDSH_MODE}}`. A
 `textbox` or `choice` block with `var=name` binds `$MDSH_VAR_name` to its
-text or checked options, for blocks and conditions. The helpers `md_h1`, `md_h2`, `md_h3`,
+text or checked options, for blocks and conditions (see [Inputs]({{< relref "inputs" >}})). A block can set one for later blocks with [`mdsh ctl set`]({{< relref "control" >}}). The helpers `md_h1`, `md_h2`, `md_h3`,
 `md_table` (TSV on stdin) and `md_code` print markdown. `md_table -F SEP`
 splits fields on SEP as `awk -F` does (`-F ' '` is runs of blanks), and
 `md_table -s N` skips the first N lines.

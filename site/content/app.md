@@ -73,7 +73,7 @@ how a document starts when you don't know yet what it will say.
 
 `textbox` and `choice` blocks are drawn as a text field, radio buttons
 and checkboxes; what you pick is saved in the file and reaches the
-blocks as `$MDSH_VAR_` variables. `d2` fences draw diagrams and `svg`
+blocks as `$MDSH_VAR_` variables ([Inputs]({{< relref "docs/inputs" >}})). `d2` fences draw diagrams and `svg`
 fences pictures. `out=markdown` output is drawn as markdown, images and
 terminal recordings show in the block, and nothing is loaded from the
 network.

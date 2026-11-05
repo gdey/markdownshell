@@ -19,12 +19,13 @@ weight: 50
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
 | `mdsh --step doc.md` | Asks before every block: run, skip or stop | Per flags |
+| `mdsh --stop-on-error doc.md` | Stops at the first block that fails, as if every block had `on_error=stop` | Per flags |
 | `mdsh --expose DEBUG doc.md` | Lets `{{$DEBUG}}` read `DEBUG` from your environment; see [Conditions and placeholders]({{< relref "conditions#exposing-variables" >}}) | Per flags |
-| `mdsh --audit run.jsonl doc.md` | Also writes a JSON Lines log of the run: each block started, ended or skipped and why, each question answered, each variable changed | Per flags |
+| `mdsh --audit run.jsonl doc.md` | Also writes a JSON Lines log of the run: each block started, ended or skipped and why, each variable changed; see [Talking back to mdsh]({{< relref "control#the-audit-log" >}}) | Per flags |
 | `mdsh --source defs.zsh doc.md` | Sources `defs.zsh` into every shell before its first block; repeatable | Per flags |
 | `mdsh -i doc.md` | A full-screen UI: pick blocks and run them, see [Terminal UI]({{< relref "interactive" >}}) | When you save (`w`), or after each block with `--autosave` |
 | `mdsh -i` or `mdsh -i ~/notes` | A start screen to pick a file under this folder, or that one | As above |
-| `mdsh ctl set NAME value` | From inside a block: sets a variable for the blocks after it (`unset`, `get` and `status` too; `mdsh ctl help` lists them) | No |
+| `mdsh ctl set NAME value` | From inside a block: sets a variable for the blocks after it (`unset`, `get` and `status` too); see [Talking back to mdsh]({{< relref "control" >}}) | No |
 | `mdsh lsp` | A language server for block attributes, for your editor | No |
 | `mdsh completion bash\|zsh` | A completion script | No |
 | `mdsh --version` | The version | No |
