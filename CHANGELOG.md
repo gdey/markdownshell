@@ -19,6 +19,12 @@ follow [Semantic Versioning](https://semver.org/).
   both themes, and `TestLookContrast` now checks it too.
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
+
+- mdsh-gui shows the cheat sheet beside the changelog: Help › Cheat
+  Sheet, or its link on Settings › About, opens it in a read-only tab,
+  so every attribute, key and flag is a menu away and matches the build.
+
+  ![The cheat sheet in a tab of the desktop app, its Fence attributes table under the Help menu](docs/changelog/cheatsheet-tab.png)
 - `mdsh --serve` serves the notebook mdsh-gui shows to a web browser,
   at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
   address can run commands as you, so it listens on loopback by default;
@@ -26,17 +32,15 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
   the program that started them, such as an editor plugin, as JSON lines
   on stdin and stdout.
-
-- mdsh-gui shows the cheat sheet beside the changelog: Help › Cheat
-  Sheet, or its link on Settings › About, opens it in a read-only tab,
-  so every attribute, key and flag is a menu away and matches the build.
-
-  ![The cheat sheet in a tab of the desktop app, its Fence attributes table under the Help menu](docs/changelog/cheatsheet-tab.png)
+- `mdsh --serve` speaks only HTTPS on an address other machines can
+  reach: with `--serve-cert` and `--serve-key`, or a self-signed
+  certificate it keeps and prints the fingerprint of. `--serve-client-ca`
+  requires a client certificate that CA signed (mutual TLS).
 
 ### Changed
 
 - `mdsh-gui`: each look is now one file, `look.css` in its own folder
-  in `web/looks`. It opens with the look's front
+  in `cmd/mdsh-gui/frontend/looks`. It opens with the look's front
   matter in TOML, between `+++` lines in its first comment, that says
   what the look is, and the rules after it paint it. Everything else
   that names the looks is made from those files by `go generate`:

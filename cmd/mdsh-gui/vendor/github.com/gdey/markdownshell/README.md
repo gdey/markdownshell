@@ -320,6 +320,8 @@ blocks in a terminal, reports and tabs. It prints the address to open.
 mdsh --serve                     # the markdown files under this folder, at 127.0.0.1:8080
 mdsh --serve notes.md a b        # notes.md, with $1 and $2 set
 mdsh --serve=localhost:9000 docs # the files under docs, on port 9000
+mdsh --serve=0.0.0.0:8443 --serve-cert cert.pem --serve-key key.pem --serve-client-ca ca.pem
+                                 # HTTPS to the network, only for client certificates ca.pem signed
 ```
 
 The address comes after `=`: `--serve host:port` would take
@@ -348,6 +350,16 @@ a shell login:
 - By default mdsh listens on 127.0.0.1, so only this machine can reach
   it. `--serve=0.0.0.0:8080` or another machine's address lets the
   network in, and mdsh warns when it does.
+- Listening anywhere but loopback, mdsh speaks only HTTPS. With
+  `--serve-cert` and `--serve-key` it uses your certificate; without
+  them it makes a self-signed one, keeps it beside the settings
+  (`serve-self-signed.pem`) so a browser told to trust it once keeps
+  trusting it, and prints its SHA-256 fingerprint to check the
+  browser's warning against.
+- `--serve-client-ca ca.pem` turns on mutual TLS: a browser must present
+  a client certificate one of those CAs signed before it gets as far as
+  the token. Every major browser supports this; import the client
+  certificate and key (a `.p12`) on each device that should get in.
 - Every start makes a new random token and prints it in the address.
   The first visit trades it for a cookie; without it every request is
   refused. Don't share the address or put it in a shell history others
@@ -355,11 +367,11 @@ a shell login:
 - Requests from other sites' pages are refused (their `Origin` must be
   this server), and on 127.0.0.1 the `Host` must be a loopback name, so
   a site can't point its own name at your machine to get in.
-- There is no TLS: the token and everything on the page cross the
-  network in the clear. To use it from another machine, keep the
+- The simplest safe way in from another machine is still to keep the
   default address and tunnel to it, for example
-  `ssh -L 8080:127.0.0.1:8080 host`, rather than listening on the
-  network.
+  `ssh -L 8080:127.0.0.1:8080 host`, then open the printed address on
+  your own machine: nothing listens on the network, and SSH does the
+  encryption and the login.
 - The page can read and write any file the user can, through its file
   dialogs and the commands it runs, and it shows the images and files
   beside open documents.

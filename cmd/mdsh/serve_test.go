@@ -39,4 +39,16 @@ func TestServeConflicts(t *testing.T) {
 	if code != 2 || !strings.Contains(stderr.String(), "-w can't be used with --serve") {
 		t.Errorf("--serve -w: %d %q", code, stderr.String())
 	}
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--serve-cert", "c.pem", "doc.md"}, "--serve-cert is only for --serve"},
+		{[]string{"--serve=stdio", "--serve-client-ca", "ca.pem", "doc.md"}, "--serve-client-ca can't be used with --serve=stdio"},
+	} {
+		stderr.Reset()
+		if code := mdsh(tc.args, strings.NewReader(""), io.Discard, &stderr); code != 2 || !strings.Contains(stderr.String(), tc.want) {
+			t.Errorf("%q: %d %q", tc.args, code, stderr.String())
+		}
+	}
 }

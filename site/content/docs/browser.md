@@ -69,9 +69,26 @@ a shell login.
   refused because its `Origin` isn't this server. On 127.0.0.1 the
   `Host` must be a loopback name such as `localhost`, so a site can't
   point its own name at your machine to get in (DNS rebinding).
-- **No encryption.** There is no TLS, so on a network the token and
-  everything on the page travel in the clear. To use mdsh from another
-  machine, keep the default address and tunnel to it over SSH:
+- **HTTPS off this machine.** Listening anywhere but loopback, mdsh
+  speaks only HTTPS. Give it your certificate with `--serve-cert` and
+  `--serve-key`, or let it make a self-signed one. The self-signed
+  certificate is kept beside the settings as `serve-self-signed.pem`,
+  so a browser told to trust it once keeps trusting it, and mdsh prints
+  its SHA-256 fingerprint to check the browser's warning against.
+- **Client certificates, if you want them.** `--serve-client-ca ca.pem`
+  turns on mutual TLS: the browser must present a certificate one of
+  those CAs signed before it gets as far as the token. Chrome, Safari,
+  Firefox and Edge all support this; import the certificate and its key
+  (usually a `.p12` file) on each device that should get in, and the
+  browser asks which one to use.
+
+  ```sh
+  mdsh --serve=0.0.0.0:8443 --serve-cert cert.pem --serve-key key.pem --serve-client-ca ca.pem
+  ```
+
+- **Or use SSH.** The simplest safe way in from another machine is to
+  keep the default address and tunnel to it. Nothing listens on the
+  network, and SSH does the encryption and the login:
 
   ```sh
   ssh -L 8080:127.0.0.1:8080 server   # then open the address mdsh printed, on this machine
