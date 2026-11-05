@@ -446,7 +446,12 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 		stderr += "mdsh: " + r.Err.Error() + "\n"
 	}
 
-	switch run.OutKind(r.Block) {
+	kind := run.OutKind(r.Block)
+	if kind == "recording" && r.Image == "" && len(r.Stdout) > 0 {
+		// A recording swapped for the text of a frame of it.
+		kind = "text"
+	}
+	switch kind {
 	case "markdown":
 		if len(r.Stdout) > 0 {
 			b.WriteString(doc.RegionStart(id) + "\n")
@@ -457,14 +462,14 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 		if r.Image != "" {
 			link := r.Image
 			// frame= picks the frame a still view, such as a PDF, shows.
-			if f := r.Block.Attrs["frame"]; f != "" && run.OutKind(r.Block) == "recording" {
+			if f := r.Block.Attrs["frame"]; f != "" && kind == "recording" {
 				link += "#frame=" + f
 			}
 			// The alt text is the block's name, or what the output is
 			// when mdsh made the name up.
 			alt := id
 			if !r.Block.Named() || doc.GeneratedID(id) {
-				alt = run.OutKind(r.Block)
+				alt = kind
 			}
 			b.WriteString(doc.RegionStart(id) + "\n")
 			fmt.Fprintf(&b, "![%s](%s)\n", alt, link)

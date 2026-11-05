@@ -6,6 +6,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- mdsh-gui: a tty block's recording player has two more buttons. One
+  replaces the recording in the file with the text of the frame shown,
+  as an ordinary output block; the other replaces it with an animated
+  GIF, saved beside the cast. Undo puts the recording back, and running
+  the block again records a new one.
+
+  ![A tty block's recording player, with the new buttons at the right: replace with this frame's text, and replace with an animated GIF](docs/changelog/cast-replace.png)
+
 ### Fixed
 
 - A `cast` block, a recording kept in the document, no longer prints as

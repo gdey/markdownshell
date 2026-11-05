@@ -546,6 +546,15 @@ export function Reload(): $CancellablePromise<void> {
 }
 
 /**
+ * ReplaceCast swaps tty block i's recording, in its output, for the
+ * text of frame n (as "text") or an animated GIF of it (as "gif"). Undo
+ * puts the recording back.
+ */
+export function ReplaceCast(i: number, $as: string, frame: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ReplaceCast", i, $as, frame);
+}
+
+/**
  * ReportCommand is the mdsh command that makes the report r describes.
  */
 export function ReportCommand(r: notebook$0.Report): $CancellablePromise<string> {
