@@ -450,6 +450,13 @@ figure.diagram img.dark { display: none; }
 .textbox { display: block; box-sizing: border-box; width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.5; resize: none; }
 .textbox:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .textbox::placeholder { color: var(--muted); }
+/* The grip under a textbox makes it taller: a strip along its bottom
+   edge, with a short bar in the middle that shows where to take it. */
+.textbox-grip { position: relative; height: 10px; margin: -5px 0 -5px; cursor: ns-resize; touch-action: none; }
+.textbox-grip::after { content: ""; position: absolute; left: 50%; top: 3px; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--border); }
+.textbox-cell:hover .textbox-grip::after { background: var(--muted); }
+.textbox-grip:hover::after, .textbox-grip:focus-visible::after { background: var(--accent); }
+.textbox-grip:focus-visible { outline: none; }
 .choice-cell { margin: 16px 0; }
 .input-cell.taken .name { color: var(--bad); }
 .input-cell.taken .textbox, .input-cell.taken .choice-select { border-color: var(--bad); }

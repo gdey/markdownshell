@@ -29,6 +29,16 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The Events tab after a block ran exit 3: block events, then env.end in bold saying the block ended the shell for the top level, and the same note in the status line](docs/changelog/shell-events.png)
 
+- `textbox` blocks take `lines=fit`: the box holds any number of lines
+  and is as tall as its text, growing and shrinking as you type.
+- mdsh-gui: a grip under each textbox in the rendered view makes it
+  taller. Drag it, or focus it and press down and up; a double click
+  puts the box back to its own height. The height lasts until the
+  window closes and is never written to the file, whose `lines=` stays
+  the limit on the text for every copy and everyone who opens it.
+
+  ![Three textboxes in the rendered view: a one-line box, a lines=fit box grown to four lines of text, and a three-line box dragged taller by the grip under it](docs/changelog/textbox-fit.png)
+
 ### Fixed
 
 - mdsh-gui scrolls long documents more smoothly. Moving the pointer

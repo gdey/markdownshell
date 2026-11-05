@@ -66,6 +66,11 @@ func TestAttrCheck(t *testing.T) {
 		{"frame", "x", true, false},
 		{"#", "", true, false},
 		{"number_on", "off", true, true},
+		{"lines", "3", true, true},
+		{"lines", "-1", true, true},
+		{"lines", "fit", true, true},
+		{"lines", "auto", true, false},
+		{"from", "fit", true, false},
 	} {
 		s, ok := LookupAttr(c.name)
 		if !ok {

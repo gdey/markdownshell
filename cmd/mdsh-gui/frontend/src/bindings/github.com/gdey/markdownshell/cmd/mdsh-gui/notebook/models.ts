@@ -567,6 +567,12 @@ export interface TextboxCell {
     "id": string;
     "text": string;
     "lines": number;
+
+    /**
+     * Fit is set by lines=fit: any number of lines, in a box as tall
+     * as the text.
+     */
+    "fit"?: boolean;
     "placeholder"?: string;
 
     /**

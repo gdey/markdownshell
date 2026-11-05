@@ -95,6 +95,11 @@ func TestComplete(t *testing.T) {
 	if got := labels(items); !slices.Contains(got, "lines") || slices.Contains(got, "timeout") {
 		t.Errorf("a textbox's names: %v", got)
 	}
+	// lines= takes a number or fit.
+	box := "```textbox {#t lines=}\n```\n"
+	if _, items = Complete(box, "", 0, len("```textbox {#t lines=")); !slices.Equal(labels(items), []string{"fit"}) {
+		t.Errorf("lines= offers %v", labels(items))
+	}
 	// Outside a fence's {…}, nothing.
 	if _, items = Complete(text, "", 3, 2); items != nil {
 		t.Errorf("in a block's body: %v", labels(items))

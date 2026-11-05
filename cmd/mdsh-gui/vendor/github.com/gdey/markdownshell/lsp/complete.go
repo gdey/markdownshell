@@ -152,6 +152,10 @@ func Complete(text, file string, line, col int) (from int, items []Item) {
 		for _, v := range spec.Values {
 			values = append(values, Item{Label: v, Kind: "enum"})
 		}
+	case doc.AttrNumber:
+		for _, v := range spec.Values {
+			values = append(values, Item{Label: v, Kind: "enum"})
+		}
 	case doc.AttrText:
 		switch key {
 		case "env":

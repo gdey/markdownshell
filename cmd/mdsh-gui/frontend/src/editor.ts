@@ -263,6 +263,9 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
         values = (spec.values ?? []).map((v) => ({ label: v, type: "enum" }));
         break;
       }
+      case AttrKind.AttrNumber:
+        values = (spec.values ?? []).map((v) => ({ label: v, type: "enum" }));
+        break;
       case AttrKind.AttrText:
         if (key === "env") values = known.envs?.map((v) => ({ label: v, type: "variable" })) ?? [];
         if (key === "file") values = value.startsWith("res:") ? res("") : [...res(""), ...files()];

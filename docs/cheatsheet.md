@@ -126,6 +126,7 @@ on save.
 | --- | --- | --- |
 | `var=NAME` | both | Bind the text, or the checked options one per line, to `$MDSH_VAR_NAME` for blocks and conditions |
 | `lines=N` | `textbox` | The most lines it holds; 1 or less is one line |
+| `lines=fit` | `textbox` | Any number of lines; mdsh-gui sizes the box to the text |
 | `mode=dropdown\|radio\|multi` | `choice` | Pick one from a list (default) or buttons, or check any number |
 | `placeholder="…"` | both | What an empty textbox, or a dropdown with nothing chosen, shows |
 | `nosave`, `secret` | both | As above: what is typed stays in the session |
