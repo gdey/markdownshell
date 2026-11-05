@@ -26,6 +26,10 @@ follow [Semantic Versioning](https://semver.org/).
 - `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
   the program that started them, such as an editor plugin, as JSON lines
   on stdin and stdout.
+- `mdsh --serve` speaks only HTTPS on an address other machines can
+  reach: with `--serve-cert` and `--serve-key`, or a self-signed
+  certificate it keeps and prints the fingerprint of. `--serve-client-ca`
+  requires a client certificate that CA signed (mutual TLS).
 
 ## [1.4.1] - 2026-11-07
 

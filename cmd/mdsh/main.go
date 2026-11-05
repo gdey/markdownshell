@@ -166,6 +166,10 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	var serveOn serveFlag
 	fs.Var(&serveOn, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"), or with =stdio to the program that started mdsh, as JSON lines on stdin and stdout; anyone who can reach it with its token can run commands as you")
+	var tlsOpts serve.TLS
+	fs.StringVar(&tlsOpts.Cert, "serve-cert", "", "with --serve, the PEM certificate `file` to serve HTTPS with; without it, an address other machines can reach gets a self-signed one")
+	fs.StringVar(&tlsOpts.Key, "serve-key", "", "with --serve-cert, its PEM private key `file`")
+	fs.StringVar(&tlsOpts.ClientCA, "serve-client-ca", "", "with --serve, require a client certificate signed by a CA in this PEM `file` (mutual TLS)")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	auditFile := fs.String("audit", "", "write an audit log of the run to this file, one JSON object per line")
 	// Files are read as the flag is parsed, so a pipe such as
@@ -212,7 +216,19 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 				return fmt.Errorf("-%s can't be used with --serve", name)
 			}
 		}
-		return serveCmd(serveOn.addr, fs.Arg(0), fs.Args()[min(1, fs.NArg()):], sources.String(), stderr)
+		if serveOn.addr == serve.Stdio {
+			for _, name := range []string{"serve-cert", "serve-key", "serve-client-ca"} {
+				if set[name] {
+					return fmt.Errorf("--%s can't be used with --serve=stdio", name)
+				}
+			}
+		}
+		return serveCmd(serveOn.addr, tlsOpts, fs.Arg(0), fs.Args()[min(1, fs.NArg()):], sources.String(), stderr)
+	}
+	for _, name := range []string{"serve-cert", "serve-key", "serve-client-ca"} {
+		if set[name] {
+			return fmt.Errorf("--%s is only for --serve", name)
+		}
 	}
 	if fs.NArg() < 1 && !*interactive {
 		fs.Usage()

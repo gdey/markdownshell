@@ -43,7 +43,7 @@ func (f *serveFlag) Set(v string) error {
 // serveCmd serves the notebook to a browser until interrupted: with file
 // open, run with args, or with the start screen listing the markdown
 // files under the current folder, or under file if it is a folder.
-func serveCmd(addr, file string, args []string, source string, stderr io.Writer) error {
+func serveCmd(addr string, tlsOpts serve.TLS, file string, args []string, source string, stderr io.Writer) error {
 	if file == "-" {
 		return errors.New("--serve needs a file or folder, not stdin")
 	}
@@ -57,7 +57,10 @@ func serveCmd(addr, file string, args []string, source string, stderr io.Writer)
 	}
 	cwd, _ := os.Getwd()
 	bi, _ := debug.ReadBuildInfo()
-	opts := serve.Options{Addr: addr, Settings: store, Cwd: cwd, File: file, Args: args, Source: source, Log: stderr, Build: ui.BuildInfo(version, bi)}
+	// A self-signed certificate is kept beside the settings, so a browser
+	// told to trust it once keeps trusting it.
+	tlsOpts.CertDir = filepath.Dir(path)
+	opts := serve.Options{Addr: addr, Settings: store, Cwd: cwd, File: file, Args: args, Source: source, Log: stderr, Build: ui.BuildInfo(version, bi), TLS: tlsOpts}
 	// The Neovim pane's language server is mdsh lsp.
 	if exe, err := os.Executable(); err == nil {
 		opts.LSP = func(string) []string { return []string{exe, "lsp"} }

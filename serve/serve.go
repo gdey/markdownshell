@@ -10,13 +10,16 @@
 //
 // Anyone who can reach the server can run commands as the user who
 // started it, so every request needs the token printed at start: the
-// first visit gives it in the URL and gets a cookie for it.
+// first visit gives it in the URL and gets a cookie for it. A server
+// other machines can reach speaks only HTTPS, and can require a client
+// certificate too; see TLS.
 package serve
 
 import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"crypto/tls"
 	_ "embed"
 	"encoding/hex"
 	"errors"
@@ -52,6 +55,7 @@ type Options struct {
 	Args     []string // its arguments
 	Source   string   // what the files given to --source hold, for every shell to source
 	Token    string   // the access token; "" makes a random one
+	TLS      TLS      // HTTPS and client certificates
 	Log      io.Writer
 	Build    ui.Build // the program's build, for the About tab
 	// LSP is the command that runs the language server for a file, for
@@ -65,10 +69,14 @@ type Server struct {
 	ctrl  ui.Control
 	cwd   string
 	token string
-	addr  string // the address listened on
-	local bool   // listening on a loopback address only
-	log   io.Writer
-	calls map[string]method
+	addr  string      // the address listened on
+	local bool        // listening on a loopback address only
+	tls   *tls.Config // nil for plain HTTP
+	// tlsNote says what the user should know about the certificate, such
+	// as a self-signed one's fingerprint.
+	tlsNote string
+	log     io.Writer
+	calls   map[string]method
 
 	mu      sync.Mutex
 	windows map[uint]*window
@@ -105,6 +113,9 @@ func New(opts Options) (*Server, error) {
 	}
 	host, _, _ := net.SplitHostPort(addr)
 	s.local = isLoopback(host)
+	if s.tls, s.tlsNote, err = tlsConfig(opts.TLS, host, s.local); err != nil {
+		return nil, err
+	}
 	s.app = ui.New(s, opts.Settings, opts.Cwd, opts.Dir, opts.Source)
 	s.ctrl = ui.ControlOf(s.app)
 	s.ctrl.SetBuild(opts.Build)
@@ -169,7 +180,11 @@ func (s *Server) URL(l net.Listener) string {
 	if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
 		host = "localhost"
 	}
-	return "http://" + net.JoinHostPort(host, port) + "/?token=" + s.token
+	scheme := "http://"
+	if s.tls != nil {
+		scheme = "https://"
+	}
+	return scheme + net.JoinHostPort(host, port) + "/?token=" + s.token
 }
 
 // Console is the log the Console pane shows. Log to it with a handler
@@ -188,8 +203,18 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 // Serve serves on l until ctx ends, then closes every window's shells.
 func (s *Server) Serve(ctx context.Context, l net.Listener) error {
+	if s.tls != nil {
+		l = tls.NewListener(l, s.tls)
+		if s.tlsNote != "" {
+			fmt.Fprintln(s.log, "mdsh:", s.tlsNote)
+		}
+	}
 	if !s.local {
-		fmt.Fprintln(s.log, "mdsh: warning: serving to other machines. Anyone who can reach this address and has the token can run commands as you, and the traffic is not encrypted.")
+		who := "has the token"
+		if s.tls.ClientAuth == tls.RequireAndVerifyClientCert {
+			who = "has the token and a client certificate your CA signed"
+		}
+		fmt.Fprintf(s.log, "mdsh: warning: serving to other machines. Anyone who can reach this address and %s can run commands as you.\n", who)
 	}
 	fmt.Fprintln(s.log, "mdsh: serving the notebook at", s.URL(l))
 	go s.ctrl.Console().Send(ctx, func(e ui.ConsoleEntry) { s.EmitAll("console", e) }, func(seqs []int) { s.EmitAll("console-stale", seqs) })
@@ -311,6 +336,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 				Value:    s.token,
 				Path:     "/",
 				HttpOnly: true,
+				Secure:   r.TLS != nil,
 				SameSite: http.SameSiteStrictMode,
 			})
 			q := r.URL.Query()
