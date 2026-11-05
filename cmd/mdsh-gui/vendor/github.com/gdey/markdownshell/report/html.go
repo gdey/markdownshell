@@ -61,6 +61,8 @@ code, pre { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monos
 pre { margin: 0; padding: 10px 12px; overflow-x: auto; }
 figure { margin: 1em 0; border-radius: 6px; overflow: hidden; background: #f4f4f6; }
 figcaption { padding: 6px 12px 0; color: #8a8a8e; font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+figure.cast { background: #1e1e1e; }
+figure.cast img { display: block; }
 figure.output { background: #1e1e1e; color: #d4d4d4; }
 figure.stderr { background: #3c1414; color: #ffc8c8; }
 figure.output figcaption { color: #ff8a8a; }
@@ -91,6 +93,16 @@ func (fences) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 		for i := 0; i < f.Lines().Len(); i++ {
 			s := f.Lines().At(i)
 			body.Write(s.Value(src))
+		}
+		if lang == "cast" && termrec.IsCast(body.Bytes()) {
+			// A cast fence's recording plays as a GIF made from it, as a
+			// tty block's linked cast does, rather than showing its JSON.
+			if rec, err := termrec.ReadCast(bytes.NewReader(body.Bytes())); err == nil {
+				if data, err := termrec.GIF(rec); err == nil {
+					w.WriteString(`<figure class="cast"><img alt="recording" src="data:image/gif;base64,` + base64.StdEncoding.EncodeToString(data) + `"></figure>` + "\n")
+					return ast.WalkSkipChildren, nil
+				}
+			}
 		}
 		if lang == "output" {
 			class, caption = "output", ""
