@@ -1,11 +1,14 @@
 package render
 
 import (
+	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termrec"
 )
 
 func TestFence(t *testing.T) {
@@ -270,5 +273,36 @@ func TestSecretWriteBack(t *testing.T) {
 	want := src + "\n```output {for=plain exit=0}\nhi\n```\n"
 	if got := string(Markdown(d, results, Options{WriteBack: true})); got != want {
 		t.Errorf("write-back:\ngot  %q\nwant %q", got, want)
+	}
+}
+
+// On a terminal, as with mdsh -n, a cast fence shows the text of its
+// frame=, or of the last frame, not the recording's JSON; written back,
+// it is left as it is. Nested in a quote, the text keeps the quote.
+func TestTerminalCastFence(t *testing.T) {
+	var cast bytes.Buffer
+	termrec.WriteCast(&cast, termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{
+		{At: 0, Data: []byte("first")},
+		{At: time.Second, Data: []byte("\x1b[2J\x1b[Hsecond")},
+	}})
+	quote := func(s string) string {
+		return "> " + strings.ReplaceAll(strings.TrimSuffix(s, "\n"), "\n", "\n> ") + "\n"
+	}
+	for _, tt := range []struct{ src, want string }{
+		{"```cast\n" + cast.String() + "```\n", "```cast\nsecond\n```\n"},
+		{"```cast {frame=1}\n" + cast.String() + "```\n", "```cast {frame=1}\nfirst\n```\n"},
+		{quote("```cast\n" + cast.String() + "```"), "> ```cast\n> second\n> ```\n"},
+		{"```cast\nnot a recording\n```\n", "```cast\nnot a recording\n```\n"},
+	} {
+		d, err := doc.Parse([]byte(tt.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := string(Markdown(d, nil, Options{Terminal: true})); got != tt.want {
+			t.Errorf("terminal:\ngot  %q\nwant %q", got, tt.want)
+		}
+		if got := string(Markdown(d, nil, Options{Terminal: true, WriteBack: true})); got != tt.src {
+			t.Errorf("write-back changed the cast: %q", got)
+		}
 	}
 }
