@@ -102,7 +102,7 @@ func TestFIFONeverClosed(t *testing.T) {
 }
 
 // A shell's own wait on a reader that never gets end of file blocks
-// until the block's timeout, which kills the shell and stops the run.
+// until the block's timeout, which interrupts it and stops the run.
 func TestFIFOWaitNeverEnds(t *testing.T) {
 	src := "```sh {#mk}\nmkfifo pipe\ncat pipe > got.txt &\nREADER=$!\n```\n" +
 		"```sh {#open}\nexec 3>pipe\necho one >&3\n```\n" +
@@ -110,8 +110,8 @@ func TestFIFOWaitNeverEnds(t *testing.T) {
 		"```sh {#after}\necho after\n```\n"
 	r := runFIFO(t, src, 10*time.Second)
 	w := r["wait"]
-	if !w.Exited || w.Err == nil || !strings.Contains(w.Err.Error(), "timed out") {
-		t.Errorf("wait: exited %v, err %v; want a timeout that ended the shell", w.Exited, w.Err)
+	if w.Exited || !w.TimedOut {
+		t.Errorf("wait: exited %v, err %v; want a timeout that kept the shell", w.Exited, w.Err)
 	}
 	if r["after"].Ran {
 		t.Error("the block after the timeout ran")
@@ -125,8 +125,8 @@ func TestFIFOForegroundReader(t *testing.T) {
 		"```sh {#read timeout=1s}\ncat pipe\n```\n" +
 		"```sh {#after}\necho after\n```\n"
 	r := runFIFO(t, src, 10*time.Second)
-	if !r["read"].Exited || r["read"].Err == nil {
-		t.Errorf("read: exited %v, err %v; want a timeout", r["read"].Exited, r["read"].Err)
+	if rd := r["read"]; rd.Exited || !rd.TimedOut {
+		t.Errorf("read: exited %v, err %v; want a timeout that kept the shell", rd.Exited, rd.Err)
 	}
 	if r["after"].Ran {
 		t.Error("the block after the timeout ran")

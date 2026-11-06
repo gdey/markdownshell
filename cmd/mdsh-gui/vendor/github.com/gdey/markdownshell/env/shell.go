@@ -4,18 +4,22 @@ package env
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // ErrExited is returned by Run when the block ended the shell, for
@@ -40,6 +44,16 @@ type Shell struct {
 	pipes []io.Closer
 	exit  int
 	mu    sync.Mutex // one Run at a time
+	// killAfter is Config.KillAfter. forced closes when Kill ends the
+	// shell, and busy is set while a script runs.
+	killAfter time.Duration
+	forced    chan struct{}
+	force     sync.Once
+	busy      atomic.Bool
+	// jobs are the PIDs of the background jobs started, which stopping
+	// a block leaves running.
+	jobMu sync.Mutex
+	jobs  map[int]bool
 }
 
 // Terminal is a terminal mdsh draws itself, such as a pane in a window,
@@ -82,6 +96,11 @@ type Config struct {
 	// TTY gives the shell a pseudo-terminal of its own as its
 	// controlling terminal, so RunTTY can run blocks on it.
 	TTY bool
+	// KillAfter, if set, kills the shell when a script is still
+	// running that long after its run was stopped or timed out and the
+	// script was interrupted (see Run). Zero leaves it running until
+	// Kill, for a caller that asks the user first.
+	KillAfter time.Duration
 	// Init runs in the shell once it starts, before any block, such as
 	// aliases and functions to define. Its exit status is ignored, but
 	// an Init that ends the shell is an error.
@@ -102,10 +121,12 @@ func Start(cfg Config) (*Shell, error) {
 		return nil, err
 	}
 	s := &Shell{
-		path:   cfg.Path,
-		mark:   "__MDSH_" + hex.EncodeToString(rb[:]) + "__",
-		tmp:    tmp,
-		waited: make(chan struct{}),
+		path:      cfg.Path,
+		mark:      "__MDSH_" + hex.EncodeToString(rb[:]) + "__",
+		tmp:       tmp,
+		waited:    make(chan struct{}),
+		killAfter: cfg.KillAfter,
+		forced:    make(chan struct{}),
 	}
 	s.cmd = exec.Command(cfg.Path)
 	s.cmd.Env = cfg.Env
@@ -178,7 +199,11 @@ func Start(cfg Config) (*Shell, error) {
 
 // Run runs script in the shell and returns its exit status. The script's
 // stdin is /dev/null. If the script ends the shell, Run returns ErrExited
-// and the shell's exit status. If ctx ends first, the shell is killed.
+// and the shell's exit status. If ctx ends first, the script is
+// interrupted, as ctrl+c would, and Run returns status 130 and ctx's
+// error with the shell still alive, and what earlier scripts set in it
+// (see interrupt). Should the script not stop, Run waits until it does,
+// or until Kill, or Config.KillAfter, ends the shell.
 func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer) (status int, exited bool, err error) {
 	return s.run(ctx, script, stdout, stderr, false, false)
 }
@@ -196,6 +221,9 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 	}
 
 	f := filepath.Join(s.tmp, "block.sh")
+	if !onTTY {
+		script = keepScript(script)
+	}
 	if err := os.WriteFile(f, []byte(script), 0o600); err != nil {
 		return 0, false, err
 	}
@@ -214,6 +242,16 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 	defer errw.Flush()
 
 	cmd := fmt.Sprintf(". %s </dev/null\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark)
+	if !onTTY {
+		// An interrupt ends the script, whatever it is running, and not
+		// the shell: while _mdsh_in is set, the trap returns from the
+		// sourced file, or from a function the script is in, which is
+		// why interrupt sends it again. Outside a script it does
+		// nothing, since a return there would end dash and zsh. The
+		// script clears _mdsh_in itself as it ends (see keepScript), so
+		// only a script that returned early leaves it to the line after.
+		cmd = fmt.Sprintf("trap '[ -n \"${_mdsh_in-}\" ] && return 130' INT\n_mdsh_in=1; . %s </dev/null\n_mdsh_rc=$?; _mdsh_in=\nprintf '%%s%%d\\n' '%s' \"$_mdsh_rc\"\nprintf '%%s0\\n' '%s' >&2\n", quote(f), s.mark, s.mark)
+	}
 	if onTTY {
 		// The INT trap keeps ctrl+c from ending the shell along with the
 		// command it is waiting for. Commands start with the default
@@ -244,6 +282,9 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 			before, after = s.jobsOn(), "set +m\ntrap - TSTP TTIN TTOU\n"
 		}
 		cmd = fmt.Sprintf("trap : INT\n%s. %s 0<>%s 1>&0 2>&0\nprintf '%%s%%d\\n' '%s' \"$?\"\nprintf '%%s%%d\\n' '%s' %d >/dev/tty\ntrap - INT\n%sprintf '%%s0\\n' '%s' >&2\n", before, quote(f), quote(s.pty.name()), s.mark, s.mark, s.ttyRun, after, s.mark)
+		// An interrupt that comes as the block ends mustn't end the
+		// shell, so the INT trap stays.
+		cmd = strings.Replace(cmd, "trap - INT\n", "", 1)
 	}
 	if _, err := io.WriteString(s.stdin, cmd); err != nil {
 		<-s.waited
@@ -251,28 +292,43 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		return s.exit, true, ErrExited
 	}
 
+	s.busy.Store(true)
+	defer s.busy.Store(false)
 	var outRC string
 	gotOut, gotErr := false, false
+	// stopped is ctx's error once ctx ended and the script was
+	// interrupted; stop ends interrupt.
+	var stopped error
+	stop := make(chan struct{})
+	defer close(stop)
+	done := ctx.Done()
+	ended := func() (int, bool, error) {
+		<-s.waited
+		s.drainTTY(onTTY)
+		if stopped != nil {
+			return s.exit, true, stopped
+		}
+		return s.exit, true, ErrExited
+	}
 	for !gotOut || !gotErr {
 		select {
 		case v, ok := <-s.out.done:
 			if !ok {
-				<-s.waited
-				s.drainTTY(onTTY)
-				return s.exit, true, ErrExited
+				return ended()
 			}
 			outRC, gotOut = v, true
 		case _, ok := <-s.errs.done:
 			if !ok {
-				<-s.waited
-				s.drainTTY(onTTY)
-				return s.exit, true, ErrExited
+				return ended()
 			}
 			gotErr = true
-		case <-ctx.Done():
-			s.kill()
+		case <-done:
+			done, stopped = nil, ctx.Err()
+			go s.interrupt(stop)
+		case <-s.forced:
 			<-s.waited
-			return -1, true, ctx.Err()
+			s.drainTTY(onTTY)
+			return -1, true, cmp.Or(stopped, ErrExited)
 		}
 	}
 	if onTTY {
@@ -282,7 +338,72 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 	if err != nil {
 		return 0, false, fmt.Errorf("bad status %q", outRC)
 	}
+	if stopped != nil {
+		return 130, false, stopped
+	}
 	return rc, false, nil
+}
+
+// interruptEvery is how often interrupt sends SIGINT, and interruptFor
+// how long before it also kills what the script started.
+const (
+	interruptEvery = 50 * time.Millisecond
+	interruptFor   = 2 * time.Second
+)
+
+// interrupt stops the running script without ending the shell, until
+// stop closes: it sends SIGINT to the shell's process group, as ctrl+c
+// would, again and again, since each one ends a command the script
+// waits for or, through the INT trap, returns from one function; the
+// commands that follow such a function in its caller run until the
+// next one, a few milliseconds later, ends them. The same goes for
+// what follows a command that ignored SIGINT and was killed: bash only
+// acts on an interrupt that killed the command it waited for. After
+// interruptFor it also kills every process the shell started, except
+// its background jobs, in case one ignores SIGINT. A script still
+// running after that, such as a loop in the shell that ignores the
+// trap, needs Kill, which Config.KillAfter does itself.
+func (s *Shell) interrupt(stop <-chan struct{}) {
+	start := time.Now()
+	t := time.NewTicker(interruptEvery)
+	defer t.Stop()
+	for {
+		interrupt(s.cmd)
+		if s.killAfter > 0 && time.Since(start) >= s.killAfter {
+			s.Kill()
+			return
+		}
+		if time.Since(start) >= interruptFor {
+			s.jobMu.Lock()
+			spare := maps.Clone(s.jobs)
+			s.jobMu.Unlock()
+			killChildren(s.cmd.Process.Pid, spare)
+		}
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// Busy reports whether a script is running in the shell.
+func (s *Shell) Busy() bool { return s.busy.Load() }
+
+// Kill ends the shell, and whatever it is running, at once. A Run
+// waiting on an interrupted script returns.
+func (s *Shell) Kill() {
+	s.force.Do(func() { close(s.forced) })
+	s.kill()
+}
+
+// keepScript is script ending by clearing _mdsh_in, the mark that an
+// interrupt should end it, keeping its status.
+func keepScript(script string) string {
+	if script != "" && !strings.HasSuffix(script, "\n") {
+		script += "\n"
+	}
+	return script + "_mdsh_rc=$?; _mdsh_in=; return $_mdsh_rc\n"
 }
 
 // drainTTY, after a block on the terminal ended the shell, waits until
@@ -331,6 +452,14 @@ func (s *Shell) kill() {
 	for _, p := range s.pipes {
 		p.Close()
 	}
+}
+
+// ExitStatus is the shell's exit status once it has ended, or 0.
+func (s *Shell) ExitStatus() int {
+	if !s.Exited() {
+		return 0
+	}
+	return s.exit
 }
 
 // Exited reports whether the shell has ended, by a block calling exit or

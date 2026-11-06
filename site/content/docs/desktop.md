@@ -153,6 +153,13 @@ This page is the reference.
   the app, with a count on the toolbar; a line about a place in a file
   jumps to it. A warning an edit fixed is struck out, and one with a
   plain fix, such as a `depends=` naming no block, has a Fix button.
+  Its Events tab is the file's event log: shells starting and ending,
+  and why, blocks running, the file changing on disk, `mdsh ctl` calls.
+  Whatever cost the shells what blocks set in them stands out there and
+  in the status line. The app never ends a shell without asking: Stop
+  and `timeout=` interrupt the block, as ctrl+c would, and only Kill
+  Shell, offered when a block won't stop, and Restart Shells, which
+  asks first, start a shell afresh.
 - **Outline** (cmd/ctrl+shift+O). Headings, blocks and controls, with a
   play button on the selected block.
 - **Pictures.** Images, screenshots and recordings show in the block.

@@ -25,22 +25,25 @@ import (
 var ErrHistoryOff = errors.New("the History pane is off")
 
 // SetHistory turns the History pane on or off. Commands typed there run
-// on a terminal, so turning it on starts the shells again, with
-// terminals of their own, unless they have them already. It reports
-// whether that lost what blocks that ran had set up. The output shown so
-// far is kept.
-func (n *Notebook) SetHistory(on bool) (restarted bool, err error) {
+// on a terminal, so turning it on needs shells with terminals of their
+// own. If the shells have none, and blocks have run in them, starting
+// them again would lose what those blocks set: then it starts them
+// again only if restart is set, the user having said to, and otherwise
+// leaves the pane off and returns ErrRestartNeeded. It reports whether
+// the shells started again. The output shown so far is kept.
+func (n *Notebook) SetHistory(on, restart bool) (restarted bool, err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.waitAsking()
 	if n.running {
 		return false, ErrBusy
 	}
-	n.history = on
 	if !on {
+		n.history = false
 		return false, nil
 	}
 	if n.sess.PTY() {
+		n.history = true
 		// The shells have terminals; they only need the rc file.
 		if rc := rcScript(n.opts.Run.HistoryRC, n.shell()); rc != "" {
 			n.running = true
@@ -52,20 +55,18 @@ func (n *Notebook) SetHistory(on bool) (restarted bool, err error) {
 		}
 		return false, nil
 	}
+	if n.ran() && !restart {
+		return false, ErrRestartNeeded
+	}
 	n.waitReap()
+	n.history = true
 	sess, err := n.newSession(n.opts.Run)
 	if err != nil {
 		n.history = false
 		return false, err
 	}
-	n.closeSession()
-	n.sess = sess
-	for _, r := range n.results {
-		if r.Ran && run.Runnable(r.Block) {
-			restarted = true
-		}
-	}
-	return restarted, nil
+	n.replaceSession(sess, whyHistory)
+	return true, nil
 }
 
 // shellEnv is the environment the shells start with. With the History

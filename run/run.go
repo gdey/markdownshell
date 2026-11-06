@@ -101,7 +101,19 @@ type Options struct {
 	// with a tty block does, so Session.RunTyped can run any block on
 	// Terminal.
 	PTY bool
+	// KillAfter, if set, kills a block's shell when the block is still
+	// running that long after the run was stopped or the block timed
+	// out. Stopping a block interrupts it, as ctrl+c would, and keeps
+	// its shell and what earlier blocks set there; one that won't stop
+	// runs on until Session.Kill, or until KillAfter. Zero is for a
+	// caller that asks the user before Session.Kill. See
+	// env.Config.KillAfter.
+	KillAfter time.Duration
 }
+
+// KillAfter is Options.KillAfter for a run nobody can be asked about,
+// such as mdsh on the command line.
+const KillAfter = 5 * time.Second
 
 // The values of $MDSH_MODE, which tells blocks how they are being run.
 const (
@@ -168,7 +180,8 @@ type Result struct {
 	Stdout  []byte
 	Stderr  []byte
 	Status  int
-	// Exited is true when the block ended its shell (exit, or a timeout).
+	// Exited is true when the block ended its shell, as exit does, or its
+	// shell was killed.
 	Exited bool
 	// Running is true while a background block is still going. Its
 	// output and status come in once it ends.
@@ -194,7 +207,8 @@ type Result struct {
 	// Done, for a block that ran in a Session. A background block's runs
 	// until Reap sees it end.
 	Duration time.Duration
-	// TimedOut is true when the block's timeout= ended it.
+	// TimedOut is true when the block's timeout= ended it, which stops
+	// the run.
 	TimedOut bool
 }
 

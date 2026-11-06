@@ -1,6 +1,8 @@
 package run
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -29,6 +31,47 @@ func (s *Session) logEnd(b *doc.Block, r *Result, start time.Time) {
 		f["error"] = r.Err.Error()
 	}
 	s.opts.Audit.Event("block.end", f)
+	if r.Exited {
+		s.logShellEnd(b, r)
+	}
+}
+
+// ShellEnd says why a block's run ended its shell: "timeout" when its
+// timeout= did, "stopped" when the run was stopped, or "exit" when the
+// block ended it itself, as exit does. The next block in that env
+// starts a new shell, without what earlier blocks set there.
+func ShellEnd(r *Result) string {
+	switch {
+	case r.TimedOut:
+		return "timeout"
+	case errors.Is(r.Err, context.Canceled):
+		return "stopped"
+	}
+	return "exit"
+}
+
+// logShellEnd logs that b's run, r, ended its env's shell, and why.
+func (s *Session) logShellEnd(b *doc.Block, r *Result) {
+	name := blockEnv(b)
+	if s.ended == nil {
+		s.ended = map[string]bool{}
+	}
+	s.ended[name] = true
+	why := ShellEnd(r)
+	if s.killed.Swap(false) {
+		why = "killed"
+	}
+	s.opts.Audit.Event("env.end", audit.Fields{"env": name, "block": b.ID, "reason": why, "exit": r.ExitStatus()})
+}
+
+// logExited logs that e's shell was found ended, unless the block that
+// ended it was logged doing so, before a new one starts in its place.
+func (s *Session) logExited(e *env.Env, status int) {
+	if s.ended[e.Name] {
+		delete(s.ended, e.Name)
+		return
+	}
+	s.opts.Audit.Event("env.end", audit.Fields{"env": e.Name, "reason": "died", "exit": status})
 }
 
 // logSkip logs that b didn't run, and why, with more fields if any.
@@ -81,6 +124,13 @@ func (s *Session) logEnv(e *env.Env, share, names []string) {
 		shared = names
 	}
 	f := audit.Fields{"env": e.Name, "shared": shared}
+	if s.restarts[e.Name] {
+		f["again"] = true
+	}
+	if s.restarts == nil {
+		s.restarts = map[string]bool{}
+	}
+	s.restarts[e.Name] = true
 	if e.Parent != nil {
 		f["parent"] = e.Parent.Name
 	}

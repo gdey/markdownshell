@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
@@ -186,6 +189,9 @@ type Options struct {
 	// and which hasn't run in this session. If it is nil, block of
 	// doesn't run.
 	Depend func(block, of int, question string) run.Answer
+	// Events, if set, gets the audit log of what the notebook's shells
+	// and blocks do, and why; see EventLog.
+	Events *EventLog
 	// Resolved, if set, is told of each warning logged for the console
 	// that the document no longer has, as logged, after an edit fixes
 	// it.
@@ -288,6 +294,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		return nil, err
 	}
 	n.sess = sess
+	n.logStart(whyOpen)
 	n.results = append([]*run.Result(nil), sess.Results()...)
 	// Copies of an input that disagree, as the warnings logged above
 	// say, all take the first's value: a change Undo can take back.
@@ -318,7 +325,27 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		TakeTTY:     n.takeTTY,
 		Mode:        run.ModeInteractive,
 		PTY:         n.history,
+		Audit:       n.opts.Events.Audit(),
 	})
+}
+
+// ErrRestartNeeded is the answer when doing what was asked needs the
+// shells to start again, which would lose what blocks set in them, and
+// the user hasn't said that's fine.
+var ErrRestartNeeded = errors.New("the shells need to start again, which loses the variables, functions and aliases blocks set in them")
+
+// replaceSession, with n.mu held, puts sess in place of n.sess, whose
+// shells end, and logs why.
+func (n *Notebook) replaceSession(sess *run.Session, why string) {
+	n.opts.Events.Event("session.end", audit.Fields{"reason": why})
+	n.closeSession()
+	n.sess = sess
+	n.logStart(why)
+}
+
+// logStart logs that n.sess is ready, and why there is a new one.
+func (n *Notebook) logStart(why string) {
+	n.opts.Events.Event("session.start", audit.Fields{"reason": why, "file": n.file, "shell": n.shell(), "terminal": n.sess.PTY(), "lost": why != whyOpen && n.ran()})
 }
 
 // environ is the environment blocks run in, and conditions and
@@ -339,23 +366,35 @@ func (n *Notebook) RunOptions() RunOptions {
 	return n.opts.Run
 }
 
-// SetRunOptions changes the options blocks run with. The shells start
-// again, since arguments and the shell are fixed when they start, but
-// the output shown so far is kept.
-func (n *Notebook) SetRunOptions(ro RunOptions) error {
+// SetRunOptions changes the options blocks run with. It never starts
+// the shells again: new arguments are set in the shells as they are,
+// with set --, and --only, step mode and stop on error apply to the
+// next run. A new shell, or new files to source, wait for Restart
+// Shells, which is up to the user; it reports whether such a change is
+// waiting. The output shown so far is kept.
+func (n *Notebook) SetRunOptions(ro RunOptions) (waiting bool, err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.running {
-		return ErrBusy
+		return false, ErrBusy
 	}
 	n.waitReap()
-	sess, err := n.newSession(ro)
-	if err != nil {
-		return err
+	was := n.opts.Run
+	if err := n.sess.SetChoices(ro.Only, ro.Step, ro.StopOnError); err != nil {
+		return false, err
 	}
-	n.closeSession()
-	n.sess, n.opts.Run = sess, ro
-	return nil
+	if !slices.Equal(ro.Args, was.Args) {
+		if err := n.sess.SetArgs(context.Background(), ro.Args); err != nil {
+			return false, err
+		}
+		n.opts.Events.Event("args", audit.Fields{"args": ro.Args})
+	}
+	n.opts.Run = ro
+	if ro.Shell != was.Shell || ro.Source != was.Source || ro.HistoryRC != was.HistoryRC {
+		n.opts.Events.Event("restart.needed", audit.Fields{"reason": whyRunOptions})
+		return true, nil
+	}
+	return false, nil
 }
 
 // Dirty reports whether output changed since the file was last saved.
@@ -376,6 +415,7 @@ func (n *Notebook) Changed() bool {
 // Close ends the shells blocks ran in, stopping any block that runs,
 // background blocks included.
 func (n *Notebook) Close() {
+	n.opts.Events.Event("session.end", audit.Fields{"reason": whyClose})
 	n.Stop()
 	n.mu.Lock()
 	select {
@@ -539,9 +579,11 @@ func (n *Notebook) HasOutput() bool {
 }
 
 // ClearOutputs takes every run's output out of the document, as
-// render.Clear does, and starts the shells again, so the notebook is as
-// if nothing had run: no output, no statuses, no variables. Like an
-// edit, it isn't saved until Save.
+// render.Clear does, and forgets what ran, so the notebook shows no
+// output and no statuses, and depends= runs what a block needs again.
+// The shells stay as they are, with what blocks set in them: only
+// Restart Shells starts them again. Like an edit, it isn't saved until
+// Save.
 func (n *Notebook) ClearOutputs() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -552,14 +594,23 @@ func (n *Notebook) ClearOutputs() error {
 	if err := n.setSource(render.Clear(n.d)); err != nil {
 		return err
 	}
-	sess, err := n.newSession(n.opts.Run)
-	if err != nil {
-		return err
-	}
-	n.closeSession()
-	n.sess = sess
-	n.results = append([]*run.Result(nil), sess.Results()...)
+	n.forgetRuns()
+	n.opts.Events.Event("outputs.clear", nil)
 	return nil
+}
+
+// forgetRuns, with n.mu held, drops every block's result from this
+// session, as if none had run; include blocks show their files as they
+// are now.
+func (n *Notebook) forgetRuns() {
+	n.sess.ReadIncludes()
+	for i, r := range n.sess.Results() {
+		if !r.Block.IsInclude() {
+			r = &run.Result{Block: r.Block}
+			n.sess.SetResult(i, r)
+		}
+		n.results[i] = r
+	}
 }
 
 // Restart ends the shells, and any background block still running, and
@@ -576,8 +627,7 @@ func (n *Notebook) Restart() error {
 	if err != nil {
 		return err
 	}
-	n.closeSession()
-	n.sess = sess
+	n.replaceSession(sess, whyRestart)
 	n.results = append([]*run.Result(nil), sess.Results()...)
 	return nil
 }
@@ -616,16 +666,18 @@ func (n *Notebook) SaveAs(file string) error {
 	}
 	moved := filepath.Dir(abs) != filepath.Dir(n.file)
 	n.file = abs
-	if !moved {
+	if !moved || n.ran() {
+		// The shells stay, in the folder they are in, with what blocks
+		// set in them.
 		n.sess.SetFile(abs)
 		return nil
 	}
+	// No block has run, so new shells, in the new folder, lose nothing.
 	sess, err := n.newSession(n.opts.Run)
 	if err != nil {
 		return err
 	}
-	n.closeSession()
-	n.sess = sess
+	n.replaceSession(sess, whySaveAs)
 	return nil
 }
 
@@ -811,4 +863,63 @@ func (n *Notebook) confirm(b *doc.Block) run.Answer {
 	i := n.index[b]
 	n.mu.Unlock()
 	return n.opts.Confirm(i, q)
+}
+
+// Reload reads the file from disk again, dropping output not saved and
+// the edits Undo would take back. The shells stay as they are, with what
+// blocks set in them. A change to the front matter's shell, or to what
+// the shells share or source, which are fixed when they start, waits
+// for Restart Shells; Reload reports whether one is waiting.
+func (n *Notebook) Reload() (waiting bool, err error) {
+	src, err := os.ReadFile(n.File())
+	if err != nil {
+		return false, err
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return false, ErrBusy
+	}
+	n.waitReap()
+	n.waitAsking()
+	shell, env := n.shell(), n.d.Options.Env
+	if err := n.d.SetSource(src); err != nil {
+		return false, fmt.Errorf("%s: %w", n.file, err)
+	}
+	n.opts.Events.Event("file.reload", audit.Fields{"file": n.file})
+	n.undo, n.redo, n.noteEnd = nil, nil, -1
+	if err := n.sync(); err != nil {
+		return false, err
+	}
+	// What ran this session goes, as when the file is opened.
+	n.forgetRuns()
+	n.dirty = false
+	n.stamp = stampOf(n.file)
+	if shell != n.shell() || !reflect.DeepEqual(env, n.d.Options.Env) {
+		n.opts.Events.Event("restart.needed", audit.Fields{"reason": whyReload})
+		return true, nil
+	}
+	return false, nil
+}
+
+// Kill ends the shell the running block runs in, at once, as when a
+// stopped block won't stop and the user says to. What blocks set there
+// is gone; the next block in that env starts a new shell. It reports
+// whether a block was running.
+func (n *Notebook) Kill() bool {
+	n.mu.Lock()
+	sess := n.sess
+	n.mu.Unlock()
+	return sess.Kill()
+}
+
+// ran reports, with n.mu held, whether a block has run in the shells,
+// so starting them again would lose what it set.
+func (n *Notebook) ran() bool {
+	for _, r := range n.results {
+		if r != nil && r.Ran && run.Runnable(r.Block) {
+			return true
+		}
+	}
+	return false
 }

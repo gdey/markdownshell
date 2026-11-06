@@ -9,6 +9,45 @@ import * as doc$0 from "../../../doc/models.js";
 import * as report$0 from "../../../report/models.js";
 
 /**
+ * AuditEvent is one entry of a file's event log, as the Events pane
+ * shows it: what the shells, the file and the blocks run in it did, and
+ * why.
+ */
+export interface AuditEvent {
+    /**
+     * Seq counts up from 1, so a page can tell it missed one.
+     */
+    "seq": number;
+
+    /**
+     * Time is when it happened, RFC 3339 with milliseconds, in UTC.
+     */
+    "time": string;
+
+    /**
+     * Event names it, such as session.start or block.end; see
+     * docs/audit.md.
+     */
+    "event": string;
+
+    /**
+     * Text says what happened, in words.
+     */
+    "text": string;
+
+    /**
+     * Lost is set when what blocks set in a shell, its variables,
+     * functions and aliases, went with it.
+     */
+    "lost"?: boolean;
+
+    /**
+     * JSON is the event as the audit log writes it, one line.
+     */
+    "json": string;
+}
+
+/**
  * Cell is one piece of the document as the frontend draws it: a
  * top-level block of prose, or a block the user can run.
  */

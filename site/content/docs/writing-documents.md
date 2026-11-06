@@ -68,7 +68,7 @@ hello from a sub-env
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
-| `timeout=30s` | Kill the block's shell after this long (stops the run); mdsh-gui and `mdsh -i` show the time against it while the block runs |
+| `timeout=30s` | Interrupt the block after this long, keeping its shell (stops the run); mdsh-gui and `mdsh -i` show the time against it while the block runs |
 | `background` | Start the block and go straight on to the next; see [Background blocks](#background-blocks) |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
 | `frame=N` | With `tty`, the frame a PDF shows (default the last) |

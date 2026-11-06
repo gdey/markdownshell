@@ -303,7 +303,7 @@ func TestRunOptions(t *testing.T) {
 	if err := n.RunBlock(0); err != nil {
 		t.Fatal(err)
 	}
-	if err := n.SetRunOptions(RunOptions{Args: []string{"c", "d"}, Only: "args"}); err != nil {
+	if _, err := n.SetRunOptions(RunOptions{Args: []string{"c", "d"}, Only: "args"}); err != nil {
 		t.Fatal(err)
 	}
 	if c := n.Cells(); !c[0].Ran {

@@ -138,10 +138,11 @@ func (a *App) newWindow(t *docTab) *docWindow {
 func (a *App) newTab() *docTab {
 	a.mu.Lock()
 	a.lastTab++
-	t := &docTab{app: a, id: a.lastTab, answers: make(chan run.Answer), done: make(chan struct{}), view: defaultView}
+	t := &docTab{app: a, id: a.lastTab, answers: make(chan run.Answer), done: make(chan struct{}), view: defaultView, auditQ: make(chan notebook.AuditEvent, 256)}
 	a.tabs[t.id] = t
 	a.mu.Unlock()
 	go t.watch()
+	go t.sendAudit()
 	return t
 }
 

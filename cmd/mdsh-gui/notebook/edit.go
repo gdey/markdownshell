@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/lsp"
 	"github.com/gdey/markdownshell/run"
@@ -35,12 +36,18 @@ func (n *Notebook) sync() error {
 		if !errors.Is(err, run.ErrRestart) {
 			return err
 		}
-		sess, err := n.newSession(n.opts.Run)
-		if err != nil {
-			return err
+		if n.ran() {
+			// Starting the shells again would lose what blocks set in
+			// them; that is the user's call, with Restart Shells. Until
+			// then the tty block can't run.
+			n.opts.Events.Event("restart.needed", audit.Fields{"reason": whyTTY})
+		} else {
+			sess, err := n.newSession(n.opts.Run)
+			if err != nil {
+				return err
+			}
+			n.replaceSession(sess, whyTTY)
 		}
-		n.closeSession()
-		n.sess = sess
 	}
 	// The session reads include blocks that are new, so a typed
 	// include shows its file's lines without a run.

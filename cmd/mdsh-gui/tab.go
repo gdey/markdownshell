@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
 	"github.com/gdey/markdownshell/run"
@@ -42,6 +43,43 @@ type docTab struct {
 	live        []liveEvent  // what the running run has sent so far
 	nvim        *nvim.Editor // the source pane's Neovim, if running
 	roRun       string       // the read-only file to run without saving
+	// events is the event log of the file open in the tab, which
+	// reloading keeps and opening another file starts afresh; auditQ
+	// takes its new events to sendAudit.
+	events *notebook.EventLog
+	auditQ chan notebook.AuditEvent
+}
+
+// newEvents starts an event log for a file opening in the tab.
+func (t *docTab) newEvents() *notebook.EventLog {
+	return notebook.NewEventLog(func(e notebook.AuditEvent) {
+		select {
+		case t.auditQ <- e:
+		default:
+			// The page sees the gap in Seq and reads the log again.
+		}
+	})
+}
+
+// sendAudit sends the tab's page each new event, as an "audit" event,
+// until the tab closes. It runs on its own goroutine, since events are
+// logged with the notebook's lock held.
+func (t *docTab) sendAudit() {
+	for {
+		select {
+		case <-t.done:
+			return
+		case e := <-t.auditQ:
+			t.emit("audit", e)
+		}
+	}
+}
+
+// eventLog is the event log of the tab's file, or nil.
+func (t *docTab) eventLog() *notebook.EventLog {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.events
 }
 
 // askReadOnly reports whether a run of file should first ask for a copy
@@ -79,7 +117,7 @@ type tabEvent struct {
 // emit sends an event to this tab's page, in whichever window holds it.
 func (t *docTab) emit(name string, data any) {
 	t.mu.Lock()
-	if t.running && name != "menu" {
+	if t.running && name != "menu" && name != "audit" {
 		t.live = append(t.live, liveEvent{name, data})
 	}
 	t.mu.Unlock()
@@ -119,8 +157,13 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 	// stop and what it sends no longer reaches the page, which now shows
 	// the new notebook.
 	done := make(chan struct{})
+	events := t.eventLog()
+	if abs, _ := filepath.Abs(file); events == nil || abs != t.file() {
+		events = t.newEvents()
+	}
 	n, err := notebook.Open(file, notebook.Options{
-		Run: ro,
+		Run:    ro,
+		Events: events,
 		OnEvent: func(e notebook.Event) {
 			select {
 			case <-done:
@@ -142,7 +185,7 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 	}
 	t.mu.Lock()
 	old, oldDone := t.n, t.nDone
-	t.n, t.nDone, t.warned = n, done, false
+	t.n, t.nDone, t.warned, t.events = n, done, false, events
 	t.fresh = old == nil || old.File() != n.File()
 	t.mu.Unlock()
 	if oldDone != nil {
@@ -263,7 +306,9 @@ func (t *docTab) watch() {
 		}
 		t.mu.Lock()
 		t.warned = true
+		events := t.events
 		t.mu.Unlock()
+		events.Event("file.changed", audit.Fields{"file": n.File()})
 		t.emit("file-changed", n.File())
 	}
 }
