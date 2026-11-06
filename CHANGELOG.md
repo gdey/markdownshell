@@ -31,6 +31,22 @@ follow [Semantic Versioning](https://semver.org/).
   cell asked the document questions, such as where a block could move to
   and what uses it, that read the whole document again. It now works
   those out once, and the same documents take 30 and 70 milliseconds.
+- mdsh-gui opens and edits documents of 100,000 lines and more. A
+  100,000-line runbook took 23 seconds to open with the source view and
+  now takes 8, typing in it is about three times as quick, and one of a
+  million lines, which never finished opening, opens in about a minute
+  and a half. Cards out of sight are no longer laid out or painted,
+  copying folds between the views and placing the dependency lines no
+  longer take time that grows with the square of the length, the source
+  view's fold arrows are worked out again only around each edit, and the
+  fence checker asks Go about every new fence in one call.
+- Adding a block in mdsh-gui's source view, such as typing a ```` ```text ````
+  fence to paste captured output into, no longer redraws every card
+  below it. Each block after it was numbered anew, and an unnamed one
+  renamed for its new line, which drew its card again; now the number
+  and name are changed in place. While the new fence is still open, and
+  everything below it reads as its code, the rendered view waits for the
+  typing to settle before drawing it.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

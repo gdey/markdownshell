@@ -216,12 +216,23 @@ export function markDeps() {
 // where its own lines leave and are dragged from, and the bottom one,
 // where lines from the blocks that depend on it arrive.
 
-// headY is the y of a card's top anchor.
+// headY is the y of a card's top anchor. Every head row is drawn alike,
+// so one is measured, and the others are found from their cards: a card
+// out of sight isn't laid out, and measuring what is inside it would lay
+// it out, which, for every card of a long document, took minutes.
 function headY(card: HTMLElement, top: number): number {
-  const head = card.querySelector(":scope > .head") ?? card;
-  const r = head.getBoundingClientRect();
-  return r.top + Math.min(r.height / 2, 14) - top;
+  if (!card.querySelector(":scope > .head")) return card.getBoundingClientRect().top + Math.min(card.getBoundingClientRect().height / 2, 14) - top;
+  if (headAt === undefined) {
+    const head = card.querySelector(":scope > .head")!;
+    const r = head.getBoundingClientRect();
+    headAt = r.top - card.getBoundingClientRect().top + Math.min(r.height / 2, 14);
+  }
+  return card.getBoundingClientRect().top + headAt - top;
 }
+
+// headAt is how far below its card's top a head row's anchor is, for
+// this draw.
+let headAt: number | undefined;
 
 // footY is the y of a card's bottom anchor.
 function footY(card: HTMLElement, top: number): number {
@@ -283,6 +294,7 @@ function draw() {
     layer.setAttribute("viewBox", `0 0 ${width} ${height}`);
   }
 
+  headAt = undefined;
   type Line = Edge & { a: Anchor; b: Anchor; lane: number };
   const lines: Line[] = [];
   for (const e of edges) {
@@ -292,14 +304,27 @@ function draw() {
   }
   // Lanes: the shortest lines nearest the cards, and a line takes the
   // first lane where no line already there runs over the same rows.
-  const lanes: Line[][] = [];
+  // A lane's lines don't overlap, so kept in order down the page, a line
+  // can only run over the ones either side of where it would go.
+  const lanes: { lo: number; hi: number }[][] = [];
   const span = (l: Line) => Math.abs(l.a.y - l.b.y);
   for (const l of [...lines].sort((p, q) => span(p) - span(q))) {
     const lo = Math.min(l.a.y, l.b.y);
     const hi = Math.max(l.a.y, l.b.y);
     let i = 0;
-    while (lanes[i]?.some((o) => Math.min(o.a.y, o.b.y) < hi && lo < Math.max(o.a.y, o.b.y))) i++;
-    (lanes[i] ??= []).push(l);
+    for (; ; i++) {
+      const lane = (lanes[i] ??= []);
+      let a = 0;
+      let b = lane.length;
+      while (a < b) {
+        const m = (a + b) >> 1;
+        if (lane[m].lo < lo) a = m + 1;
+        else b = m;
+      }
+      if ((a > 0 && lane[a - 1].hi > lo) || (a < lane.length && lane[a].lo < hi && lo < lane[a].hi)) continue;
+      lane.splice(a, 0, { lo, hi });
+      break;
+    }
     l.lane = i;
   }
   // The side: the left margin when the lanes fit there, else the right

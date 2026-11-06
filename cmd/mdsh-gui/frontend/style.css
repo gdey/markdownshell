@@ -329,6 +329,12 @@ th { background: var(--code-bg); }
    clear layer (#deps-ui, z-index 1), so its heading stacks above that;
    a card's buttons are inside the card, clear of the lines. */
 #doc > .block { isolation: isolate; }
+/* A card out of sight is neither laid out nor painted, only kept at the
+   size it last had, or else the size drawCell guesses from its lines, so
+   the page's work as a long document changes is for the cards in view.
+   A card clips what is in it already, so containing its paint changes
+   nothing. */
+#doc > .block { content-visibility: auto; contain-intrinsic-size: auto var(--guess, 120px); }
 #doc > .heading-cell { z-index: 2; }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

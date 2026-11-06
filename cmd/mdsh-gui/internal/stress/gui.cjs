@@ -6,7 +6,8 @@
 // fast the machine is, so CI can run them; the times it prints do.
 //
 // It needs mdsh-gui built in server mode, which serves the window to a
-// browser, and Playwright:
+// browser, and Playwright. On Linux, without GTK, build it with cgo off;
+// on macOS it needs cgo, so leave CGO_ENABLED out:
 //
 //	CGO_ENABLED=0 go build -tags server -o /tmp/mdsh-gui-server .
 //	node internal/stress/gui.cjs --server /tmp/mdsh-gui-server [--check] \
@@ -163,6 +164,21 @@ async function run(shape, lines) {
     // long that a key takes longer than the pause, a burst can be drawn
     // in two, so only --check, on a short one, counts.
     if (check && (s.added > 3 || s.removed > 3)) fail(`${shape}/${lines}: typing in one paragraph redrew ${s.added} cards; want 3, one a pause`);
+    if (check) {
+      // A new block below the paragraph, typed fence first, numbers every
+      // block after it anew and, until its fence is closed, turns them
+      // into its code. The cards below are kept all the same: those that
+      // change are the paragraph's, the new block's and the next one's,
+      // as typing settles once on the open fence and once at the end.
+      await page.evaluate(() => Object.assign(window.stress, { added: 0, removed: 0 }));
+      for (const k of "\n\n```text\ncaptured output\n```") {
+        await page.keyboard.type(k);
+        await page.waitForTimeout(100);
+      }
+      await page.waitForTimeout(2500 * slow);
+      const f = await page.evaluate(() => window.stress);
+      if (f.added > 8) fail(`${shape}/${lines}: typing a new block redrew ${f.added} cards; want 8 at most`);
+    }
     if (check) {
       // What typing drew must be what drawing it all afresh draws.
       const typed = await cards(page);

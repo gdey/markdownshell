@@ -137,6 +137,7 @@ function drawDoc() {
   const main = $("doc");
   const restore = anchor();
   closeTerminal();
+  behind = false;
   main.replaceChildren(...cells.map(drawCell));
   drawn++;
   nameFolds();
@@ -178,10 +179,33 @@ const placeFields = ["line", "from", "to", "lastLine", "outputLine", "drop", "dr
 // drawnAs is what a cell's card is drawn from: the cell without its
 // place in the file.
 function drawnAs(c: Cell): string {
-  const rest: Partial<Cell> = { ...c };
+  const rest: Partial<Cell> & { section?: boolean } = { ...c };
   for (const k of placeFields) delete rest[k];
+  // A code block's index, and the name and id of one not named, which
+  // come from its line and index, change with every block or line added
+  // above it, and so does
+  // which blocks a heading's section runs. keep writes them into the
+  // card, rather than every card below an edit being drawn again.
+  if (renumbered(c)) {
+    delete rest.block;
+    delete rest.name;
+    // An unnamed block's id is made from its index.
+    if (c.name !== c.id) delete rest.id;
+  }
+  if (c.heading) {
+    delete rest.sectionFrom;
+    delete rest.sectionTo;
+    rest.section = !!c.sectionTo;
+  }
+  // So does a textbox's or a choice's.
+  if (c.textbox) rest.textbox = { ...c.textbox, block: 0 };
+  if (c.choice) rest.choice = { ...c.choice, block: 0 };
   return JSON.stringify(rest);
 }
+
+// renumbered says c's card is a code block's, whose index and name keep
+// can change.
+const renumbered = (c: Cell) => c.block >= 0 && !c.textbox && !c.choice;
 
 // updateDoc draws the cells Go has after an edit in the source pane,
 // fresh, drawing again only the cards whose cells changed. Typing
@@ -197,30 +221,51 @@ function updateDoc(fresh: Cell[]) {
     cells = fresh;
     return drawDoc();
   }
-  const was = cells.map(drawnAs);
-  const now = fresh.map(drawnAs);
-  let head = 0;
-  while (head < was.length && head < now.length && was[head] === now[head]) head++;
-  let tail = 0;
-  while (tail < was.length - head && tail < now.length - head && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
+  behind = false;
+  const { head, tail } = unchanged(fresh);
   const restore = anchor();
   const keep = (i: number, j: number): Cell => {
     const c = cells[i];
     const f = fresh[j];
     const card = cards[i];
-    Object.assign(c, Object.fromEntries(placeFields.map((k) => [k, f[k]])));
+    if (renumbered(c) && (c.block !== f.block || c.name !== f.name || c.id !== f.id)) {
+      card.id = "block-" + f.block;
+      card.dataset.block = String(f.block);
+      if (c.secret) card.classList.toggle("masked", !revealed.has(f.block));
+      const id = card.querySelector(":scope > .head .id");
+      if (id) id.textContent = f.name ?? f.id ?? "";
+      c.block = f.block;
+      c.name = f.name;
+      c.id = f.id;
+      labelBlock(card);
+    }
+    const input = c.textbox ?? c.choice;
+    const to = (f.textbox ?? f.choice)?.block;
+    if (input && to !== undefined && input.block !== to) {
+      renumberInput(card, input.block, to);
+      input.block = to;
+    }
+    if (c.heading && f.sectionTo && (c.sectionFrom !== f.sectionFrom || c.sectionTo !== f.sectionTo)) {
+      card.dataset.sectionFrom = String(f.sectionFrom ?? 0);
+      card.dataset.sectionTo = String(f.sectionTo);
+      c.sectionFrom = f.sectionFrom;
+      c.sectionTo = f.sectionTo;
+    }
+    if (placeFields.every((k) => c[k] === f[k])) return c;
     // Only what changed is written: writing every card's place, though
-    // the same, made the page work out every card's style again.
-    const set = (key: string, v: string | undefined) => {
-      if (card.dataset[key] === v) return;
+    // the same, made the page work out every card's style again. It is
+    // told from the cell, as reading the card's took longer.
+    const set = (key: string, was: string | undefined, v: string | undefined) => {
+      if (was === v) return;
       if (v === undefined) delete card.dataset[key];
       else card.dataset[key] = v;
     };
-    set("line", String(c.line));
-    set("from", String(c.from));
-    set("drop", c.drop ? "1" : undefined);
-    set("dropAfter", c.dropAfter >= 0 ? String(c.dropAfter) : undefined);
-    set("dropBefore", c.dropBefore >= 0 ? String(c.dropBefore) : undefined);
+    set("line", String(c.line), String(f.line));
+    set("from", String(c.from), String(f.from));
+    set("drop", c.drop ? "1" : undefined, f.drop ? "1" : undefined);
+    set("dropAfter", c.dropAfter >= 0 ? String(c.dropAfter) : undefined, f.dropAfter >= 0 ? String(f.dropAfter) : undefined);
+    set("dropBefore", c.dropBefore >= 0 ? String(c.dropBefore) : undefined, f.dropBefore >= 0 ? String(f.dropBefore) : undefined);
+    Object.assign(c, Object.fromEntries(placeFields.map((k) => [k, f[k]])));
     return c;
   };
   const middle = fresh.slice(head, fresh.length - tail);
@@ -237,7 +282,9 @@ function updateDoc(fresh: Cell[]) {
   cells = next;
   drawn++;
   if (!gone.length && !middle.length) return;
-  nameFolds();
+  // Headings are named by which of those alike they are, which only a
+  // heading coming or going changes.
+  if ([...gone, ...drawnNow].some((e) => e.dataset.level)) nameFolds();
   applyFolds(drawnNow);
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
@@ -247,6 +294,30 @@ function updateDoc(fresh: Cell[]) {
   setDeps(cells);
   // Many new cards can leave the view blank, as drawing every one can.
   if (middle.length > 20) repaint($("doc-scroll"));
+}
+
+// renumberInput writes a textbox's or a choice's new block index, to,
+// into its card, wherever drawTextbox and drawChoice wrote it.
+function renumberInput(card: HTMLElement, from: number, to: number) {
+  for (const e of card.querySelectorAll<HTMLElement>("[data-input]")) e.dataset.input = String(to);
+  for (const e of card.querySelectorAll<HTMLInputElement>(`input[name="choice-${from}"]`)) e.name = "choice-" + to;
+  const problem = card.querySelector<HTMLElement>(`#problem-${from}`);
+  if (problem) {
+    problem.id = "problem-" + to;
+    for (const e of card.querySelectorAll(`[aria-describedby="problem-${from}"]`)) e.setAttribute("aria-describedby", problem.id);
+  }
+}
+
+// unchanged is how many cells at the head and the tail of fresh are
+// drawn as the cells drawn now are.
+function unchanged(fresh: Cell[]): { head: number; tail: number } {
+  const was = cells.map(drawnAs);
+  const now = fresh.map(drawnAs);
+  let head = 0;
+  while (head < was.length && head < now.length && was[head] === now[head]) head++;
+  let tail = 0;
+  while (tail < was.length - head && tail < now.length - head && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
+  return { head, tail };
 }
 
 // fragment holds nodes, to be put in the page at once.
@@ -394,6 +465,7 @@ function drawCell(c: Cell): HTMLElement {
   if (c.drop) e.dataset.drop = "1";
   if (c.dropAfter >= 0) e.dataset.dropAfter = String(c.dropAfter);
   if (c.dropBefore >= 0) e.dataset.dropBefore = String(c.dropBefore);
+  if (c.block >= 0 && !c.textbox && !c.choice) e.style.setProperty("--guess", guessHeight(c) + "px");
   if (c.movable) {
     // The grip goes first in a block's head, or before an input's name.
     const g = grip("Drag to move this block (alt+↑/↓)", (ev, handle) => startDrag(ev, handle, e, c.from, 0, "doc"));
@@ -407,6 +479,16 @@ function drawCell(c: Cell): HTMLElement {
     }
   }
   return e;
+}
+
+// guessHeight is about how tall block c's card is, in pixels, which the
+// page takes it to be until it is first in sight: the cards out of sight
+// are not laid out, and a guess near their size keeps the scroll bar
+// steady as they come into it.
+function guessHeight(c: Cell): number {
+  const lines = (s?: string) => (s ? s.split("\n").length : 0);
+  const out = lines(c.output);
+  return 60 + 19 * lines(c.body) + (out ? 30 + 19 * out : 0);
 }
 
 // drawProse draws one top-level block of prose. Clicking it shows its
@@ -1210,8 +1292,9 @@ function foldAll(what: "blocks" | "sections", on: boolean): Fold[] {
 // or, with fromFile, of the folds the file asks for.
 function renderedFoldLines(fromFile: boolean): number[] {
   const lines: number[] = [];
+  const at = cellsByLine();
   for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    const c = cells.find((c) => String(c.line) === e.dataset.line);
+    const c = at.get(e.dataset.line ?? "");
     if (!c) continue;
     if (c.heading && (fromFile ? c.collapsed : sectionFolded(e))) lines.push(c.line);
     if (c.block >= 0) {
@@ -1220,6 +1303,13 @@ function renderedFoldLines(fromFile: boolean): number[] {
     }
   }
   return lines;
+}
+
+// cellsByLine finds the cells by their cards' data-line. Looking each
+// card's cell up in the list took time that grew with the square of the
+// document's length.
+function cellsByLine(): Map<string, Cell> {
+  return new Map(cells.map((c) => [String(c.line), c]));
 }
 
 async function foldsToSource() {
@@ -1233,8 +1323,9 @@ async function foldsToRendered() {
   const lines = new Set(nvimDoc ? ((await nvimCall<number[]>("folds").catch(fail)) ?? []) : source ? sourceFolds(source.view) : []);
   if (!source && !nvimDoc) return status("open the source view to copy its folds");
   const list: Fold[] = [];
+  const at = cellsByLine();
   for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    const c = cells.find((c) => String(c.line) === e.dataset.line);
+    const c = at.get(e.dataset.line ?? "");
     if (!c) continue;
     if (c.heading && e.dataset.fold) {
       const on = lines.has(c.line);
@@ -1338,11 +1429,24 @@ function viewImage(img: HTMLImageElement) {
 }
 
 // blocks are the blocks j and k move between: those no fold hides.
-const blocks = () => [...document.querySelectorAll<HTMLElement>("#doc .block:not(.in-fold)")];
+// blocks are the block cards in sight, not folded away. They are kept
+// until a card comes, goes or changes its classes: selecting, marking
+// and the outline each ask, and asking a long document's page took long
+// enough to show in typing.
+function blocks(): HTMLElement[] {
+  if (cardsChanged.takeRecords().length || !shownBlocks) {
+    shownBlocks = [...document.querySelectorAll<HTMLElement>("#doc .block:not(.in-fold)")];
+    cardsChanged.observe($("doc"), { childList: true, attributes: true, attributeFilter: ["class"] });
+  }
+  return shownBlocks;
+}
+
+let shownBlocks: HTMLElement[] | null = null;
+const cardsChanged = new MutationObserver(() => (shownBlocks = null));
 
 function select(i: number, scroll = true) {
   const all = blocks();
-  for (const b of all) b.classList.remove("selected");
+  for (const b of document.querySelectorAll("#doc .block.selected")) b.classList.remove("selected");
   selected = i;
   if (i >= 0 && selectedSection) {
     selectedSection = "";
@@ -1370,9 +1474,8 @@ function selectSection(cell: HTMLElement) {
 
 // markSection marks the selected heading in the view and the outline.
 function markSection() {
-  for (const e of document.querySelectorAll<HTMLElement>("#doc > .heading-cell")) {
-    e.classList.toggle("selected", !!selectedSection && e.dataset.fold === selectedSection);
-  }
+  for (const e of document.querySelectorAll<HTMLElement>("#doc > .heading-cell.selected")) e.classList.remove("selected");
+  if (selectedSection) document.querySelector(`#doc > .heading-cell[data-fold="${CSS.escape(selectedSection)}"]`)?.classList.add("selected");
   markOutline();
 }
 
@@ -1605,6 +1708,15 @@ async function names(): Promise<Names> {
 
 let source: MarkdownEditor | null = null;
 let sourceTimer = 0;
+
+// typedAt is when the source pane was last typed in, and behind is set
+// while the rendered view waits for the typing to settle before drawing
+// an edit that changes more than manyCards cards. settle is how long, in
+// milliseconds, the typing must stop for.
+let typedAt = 0;
+let behind = false;
+const manyCards = 30;
+const settle = 1500;
 let sourceTurn: Promise<unknown> = Promise.resolve();
 
 // inTurn runs f once the source pane's reads and writes before it are
@@ -1629,8 +1741,9 @@ function openSource() {
     // the cursor keeps clear of it.
     extensions: [runGutter((line) => void runLine(line)), sourceFolding(), scrollPastEnd(), EditorView.scrollMargins.of(() => ({ bottom: 48 }))],
     onChange() {
+      typedAt = Date.now();
       clearTimeout(sourceTimer);
-      sourceTimer = window.setTimeout(() => void applySource(), 500);
+      sourceTimer = window.setTimeout(() => void applySource(true), 500);
     },
     onCursor: (line) => markCurrent(line),
     async write() {
@@ -1666,26 +1779,42 @@ function closeSource() {
 }
 
 // applySource hands Go what was typed in the source pane, once a run
-// is over, and draws the document again.
-function applySource(): Promise<void> {
+// is over, and draws the document again. While typing, which is when
+// typing calls it, an edit that changes many cards waits to be drawn
+// until the typing settles: opening a fence turns everything below it
+// into code until the fence is closed, and drawing every card below at
+// each pause, and then again once it closed, made typing choppy.
+function applySource(typing = false): Promise<void> {
   clearTimeout(sourceTimer);
   return inTurn(async () => {
     if (nvimDoc) return applyNvim(nvimDoc);
     const ed = source;
-    if (!ed?.pending) return;
+    if (!ed || (!ed.pending && !behind)) return;
     if (running) {
       sourceTimer = window.setTimeout(() => void applySource(), 1000);
       return;
     }
-    try {
-      await sendSource(ed);
-      status("");
-    } catch (err) {
-      fail(err);
-      return;
+    if (ed.pending) {
+      try {
+        await sendSource(ed);
+        status("");
+      } catch (err) {
+        fail(err);
+        return;
+      }
+      $("dirty").hidden = false;
     }
-    $("dirty").hidden = false;
-    updateDoc((await App.Cells()) ?? []);
+    const fresh = (await App.Cells()) ?? [];
+    const settles = typedAt + settle - Date.now();
+    if (typing && settles > 0) {
+      const { head, tail } = unchanged(fresh);
+      if (fresh.length - head - tail > manyCards) {
+        behind = true;
+        sourceTimer = window.setTimeout(() => void applySource(true), settles);
+        return;
+      }
+    }
+    updateDoc(fresh);
     if (source !== ed) return;
     markRunLines();
     markCurrent(ed.view.state.doc.lineAt(ed.view.state.selection.main.head).number);
@@ -2400,13 +2529,16 @@ function jumpTo(target: HTMLElement) {
 // current step first (or the block waiting for an answer), then the
 // ones in the background. A click on one jumps to it.
 function drawRunning() {
-  // Blocks in folded sections run too.
-  const all = [...document.querySelectorAll<HTMLElement>("#doc .block")];
-  const now = all.filter((e) => "?▶".includes(blockMark(e) || "x"));
-  const bg = all.filter((e) => blockMark(e) === "◐");
+  // Blocks in folded sections run too. Only the blocks that could be
+  // running are looked at, not every one in a long document.
+  const asking = [...document.querySelectorAll<HTMLElement>("#doc .block .ask:not([hidden])")].map((a) => a.closest<HTMLElement>(".block")!);
+  const some = [...new Set([...document.querySelectorAll<HTMLElement>("#doc .block:is(.now, .background)"), ...asking])];
+  some.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const now = some.filter((e) => "?▶".includes(blockMark(e) || "x"));
+  const bg = some.filter((e) => blockMark(e) === "◐");
   const chip = (e: HTMLElement) => {
     const mark = blockMark(e);
-    const name = e.querySelector(".name")?.firstChild?.textContent || "block " + (all.indexOf(e) + 1);
+    const name = e.querySelector(".name")?.firstChild?.textContent || "block " + ([...document.querySelectorAll("#doc .block")].indexOf(e) + 1);
     const why = mark === "?" ? "waiting for an answer" : mark === "▶" ? "running now" : "running in the background";
     const b = el("button", { className: "chip" + markClass(mark), title: name + ": " + why + ". Click to go to it." }, el("span", { className: "mark", ariaHidden: "true" }, mark), name);
     b.setAttribute("aria-label", name + ", " + why + ". Go to it");
