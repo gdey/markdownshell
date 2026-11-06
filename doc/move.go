@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/text"
 )
 
 var gfm = goldmark.New(goldmark.WithExtensions(extension.GFM))
@@ -20,33 +20,19 @@ var gfm = goldmark.New(goldmark.WithExtensions(extension.GFM))
 // end of the file. Offsets inside a list, a block quote, front matter,
 // or a block's attached output or an output copy are not boundaries.
 func (d *Document) Boundaries() []int {
-	body := d.bodyStart()
-	root := gfm.Parser().Parse(text.NewReader(d.Src))
-	var out []int
-	for c := root.FirstChild(); c != nil; c = c.NextSibling() {
-		s, ok := nodeStart(c, d.Src)
-		if !ok || s < body || d.inside(s) {
-			continue
-		}
-		out = append(out, s)
-	}
-	out = append(out, len(d.Src))
-	slices.Sort(out)
-	return slices.Compact(out)
+	return d.NewIndex().Boundaries()
 }
 
 // inside reports whether pos is strictly inside a block and its output,
 // or an output copy, so nothing can go there.
 func (d *Document) inside(pos int) bool {
-	for _, b := range d.Blocks {
-		if pos > b.Span.Start && pos < b.Output.End {
-			return true
-		}
+	// The blocks and the copies are in order and don't overlap, so only
+	// the last of each to start before pos can hold it.
+	if i := sort.Search(len(d.Blocks), func(i int) bool { return d.Blocks[i].Span.Start >= pos }) - 1; i >= 0 && pos < d.Blocks[i].Output.End {
+		return true
 	}
-	for _, c := range d.Copies {
-		if pos > c.Span.Start && pos < c.Span.End {
-			return true
-		}
+	if i := sort.Search(len(d.Copies), func(i int) bool { return d.Copies[i].Span.Start >= pos }) - 1; i >= 0 && pos < d.Copies[i].Span.End {
+		return true
 	}
 	return false
 }
@@ -103,6 +89,12 @@ func (d *Document) Unit(b *Block) (Span, error) {
 	if b.Prefix != "" || !slices.Contains(d.Boundaries(), b.Span.Start) {
 		return Span{}, fmt.Errorf("the block %s is in a list, a quote or an output, and only top-level blocks move", d.Label(b))
 	}
+	return d.unitFrom(i), nil
+}
+
+// unitFrom is the unit of d.Blocks[i], a top-level block.
+func (d *Document) unitFrom(i int) Span {
+	b := d.Blocks[i]
 	end := b.Output.End
 	if i+1 < len(d.Blocks) {
 		t := d.Blocks[i+1]
@@ -110,7 +102,7 @@ func (d *Document) Unit(b *Block) (Span, error) {
 			end = t.Output.End
 		}
 	}
-	return Span{b.Span.Start, end}, nil
+	return Span{b.Span.Start, end}
 }
 
 // MoveBlock moves b's unit (see Unit) to at, one of Boundaries, and
@@ -337,12 +329,7 @@ func endsBlank(src []byte) bool {
 // to the next heading of the same or a higher level, or the end of the
 // file. It also returns the heading's level.
 func (d *Document) Section(start int) (Span, int, error) {
-	for _, h := range d.Headings() {
-		if h.Span.Start == start {
-			return h.Span, h.Level, nil
-		}
-	}
-	return Span{}, 0, errors.New("no heading there")
+	return d.NewIndex().Section(start)
 }
 
 // MoveSection moves the section of the heading at start (see Section),

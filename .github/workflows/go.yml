@@ -89,3 +89,13 @@ jobs:
       - name: Type-check the frontend
         if: runner.os == 'Linux'
         run: npx --yes --package typescript@5.9.3 tsc -p frontend
+      # Typing in the source view of a long document must redraw only the
+      # cards whose markdown changed, and draw them as a fresh draw would.
+      # These are counts, not times, so a slow runner doesn't fail them.
+      - name: Check typing on long documents in the browser
+        if: runner.os == 'Linux'
+        run: |
+          CGO_ENABLED=0 go build -tags server -o "$RUNNER_TEMP/mdsh-gui-server" .
+          npm install --prefix "$RUNNER_TEMP/pw" --no-save playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" node internal/stress/gui.cjs --server "$RUNNER_TEMP/mdsh-gui-server" --check

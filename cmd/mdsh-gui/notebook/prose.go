@@ -2,8 +2,10 @@ package notebook
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -91,7 +93,7 @@ func (n *Notebook) cells() []Cell {
 		after := run.LookupAt(l.lookup, d, n.results, b.Output.End)
 		outLine := 0
 		if b.Output.End > b.Span.End {
-			outLine = lineNo(d.Src, b.Span.End+leadingBlank(d.Src[b.Span.End:b.Output.End]))
+			outLine = l.lineNo(b.Span.End + leadingBlank(d.Src[b.Span.End:b.Output.End]))
 		}
 		l.cells = append(l.cells, Cell{
 			Collapsed:       hidden == "" && holds(b, "collapse", after),
@@ -100,7 +102,7 @@ func (n *Notebook) cells() []Cell {
 			OutputLine:      outLine,
 			Block:           i,
 			ID:              b.ID,
-			Name:            strings.TrimPrefix(d.Label(b), "at "),
+			Name:            l.name(b),
 			Lang:            b.Lang,
 			Body:            b.Body,
 			Attrs:           attrsText(b.Info),
@@ -138,18 +140,21 @@ func (n *Notebook) cells() []Cell {
 	}
 	sections(d, l.cells)
 	unfoldHidden(l.cells)
+	// Each question below is about the whole document, so they all go
+	// to one index: asking d for each cell made laying out a long
+	// document take time in the square of its length.
+	x := d.NewIndex()
 	pos, line := 0, 1
-	bounds := d.Boundaries()
 	for i := range l.cells {
 		c := &l.cells[i]
 		line += bytes.Count(d.Src[pos:c.From], []byte("\n"))
 		pos = c.From
 		c.Line = line
-		c.Drop = slices.Contains(bounds, c.From)
+		c.Drop = x.IsBoundary(c.From)
 		c.DropAfter, c.DropBefore = -1, -1
 		if c.Heading > 0 && c.Drop {
-			if span, _, err := d.Section(c.From); err == nil {
-				c.dropLimits(d, span)
+			if span, _, err := x.Section(c.From); err == nil {
+				c.dropLimits(x, span)
 			}
 		}
 		bi := c.Block
@@ -160,25 +165,35 @@ func (n *Notebook) cells() []Cell {
 		} else if bi < 0 && c.Heading == 0 {
 			// A fence that doesn't run, drawn as it reads, moves too.
 			// A tape moves with its block, not on its own.
-			bi = slices.IndexFunc(d.Blocks, func(b *doc.Block) bool { return b.Span.Start == c.From })
+			bi = blockAt(d, c.From)
 			if bi > 0 {
-				if end, ok := unitEnd(d, bi-1, bounds); ok && end > c.From {
+				if end, ok := unitEnd(d, bi-1, x); ok && end > c.From {
 					bi = -1
 				}
 			}
 		}
 		if bi >= 0 {
-			if end, ok := unitEnd(d, bi, bounds); ok {
-				c.Movable, c.LastLine = true, lineNo(d.Src, max(end-1, c.From))
+			if end, ok := unitEnd(d, bi, x); ok {
+				last := max(end-1, c.From)
+				c.Movable, c.LastLine = true, line+bytes.Count(d.Src[c.From:last], []byte("\n"))
 				c.History = doc.IsHistoryID(d.Blocks[bi].ID)
-				c.dropLimits(d, doc.Span{Start: d.Blocks[bi].Span.Start, End: end})
-				if users := d.DeleteBlockers(d.Blocks[bi]); len(users) > 0 {
+				c.dropLimits(x, doc.Span{Start: d.Blocks[bi].Span.Start, End: end})
+				if users := x.DeleteBlockers(d.Blocks[bi]); len(users) > 0 {
 					c.Undeletable = "Can't delete: " + strings.Join(users, ", ") + " still use it. Take those out first."
 				}
 			}
 		}
 	}
 	return l.cells
+}
+
+// blockAt is the index of the block that starts at pos, or -1.
+func blockAt(d *doc.Document, pos int) int {
+	i := sort.Search(len(d.Blocks), func(i int) bool { return d.Blocks[i].Span.Start >= pos })
+	if i < len(d.Blocks) && d.Blocks[i].Span.Start == pos {
+		return i
+	}
+	return -1
 }
 
 // unfoldHidden opens a heading folded by an mdsh:collapse line when its
@@ -204,8 +219,8 @@ func unfoldHidden(cells []Cell) {
 
 // dropLimits sets c's DropAfter and DropBefore from span's
 // doc.Document.DependsLimits.
-func (c *Cell) dropLimits(d *doc.Document, span doc.Span) {
-	l := d.DependsLimits(span)
+func (c *Cell) dropLimits(x *doc.Index, span doc.Span) {
+	l := x.DependsLimits(span)
 	c.DropAfter = l.After
 	if l.BeforeDep != nil {
 		c.DropBefore = l.Before
@@ -236,9 +251,9 @@ func sections(d *doc.Document, cells []Cell) {
 // unitEnd is where the unit that moves with block i ends, as
 // doc.Document.Unit has it, given the document's boundaries, and false
 // for a block that can't move. It saves Unit's parse for every block.
-func unitEnd(d *doc.Document, i int, bounds []int) (int, bool) {
+func unitEnd(d *doc.Document, i int, x *doc.Index) (int, bool) {
 	b := d.Blocks[i]
-	if b.Prefix != "" || !slices.Contains(bounds, b.Span.Start) {
+	if b.Prefix != "" || !x.IsBoundary(b.Span.Start) {
 		return 0, false
 	}
 	end := b.Output.End
@@ -259,6 +274,31 @@ type layout struct {
 	refs   []byte
 	tasks  []int // taskMarks
 	cells  []Cell
+	// at and line are where lineNo last counted to and its line there.
+	at, line int
+}
+
+// lineNo is lineNo(src, pos) for the document. The blocks are laid out
+// in order, so it counts on from where it last got to rather than from
+// the top each time, which in a long document took longer than the rest
+// of the layout.
+func (l *layout) lineNo(pos int) int {
+	src := l.n.d.Src
+	if pos < l.at || l.line == 0 {
+		l.at, l.line = 0, 1
+	}
+	l.line += bytes.Count(src[l.at:pos], []byte("\n"))
+	l.at = pos
+	return l.line
+}
+
+// name is how the view names b: as doc.Document.Label does, without
+// "at ".
+func (l *layout) name(b *doc.Block) string {
+	if b.Named() && !doc.GeneratedID(b.ID) {
+		return b.ID
+	}
+	return fmt.Sprintf("line %d", l.lineNo(b.Span.Start))
 }
 
 // prose adds a cell for each top-level markdown block in src[from:to].

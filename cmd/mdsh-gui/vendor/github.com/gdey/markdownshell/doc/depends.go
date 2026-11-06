@@ -46,9 +46,10 @@ func idleDepWarning(b, dep *Block) string {
 // so a typo doesn't stop the document opening. No block may depend on
 // itself, directly or through others.
 func checkDepends(d *Document) error {
+	x := d.NewIndex()
 	for _, b := range d.Blocks {
 		for _, id := range b.Depends() {
-			dep := d.Block(id)
+			dep := x.byID[id]
 			switch {
 			case dep == nil || dep.IsInclude() || dep.IsTape():
 				d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(d.Src, b.Span.Start), unknownDepWarning(b, id)))
@@ -82,7 +83,7 @@ func checkDepends(d *Document) error {
 		state[b] = onPath
 		path = append(path, b.ID)
 		for _, id := range b.Depends() {
-			if dep := d.Dep(id); dep != nil {
+			if dep := x.Dep(id); dep != nil {
 				if err := visit(dep); err != nil {
 					return err
 				}
@@ -117,23 +118,7 @@ type MoveLimits struct {
 // DependsLimits works out span's MoveLimits. A depends= already out of
 // order doesn't limit the move.
 func (d *Document) DependsLimits(span Span) MoveLimits {
-	l := MoveLimits{After: -1, Before: len(d.Src)}
-	in := func(b *Block) bool { return b.Span.Start >= span.Start && b.Span.Start < span.End }
-	for _, b := range d.Blocks {
-		for _, id := range b.Depends() {
-			dep := d.Dep(id)
-			if dep == nil || dep == b || dep.Span.Start >= b.Span.Start || in(b) == in(dep) {
-				continue
-			}
-			if in(dep) && b.Span.Start < l.Before {
-				l.Before, l.BeforeDep, l.BeforeOn = b.Span.Start, b, dep
-			}
-			if in(b) && dep.Span.Start > l.After {
-				l.After, l.AfterDep, l.AfterOn = dep.Span.Start, b, dep
-			}
-		}
-	}
-	return l
+	return d.NewIndex().DependsLimits(span)
 }
 
 // CheckDependsMove fails if moving span to at, one of Boundaries,

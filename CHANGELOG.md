@@ -25,6 +25,12 @@ follow [Semantic Versioning](https://semver.org/).
   re-selects its block on every key.
 
   ![The source view and the rendered view side by side, a heading edited in one and drawn in the other, in a 2,900-line runbook](docs/changelog/typing-long-documents.png)
+- mdsh-gui laid out a document's cells in time that grew with the
+  square of its length, and does that after every pause in typing: a
+  10,000-line runbook took 3.5 seconds, and one mostly of prose 10. Each
+  cell asked the document questions, such as where a block could move to
+  and what uses it, that read the whole document again. It now works
+  those out once, and the same documents take 30 and 70 milliseconds.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed
