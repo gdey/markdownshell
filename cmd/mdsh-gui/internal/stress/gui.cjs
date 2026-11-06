@@ -125,30 +125,41 @@ async function run(shape, lines) {
     await page.waitForSelector(".cm-content", { timeout: 600000 });
     await page.waitForTimeout(1500);
     await page.evaluate(() => {
-      window.stress = { long: [], added: 0, removed: 0 };
+      window.stress = { long: [], added: 0, removed: 0, draws: 0, drawnAt: 0, most: 0 };
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) window.stress.long.push(e.duration);
       }).observe({ type: "longtask" });
       new MutationObserver((ms) => {
+        let added = 0;
         for (const m of ms) {
-          window.stress.added += m.addedNodes.length;
+          added += m.addedNodes.length;
           window.stress.removed += m.removedNodes.length;
         }
+        window.stress.added += added;
+        window.stress.most = Math.max(window.stress.most, added);
+        window.stress.draws++;
+        window.stress.drawnAt = performance.now();
       }).observe(document.getElementById("doc"), { childList: true });
     });
     // Three bursts of typing at the end of a prose line, each followed
-    // by a pause long enough for the view to draw the edit.
+    // by a pause long enough for the view to draw the edit. preview is
+    // how long the view took to show a burst's last key, from just
+    // before it was typed.
     await typeAt(page, " in it.");
     const keys = [];
+    const previews = [];
     for (let burst = 0; burst < 3; burst++) {
+      let last = 0;
       for (let k = 0; k < 5; k++) {
         const t = Date.now();
+        last = await page.evaluate(() => performance.now());
         await page.keyboard.type("x");
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r))));
         keys.push(Date.now() - t);
         await page.waitForTimeout(80);
       }
       await page.waitForTimeout(1500 * slow);
+      previews.push(await page.evaluate((last) => Math.max(0, Math.round(window.stress.drawnAt - last)), last));
     }
     const s = await page.evaluate(() => window.stress);
     const total = Math.round(s.long.reduce((a, b) => a + b, 0));
@@ -157,27 +168,29 @@ async function run(shape, lines) {
     const p50 = keys[Math.floor(keys.length / 2)];
     const nCards = await page.evaluate(() => document.querySelectorAll("#doc > *").length);
     console.log(
-      [shape, lines, nCards, `${open}ms`, `${p50}ms`, `${keys[keys.length - 1]}ms`, s.long.length, `${total}ms`, `${worst}ms`, `${s.added}/${s.removed}`].join("\t"),
+      [shape, lines, nCards, `${open}ms`, `${p50}ms`, `${keys[keys.length - 1]}ms`, `${Math.max(...previews)}ms`, s.long.length, `${total}ms`, `${worst}ms`, `${s.added}/${s.removed}`].join("\t"),
     );
-    // Each burst changes one paragraph, so each pause should draw one
-    // card again, taking one out and putting one in. On a document so
-    // long that a key takes longer than the pause, a burst can be drawn
-    // in two, so only --check, on a short one, counts.
-    if (check && (s.added > 3 || s.removed > 3)) fail(`${shape}/${lines}: typing in one paragraph redrew ${s.added} cards; want 3, one a pause`);
+    // Each burst changes one paragraph, so each time the view draws it
+    // should draw that one card again, taking one out and putting one
+    // in, whether it draws after each key, as on a short document, or
+    // once a pause, as on a long one.
+    if (check && s.most > 1) fail(`${shape}/${lines}: typing in one paragraph redrew ${s.most} cards at once; want 1`);
     if (check) {
       // A new block below the paragraph, typed fence first, numbers every
       // block after it anew and, until its fence is closed, turns them
       // into its code. The cards below are kept all the same: those that
       // change are the paragraph's, the new block's and the next one's,
-      // as typing settles once on the open fence and once at the end.
-      await page.evaluate(() => Object.assign(window.stress, { added: 0, removed: 0 }));
+      // and while the fence is open it may draw the few cards up to the
+      // next fence as code, but it waits for the typing to settle
+      // rather than draw more than 30 (manyCards in app.ts).
+      await page.evaluate(() => Object.assign(window.stress, { added: 0, removed: 0, most: 0 }));
       for (const k of "\n\n```text\ncaptured output\n```") {
         await page.keyboard.type(k);
         await page.waitForTimeout(100);
       }
       await page.waitForTimeout(2500 * slow);
       const f = await page.evaluate(() => window.stress);
-      if (f.added > 8) fail(`${shape}/${lines}: typing a new block redrew ${f.added} cards; want 8 at most`);
+      if (f.most > 30) fail(`${shape}/${lines}: typing a new block redrew ${f.most} cards at once; want 30 at most`);
     }
     if (check) {
       // What typing drew must be what drawing it all afresh draws.
@@ -197,7 +210,7 @@ async function run(shape, lines) {
 }
 
 (async () => {
-  console.log(["shape", "lines", "cards", "open", "key p50", "key max", "long tasks", "total", "worst", "cards drawn/removed"].join("\t"));
+  console.log(["shape", "lines", "cards", "open", "key p50", "key max", "preview", "long tasks", "total", "worst", "cards drawn/removed"].join("\t"));
   for (const lines of sizes) for (const shape of shapes) await run(shape, lines);
   fs.rmSync(tmp, { recursive: true, force: true });
   if (failed) process.exit(1);

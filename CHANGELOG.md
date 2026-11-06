@@ -47,6 +47,14 @@ follow [Semantic Versioning](https://semver.org/).
   and name are changed in place. While the new fence is still open, and
   everything below it reads as its code, the rendered view waits for the
   typing to settle before drawing it.
+- mdsh-gui's rendered view now follows typing in the source view of a
+  10,000-line document within about a fifth of a second, rather than
+  half a second after you stop, with no stall in between; a document
+  that takes longer to draw still waits for a pause. On 100,000 lines
+  keys take a third of the time they did. The source pane colors the
+  code in fences only in documents of up to 20,000 lines, as parsing it
+  again after each key was most of a key's time in longer ones, and the
+  dependency lines are drawn near the view rather than all of them.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

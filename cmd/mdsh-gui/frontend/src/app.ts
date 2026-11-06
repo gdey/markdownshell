@@ -176,31 +176,49 @@ function nameFolds() {
 // is, which typing above it changes without changing how it is drawn.
 const placeFields = ["line", "from", "to", "lastLine", "outputLine", "drop", "dropAfter", "dropBefore"] as const;
 
-// drawnAs is what a cell's card is drawn from: the cell without its
-// place in the file.
-function drawnAs(c: Cell): string {
-  const rest: Partial<Cell> & { section?: boolean } = { ...c };
-  for (const k of placeFields) delete rest[k];
-  // A code block's index, and the name and id of one not named, which
-  // come from its line and index, change with every block or line added
-  // above it, and so does
-  // which blocks a heading's section runs. keep writes them into the
-  // card, rather than every card below an edit being drawn again.
-  if (renumbered(c)) {
-    delete rest.block;
-    delete rest.name;
+// sameDrawn says cells a and b draw the same card: they are alike but
+// for their places in the file. A code block's index, and the name and
+// id of one not named, which come from its line and index, change with
+// every block or line added above it, and so do which blocks a
+// heading's section runs and a textbox's or a choice's index. keep
+// writes those into the card, rather than every card below an edit
+// being drawn again. The cells are compared field by field: turning
+// each into JSON, as this once did, took most of the time a pause in
+// typing spent on a long document.
+function sameDrawn(a: Cell, b: Cell): boolean {
+  if (renumbered(a) !== renumbered(b) || !!a.heading !== !!b.heading || !!a.sectionTo !== !!b.sectionTo) return false;
+  const skip = new Set<string>(placeFields);
+  if (renumbered(a)) {
+    skip.add("block").add("name");
     // An unnamed block's id is made from its index.
-    if (c.name !== c.id) delete rest.id;
+    if ((a.name !== a.id) !== (b.name !== b.id)) return false;
+    if (a.name !== a.id) skip.add("id");
   }
-  if (c.heading) {
-    delete rest.sectionFrom;
-    delete rest.sectionTo;
-    rest.section = !!c.sectionTo;
+  if (a.heading) skip.add("sectionFrom").add("sectionTo");
+  if (a.textbox || a.choice) skip.add("textbox").add("choice");
+  if (!sameJSON(a, b, skip)) return false;
+  if (a.textbox || b.textbox) return !!a.textbox && !!b.textbox && sameJSON(a.textbox, b.textbox, inputSkip);
+  if (a.choice || b.choice) return !!a.choice && !!b.choice && sameJSON(a.choice, b.choice, inputSkip);
+  return true;
+}
+
+const inputSkip = new Set(["block"]);
+
+// sameJSON says a and b, as Go sent them, are alike, but for the keys
+// in skip at the top. A key that is missing is alike one that is
+// undefined, as JSON leaves both out.
+function sameJSON(a: unknown, b: unknown, skip?: Set<string>): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((x, i) => sameJSON(x, b[i]));
   }
-  // So does a textbox's or a choice's.
-  if (c.textbox) rest.textbox = { ...c.textbox, block: 0 };
-  if (c.choice) rest.choice = { ...c.choice, block: 0 };
-  return JSON.stringify(rest);
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  for (const k in x) if (!skip?.has(k) && !sameJSON(x[k], y[k])) return false;
+  for (const k in y) if (!skip?.has(k) && !(k in x) && y[k] !== undefined) return false;
+  return true;
 }
 
 // renumbered says c's card is a code block's, whose index and name keep
@@ -311,12 +329,11 @@ function renumberInput(card: HTMLElement, from: number, to: number) {
 // unchanged is how many cells at the head and the tail of fresh are
 // drawn as the cells drawn now are.
 function unchanged(fresh: Cell[]): { head: number; tail: number } {
-  const was = cells.map(drawnAs);
-  const now = fresh.map(drawnAs);
+  const was = cells;
   let head = 0;
-  while (head < was.length && head < now.length && was[head] === now[head]) head++;
+  while (head < was.length && head < fresh.length && sameDrawn(was[head], fresh[head])) head++;
   let tail = 0;
-  while (tail < was.length - head && tail < now.length - head && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
+  while (tail < was.length - head && tail < fresh.length - head && sameDrawn(was[was.length - 1 - tail], fresh[fresh.length - 1 - tail])) tail++;
   return { head, tail };
 }
 
@@ -1212,6 +1229,11 @@ function applyFolds(only?: HTMLElement[]) {
     drawPart(b, "code");
     drawPart(b, "output");
   }
+  // New cards that aren't headings, where no section is folded, are in
+  // no fold, and change no section's count of what it hides: going
+  // through every card after each pause in typing is left out.
+  if (only && !only.some((e) => e.dataset.level) && !sectionsFolded) return;
+  sectionsFolded = false;
   const open: { level: number; folded: boolean; cell: HTMLElement; hidden: number }[] = [];
   const headings: typeof open = [];
   for (const e of doc.children as HTMLCollectionOf<HTMLElement>) {
@@ -1222,6 +1244,7 @@ function applyFolds(only?: HTMLElement[]) {
     if (owner) owner.hidden++;
     if (level) {
       const h = { level, folded: shownFolded(e), cell: e, hidden: 0 };
+      if (h.folded) sectionsFolded = true;
       e.classList.toggle("folded", h.folded);
       open.push(h);
       headings.push(h);
@@ -1238,6 +1261,10 @@ function applyFolds(only?: HTMLElement[]) {
   const current = doc.querySelector<HTMLElement>(".block.selected");
   if (current) select(current.classList.contains("in-fold") ? -1 : blocks().indexOf(current), false);
 }
+
+// sectionsFolded is whether a section was folded when applyFolds last
+// went through every card.
+let sectionsFolded = false;
 
 // reveal unfolds the sections that hide cell, so it can be shown, as
 // when a block asks before it runs or the toolbar jumps to it.
@@ -1715,6 +1742,15 @@ let sourceTimer = 0;
 // milliseconds, the typing must stop for.
 let typedAt = 0;
 let behind = false;
+
+// typingPause is how long typing must stop for before what was typed
+// is drawn, in milliseconds. A document whose edits draw in a few
+// milliseconds is drawn soon after each key, so it follows the typing;
+// one that takes longer waits, up to half a second, so drawing it
+// doesn't hold up the keys. drawTook is how long the last edit took to
+// draw.
+let drawTook = 0;
+const typingPause = () => Math.round(Math.min(500, Math.max(40, 6 * drawTook)));
 const manyCards = 30;
 const settle = 1500;
 let sourceTurn: Promise<unknown> = Promise.resolve();
@@ -1743,7 +1779,7 @@ function openSource() {
     onChange() {
       typedAt = Date.now();
       clearTimeout(sourceTimer);
-      sourceTimer = window.setTimeout(() => void applySource(true), 500);
+      sourceTimer = window.setTimeout(() => void applySource(true), typingPause());
     },
     onCursor: (line) => markCurrent(line),
     async write() {
@@ -1814,7 +1850,9 @@ function applySource(typing = false): Promise<void> {
         return;
       }
     }
+    const t = performance.now();
     updateDoc(fresh);
+    drawTook = performance.now() - t;
     if (source !== ed) return;
     markRunLines();
     markCurrent(ed.view.state.doc.lineAt(ed.view.state.selection.main.head).number);
