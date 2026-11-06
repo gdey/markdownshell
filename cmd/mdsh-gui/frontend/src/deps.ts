@@ -331,10 +331,16 @@ function draw() {
     // What is clicked: the line, unseen and wider, and the dot at its
     // corner on the dependency's row, in its own lane.
     const hit = make("path", { class: "hit", d: elbow(x, y1, y2) });
-    const title = make("title", {});
-    title.textContent = `${name(l.a.card)} depends on ${name(l.b.card)}`;
-    hit.append(title);
-    hit.onpointerenter = () => g.classList.add("hover");
+    // The tooltip names the blocks when the pointer gets there: naming
+    // them for every line on every redraw took most of a redraw's time
+    // in a long document.
+    hit.onpointerenter = () => {
+      g.classList.add("hover");
+      if (hit.querySelector("title")) return;
+      const title = make("title", {});
+      title.textContent = `${name(l.a.card)} depends on ${name(l.b.card)}`;
+      hit.append(title);
+    };
     hit.onpointerleave = () => g.classList.remove("hover");
     hit.ondblclick = (ev) => {
       ev.preventDefault();

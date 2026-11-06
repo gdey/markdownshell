@@ -16,6 +16,15 @@ follow [Semantic Versioning](https://semver.org/).
   Nothing on screen changes:
 
   ![A runbook in mdsh-gui with dependency lines, fold buttons and an output's copy button shown on hover, drawn as before](docs/changelog/long-documents.png)
+- Typing in mdsh-gui's source view no longer stalls on a long document.
+  Each pause in the typing drew every card of the rendered view again,
+  which on a runbook of a few thousand lines took long enough to swallow
+  keystrokes. Now only the cards whose markdown changed are drawn again.
+  The fence checker also stopped asking for every fence's attributes
+  again after each pause, and moving the cursor along a line no longer
+  re-selects its block on every key.
+
+  ![The source view and the rendered view side by side, a heading edited in one and drawn in the other, in a 2,900-line runbook](docs/changelog/typing-long-documents.png)
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

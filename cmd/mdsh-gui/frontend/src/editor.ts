@@ -7,7 +7,7 @@ import { autocompletion, type Completion, type CompletionContext, type Completio
 import { type Diagnostic, linter } from "@codemirror/lint";
 import { Vim } from "@replit/codemirror-vim";
 
-import { App, AttrKind, type AttrSpec, type Names, type SourceBlock } from "./api.js";
+import { App, AttrKind, type AttrSpec, type Names, type Problem, type SourceBlock } from "./api.js";
 
 // fence matches an opening fence line: the fence, then the info string.
 const fence = /^(\s*(?:`{3,}|~{3,}))(.*)$/;
@@ -124,6 +124,21 @@ function checkDepends(blocks: SourceBlock[], from: number, info: string, out: Di
   }
 }
 
+// infoProblems are the problems mdsh finds in an info string. Go is
+// asked once for each, not for every fence each time the text changes:
+// a long document has hundreds, and their info strings rarely change.
+async function infoProblems(info: string): Promise<Problem[]> {
+  let p = checked.get(info);
+  if (!p) {
+    p = (await App.CheckInfo(info)) ?? [];
+    if (checked.size >= 1000) checked.clear();
+    checked.set(info, p);
+  }
+  return p;
+}
+
+const checked = new Map<string, Problem[]>();
+
 // checkInfo checks the attributes of every fence with some, as mdsh's
 // language server (the lsp package) does for the Neovim source pane.
 async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
@@ -138,7 +153,7 @@ async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
     if (!line.text.includes("{")) continue;
     const r = infoRange(state, line.from);
     if (!r || !r.text.trim()) continue;
-    const problems = (await App.CheckInfo(r.text)) ?? [];
+    const problems = await infoProblems(r.text);
     for (const p of problems) {
       out.push({ from: r.from + p.from, to: r.from + p.to, severity: p.severity === "error" ? "error" : "warning", message: p.message });
     }

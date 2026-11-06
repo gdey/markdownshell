@@ -137,20 +137,9 @@ function drawDoc() {
   const main = $("doc");
   const restore = anchor();
   closeTerminal();
-  main.replaceChildren();
-  const seen = new Map<string, number>();
-  for (const c of cells) {
-    const e = drawCell(c);
-    if (c.heading) {
-      // A heading is known by its level and text, and which one it is
-      // of those alike, so its fold outlives edits elsewhere.
-      const name = c.heading + ":" + (e.querySelector("h1, h2, h3, h4, h5, h6")?.textContent ?? "");
-      const nth = seen.get(name) ?? 0;
-      seen.set(name, nth + 1);
-      e.dataset.fold = "section:" + name + ":" + nth;
-    }
-    main.append(e);
-  }
+  main.replaceChildren(...cells.map(drawCell));
+  drawn++;
+  nameFolds();
   applyFolds();
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
@@ -164,19 +153,124 @@ function drawDoc() {
   repaint($("doc-scroll"));
 }
 
+// drawn counts the times the document's cards were drawn, all of them
+// or some.
+let drawn = 0;
+
+// nameFolds names each heading's fold. A heading is known by its level
+// and text, and which one it is of those alike, so its fold outlives
+// edits elsewhere.
+function nameFolds() {
+  const seen = new Map<string, number>();
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    if (!e.dataset.level) continue;
+    const name = e.dataset.level + ":" + (e.querySelector("h1, h2, h3, h4, h5, h6")?.textContent ?? "");
+    const nth = seen.get(name) ?? 0;
+    seen.set(name, nth + 1);
+    e.dataset.fold = "section:" + name + ":" + nth;
+  }
+}
+
+// placeFields are the fields of a cell that say where in the file it
+// is, which typing above it changes without changing how it is drawn.
+const placeFields = ["line", "from", "to", "lastLine", "outputLine", "drop", "dropAfter", "dropBefore"] as const;
+
+// drawnAs is what a cell's card is drawn from: the cell without its
+// place in the file.
+function drawnAs(c: Cell): string {
+  const rest: Partial<Cell> = { ...c };
+  for (const k of placeFields) delete rest[k];
+  return JSON.stringify(rest);
+}
+
+// updateDoc draws the cells Go has after an edit in the source pane,
+// fresh, drawing again only the cards whose cells changed. Typing
+// changes a cell or two, and drawing every card of a long document
+// again, as drawDoc does, took long enough to stall the typing. The
+// cards before and after the cells that changed are kept, with their
+// places in the file brought up to date. Their handlers hold their
+// cells, so those are updated in place.
+function updateDoc(fresh: Cell[]) {
+  const main = $("doc");
+  const cards = [...main.children] as HTMLElement[];
+  if (cards.length !== cells.length || cards.some((e) => !e.hasAttribute("data-line"))) {
+    cells = fresh;
+    return drawDoc();
+  }
+  const was = cells.map(drawnAs);
+  const now = fresh.map(drawnAs);
+  let head = 0;
+  while (head < was.length && head < now.length && was[head] === now[head]) head++;
+  let tail = 0;
+  while (tail < was.length - head && tail < now.length - head && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
+  const restore = anchor();
+  const keep = (i: number, j: number): Cell => {
+    const c = cells[i];
+    const f = fresh[j];
+    const card = cards[i];
+    Object.assign(c, Object.fromEntries(placeFields.map((k) => [k, f[k]])));
+    // Only what changed is written: writing every card's place, though
+    // the same, made the page work out every card's style again.
+    const set = (key: string, v: string | undefined) => {
+      if (card.dataset[key] === v) return;
+      if (v === undefined) delete card.dataset[key];
+      else card.dataset[key] = v;
+    };
+    set("line", String(c.line));
+    set("from", String(c.from));
+    set("drop", c.drop ? "1" : undefined);
+    set("dropAfter", c.dropAfter >= 0 ? String(c.dropAfter) : undefined);
+    set("dropBefore", c.dropBefore >= 0 ? String(c.dropBefore) : undefined);
+    return c;
+  };
+  const middle = fresh.slice(head, fresh.length - tail);
+  const next: Cell[] = [];
+  for (let i = 0; i < head; i++) next.push(keep(i, i));
+  next.push(...middle);
+  for (let k = tail; k > 0; k--) next.push(keep(cells.length - k, fresh.length - k));
+  const gone = cards.slice(head, cards.length - tail);
+  const before = cards[cards.length - tail] ?? null;
+  if (following && gone.includes(following)) following = null;
+  for (const e of gone) e.remove();
+  const drawnNow = middle.map(drawCell);
+  main.insertBefore(fragment(drawnNow), before);
+  cells = next;
+  drawn++;
+  if (!gone.length && !middle.length) return;
+  nameFolds();
+  applyFolds(drawnNow);
+  runAllButton();
+  select(Math.min(selected, blocks().length - 1), false);
+  markSection();
+  drawOutline();
+  restore();
+  setDeps(cells);
+  // Many new cards can leave the view blank, as drawing every one can.
+  if (middle.length > 20) repaint($("doc-scroll"));
+}
+
+// fragment holds nodes, to be put in the page at once.
+function fragment(nodes: Node[]): DocumentFragment {
+  const f = document.createDocumentFragment();
+  f.append(...nodes);
+  return f;
+}
+
 // anchor notes where the block being followed is in the rendered view,
-// or else the card at its top, and returns a function that puts the
-// card drawn in its place back there. Drawing the document anew replaces
-// every card, and the view would otherwise jump, as far as the top.
+// or else the card at its top, and returns a function that puts that
+// card, or the card drawn in its place, back there. Drawing the document
+// anew replaces every card, and the view would otherwise jump, as far as
+// the top.
 function anchor(): () => void {
   const pane = $("doc-scroll");
   const cards = [...$("doc").children];
   const top = pane.getBoundingClientRect().top;
   const i = following ? cards.indexOf(following) : cards.findIndex((e) => e.getBoundingClientRect().bottom > top);
   if (i < 0) return () => {};
-  const offset = cards[i].getBoundingClientRect().top - top;
+  const was = cards[i];
+  const offset = was.getBoundingClientRect().top - top;
   return () => {
-    const e = $("doc").children[i] as HTMLElement | undefined;
+    const e = (was.isConnected ? was : $("doc").children[i]) as HTMLElement | undefined;
     if (following) following = e?.classList.contains("block") ? e : null;
     if (e) pane.scrollTop += e.getBoundingClientRect().top - top - offset;
   };
@@ -1027,9 +1121,12 @@ function summarize(full: HTMLElement, summary: HTMLElement) {
 
 // applyFolds draws every fold: each block's parts, and the sections,
 // hiding the cells under a folded heading.
-function applyFolds() {
+// With only, it draws the code and output folds of only those cards,
+// as after an edit draws a few cards again; the sections' folds are
+// always worked out for the whole document.
+function applyFolds(only?: HTMLElement[]) {
   const doc = $("doc");
-  for (const b of doc.querySelectorAll<HTMLElement>(":scope > .block")) {
+  for (const b of only?.filter((e) => e.classList.contains("block")) ?? doc.querySelectorAll<HTMLElement>(":scope > .block")) {
     drawPart(b, "code");
     drawPart(b, "output");
   }
@@ -1588,8 +1685,7 @@ function applySource(): Promise<void> {
       return;
     }
     $("dirty").hidden = false;
-    cells = (await App.Cells()) ?? [];
-    drawDoc();
+    updateDoc((await App.Cells()) ?? []);
     if (source !== ed) return;
     markRunLines();
     markCurrent(ed.view.state.doc.lineAt(ed.view.state.selection.main.head).number);
@@ -1724,8 +1820,7 @@ async function applyNvim(d: NvimDoc) {
     return;
   }
   $("dirty").hidden = false;
-  cells = (await App.Cells()) ?? [];
-  drawDoc();
+  updateDoc((await App.Cells()) ?? []);
   markRunLines();
 }
 
@@ -2037,12 +2132,20 @@ function firstCell(past: (e: HTMLElement) => boolean, shown: boolean): number {
 // the cursor is in becomes the selected one, so the rendered view, the
 // outline and enter all go by the same block.
 function markCurrent(line: number) {
+  // The cursor moves with every key typed, mostly on the same line.
+  const mark = [line, drawn, selected, selectedSection].join(" ");
+  if (mark === marked) return;
   for (const e of document.querySelectorAll("#doc > .current")) e.classList.remove("current");
   const cell = cellAt(line);
   cell?.classList.add("current");
   if (cell?.classList.contains("block")) select(blocks().indexOf(cell), false);
   else if (cell?.classList.contains("heading-cell") && Number(cell.dataset.line) === line) selectSection(cell);
+  marked = [line, drawn, selected, selectedSection].join(" ");
 }
+
+// marked is what markCurrent last marked: the line, which drawing of
+// the cards, and the selection it left.
+let marked = "";
 
 // syncScroll scrolls one side of the split view to match the other.
 let scrolling: "source" | "doc" | "outline" | null = null;

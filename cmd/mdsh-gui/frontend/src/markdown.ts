@@ -28,7 +28,8 @@ export interface MarkdownEditorOptions {
   // extensions are added to the editor's own, such as the source pane's
   // run buttons.
   extensions?: Extension[];
-  onChange?(text: string): void;
+  // onChange is called as the text is typed in.
+  onChange?(): void;
   // onCursor reports the line the cursor moved to.
   onCursor?(line: number): void;
   // write applies the edit and saves the file, for :w.
@@ -126,7 +127,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !quiet) {
             sync.typed(u.changes);
-            opts.onChange?.(u.state.doc.toString());
+            opts.onChange?.();
           }
           if (u.selectionSet || u.docChanged) opts.onCursor?.(u.state.doc.lineAt(u.state.selection.main.head).number);
         }),
