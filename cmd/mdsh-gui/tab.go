@@ -215,8 +215,11 @@ type Tab struct {
 }
 
 func (t *docTab) info() Tab {
-	if t.page == changelogPage {
+	switch t.page {
+	case changelogPage:
 		return Tab{ID: t.id, Title: "Changelog", URL: changelogURL, Page: t.page}
+	case cheatsheetPage:
+		return Tab{ID: t.id, Title: "Cheat sheet", URL: cheatsheetURL, Page: t.page}
 	}
 	n, err := t.notebook()
 	if err != nil {

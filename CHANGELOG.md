@@ -20,6 +20,12 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
 
+- mdsh-gui shows the cheat sheet beside the changelog: Help › Cheat
+  Sheet, or its link on Settings › About, opens it in a read-only tab,
+  so every attribute, key and flag is a menu away and matches the build.
+
+  ![The cheat sheet in a tab of the desktop app, its Fence attributes table under the Help menu](docs/changelog/cheatsheet-tab.png)
+
 ## [1.4.1] - 2026-11-07
 
 mdsh-gui keeps up with long documents. Scrolling is smoother, typing in

@@ -71,9 +71,10 @@ func build() error {
 	if res := api.Build(opts); len(res.Errors) > 0 {
 		return errors.New("esbuild failed")
 	}
-	// The changelog page is bundled whole, on its own: splitting it with
-	// the others would split their shared chunk in two.
-	opts.EntryPoints = []string{"frontend/src/changelog.ts"}
+	// The changelog and cheat sheet pages are bundled whole, on their
+	// own: splitting them with the others would split their shared
+	// chunk in two.
+	opts.EntryPoints = []string{"frontend/src/changelog.ts", "frontend/src/cheatsheet.ts"}
 	opts.Splitting = false
 	if res := api.Build(opts); len(res.Errors) > 0 {
 		return errors.New("esbuild failed")

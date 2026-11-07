@@ -422,15 +422,17 @@ async function drawAbout() {
     tools.append(el("dt", {}, t.name), dd);
   }
 
-  // The changelog is built in: it opens in a read-only tab of the
-  // document window, not on the website.
+  // The cheat sheet and the changelog are built in: each opens in a
+  // read-only tab of the document window, not on the website.
   const links = $("links");
-  const changes = el("a", { href: "#", textContent: "Changelog" });
-  changes.onclick = (e) => {
-    e.preventDefault();
-    App.ShowChangelog().catch(showError);
-  };
-  links.append(changes);
+  for (const [name, show] of [["Cheat sheet", App.ShowCheatsheet], ["Changelog", App.ShowChangelog]] as const) {
+    const link = el("a", { href: "#", textContent: name });
+    link.onclick = (e) => {
+      e.preventDefault();
+      show().catch(showError);
+    };
+    links.append(link);
+  }
   for (const l of a.links ?? []) {
     const link = el("a", { href: l.url, textContent: l.name });
     link.onclick = (e) => {

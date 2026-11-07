@@ -3,7 +3,8 @@
 mdsh runs the code blocks in a markdown file, like a notebook whose file
 format is plain markdown. The documentation lives at
 **[gdey.github.io/markdownshell](https://gdey.github.io/markdownshell/)**.
-See [docs/spec.md](docs/spec.md) for the design and
+[docs/cheatsheet.md](docs/cheatsheet.md) has every attribute, flag and
+key on one page. See [docs/spec.md](docs/spec.md) for the design and
 [docs/plan.md](docs/plan.md) for the roadmap.
 
 Here is [examples/hello.md](examples/hello.md), written the literate way: prose
@@ -150,8 +151,11 @@ With Homebrew, on macOS or Linux:
 
 ```sh
 brew install gdey/tap/mdsh          # the command line and mdsh -i
-brew install --cask gdey/tap/mdsh   # the desktop app, macOS only
+brew install --cask gdey/tap/mdsh   # the desktop app and the command line, macOS only
 ```
+
+The cask's app carries `mdsh` and links it for you, so it conflicts with
+the formula: on a Mac, install one or the other.
 
 On Debian, Ubuntu, Fedora and the like, each release has a `.deb` and an
 `.rpm` for `mdsh`.
@@ -176,7 +180,8 @@ on Windows, set `shell:` under `mdsh:` in the front matter to a POSIX shell
 such as Git Bash's `bash.exe`. The Windows builds are not well tested yet.
 
 The releases also have `mdsh-gui`, a desktop app for macOS (a universal
-`.dmg`) and Linux (an AppImage); see [cmd/mdsh-gui](cmd/mdsh-gui).
+`.dmg`) and Linux (an AppImage), each carrying the same `mdsh`, which
+Settings › Shell puts on your `PATH`; see [cmd/mdsh-gui](cmd/mdsh-gui).
 
 With Go 1.27 or newer you can build it instead:
 
@@ -279,7 +284,7 @@ its output.
 | `W` | save as: type a path (relative to the file's folder); mdsh follows the new file. In another folder it opens it again, with fresh shells |
 | `R` | reload the file from disk, dropping output not saved |
 | `M` | when the file changed on disk, keep what is shown; the next save overwrites the file |
-| ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
+| ctrl+c | stop the running block: it is interrupted, and its shell keeps what blocks set there. A block that won't stop gets ctrl+c again, which kills its shell. Quits when nothing runs |
 | `q` | go back to the list of files, or close the tab; the last tab quits |
 | ctrl+t | open a new tab with the list of files; picking a file already open in a tab goes to that tab |
 | `]` / `[` | the next or previous tab. The tab bar marks a file with • when its output isn't saved, … while a block runs and ? while one waits for an answer. Blocks go on running in the tabs behind |
@@ -357,7 +362,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
-| `timeout=30s` | Kill the block's shell after this long (stops the run) |
+| `timeout=30s` | Interrupt the block after this long, as ctrl+c would, and stop the run; the shell and what blocks set there stay |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
 | `frame=N` | With `tty`, the frame a PDF shows (default the last) |
 | `out=markdown` | Insert output as raw markdown |
@@ -709,4 +714,7 @@ passes along whatever your shell has defined when you run mdsh:
 mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
 ```
 
-In bash, use `<(alias -p; declare -f)`.
+In bash, use `<(unset -f mdsh _mdsh; alias -p; declare -f)`; leaving out
+the wrapper and its completion function keeps their bash-only syntax from
+stopping a `/bin/sh` that is dash. Settings › Shell in mdsh-gui can add the
+wrapper to `~/.zshrc` and `~/.bashrc`, with a line that loads completion.

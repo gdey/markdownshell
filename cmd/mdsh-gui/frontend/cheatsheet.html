@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Nothing a document holds may load from the network; see csp_test.go. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OKxuUMfPrzQq3XhEnBLzaiAjTx/xY9aFq+d83FQkwSw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'self'; base-uri 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cheat sheet</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="teletype.css">
+  <link rel="stylesheet" href="blueprint.css">
+  <link rel="stylesheet" href="bubblegum.css">
+  <link rel="stylesheet" href="witchcraft.css">
+  <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <script type="module" src="bundle/cheatsheet.js"></script>
+</head>
+<body class="changelog cheatsheet">
+  <header aria-label="Cheat sheet">
+    <span id="file">Cheat sheet</span>
+    <span class="chip" title="The cheat sheet built into this app. It can't be edited or run.">Read-only</span>
+    <span id="status" class="muted"></span>
+  </header>
+  <div id="changelog-scroll">
+    <main id="changelog" class="prose cheatsheet" tabindex="-1" aria-busy="true"></main>
+  </div>
+</body>
+</html>

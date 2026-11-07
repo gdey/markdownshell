@@ -920,3 +920,7 @@ body.changelog #status { flex: 1; text-align: right; }
 #changelog :not(pre) > code { background: var(--code-bg); padding: 1px 4px; border-radius: 4px; }
 #changelog h2 a { color: inherit; text-decoration: none; }
 #changelog h2 a:hover { text-decoration: underline; }
+/* The cheat sheet tab is the changelog's page with tables: they take the
+   width, and the name in a row's first cell doesn't break inside a flag. */
+#changelog.cheatsheet table { width: 100%; }
+#changelog.cheatsheet td:first-child code { white-space: nowrap; }

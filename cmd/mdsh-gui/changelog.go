@@ -87,11 +87,17 @@ func serveChangelogImage(w http.ResponseWriter, r *http.Request, name string) {
 // ShowChangelog brings the changelog's tab forward, opening one after
 // the tab in front of the document window in front if there is none.
 // With no document window open, it opens in a window of its own.
-func (a *App) ShowChangelog() {
+func (a *App) ShowChangelog() { a.showPage(changelogPage) }
+
+// showPage brings the tab showing page, a built-in page such as the
+// changelog, forward, opening one after the tab in front of the document
+// window in front if there is none. With no document window open, it
+// opens in a window of its own.
+func (a *App) showPage(page string) {
 	a.mu.Lock()
 	var open *docTab
 	for _, t := range a.tabs {
-		if t.page == changelogPage {
+		if t.page == page {
 			open = t
 			break
 		}
@@ -101,7 +107,7 @@ func (a *App) ShowChangelog() {
 		a.focusTab(open)
 		return
 	}
-	t := a.newPageTab(changelogPage)
+	t := a.newPageTab(page)
 	w := a.current()
 	if w == nil {
 		w = a.lastWindow()
