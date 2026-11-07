@@ -57,6 +57,8 @@ hello from a sub-env
 | `show=COND` | Print the code only if the condition holds |
 | `show-output=COND` | Print the output only if the condition holds |
 | `show-stderr[=COND]` | Show stderr (by default only when the block fails) |
+| `collapse[=COND]` | In mdsh-gui, open with the code folded to one line (if the condition holds); folding by hand there writes it |
+| `collapse-output[=COND]` | The same for the output |
 | `links` | Make web addresses (`http:`, `https:`, `mailto:`) in the output clickable in mdsh-gui and `mdsh -i`; History adds it to commands typed there |
 | `nosave` | Keep the value out of the file: the block runs and shows its output, but saving leaves what the file holds. Works on textboxes, choices and `output` fences too |
 | `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, and as with `nosave` the output isn't saved to the file |
@@ -67,6 +69,7 @@ hello from a sub-env
 | `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
 | `timeout=30s` | Kill the block's shell after this long (stops the run); mdsh-gui and `mdsh -i` show the time against it while the block runs |
+| `background` | Start the block and go straight on to the next; see [Background blocks](#background-blocks) |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
 | `frame=N` | With `tty`, the frame a PDF shows (default the last) |
 | `out=markdown` | Insert output as raw markdown |
@@ -222,6 +225,48 @@ all have run. Run `a` again, and `c`, `d` and `e` are stale; run `e`,
 and mdsh asks about `d`, then, on the way to `d`, `c`, but not `b`.
 mdsh-gui marks a stale block's card with a *stale* badge, and `mdsh -i`
 shows `✓ stale` in its header.
+
+## Background blocks
+
+A block marked `background` starts the way `block &` would, and the run
+goes on to the next block. Use it for a server a later block talks to, or
+a slow check that can run while you build:
+
+````markdown
+```sh {#serve background timeout=2m}
+python3 -m http.server 8000
+```
+
+```sh {#check}
+curl -fsS localhost:8000/ >/dev/null && echo up
+```
+````
+
+- It runs in a subshell, so it sees the shell's variables and directory,
+  but what it sets stays its own. Its stdin is `/dev/null`.
+- What it prints is kept apart and shows under it once it ends, so it
+  never lands in another block's output.
+- Its process ID is in `$MDSH_BG_<id>` (anything but letters, digits and
+  `_` in the id becomes `_`), so a later block in the same env can
+  `wait "$MDSH_BG_serve"` for it and get its status. `{{#serve/?}}` is
+  its status once it has ended.
+- `timeout=` kills just that block and what it started, and the run goes
+  on. After the last block, mdsh waits for background blocks still
+  running until their `timeout=`, or 5 seconds, and then kills them.
+- A background block that fails doesn't stop the run, and it can't be
+  `tty`, since nobody is at its terminal.
+
+[examples/fifo](https://github.com/gdey/markdownshell/tree/main/examples/fifo)
+hands data between background blocks through named pipes.
+
+## Folding
+
+`collapse` and `collapse-output` only set how mdsh-gui first draws the
+file; nothing else reads them. A `<!-- mdsh:collapse -->` line, or
+`<!-- mdsh:collapse COND -->`, folds the heading section it is in, down
+to the next heading of the same or a higher level. Folding by hand in
+mdsh-gui writes these for you, and unfolding takes them out; a fold set
+by a condition is left as it is.
 
 ## Terminal blocks
 
