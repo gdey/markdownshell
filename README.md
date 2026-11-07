@@ -3,7 +3,8 @@
 mdsh runs the code blocks in a markdown file, like a notebook whose file
 format is plain markdown. The documentation lives at
 **[gdey.github.io/markdownshell](https://gdey.github.io/markdownshell/)**.
-See [docs/spec.md](docs/spec.md) for the design and
+[docs/cheatsheet.md](docs/cheatsheet.md) has every attribute, flag and
+key on one page. See [docs/spec.md](docs/spec.md) for the design and
 [docs/plan.md](docs/plan.md) for the roadmap.
 
 Here is [examples/hello.md](examples/hello.md), written the literate way: prose

@@ -6,11 +6,13 @@ on:
     paths:
       - "site/**"
       - "CHANGELOG.md"
+      - "docs/cheatsheet.md"
       - ".github/workflows/pages.yml"
   pull_request:
     paths:
       - "site/**"
       - "CHANGELOG.md"
+      - "docs/cheatsheet.md"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

@@ -33,12 +33,15 @@ it; the `[tty] [plain]` switch in the header saves the choice in
 paint. The teletype palette is the app's Teletype look, from
 `cmd/mdsh-gui/frontend/teletype.css`; keep the two in step.
 
-## The changelog page
+## The changelog page and the cheat sheet
 
 `/changelog/` is the repository's `CHANGELOG.md`, mounted into the
 site's assets in `hugo.toml` and rendered by
 `layouts/_default/changelog.html`, so the site never carries a copy.
-The Website workflow runs when `CHANGELOG.md` changes, too.
+`/docs/cheatsheet/` is `docs/cheatsheet.md` the same way, mounted into
+`content/docs/` beside the other docs pages, so its front matter is a
+docs page's (`title`, `description`, `weight`). The Website workflow
+runs when either file changes, too.
 
 ## Screenshots
 
