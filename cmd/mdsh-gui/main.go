@@ -38,7 +38,7 @@ import (
 //go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
 //go:generate go run ./internal/build
 
-// build/appicon.svg is the app's icon, for the Settings window's About
+// build/appicon.svg is the app's icon, for Settings' About
 // tab.
 //
 //go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/style.css frontend/teletype.css frontend/blueprint.css frontend/bubblegum.css frontend/witchcraft.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg

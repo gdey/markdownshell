@@ -57,7 +57,7 @@ included, before their first block:
   mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
   ```
 
-  The desktop app's Settings window can add it for you: check **Give
+  The desktop app's Settings can add it for you: check **Give
   blocks your shell's aliases and functions**. It goes between marker
   comments at the end of `~/.zshrc`, and of `~/.bashrc` if you have
   one, with a line that turns on tab completion for `mdsh`; unchecking

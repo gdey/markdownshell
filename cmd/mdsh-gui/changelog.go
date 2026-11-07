@@ -84,24 +84,38 @@ func serveChangelogImage(w http.ResponseWriter, r *http.Request, name string) {
 	_, _ = w.Write(b)
 }
 
-// ShowChangelog brings the changelog's tab forward, opening one after
-// the tab in front of the document window in front if there is none.
-// With no document window open, it opens in a window of its own.
-func (a *App) ShowChangelog() {
+// ShowChangelog brings the changelog's tab forward, opening one if
+// there is none (see showPage).
+func (a *App) ShowChangelog() { a.showPage(changelogPage) }
+
+// showPage brings the tab showing page forward, opening one if there is
+// none (see placePage), and returns it.
+func (a *App) showPage(page string) *docTab {
+	if t := a.pageTab(page); t != nil {
+		a.focusTab(t)
+		return t
+	}
+	t := a.newPageTab(page)
+	a.placePage(t)
+	return t
+}
+
+// pageTab is the tab showing page, or nil.
+func (a *App) pageTab(page string) *docTab {
 	a.mu.Lock()
-	var open *docTab
+	defer a.mu.Unlock()
 	for _, t := range a.tabs {
-		if t.page == changelogPage {
-			open = t
-			break
+		if t.page == page {
+			return t
 		}
 	}
-	a.mu.Unlock()
-	if open != nil {
-		a.focusTab(open)
-		return
-	}
-	t := a.newPageTab(changelogPage)
+	return nil
+}
+
+// placePage puts t, a new page tab, after the tab in front of the
+// document window in front, and brings that window forward. With no
+// document window open, t opens in a window of its own.
+func (a *App) placePage(t *docTab) {
 	w := a.current()
 	if w == nil {
 		w = a.lastWindow()
@@ -117,8 +131,8 @@ func (a *App) ShowChangelog() {
 	w.win.Focus()
 }
 
-// lastWindow is the document window opened last, or nil, for when the
-// window in front, such as Settings, holds no tabs.
+// lastWindow is the document window opened last, or nil, for when no
+// window is in front.
 func (a *App) lastWindow() *docWindow {
 	a.mu.Lock()
 	defer a.mu.Unlock()

@@ -29,12 +29,6 @@ type Place struct {
 	Height int    `json:"height"`
 }
 
-// Size is a window's width and height.
-type Size struct {
-	Width  int `json:"width"`
-	Height int `json:"height"`
-}
-
 // Settings are the app-wide settings. The zero value is the default.
 type Settings struct {
 	// Autosave saves the file after each run.
@@ -121,9 +115,6 @@ type Settings struct {
 	// Places are where the windows of the files last shown alone in a
 	// new window were, newest first.
 	Places []Place `json:"places,omitempty"`
-	// SettingsWindow is the size the Settings window was left at, or
-	// nil for its default.
-	SettingsWindow *Size `json:"settingsWindow,omitempty"`
 }
 
 // Store reads and writes Settings.
@@ -175,10 +166,6 @@ func (s Settings) clone() Settings {
 	s.Recent = slices.Clone(s.Recent)
 	s.Pinned = slices.Clone(s.Pinned)
 	s.Places = slices.Clone(s.Places)
-	if s.SettingsWindow != nil {
-		sz := *s.SettingsWindow
-		s.SettingsWindow = &sz
-	}
 	return s
 }
 

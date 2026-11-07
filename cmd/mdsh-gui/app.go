@@ -14,10 +14,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
@@ -49,7 +47,6 @@ type App struct {
 	named     int // windows made so far, for unique names
 	lastTab   int // the last tab id handed out
 	dragging  *docTab
-	prefs     *application.WebviewWindow
 	quitting  bool
 	// startImages are the collection icons and backgrounds the start
 	// screen shows, by real path, which the window may load.
@@ -515,61 +512,33 @@ func (a *App) startDir() string {
 	return a.settings.Get().StartDir(a.cwd, home, docs)
 }
 
-// openSettings shows the settings window, making it the first time.
+// openSettings brings the Settings tab forward, opening one if there is
+// none (see showPage).
 func (a *App) openSettings() { a.openSettingsTab("") }
 
-// openSettingsTab shows the settings window at one of its tabs, such
-// as "about", or at the tab it was on (General when new) for "".
+// openSettingsTab brings the Settings tab forward at one of its own
+// tabs, such as "about", or at the one it was on (General when new) for
+// "".
 func (a *App) openSettingsTab(tab string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.prefs != nil {
+	if t := a.pageTab(settingsPage); t != nil {
 		if tab != "" {
-			a.prefs.EmitEvent("settings-tab", tab)
+			t.emit("settings-tab", tab)
 		}
-		a.prefs.Show()
-		a.prefs.Focus()
+		a.focusTab(t)
 		return
 	}
-	width, height := a.settingsSize()
-	opts := application.WebviewWindowOptions{
-		Name:      "settings",
-		Title:     "Settings",
-		Width:     width,
-		Height:    height,
-		MinWidth:  560,
-		MinHeight: 440,
-		URL:       settingsURL(tab),
-	}
-	win := a.app.Window.NewWithOptions(opts)
-	a.prefs = win
-	if a.settings.Get().SettingsWindow != nil {
-		resize(win, width, height)
-	}
-	var timer *time.Timer
-	win.OnWindowEvent(events.Common.WindowDidResize, func(*application.WindowEvent) {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		if timer != nil {
-			timer.Stop()
-		}
-		timer = time.AfterFunc(placeDelay, func() { a.saveSettingsSize(win) })
-	})
-	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
-		a.mu.Lock()
-		if timer != nil {
-			timer.Stop()
-		}
-		a.prefs = nil
-		a.mu.Unlock()
-		a.saveSettingsSize(win)
-	})
+	t := a.newPageTab(settingsPage)
+	t.at = tab
+	a.placePage(t)
 }
+
+// settingsPage is the page a Settings tab shows.
+const settingsPage = "/settings.html"
 
 // settingsURL is the settings page, opening at tab when it isn't "".
 func settingsURL(tab string) string {
 	if tab == "" {
-		return "/settings.html"
+		return settingsPage
 	}
-	return "/settings.html#" + tab
+	return settingsPage + "#" + tab
 }
