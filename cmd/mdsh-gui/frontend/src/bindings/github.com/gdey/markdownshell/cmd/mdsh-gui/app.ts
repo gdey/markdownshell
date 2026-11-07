@@ -720,7 +720,7 @@ export function SetRunOptions(args: string, only: string, step: boolean, stopOnE
 }
 
 /**
- * SetSettings saves the settings the Settings window edits (see
+ * SetSettings saves the settings edited in Settings (see
  * edited). Open windows hear of it with a "settings" event.
  */
 export function SetSettings(s: settings$0.Settings): $CancellablePromise<void> {
@@ -784,9 +784,8 @@ export function Settings(): $CancellablePromise<settings$0.Settings> {
 }
 
 /**
- * ShowChangelog brings the changelog's tab forward, opening one after
- * the tab in front of the document window in front if there is none.
- * With no document window open, it opens in a window of its own.
+ * ShowChangelog brings the changelog's tab forward, opening one if
+ * there is none (see showPage).
  */
 export function ShowChangelog(): $CancellablePromise<void> {
     return $Call.ByName("main.App.ShowChangelog");

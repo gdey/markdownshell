@@ -17,7 +17,7 @@ import (
 // "nvim-write", and what else the buffer reports (the cursor moving,
 // :RunBlock, …) as "nvim-event"; "nvim-exit" says it quit.
 
-// NeovimInfo is what the Settings window shows about Neovim.
+// NeovimInfo is what Settings shows about Neovim.
 type NeovimInfo struct {
 	Path    string `json:"path"`
 	Version string `json:"version"`

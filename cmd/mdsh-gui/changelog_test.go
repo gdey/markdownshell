@@ -67,7 +67,7 @@ func TestChangelogImages(t *testing.T) {
 
 func TestChangelogTab(t *testing.T) {
 	tab := &docTab{id: 3, page: changelogPage}
-	if got := tab.info(); got.Title != "Changelog" || got.URL != "mdsh://doc/CHANGELOG.md" || got.Page != changelogPage || got.File != "" {
+	if got := tab.info(); got.Title != "Changelog" || got.URL != "mdsh://doc/CHANGELOG.md" || got.Page != changelogPage || got.File != "" || !got.ReadOnly {
 		t.Errorf("info = %+v", got)
 	}
 	if got := (&docTab{id: 4}).info(); got.Page != "" || got.Title != "Start" {

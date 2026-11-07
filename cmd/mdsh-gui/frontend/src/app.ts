@@ -4168,7 +4168,7 @@ Events.On(
     void actions[action]?.();
   }),
 );
-// Settings come from the Settings window, so they aren't this window's.
+// Settings come from the Settings tab, which may be in another window.
 Events.On("settings", (ev: { data: Settings }) => {
   settings = ev.data;
   applyTheme(settings);

@@ -199,18 +199,4 @@ export interface Settings {
      * the view and whether the History pane was open.
      */
     "fileViews"?: FileView[] | null;
-
-    /**
-     * SettingsWindow is the size the Settings window was left at, or
-     * nil for its default.
-     */
-    "settingsWindow"?: Size | null;
-}
-
-/**
- * Size is a window's width and height.
- */
-export interface Size {
-    "width": number;
-    "height": number;
 }

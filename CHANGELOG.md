@@ -48,6 +48,14 @@ follow [Semantic Versioning](https://semver.org/).
   left in" as its default; picking a view there still opens every
   file in it.
 
+- mdsh-gui's Settings opens in a tab of the document window, beside
+  your files, instead of in a window of its own, as the Changelog
+  does. Settings… (cmd/ctrl+,) and About mdsh bring the tab forward if
+  it's open, at its About tab for About. It drags between windows like
+  any tab, and Close Tab closes it.
+
+  ![Settings in a tab beside hello.md, at its General tab](docs/changelog/settings-tab.png)
+
 ### Fixed
 
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file
