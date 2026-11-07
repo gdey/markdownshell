@@ -245,7 +245,7 @@ in `_linux.md` or `_darwin.md` runs only on that OS.
 | --- | --- | --- |
 | [deploy.md](runbooks/deploy.md) | Build, check and ship a static site behind a `current` symlink, in a scratch directory | `on_error: stop`, a `background` link checker, `confirm` before shipping, a `skip` rollback, `show=false` cleanup |
 | [release-checklist.md](runbooks/release-checklist.md) | Tag a release of a small Go project, in a scratch repository | Blocks inside numbered steps and block quotes, `out=markdown` notes, cleanup gated on `run={{#tag/?}}==0` |
-| [mdsh-release.md](runbooks/mdsh-release.md) | How mdsh itself is released: check the changelog and the checkout, then tag and push with `PUSH=1` | `run={{$PUSH}}` with `confirm`, a preflight table, a check-only mode for tests |
+| [mdsh-release.md](runbooks/mdsh-release.md) | How mdsh itself is released: check the changelog before merging the release-prep PR, which releases on merge; `PUSH=1` tags by hand | `run={{$PUSH}}` with `confirm`, a preflight table, a check-only mode for tests |
 | [onboarding.md](runbooks/onboarding.md) | A first-day check that a machine can build mdsh | A table of tools with versions, an `mdsh:if` section printed only when something is missing, a report meant to be sent as a PDF |
 | [system-report.md](runbooks/system-report.md) | Describe a machine for a bug report | Sections and blocks gated on the detected OS, a sub-env with `share=` so tokens in your shell can't leak into the report |
 | [disk-report.md](runbooks/disk-report.md) | A weekly look at disk space | `on_error: continue`, tables from `df` and `du`, a warning paragraph that appears only over a limit, `timeout=` on slow steps |
