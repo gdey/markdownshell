@@ -63,7 +63,8 @@ export interface Settings {
     /**
      * Look is "tty" for the Teletype look, paper in the light theme and
      * phosphor in the dark, "blueprint" for white lines on blueprint
-     * blue, or "gum" for Bubble Gum pink; empty is the plain look.
+     * blue, "gum" for Bubble Gum pink, or "witch" for Witchcraft
+     * purple; empty is the plain look.
      */
     "look": string;
 

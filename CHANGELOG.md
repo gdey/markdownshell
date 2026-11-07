@@ -6,6 +6,20 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `mdsh-gui`: a Witchcraft look in Settings › Look, in purple. The
+  document is written on a scroll hung against a sky of stars and
+  crescent moons: speckled kraft paper in aubergine ink, ruled round
+  with a double line and a flourish in each corner, with carved
+  capitals for the headings and an amethyst accent edged in gilt. The
+  dark theme is the witching hour: the scroll in deep plum, ruled in
+  gold, with moonlit lettering and cards that glow. The stars and moons and the glow can be turned off. Its text,
+  code, links and buttons measure at least 4.5:1 and its accent 3:1 in
+  both themes, and `TestLookContrast` now checks it too.
+
+  ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
+
 ## [1.4.1] - 2026-11-07
 
 mdsh-gui keeps up with long documents. Scrolling is smoother, typing in

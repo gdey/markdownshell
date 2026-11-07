@@ -229,10 +229,11 @@ Open any example in the terminal UI to see the rest of it: `a` runs
 from the block under the cursor, `s` runs its section, `e` edits a block
 in your editor, `i` types a new block at a prompt, `p` creates a report,
 and `?` lists it all. mdsh-gui does the same with a mouse, a source view
-beside the rendered one, tabs for several files, and four looks in
+beside the rendered one, tabs for several files, and five looks in
 Settings › Look: Plain, Teletype (typewriter text on fan-fold paper, or
 green phosphor in the dark theme), Blueprint (white lines on
-blueprint blue) and Bubble Gum (Hubba Bubba pink).
+blueprint blue), Bubble Gum (Hubba Bubba pink) and Witchcraft (a purple
+grimoire under the moon).
 
 ## 9. Real runbooks
 

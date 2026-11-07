@@ -238,14 +238,17 @@ function drawLook() {
   select("history-pane").value = s.historyPane;
   select("history-focus").value = s.historyFocus;
   // Teletype's paper has sprockets, rules and shadows; Blueprint's
-  // sheet only its grid; Bubble Gum's wrapper has bubbles and shadows.
+  // sheet only its grid; Bubble Gum's wrapper has bubbles and shadows;
+  // Witchcraft's grimoire has its night sky and the glow around cards.
   const tty = s.look === "tty";
   const gum = s.look === "gum";
-  $("paper").hidden = !tty && !gum && s.look !== "blueprint";
-  $("paper-label").textContent = tty ? "Teletype paper" : gum ? "Bubble gum wrapper" : "Blueprint sheet";
+  const witch = s.look === "witch";
+  $("paper").hidden = !tty && !gum && !witch && s.look !== "blueprint";
+  $("paper-label").textContent = tty ? "Teletype paper" : gum ? "Bubble gum wrapper" : witch ? "Grimoire" : "Blueprint sheet";
   $("sprockets-check").hidden = !tty;
-  $("shadows-check").hidden = !tty && !gum;
-  $("rules-label").textContent = tty ? "Ruled lines" : gum ? "Bubbles" : "Grid";
+  $("shadows-check").hidden = !tty && !gum && !witch;
+  $("shadows-label").textContent = witch ? "Glow around cards" : "Shadows under cards";
+  $("rules-label").textContent = tty ? "Ruled lines" : gum ? "Bubbles" : witch ? "Stars and moons" : "Grid";
   input("sprockets").checked = !s.noSprockets;
   input("rules").checked = !s.noRules;
   input("shadows").checked = !s.noShadows;

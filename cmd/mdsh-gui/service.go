@@ -632,7 +632,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 		cur.Theme = s.Theme
 	}
 	cur.Look = ""
-	if s.Look == "tty" || s.Look == "blueprint" || s.Look == "gum" {
+	if s.Look == "tty" || s.Look == "blueprint" || s.Look == "gum" || s.Look == "witch" {
 		cur.Look = s.Look
 	}
 	cur.TextSize = 0

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="teletype.css">
   <link rel="stylesheet" href="blueprint.css">
   <link rel="stylesheet" href="bubblegum.css">
+  <link rel="stylesheet" href="witchcraft.css">
   <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
   <script type="module" src="bundle/settings.js"></script>
 </head>
@@ -67,13 +68,14 @@
       <div class="setting">
         <div class="text">
           <label for="look">Look</label>
-          <p class="muted">Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark. Blueprint draws in white lines on blue paper with a drafting grid, a deeper night blue when the theme is dark. Bubble Gum is Hubba Bubba pink with bubbles across the page, puffy cards and bubble-lettered headings, or berry when the theme is dark.</p>
+          <p class="muted">Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark. Blueprint draws in white lines on blue paper with a drafting grid, a deeper night blue when the theme is dark. Bubble Gum is Hubba Bubba pink with bubbles across the page, puffy cards and bubble-lettered headings, or berry when the theme is dark. Witchcraft writes the document on a scroll of speckled kraft paper, framed in a double line with flourishes, against a sky of stars and crescent moons, with carved capitals for headings, or deep plum and gold when the theme is dark.</p>
         </div>
         <select id="look">
           <option value="">Plain</option>
           <option value="tty">Teletype</option>
           <option value="blueprint">Blueprint</option>
           <option value="gum">Bubble Gum</option>
+          <option value="witch">Witchcraft</option>
         </select>
       </div>
       <div class="setting">
@@ -128,7 +130,7 @@
       <div class="setting">
         <div class="text">
           <label for="history-pane">History pane</label>
-          <p class="muted">Inverted is light under a dark window and dark under a light one. The look's own is always dark for Plain and the window's for Teletype, Blueprint and Bubble Gum.</p>
+          <p class="muted">Inverted is light under a dark window and dark under a light one. The look's own is always dark for Plain and the window's for Teletype, Blueprint, Bubble Gum and Witchcraft.</p>
         </div>
         <select id="history-pane">
           <option value="">The look's own</option>
@@ -155,7 +157,7 @@
         <div class="checks" role="group" aria-labelledby="paper-label">
           <label id="sprockets-check" class="check"><input id="sprockets" type="checkbox"> Sprocket strips</label>
           <label class="check"><input id="rules" type="checkbox"> <span id="rules-label">Ruled lines</span></label>
-          <label id="shadows-check" class="check"><input id="shadows" type="checkbox"> Shadows under cards</label>
+          <label id="shadows-check" class="check"><input id="shadows" type="checkbox"> <span id="shadows-label">Shadows under cards</span></label>
         </div>
       </div>
     </section>

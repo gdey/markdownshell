@@ -1,0 +1,242 @@
+/* The Witchcraft look (Settings › Look): purple, and a little occult.
+   The light theme is a grimoire: the document written in aubergine ink
+   on a scroll of speckled kraft paper, framed in a double line with a
+   flourish in each corner, hung against a lavender sky of stars and
+   crescent moons, with amethyst for the accent and gilt for the
+   ornaments. The dark theme is the witching hour: the scroll in deep
+   plum ruled in gold under a midnight violet sky, moonlit lettering and
+   cards that glow like a scrying glass. It sets the
+   same tokens style.css does, plus a few of its own (--witch-*), and
+   adds texture rules: the scroll and its frame, the cards parted by
+   gilt hairlines, the headings are set in carved capitals, and rules
+   between sections fade out like smoke. Like Teletype it changes paint,
+   not layout. theme_test.go checks that every token the plain look
+   defines is defined here too, and that the text and the accent keep
+   the interface guidelines' contrast. */
+
+:root[data-look="witch"],
+:root[data-look="witch"][data-history-scheme="light"] #history {
+  --bg: #ece2f6;
+  --fg: #2a1240;
+  --muted: #4b3563;
+  --border: #b8a0d4;
+  --code-bg: #f2e6c9;
+  --hover: #dfd0ef;
+  --accent: #6b21a8;
+  --accent-fg: #ffffff;
+  --link: #5a1896;
+  --ok: #1f6b3a;
+  --bad: #a3122f;
+  --bad-fg: #ffffff;
+  --control: #8a4b00;
+  --warn-bg: #f8ecc4;
+  --warn-border: #b08410;
+  --selection: rgb(107 33 168 / 0.22);
+  --active-line: rgb(107 33 168 / 0.06);
+  --dep-1: #6b21a8; --dep-2: #b0237a; --dep-3: #1d6b5e; --dep-4: #9a5200; --dep-more: #6a5880;
+  --syn-keyword: #8b1a8f;
+  --syn-string: #1f5b4a;
+  --syn-number: #8a4b00;
+  --syn-comment: #6f5d86;
+  --syn-variable: #9a2d50;
+  --syn-function: #5b21b6;
+  --syn-type: #285a8c;
+  --syn-punct: #45325a;
+  --syn-heading: #5b1896;
+  --syn-link: #5a1896;
+  --syn-meta: #2a1240;
+  --ansi-0: #2a1240; --ansi-1: #a3122f; --ansi-2: #1f6b3a; --ansi-3: #7a5200;
+  --ansi-4: #2b4f9c; --ansi-5: #6b21a8; --ansi-6: #136a72; --ansi-7: #5c4476;
+  --ansi-8: #6f5d86; --ansi-9: #b0233f; --ansi-10: #166538; --ansi-11: #74540c;
+  --ansi-12: #3b5fc0; --ansi-13: #8b2fc9; --ansi-14: #0f646c; --ansi-15: #6f5d86;
+  --term-bg: #f2e6c9;
+  --term-fg: #2a1240;
+  /* The witch's own: the cover the tab bar and outline sit on, the
+     card's page, the gilt of the frames and ornaments, the glow around
+     cards, the ink of the carved headings, the scroll the document is
+     written on (its color, its speckled grain, and its frame's line and
+     corner flourishes), and the night sky on the
+     page (stars and crescent moons, a tile drawn in this palette's
+     colors). */
+  --witch-side: #e2d4f0;
+  --witch-card: #f2e6c9;
+  --witch-gilt: #8a6410;
+  --witch-frame: rgb(138 100 16 / 0.35);
+  --witch-glow: rgb(91 24 150 / 0.18);
+  --witch-ink: #3d1066;
+  --witch-sheet: #dcc597;
+  --witch-line: #3a2410;
+  --witch-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='904' height='640' viewBox='0 0 904 640' preserveAspectRatio='none'%3E%0A%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008' numOctaves='4' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.3  0 0 0 0 0.12  0.45 0 0 0 -0.2025'/%3E%3C/filter%3E%0A%3Cfilter id='d' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.42 0.42 0.42 0.42 0.42'/%3E%3C/feComponentTransfer%3E%3CfeColorMatrix values='0 0 0 0 0.22  0 0 0 0 0.13  0 0 0 0 0.06  0 0 0 1 0'/%3E%3C/filter%3E%0A%3Crect width='100%25' height='100%25' filter='url%28%23m%29'/%3E%0A%3Crect width='100%25' height='100%25' filter='url%28%23d%29'/%3E%0A%3C/svg%3E");
+  --witch-corner-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform=''%3E%3Cg fill='none' stroke='%233a2410' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%233a2410'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform='translate%2864 0%29 scale%28-1 1%29'%3E%3Cg fill='none' stroke='%233a2410' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%233a2410'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform='translate%280 64%29 scale%281 -1%29'%3E%3Cg fill='none' stroke='%233a2410' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%233a2410'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform='translate%2864 64%29 scale%28-1 -1%29'%3E%3Cg fill='none' stroke='%233a2410' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%233a2410'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-sky: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cg fill='%237b55a8' fill-opacity='0.22'%3E%3Cpath d='M40 18l2.2 7.8 7.8 2.2-7.8 2.2L40 38l-2.2-7.8L30 28l7.8-2.2z'/%3E%3Cpath d='M170 132l1.6 5.4 5.4 1.6-5.4 1.6-1.6 5.4-1.6-5.4-5.4-1.6 5.4-1.6z'/%3E%3Ccircle cx='120' cy='40' r='1.6'/%3E%3Ccircle cx='196' cy='70' r='1.2'/%3E%3Ccircle cx='70' cy='96' r='1.4'/%3E%3Ccircle cx='24' cy='170' r='1.8'/%3E%3Ccircle cx='132' cy='196' r='1.2'/%3E%3Ccircle cx='98' cy='150' r='1'/%3E%3C/g%3E%3Cpath d='M186 22a13 13 0 1 0 10 22a10 10 0 1 1 -10 -22z' fill='%23a07d1c' fill-opacity='0.22'/%3E%3Cpath d='M78 176a8 8 0 1 0 6 13a6 6 0 1 1 -6 -13z' fill='%23a07d1c' fill-opacity='0.18'/%3E%3C/svg%3E");
+  color-scheme: light;
+}
+
+/* The grimoire's faces: an old-style serif for the interface and the
+   code in the plain look's monospace. The headings' carved capitals
+   are set where they're drawn, below. */
+:root[data-look="witch"] {
+  --font-ui: "Palatino", "Palatino Linotype", "Book Antiqua", "URW Palladio L", "P052", Georgia, serif;
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --text-scale: 1;
+}
+
+/* The witching hour, when the theme is dark, for the window or the
+   History pane (see style.css). */
+:root[data-look="witch"][data-scheme="dark"],
+:root[data-look="witch"][data-history-scheme="dark"] #history {
+  --bg: #160c24;
+  --fg: #ece1ff;
+  --muted: #b4a2d0;
+  --border: #4e3672;
+  --code-bg: #241424;
+  --hover: #2a1946;
+  --accent: #b98aff;
+  --accent-fg: #160c24;
+  --link: #d2b0ff;
+  --ok: #7fe0a0;
+  --bad: #ff7a8a;
+  --bad-fg: #160c24;
+  --control: #e8c36a;
+  --warn-bg: #33270f;
+  --warn-border: #c9a03a;
+  --selection: rgb(185 138 255 / 0.3);
+  --active-line: rgb(185 138 255 / 0.07);
+  --dep-1: #b98aff; --dep-2: #ff8fd0; --dep-3: #7fe0d0; --dep-4: #e8c36a; --dep-more: #8f7cab;
+  --syn-keyword: #f09cff;
+  --syn-string: #9fe6c4;
+  --syn-number: #f2c879;
+  --syn-comment: #9d8bbb;
+  --syn-variable: #ffb3c8;
+  --syn-function: #c9a6ff;
+  --syn-type: #9cc8ff;
+  --syn-punct: #d6c8ee;
+  --syn-heading: #e8c36a;
+  --syn-link: #d2b0ff;
+  --syn-meta: #ece1ff;
+  --ansi-0: #3a2758; --ansi-1: #ff7a8a; --ansi-2: #7fe0a0; --ansi-3: #e8c36a;
+  --ansi-4: #8fb8ff; --ansi-5: #c9a6ff; --ansi-6: #7fe0d0; --ansi-7: #d6c8ee;
+  --ansi-8: #8f7cab; --ansi-9: #ffa3ae; --ansi-10: #a6f0bf; --ansi-11: #f5d98f;
+  --ansi-12: #b3d0ff; --ansi-13: #e0c8ff; --ansi-14: #a6f0e4; --ansi-15: #ffffff;
+  --term-bg: #241424;
+  --term-fg: #ece1ff;
+  --witch-side: #100819;
+  --witch-card: #241424;
+  --witch-gilt: #e8c36a;
+  --witch-frame: rgb(232 195 106 / 0.28);
+  --witch-glow: rgb(185 138 255 / 0.22);
+  --witch-ink: #e6d4ff;
+  --witch-sheet: #2e1a2e;
+  --witch-line: #c9a24a;
+  --witch-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='904' height='640' viewBox='0 0 904 640' preserveAspectRatio='none'%3E%0A%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008' numOctaves='4' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.42  0 0 0 0 0.24  0 0 0 0 0.4  0.3 0 0 0 -0.135'/%3E%3C/filter%3E%0A%3Cfilter id='d' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' seed='6' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0.5 0.5 0.5 0.5'/%3E%3C/feComponentTransfer%3E%3CfeColorMatrix values='0 0 0 0 0.02  0 0 0 0 0.0  0 0 0 0 0.03  0 0 0 1 0'/%3E%3C/filter%3E%0A%3Crect width='100%25' height='100%25' filter='url%28%23m%29'/%3E%0A%3Crect width='100%25' height='100%25' filter='url%28%23d%29'/%3E%0A%3C/svg%3E");
+  --witch-corner-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform=''%3E%3Cg fill='none' stroke='%23c9a24a' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%23c9a24a'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform='translate%2864 0%29 scale%28-1 1%29'%3E%3Cg fill='none' stroke='%23c9a24a' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%23c9a24a'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform='translate%280 64%29 scale%281 -1%29'%3E%3Cg fill='none' stroke='%23c9a24a' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%23c9a24a'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg transform='translate%2864 64%29 scale%28-1 -1%29'%3E%3Cg fill='none' stroke='%23c9a24a' stroke-width='1.4' stroke-linecap='round'%3E%0A%3Cpath d='M4 60 V12 Q4 4 12 4 H60'/%3E%3Cpath d='M10 60 V18 Q10 10 18 10 H60'/%3E%0A%3Cpath d='M18 18 c10 0 14 6 10 12 c-3 4 -9 2 -7 -3 c2 -4 8 -2 8 3'/%3E%3Cpath d='M18 18 c0 10 6 14 12 10'/%3E%0A%3Cpath d='M30 14 c6 -2 10 2 14 0'/%3E%3Cpath d='M14 30 c-2 6 2 10 0 14'/%3E%0A%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%23c9a24a'/%3E%3C/g%3E%3C/svg%3E");
+  --witch-sky: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cg fill='%23efe4ff' fill-opacity='0.3'%3E%3Cpath d='M40 18l2.2 7.8 7.8 2.2-7.8 2.2L40 38l-2.2-7.8L30 28l7.8-2.2z'/%3E%3Cpath d='M170 132l1.6 5.4 5.4 1.6-5.4 1.6-1.6 5.4-1.6-5.4-5.4-1.6 5.4-1.6z'/%3E%3Ccircle cx='120' cy='40' r='1.6'/%3E%3Ccircle cx='196' cy='70' r='1.2'/%3E%3Ccircle cx='70' cy='96' r='1.4'/%3E%3Ccircle cx='24' cy='170' r='1.8'/%3E%3Ccircle cx='132' cy='196' r='1.2'/%3E%3Ccircle cx='98' cy='150' r='1'/%3E%3C/g%3E%3Cpath d='M186 22a13 13 0 1 0 10 22a10 10 0 1 1 -10 -22z' fill='%23e8c36a' fill-opacity='0.45'/%3E%3Cpath d='M78 176a8 8 0 1 0 6 13a6 6 0 1 1 -6 -13z' fill='%23e8c36a' fill-opacity='0.35'/%3E%3C/svg%3E");
+  color-scheme: dark;
+}
+
+/* The chrome is the grimoire's cover: the tab bar, the outline and
+   Settings' tabs sit on a deeper violet. */
+[data-look="witch"] #tabbar, [data-look="witch"] #outline, [data-look="witch"] .tabs { background: var(--witch-side); }
+[data-look="witch"] .tab.active { color: var(--witch-ink); font-weight: 700; }
+[data-look="witch"] #outline .item.heading { font-family: "Cinzel", "Trajan Pro", "Palatino", "Palatino Linotype", "Book Antiqua", "URW Palladio L", "P052", Georgia, serif; letter-spacing: 0.03em; }
+
+/* The rendered view is the night sky: stars and crescent moons painted
+   behind the cards and scrolling with them. Settings › Look can take
+   the sky off (data-no-rules). */
+/* The document is written on a scroll hung against the night sky: the
+   document's column (860px and its padding) and 24px either side, for
+   the frame and the fold buttons, is the scroll, speckled
+   kraft paper in the light and deep plum in the dark, ruled round with
+   a double line in ink or gold and a flourish in each corner. The grain
+   is an SVG of noise filters, stretched to the column and repeated down
+   it, and the frame runs the length of the document, its corners at the
+   top and bottom. All of it is painted on the scroller, scrolling with
+   the cards, so nothing moves and the dependency lines still draw over
+   it. The stars show either side; Settings › Look can take them off
+   (data-no-rules), leaving the scroll. */
+[data-look="witch"] #doc-scroll {
+  --sheet: min(952px, 100%);
+  --rule: linear-gradient(var(--witch-line), var(--witch-line));
+  background:
+    var(--witch-corner-tl) max(6px, calc(50% - 438px)) 6px / 64px 64px no-repeat local,
+    var(--witch-corner-tr) min(calc(100% - 6px), calc(50% + 438px)) 6px / 64px 64px no-repeat local,
+    var(--witch-corner-bl) max(6px, calc(50% - 438px)) calc(100% - 6px) / 64px 64px no-repeat local,
+    var(--witch-corner-br) min(calc(100% - 6px), calc(50% + 438px)) calc(100% - 6px) / 64px 64px no-repeat local,
+    var(--rule) 50% 10px / calc(var(--sheet) - 132px) 1px no-repeat local,
+    var(--rule) 50% 16px / calc(var(--sheet) - 144px) 1px no-repeat local,
+    var(--rule) 50% calc(100% - 10px) / calc(var(--sheet) - 132px) 1px no-repeat local,
+    var(--rule) 50% calc(100% - 16px) / calc(var(--sheet) - 144px) 1px no-repeat local,
+    var(--rule) max(10px, calc(50% - 465.5px)) 50% / 1px calc(100% - 132px) no-repeat local,
+    var(--rule) max(16px, calc(50% - 459.5px)) 50% / 1px calc(100% - 144px) no-repeat local,
+    var(--rule) min(calc(100% - 10px), calc(50% + 465.5px)) 50% / 1px calc(100% - 132px) no-repeat local,
+    var(--rule) min(calc(100% - 16px), calc(50% + 459.5px)) 50% / 1px calc(100% - 144px) no-repeat local,
+    var(--witch-grain) 50% 0 / var(--sheet) 640px repeat-y local,
+    linear-gradient(var(--witch-sheet), var(--witch-sheet)) 50% 0 / var(--sheet) 100% no-repeat local,
+    var(--witch-sky) 0 0 / 220px 220px repeat local,
+    var(--bg);
+}
+/* A background position's percentage is of the room the image leaves,
+   so the frame's lines and corners are placed from the middle by the
+   scroll's half-width (476px) less half their own size, or from the
+   edge when the window is narrower than the column. */
+[data-look="witch"][data-no-rules] #doc-scroll { --witch-sky: none; }
+
+/* Headings are carved capitals in the ink, the first-level ones under
+   a crescent in gilt; in the dark they glow faintly. Section rules
+   fade out at both ends like a curl of smoke. */
+[data-look="witch"] #doc > .heading-cell :is(h1, h2, h3) { font-family: "Cinzel", "Trajan Pro", "Palatino", "Palatino Linotype", "Book Antiqua", "URW Palladio L", "P052", Georgia, serif; font-weight: 600; letter-spacing: 0.04em; color: var(--witch-ink); }
+[data-look="witch"][data-scheme="dark"] #doc > .heading-cell :is(h1, h2, h3) { text-shadow: 0 0 12px var(--witch-glow); }
+[data-look="witch"] #doc > .heading-cell h1::before { content: "☾ "; color: var(--witch-gilt); }
+[data-look="witch"] #doc > .heading-cell h1 { border-bottom: 0; }
+[data-look="witch"] #doc > .heading-cell h2 { border-bottom-color: var(--witch-frame); }
+[data-look="witch"] .heading-cell > button.fold { background: none; }
+[data-look="witch"] hr { border: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--witch-gilt), transparent); }
+[data-look="witch"] blockquote { border-left: 3px solid var(--witch-gilt); font-style: italic; }
+
+/* Block cards are grimoire pages: a pale page with a soft violet glow
+   around it, its parts parted by gilt hairlines. The selected card is
+   ringed in the amethyst. Settings › Look can take the glow off
+   (data-no-shadows). */
+[data-look="witch"] .block { background: var(--witch-card); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 18px var(--witch-glow); }
+[data-look="witch"] .block.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+[data-look="witch"] .block.ran { border-left: 3px solid var(--ok); }
+[data-look="witch"] .block.ran.stale { border-left-color: var(--warn-border); }
+[data-look="witch"] .block.timing { border-left-color: var(--accent); }
+[data-look="witch"] .block .head .lang { background: transparent; border-color: var(--witch-frame); color: var(--witch-ink); font-variant: small-caps; letter-spacing: 0.05em; }
+[data-look="witch"] :is(.block pre.code, .block .output-part, .block .ask) { border-top: 1px solid var(--witch-frame); }
+/* The confirm prompt is a candlelit slip in the hover's violet. */
+[data-look="witch"] .block .ask { background: var(--hover); color: var(--fg); }
+[data-look="witch"] .block .output .terminal { border: 1px solid var(--border); border-radius: 3px; }
+[data-look="witch"] #doc > .block.dep-target { outline-color: var(--witch-gilt); }
+[data-look="witch"][data-no-shadows] :is(.block, .coll, dialog, .md-menu) { box-shadow: none; }
+
+/* Buttons: Run All and the confirm buttons are filled with amethyst,
+   edged in gilt; the rest are quiet. */
+[data-look="witch"] :is(button.primary, .block .ask button) { background: var(--accent); color: var(--accent-fg); border-color: var(--witch-gilt); font-weight: 700; letter-spacing: 0.02em; }
+[data-look="witch"] :is(button.primary.stop, button.danger) { background: var(--bad); color: var(--bad-fg); border-color: var(--bad); }
+[data-look="witch"] #console-toggle .badge { background: var(--accent); color: var(--accent-fg); }
+
+/* Inputs, menus and dialogs: the card's page with the cover's edge. */
+[data-look="witch"] :is(.textbox, .choice-select, input[type="text"], input[type="number"], #fm-form textarea, select) { border: 1px solid var(--border); background-color: var(--witch-card); color: var(--fg); }
+[data-look="witch"] .textbox:focus { outline-color: var(--accent); }
+[data-look="witch"] :is(dialog, .md-menu) { border: 1px solid var(--border); background: var(--witch-card); box-shadow: 0 8px 28px var(--witch-glow); }
+[data-look="witch"] :is(input, select, textarea, button, a, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The start screen and Settings: the same grimoire. */
+[data-look="witch"] #start h1 { font-family: "Cinzel", "Trajan Pro", "Palatino", "Palatino Linotype", "Book Antiqua", "URW Palladio L", "P052", Georgia, serif; font-weight: 600; letter-spacing: 0.05em; color: var(--witch-ink); }
+[data-look="witch"] #start h1::before { content: "☾ "; color: var(--witch-gilt); }
+[data-look="witch"] ul.files { border: 1px solid var(--border); background: var(--witch-card); }
+[data-look="witch"] .coll { border: 1px solid var(--border); background: var(--witch-card); box-shadow: 0 4px 18px var(--witch-glow); }
+[data-look="witch"] .tabs button[aria-selected="true"] { color: var(--witch-ink); border-bottom-color: var(--accent); }
+[data-look="witch"] .setting { border-bottom: 1px solid var(--witch-frame); }
+[data-look="witch"] header { border-bottom: 1px solid var(--witch-frame); }
+[data-look="witch"] #source { border-right: 1px solid var(--witch-frame); }
+[data-look="witch"] #history { border-top: 1px solid var(--witch-frame); }
+[data-look="witch"] #console .console-bar { border-bottom: 1px solid var(--witch-frame); }
+[data-look="witch"] :is(input[type="checkbox"], input[type="range"]) { accent-color: var(--accent); }
