@@ -3,12 +3,16 @@
 //
 //	mdsh-gui [flags] [file.md [args...] | folder]
 //	mdsh-gui --version
+//	mdsh-gui --serve=stdio [--source FILE] [file.md [args...] | folder]
 //
 // --version prints the release version, or for a go install or go build
 // build the module version or the commit it was built from.
 //
 // With no file, the window lists the markdown files under the current
 // folder to pick from, or under folder when one is given.
+//
+// With --serve=stdio it opens no window and serves the notebook on stdin
+// and stdout instead, as mdsh --serve=stdio does.
 package main
 
 import (
@@ -17,8 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,22 +31,25 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/lsp"
+	"github.com/gdey/markdownshell/notebook"
+	"github.com/gdey/markdownshell/serve"
+	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/ui"
+	"github.com/gdey/markdownshell/web"
 )
 
-// The frontend is TypeScript in frontend/src, bundled into frontend/bundle.
-// The bindings in frontend/src/bindings are generated from App.
+// The frontend is the web package: TypeScript in web/src, bundled into
+// web/bundle. The bindings in web/src/bindings are generated from ui.App.
 //
-//go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d frontend/src/bindings
+//go:generate go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate bindings -silent -ts -b -names -i -noindex -noevents -d ../../web/src/bindings
 //go:generate go run ./internal/build
 
 // build/appicon.svg is the app's icon, for the Settings window's About
 // tab.
 //
-//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/style.css frontend/teletype.css frontend/blueprint.css frontend/bubblegum.css frontend/witchcraft.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
-var frontend embed.FS
+//go:embed build/appicon.svg
+var appicon embed.FS
 
 func main() {
 	// --lsp serves the language server on stdin and stdout, for the
@@ -70,6 +77,13 @@ func main() {
 		fmt.Println("mdsh-gui", thisBuild())
 		return
 	}
+	if o.stdio {
+		if err := serveStdio(o); err != nil {
+			fmt.Fprintln(os.Stderr, "mdsh-gui:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := mdshGUI(o); err != nil {
 		// Not log.Fatal: slog's default logger, which the log package
 		// writes to once the app starts, may not reach the terminal.
@@ -81,6 +95,9 @@ func main() {
 // options are what the command line asks for.
 type options struct {
 	version bool
+	// stdio is --serve=stdio: no window, the notebook served on stdin
+	// and stdout instead.
+	stdio bool
 	// source is the files given to --source, read once, as mdsh does,
 	// so a process substitution like <(alias -L) works.
 	source string
@@ -116,6 +133,13 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.BoolVar(&o.run.StopOnError, "stop-on-error", false, "stop at the first failing block")
 	fs.BoolVar(&o.run.Step, "step", false, "ask before running each block, as if every block were marked confirm")
 	fs.BoolVar(&o.version, "version", false, "print the version and exit")
+	fs.Func("serve", "with `stdio`, open no window and serve the notebook on stdin and stdout, as mdsh --serve=stdio does, for a program that starts mdsh-gui", func(v string) error {
+		if v != serve.Stdio {
+			return fmt.Errorf("mdsh-gui can only serve on %s", serve.Stdio)
+		}
+		o.stdio = true
+		return nil
+	})
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
@@ -126,6 +150,9 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	for _, name := range []string{"only", "stop-on-error", "step"} {
+		if set[name] && o.stdio {
+			return o, fmt.Errorf("--%s can't be used with --serve", name)
+		}
 		if set[name] && len(o.args) == 0 {
 			return o, fmt.Errorf("--%s needs a file", name)
 		}
@@ -135,10 +162,6 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 
 func mdshGUI(o options) error {
 	args := o.args
-	assets, err := fs.Sub(frontend, "frontend")
-	if err != nil {
-		return err
-	}
 	path, err := settings.DefaultPath()
 	if err != nil {
 		return err
@@ -158,16 +181,23 @@ func mdshGUI(o options) error {
 		args = nil
 	}
 	cwd, _ := os.Getwd()
+	g := &gui{cli: newCLIHost()}
+	a := ui.New(g, store, cwd, dir, o.source)
+	g.ctrl = ui.ControlOf(a)
+	g.ctrl.SetBuild(thisBuild())
+	// The Neovim pane's language server is this program, run with --lsp.
+	if exe, err := os.Executable(); err == nil {
+		g.ctrl.SetLSP(func(file string) []string { return []string{exe, "--lsp", file} })
+	}
 	// What Wails and the app log goes to the Console pane, as well as
 	// where Wails would send it.
-	cons := newConsole()
-	logger := slog.New(newConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
+	cons := g.ctrl.Console()
+	logger := slog.New(ui.NewConsoleHandler(application.DefaultLogger(slog.LevelInfo).Handler(), cons))
 	slog.SetDefault(logger)
-	a := &App{console: cons, settings: store, cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}, cli: newCLIHost()}
 	// A link left by a moved app is pointed back here, and an
 	// AppImage's copy brought up to this version, quietly.
 	go func() {
-		if err := a.cli.repair(); err != nil {
+		if err := g.cli.repair(); err != nil {
 			slog.Warn("updating the mdsh command line tool", "err", err)
 		}
 	}()
@@ -175,35 +205,33 @@ func mdshGUI(o options) error {
 		Name:        "mdsh",
 		Description: "Run the code blocks in a markdown file",
 		Services:    []application.Service{application.NewService(a)},
-		Assets:      application.AssetOptions{Handler: a.assets(application.AssetFileServerFS(assets)), Middleware: tabCalls},
+		Assets:      application.AssetOptions{Handler: withIcon(g.ctrl.Assets(application.AssetFileServerFS(web.FS))), Middleware: ui.TabCalls},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		ShouldQuit: a.shouldQuit,
+		ShouldQuit: g.ctrl.ShouldQuit,
 		Logger:     logger,
 	})
-	a.app = app
+	g.app = app
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		a.started.Store(true)
-		go cons.send(app.Context(), func(e ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
+		g.started.Store(true)
+		go cons.Send(app.Context(), func(e ui.ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
 	})
-	a.menu = a.buildMenu()
-	a.buildSourceMenu()
-	a.buildLinkMenu()
-	a.buildCastMenu()
+	g.menu = g.buildMenu()
+	g.buildSourceMenu()
+	g.buildLinkMenu()
+	g.buildCastMenu()
 	if runtime.GOOS == "darwin" {
-		app.Menu.Set(a.menu)
+		app.Menu.Set(g.menu)
 	}
 
-	t := a.newTab()
+	file, run := "", o.run
 	if len(args) > 0 {
-		ro := a.runOptions()
-		ro.Args, ro.Only, ro.Step, ro.StopOnError = o.run.Args, o.run.Only, o.run.Step, o.run.StopOnError
-		if err := t.open(args[0], ro); err != nil {
-			return err
-		}
+		file, run.Args = args[0], args[1:]
 	}
-	a.newWindow(t)
+	if err := g.ctrl.Start(file, run); err != nil {
+		return err
+	}
 	return app.Run()
 }
 
@@ -220,4 +248,16 @@ func argDir(args []string) (string, error) {
 		return "", errors.New("arguments after a folder are only for a file")
 	}
 	return filepath.Abs(args[0])
+}
+
+// withIcon serves the app icon at /appicon.svg, for the About tab, and
+// everything else with next.
+func withIcon(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/appicon.svg" {
+			http.ServeFileFS(w, r, appicon, "build/appicon.svg")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

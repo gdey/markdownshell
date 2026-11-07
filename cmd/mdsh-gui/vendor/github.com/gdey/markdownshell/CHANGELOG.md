@@ -8,6 +8,196 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh-gui`: a Witchcraft look in Settings › Look, in purple. The
+  document is written on a scroll hung against a sky of stars and
+  crescent moons: speckled kraft paper in aubergine ink, ruled round
+  with a double line and a flourish in each corner, with carved
+  capitals for the headings and an amethyst accent edged in gilt. The
+  dark theme is the witching hour: the scroll in deep plum, ruled in
+  gold, with moonlit lettering and cards that glow. The stars and moons and the glow can be turned off. Its text,
+  code, links and buttons measure at least 4.5:1 and its accent 3:1 in
+  both themes, and `TestLookContrast` now checks it too.
+
+  ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
+- `mdsh --serve` serves the notebook mdsh-gui shows to a web browser,
+  at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
+  address can run commands as you, so it listens on loopback by default;
+  see Serving to a browser in the README.
+- `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
+  the program that started them, such as an editor plugin, as JSON lines
+  on stdin and stdout.
+
+## [1.4.1] - 2026-11-07
+
+mdsh-gui keeps up with long documents. Scrolling is smoother, typing in
+the source view no longer stalls on a runbook of a few thousand lines,
+and documents of 100,000 lines and more open in seconds and stay
+editable. The app also stops losing what blocks set in their shells:
+Stop and `timeout=` interrupt the block rather than ending its shell,
+and a new Events tab in the Console says when and why a shell ended.
+Textboxes can grow with their text (`lines=fit`) and be dragged taller,
+and the docs gain a cheat sheet.
+
+### Added
+
+- A [cheat sheet](docs/cheatsheet.md): every fence attribute, front
+  matter key, command line flag, `mdsh -i` key and desktop app shortcut
+  and menu item on one page, in the repo and on the site's docs section.
+
+  ![The cheat sheet on the site: the docs section with Cheat sheet last in the sidebar, and the Command line table](docs/changelog/cheatsheet.png)
+
+- mdsh-gui's Console has an **Events** tab: the file's event log, in
+  the events `mdsh --audit` writes, said in words. It shows the shells
+  starting and ending, and why, blocks running and being skipped, the
+  file changing on disk and being reloaded, and `mdsh ctl` calls. When
+  the shells lose what blocks set in them, the event is in bold, counts
+  on the Console badge and shows in the status line, so a missing
+  variable, function or alias has a visible cause. Copy gives the
+  events as JSON lines. The audit log has new events for this:
+  `env.end` with its reason (`exit`, `timeout`, `stopped`, `killed`,
+  `died`), `env.start` with `again`, and in the GUI `session.start`,
+  `session.end`, `restart.needed`, `args`, `outputs.clear`,
+  `file.changed` and `file.reload`.
+
+  ![The Events tab after a block ran exit 3: block events, then env.end in bold saying the block ended the shell for the top level, and the same note in the status line](docs/changelog/shell-events.png)
+
+- `textbox` blocks take `lines=fit`: the box holds any number of lines
+  and is as tall as its text, growing and shrinking as you type.
+- mdsh-gui: a grip under each textbox in the rendered view makes it
+  taller. Drag it, or focus it and press down and up; a double click
+  puts the box back to its own height. The height lasts until the
+  window closes and is never written to the file, whose `lines=` stays
+  the limit on the text for every copy and everyone who opens it.
+
+  ![Three textboxes in the rendered view: a one-line box, a lines=fit box grown to four lines of text, and a three-line box dragged taller by the grip under it](docs/changelog/textbox-fit.png)
+
+### Fixed
+
+- mdsh-gui scrolls long documents more smoothly. Moving the pointer
+  over a card no longer lays the whole document out again, each frame
+  paints much less of the page, the dependency lines redraw several
+  times faster when the page changes size, and the source view finds
+  the matching cell without measuring every cell above it.
+  Nothing on screen changes:
+
+  ![A runbook in mdsh-gui with dependency lines, fold buttons and an output's copy button shown on hover, drawn as before](docs/changelog/long-documents.png)
+- Typing in mdsh-gui's source view no longer stalls on a long document.
+  Each pause in the typing drew every card of the rendered view again,
+  which on a runbook of a few thousand lines took long enough to swallow
+  keystrokes. Now only the cards whose markdown changed are drawn again.
+  The fence checker also stopped asking for every fence's attributes
+  again after each pause, and moving the cursor along a line no longer
+  re-selects its block on every key.
+
+  ![The source view and the rendered view side by side, a heading edited in one and drawn in the other, in a 2,900-line runbook](docs/changelog/typing-long-documents.png)
+- mdsh-gui laid out a document's cells in time that grew with the
+  square of its length, and does that after every pause in typing: a
+  10,000-line runbook took 3.5 seconds, and one mostly of prose 10. Each
+  cell asked the document questions, such as where a block could move to
+  and what uses it, that read the whole document again. It now works
+  those out once, and the same documents take 30 and 70 milliseconds.
+- mdsh-gui opens and edits documents of 100,000 lines and more. A
+  100,000-line runbook took 23 seconds to open with the source view and
+  now takes 8, typing in it is about three times as quick, and one of a
+  million lines, which never finished opening, opens in about a minute
+  and a half. Cards out of sight are no longer laid out or painted,
+  copying folds between the views and placing the dependency lines no
+  longer take time that grows with the square of the length, the source
+  view's fold arrows are worked out again only around each edit, and the
+  fence checker asks Go about every new fence in one call.
+- Adding a block in mdsh-gui's source view, such as typing a ```` ```text ````
+  fence to paste captured output into, no longer redraws every card
+  below it. Each block after it was numbered anew, and an unnamed one
+  renamed for its new line, which drew its card again; now the number
+  and name are changed in place. While the new fence is still open, and
+  everything below it reads as its code, the rendered view waits for the
+  typing to settle before drawing it.
+- mdsh-gui's rendered view now follows typing in the source view of a
+  10,000-line document within about a fifth of a second, rather than
+  half a second after you stop, with no stall in between; a document
+  that takes longer to draw still waits for a pause. On 100,000 lines
+  keys take a third of the time they did. The source pane colors the
+  code in fences only in documents of up to 20,000 lines, as parsing it
+  again after each key was most of a key's time in longer ones, and the
+  dependency lines are drawn near the view rather than all of them.
+- mdsh-gui draws the cards of a document with more than 1,000 parts
+  only near the view, and the rest as empty cards of about their size
+  until you scroll to them. A 100,000-line document of prose and short
+  blocks made over a million elements, which on a Mac slowed every key
+  to seconds and used gigabytes of memory; it now makes about 30,000,
+  and opens in 2 seconds rather than 8.
+- mdsh-gui never ends a shell, and the variables, functions and aliases
+  blocks set in it, without asking. Stop and a block's `timeout=` now
+  interrupt the block, as ctrl+c would, and the shell lives on; a block
+  still running three seconds after Stop gets a **Kill Shell**
+  question. `mdsh -i` and `mdsh` keep the shell the same way: in
+  `mdsh -i`, ctrl+c again kills the shell of a block that won't stop,
+  and `mdsh` kills it 5 seconds after its timeout or ctrl+c. A timeout
+  still stops the run. Restart Shells asks first. Reload, Clear All Outputs, Save
+  As and new arguments in Run Options keep the shells (the arguments
+  are set with `set --`); a new `shell:` or the first `tty` block waits
+  for Restart Shells, and opening the History pane asks before starting
+  the shells again on a terminal. A block that runs `exit` still ends
+  its own shell, and the Events tab says so.
+
+  ![Asked before killing a shell: The block hasn't stopped, with Cancel and Kill Shell](docs/changelog/kill-shell.png)
+- `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
+  the zsh wrapper from Settings › Shell and the README. The wrapper puts
+  `--source …` first, so mdsh took the subcommand for a file and failed
+  with `open completion: no such file or directory`. A subcommand may now
+  follow `--source` flags.
+- Settings › Shell's **Give blocks your shell's aliases and functions**
+  (was "your zsh aliases") now also turns on tab completion for `mdsh`,
+  in zsh once `compinit` has run, and adds the bash version of the
+  wrapper and completion to `~/.bashrc` when you have one. A `.zshrc`
+  with the older block gets the completion line the next time Settings
+  opens.
+
+  ![Settings › Shell: Give blocks your shell's aliases and functions, which adds an mdsh function to ~/.zshrc and ~/.bashrc and turns on tab completion](docs/changelog/shell-wrapper.png)
+- The Homebrew cask no longer warns that mdsh.app isn't signed and
+  suggests `--no-quarantine`: from 1.4.0 the app is signed with a
+  Developer ID and notarized, so it opens like any other app.
+
+## [1.4.0] - 2026-11-04
+
+Running a runbook gets easier to follow and to trust. Blocks show a
+timer while they run and keep how long they took, a dependency that has
+gone stale since it ran is run again, `always` reruns steps such as a
+login every time, `nosave` keeps a value out of the file, and `secret`
+blurs a block until you ask to see it. mdsh-gui gains a front matter
+form, the changelog built in, copy buttons for code, output and History
+lines, Console warnings that fix themselves, tabs that drag out to
+other apps, and a fourth look, Bubble Gum; the History pane gets
+readline keys, a timer and tmux. The macOS app is now signed with a
+Developer ID and notarized by Apple, so it opens without the Gatekeeper
+workaround that earlier releases needed. The desktop app also carries
+the `mdsh` command line tool, which Settings › Shell installs.
+
+**Two changes reach into existing files.** Blocks no longer get your
+whole environment: a file without `env.share` in its front matter now
+passes only a base set (`PATH`, `HOME`, `USER`, `LANG` and the like),
+so a document that relies on `GOPATH`, `AWS_PROFILE` or similar needs
+`share: [...]`. And a `tty` block's output is now an asciinema `.cast`
+file played in place rather than an animated GIF; give `out=recording:`
+a path ending in `.gif` to keep a GIF. Both are described in full under
+Changed.
+
+### Added
+
+- The desktop app carries the `mdsh` command line tool, at the same
+  version, so one download gives both. Settings › Shell has a Command
+  line tool row with Install and Remove: on macOS it links
+  `/usr/local/bin/mdsh` to the `mdsh` inside `mdsh.app` (asking for an
+  administrator password when it must), and the app menu has Install
+  Command Line Tool… too; from the Linux AppImage it copies `mdsh` to
+  `~/.local/bin` and keeps the copy at the app's version. The AppImage
+  also runs `mdsh` itself with `--cli` first, or through a link to it
+  named `mdsh`. Turning on the zsh wrapper offers to install it first,
+  and the About tab says when `mdsh` is only inside the app. The
+  Homebrew cask now links the app's `mdsh` and conflicts with the
+  `mdsh` formula: on a Mac, install one or the other.
+
+  ![Settings › Shell's Command line tool row with Install, and the zsh wrapper offering to install the command line tool first](docs/changelog/cli-install.png)
 - `mdsh-gui`: a Bubble Gum look in Settings › Look: Hubba Bubba pink
   paper with bubbles blown across the page, puffy cards and pill
   buttons on a chunky shadow, and bubble-lettered headings, or the
@@ -156,6 +346,9 @@ follow [Semantic Versioning](https://semver.org/).
   they open in the browser or mail app. Commands typed in the History
   pane are added with `links`, and the addresses they print are
   clickable in the pane too. Take `links` off a block to turn it off.
+
+  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
+
 - Copy a fenced block's code to the clipboard. In mdsh-gui each block's
   card has a copy button (or press `c` on the selected block), and other
   fenced code in the document shows one in its corner on hover; the
@@ -254,8 +447,6 @@ follow [Semantic Versioning](https://semver.org/).
 - Commands typed in the History pane, in mdsh-gui and `mdsh -i`, are
   added with `skip`, so running the whole file doesn't run them again.
   Running one by hand still does.
-
-  ![A History block's output with its web addresses as links, and the History pane underlining the one under the pointer](docs/changelog/history-links.png)
 
 ### Fixed
 
@@ -1127,7 +1318,9 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/gdey/markdownshell/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/gdey/markdownshell/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/gdey/markdownshell/compare/v1.1.0...v1.2.0

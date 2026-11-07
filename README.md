@@ -207,6 +207,7 @@ mdsh --step notes.md       # ask before every block: run, skip or stop
 mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
 mdsh -i ~/notes            # pick a file under ~/notes first (mdsh -i alone: this folder)
+mdsh --serve notes.md      # open it in a web browser instead; see Serving to a browser
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -308,6 +309,85 @@ numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
 is open, a banner offers to reload it (`R`) or keep yours (`M`), and mdsh
 won't save over it until you pick one or press `w` twice.
+
+## Serving to a browser
+
+`mdsh --serve` serves the same notebook mdsh-gui shows to a web browser:
+rendered prose, blocks you run and watch stream, the source view, tty
+blocks in a terminal, reports and tabs. It prints the address to open.
+
+```
+mdsh --serve                     # the markdown files under this folder, at 127.0.0.1:8080
+mdsh --serve notes.md a b        # notes.md, with $1 and $2 set
+mdsh --serve=localhost:9000 docs # the files under docs, on port 9000
+```
+
+The address comes after `=`: `--serve host:port` would take
+`host:port` for the file. Each browser tab is a window with its own tabs.
+The desktop app's menu shortcuts work in the page, with cmd on macOS and
+ctrl elsewhere: `S` saves, `shift+S` saves as, `Z` and `shift+Z` undo
+and redo, `enter` runs the current block, `shift+enter` its section, `R`
+runs all, `.` stops, `alt+K` clears all outputs, `O` opens a file, `,`
+opens Settings, `\` and `shift+\` show or hide the source and rendered
+views, `shift+O` the outline, `shift+H` the History pane, `shift+Y` the
+Console, and `shift+]` and `shift+[` switch tabs. The browser keeps ctrl+T and ctrl+W for itself,
+so use the + and × on the tab bar. The gear on the tab bar opens
+Settings too. Open, Save As and a report's destination list the folders
+on the machine mdsh runs on, since that is where the files are.
+
+Closing the browser tab leaves its shells running; opening the address
+again picks the window up, and closing its last tab ends it. Ctrl+C
+stops the server and every shell, without saving.
+
+### Security
+
+**Anyone who can use the page can run any command as the user who
+started mdsh.** That is what the page is for, so treat the address like
+a shell login:
+
+- By default mdsh listens on 127.0.0.1, so only this machine can reach
+  it. `--serve=0.0.0.0:8080` or another machine's address lets the
+  network in, and mdsh warns when it does.
+- Every start makes a new random token and prints it in the address.
+  The first visit trades it for a cookie; without it every request is
+  refused. Don't share the address or put it in a shell history others
+  read.
+- Requests from other sites' pages are refused (their `Origin` must be
+  this server), and on 127.0.0.1 the `Host` must be a loopback name, so
+  a site can't point its own name at your machine to get in.
+- There is no TLS: the token and everything on the page cross the
+  network in the clear. To use it from another machine, keep the
+  default address and tunnel to it, for example
+  `ssh -L 8080:127.0.0.1:8080 host`, rather than listening on the
+  network.
+- The page can read and write any file the user can, through its file
+  dialogs and the commands it runs, and it shows the images and files
+  beside open documents.
+- The pages carry mdsh-gui's Content-Security-Policy, so nothing they
+  show loads from the network: a document's image from another site is
+  drawn as a note naming the host, not fetched. Other sites can't put
+  the pages in a frame.
+
+### Serving to another program
+
+`mdsh --serve=stdio` serves the notebook to the program that started
+mdsh, such as an editor plugin, instead of to a browser: the same calls,
+events and questions, as one JSON object per line on stdin and stdout.
+`mdsh-gui --serve=stdio` does the same and opens no window, so a plugin
+can use whichever is installed.
+
+```
+{"id":1,"name":"ui.App.RunBlock","args":[0],"window":1,"tab":1}   → stdin
+{"window":1,"name":"block","data":{"mdshTab":1,"data":{...}},"sender":"w1"}
+{"id":1,"result":null}                                             ← stdout
+```
+
+A call names a method of `ui.App`, and its reply carries the same `id`
+with a `result` or an `error`. Every other line is an event for a window.
+A question (`mdsh:ask`, `mdsh:prompt`) is answered with
+`{"answer":ID,"value":"..."}`. There is no token, as only the parent
+holds the pipes. Logs go to stderr, and mdsh stops, closing every shell,
+when stdin ends. The full format is in [serve/stdio.go](serve/stdio.go).
 
 ## PDF output
 

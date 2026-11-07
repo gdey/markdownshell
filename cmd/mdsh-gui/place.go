@@ -1,13 +1,14 @@
 package main
 
 import (
+	"log/slog"
 	"runtime"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/settings"
 )
 
 // The sizes windows open at when there is none to remember. Each is cut
@@ -55,9 +56,9 @@ func onScreen(p settings.Place, areas []application.Rect) (application.Rect, boo
 
 // workAreas are the screens' work areas, the primary's first. Before the
 // app runs there may be none.
-func (a *App) workAreas() []application.Rect {
+func (g *gui) workAreas() []application.Rect {
 	var areas []application.Rect
-	for _, s := range a.app.Screen.GetAll() {
+	for _, s := range g.app.Screen.GetAll() {
 		if s.IsPrimary {
 			areas = append([]application.Rect{s.WorkArea}, areas...)
 		} else {
@@ -78,10 +79,10 @@ func primaryArea(areas []application.Rect) application.Rect {
 // placeFor is where a new window for file opens: where its window was
 // last, or the default size, centered, if that isn't remembered or is
 // off the screens. move is false when it should be centered.
-func (a *App) placeFor(file string, areas []application.Rect) (p settings.Place, move bool) {
+func (g *gui) placeFor(file string, areas []application.Rect) (p settings.Place, move bool) {
 	p = settings.Place{File: file, Width: docWidth, Height: docHeight}
 	if file != "" {
-		if q, ok := a.settings.Get().Place(file); ok && q.Width > 0 && q.Height > 0 {
+		if q, ok := g.ctrl.Settings().Get().Place(file); ok && q.Width > 0 && q.Height > 0 {
 			if len(areas) == 0 {
 				return q, true // the screens are checked once the window is up
 			}
@@ -120,9 +121,9 @@ func whenUp(win *application.WebviewWindow, fn func()) {
 // frame, so it is set again here to keep the window from growing by its
 // title bar each time it opens. A place off the screens, as when a
 // display was unplugged, gets the default size, centered.
-func (a *App) settle(win *application.WebviewWindow, p settings.Place) {
+func (g *gui) settle(win *application.WebviewWindow, p settings.Place) {
 	whenUp(win, func() {
-		areas := a.workAreas()
+		areas := g.workAreas()
 		area, ok := onScreen(p, areas)
 		switch {
 		case !keepPlace:
@@ -144,10 +145,10 @@ func (a *App) settle(win *application.WebviewWindow, p settings.Place) {
 
 // shrinkToFit cuts win down to fitShare of its screen once it is up,
 // for a window made before the screens were known.
-func (a *App) shrinkToFit(win *application.WebviewWindow) {
+func (g *gui) shrinkToFit(win *application.WebviewWindow) {
 	whenUp(win, func() {
 		ow, oh := win.Size()
-		area := primaryArea(a.workAreas())
+		area := primaryArea(g.workAreas())
 		if s, err := win.GetScreen(); err == nil && s != nil {
 			area = s.WorkArea
 		}
@@ -165,8 +166,8 @@ func resize(win *application.WebviewWindow, w, h int) {
 
 // resizeTo gives win, already up and showing file, the size file's
 // window had last, if that is remembered. It stays where it is.
-func (a *App) resizeTo(win *application.WebviewWindow, file string) {
-	p, ok := a.settings.Get().Place(file)
+func (g *gui) resizeTo(win *application.WebviewWindow, file string) {
+	p, ok := g.ctrl.Settings().Get().Place(file)
 	if !ok || p.Width <= 0 || p.Height <= 0 || win.IsMaximised() || win.IsFullscreen() {
 		return
 	}
@@ -183,57 +184,60 @@ func steady(win *application.WebviewWindow) bool {
 	return !win.IsMinimised() && !win.IsMaximised() && !win.IsFullscreen()
 }
 
-// savePlace remembers where w is for the file in front of it.
-func (w *docWindow) savePlace() {
-	t := w.activeTab()
-	if t == nil || t.file() == "" || !steady(w.win) {
+// savePlace remembers where win is for the file in front of it.
+func (g *gui) savePlace(win *application.WebviewWindow) {
+	file := g.ctrl.File(win.ID())
+	if file == "" || !steady(win) {
 		return
 	}
-	x, y := w.win.Position()
-	width, height := w.win.Size()
+	x, y := win.Position()
+	width, height := win.Size()
 	if width <= 0 || height <= 0 {
 		return
 	}
-	p := settings.Place{File: t.file(), X: x, Y: y, Width: width, Height: height}
-	if q, ok := w.app.settings.Get().Place(p.File); ok && q == p {
+	p := settings.Place{File: file, X: x, Y: y, Width: width, Height: height}
+	if q, ok := g.ctrl.Settings().Get().Place(p.File); ok && q == p {
 		return
 	}
-	if err := w.app.settings.Update(func(s *settings.Settings) { s.Placed(p) }); err != nil {
-		w.app.app.Logger.Warn("saving settings", "err", err)
+	if err := g.ctrl.Settings().Update(func(s *settings.Settings) { s.Placed(p) }); err != nil {
+		slog.Warn("saving settings", "err", err)
 	}
 }
 
-// moved saves where w is once it has stayed put a moment.
-func (w *docWindow) moved(*application.WindowEvent) {
-	w.app.mu.Lock()
-	defer w.app.mu.Unlock()
-	if w.placeTimer != nil {
-		w.placeTimer.Stop()
+// moved saves where win is once it has stayed put a moment.
+func (g *gui) moved(win *application.WebviewWindow) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if t := g.placeTimers[win.ID()]; t != nil {
+		t.Stop()
 	}
-	w.placeTimer = time.AfterFunc(placeDelay, w.savePlace)
+	if g.placeTimers == nil {
+		g.placeTimers = map[uint]*time.Timer{}
+	}
+	g.placeTimers[win.ID()] = time.AfterFunc(placeDelay, func() { g.savePlace(win) })
 }
 
-// flushPlace saves where w is now, before it closes.
-func (w *docWindow) flushPlace() {
-	w.app.mu.Lock()
-	if w.placeTimer != nil {
-		w.placeTimer.Stop()
-		w.placeTimer = nil
+// flushPlace saves where win is now, before it closes.
+func (g *gui) flushPlace(win *application.WebviewWindow) {
+	g.mu.Lock()
+	if t := g.placeTimers[win.ID()]; t != nil {
+		t.Stop()
+		delete(g.placeTimers, win.ID())
 	}
-	w.app.mu.Unlock()
-	w.savePlace()
+	g.mu.Unlock()
+	g.savePlace(win)
 }
 
 // settingsSize is the size the Settings window opens at.
-func (a *App) settingsSize() (int, int) {
-	if sz := a.settings.Get().SettingsWindow; sz != nil && sz.Width > 0 && sz.Height > 0 {
+func (g *gui) settingsSize() (int, int) {
+	if sz := g.ctrl.Settings().Get().SettingsWindow; sz != nil && sz.Width > 0 && sz.Height > 0 {
 		return sz.Width, sz.Height
 	}
 	return settingsWidth, settingsHeight
 }
 
 // saveSettingsSize remembers the Settings window's size.
-func (a *App) saveSettingsSize(win *application.WebviewWindow) {
+func (g *gui) saveSettingsSize(win *application.WebviewWindow) {
 	if !steady(win) {
 		return
 	}
@@ -241,11 +245,11 @@ func (a *App) saveSettingsSize(win *application.WebviewWindow) {
 	if width <= 0 || height <= 0 {
 		return
 	}
-	if sz := a.settings.Get().SettingsWindow; sz != nil && sz.Width == width && sz.Height == height {
+	if sz := g.ctrl.Settings().Get().SettingsWindow; sz != nil && sz.Width == width && sz.Height == height {
 		return
 	}
-	err := a.settings.Update(func(s *settings.Settings) { s.SettingsWindow = &settings.Size{Width: width, Height: height} })
+	err := g.ctrl.Settings().Update(func(s *settings.Settings) { s.SettingsWindow = &settings.Size{Width: width, Height: height} })
 	if err != nil {
-		a.app.Logger.Warn("saving settings", "err", err)
+		slog.Warn("saving settings", "err", err)
 	}
 }

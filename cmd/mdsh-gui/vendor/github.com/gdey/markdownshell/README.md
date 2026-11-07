@@ -3,7 +3,8 @@
 mdsh runs the code blocks in a markdown file, like a notebook whose file
 format is plain markdown. The documentation lives at
 **[gdey.github.io/markdownshell](https://gdey.github.io/markdownshell/)**.
-See [docs/spec.md](docs/spec.md) for the design and
+[docs/cheatsheet.md](docs/cheatsheet.md) has every attribute, flag and
+key on one page. See [docs/spec.md](docs/spec.md) for the design and
 [docs/plan.md](docs/plan.md) for the roadmap.
 
 Here is [examples/hello.md](examples/hello.md), written the literate way: prose
@@ -150,8 +151,11 @@ With Homebrew, on macOS or Linux:
 
 ```sh
 brew install gdey/tap/mdsh          # the command line and mdsh -i
-brew install --cask gdey/tap/mdsh   # the desktop app, macOS only
+brew install --cask gdey/tap/mdsh   # the desktop app and the command line, macOS only
 ```
+
+The cask's app carries `mdsh` and links it for you, so it conflicts with
+the formula: on a Mac, install one or the other.
 
 On Debian, Ubuntu, Fedora and the like, each release has a `.deb` and an
 `.rpm` for `mdsh`.
@@ -176,7 +180,8 @@ on Windows, set `shell:` under `mdsh:` in the front matter to a POSIX shell
 such as Git Bash's `bash.exe`. The Windows builds are not well tested yet.
 
 The releases also have `mdsh-gui`, a desktop app for macOS (a universal
-`.dmg`) and Linux (an AppImage); see [cmd/mdsh-gui](cmd/mdsh-gui).
+`.dmg`) and Linux (an AppImage), each carrying the same `mdsh`, which
+Settings › Shell puts on your `PATH`; see [cmd/mdsh-gui](cmd/mdsh-gui).
 
 With Go 1.27 or newer you can build it instead:
 
@@ -202,6 +207,7 @@ mdsh --step notes.md       # ask before every block: run, skip or stop
 mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
 mdsh -i ~/notes            # pick a file under ~/notes first (mdsh -i alone: this folder)
+mdsh --serve notes.md      # open it in a web browser instead; see Serving to a browser
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -279,7 +285,7 @@ its output.
 | `W` | save as: type a path (relative to the file's folder); mdsh follows the new file. In another folder it opens it again, with fresh shells |
 | `R` | reload the file from disk, dropping output not saved |
 | `M` | when the file changed on disk, keep what is shown; the next save overwrites the file |
-| ctrl+c | stop the running block; its env starts over with a fresh shell. Quits when nothing runs |
+| ctrl+c | stop the running block: it is interrupted, and its shell keeps what blocks set there. A block that won't stop gets ctrl+c again, which kills its shell. Quits when nothing runs |
 | `q` | go back to the list of files, or close the tab; the last tab quits |
 | ctrl+t | open a new tab with the list of files; picking a file already open in a tab goes to that tab |
 | `]` / `[` | the next or previous tab. The tab bar marks a file with • when its output isn't saved, … while a block runs and ? while one waits for an answer. Blocks go on running in the tabs behind |
@@ -303,6 +309,85 @@ numbered when they have `number_on`. `out=markdown` output is drawn as
 markdown, and placeholders in the prose show their current values. If the file changes on disk while it
 is open, a banner offers to reload it (`R`) or keep yours (`M`), and mdsh
 won't save over it until you pick one or press `w` twice.
+
+## Serving to a browser
+
+`mdsh --serve` serves the same notebook mdsh-gui shows to a web browser:
+rendered prose, blocks you run and watch stream, the source view, tty
+blocks in a terminal, reports and tabs. It prints the address to open.
+
+```
+mdsh --serve                     # the markdown files under this folder, at 127.0.0.1:8080
+mdsh --serve notes.md a b        # notes.md, with $1 and $2 set
+mdsh --serve=localhost:9000 docs # the files under docs, on port 9000
+```
+
+The address comes after `=`: `--serve host:port` would take
+`host:port` for the file. Each browser tab is a window with its own tabs.
+The desktop app's menu shortcuts work in the page, with cmd on macOS and
+ctrl elsewhere: `S` saves, `shift+S` saves as, `Z` and `shift+Z` undo
+and redo, `enter` runs the current block, `shift+enter` its section, `R`
+runs all, `.` stops, `alt+K` clears all outputs, `O` opens a file, `,`
+opens Settings, `\` and `shift+\` show or hide the source and rendered
+views, `shift+O` the outline, `shift+H` the History pane, `shift+Y` the
+Console, and `shift+]` and `shift+[` switch tabs. The browser keeps ctrl+T and ctrl+W for itself,
+so use the + and × on the tab bar. The gear on the tab bar opens
+Settings too. Open, Save As and a report's destination list the folders
+on the machine mdsh runs on, since that is where the files are.
+
+Closing the browser tab leaves its shells running; opening the address
+again picks the window up, and closing its last tab ends it. Ctrl+C
+stops the server and every shell, without saving.
+
+### Security
+
+**Anyone who can use the page can run any command as the user who
+started mdsh.** That is what the page is for, so treat the address like
+a shell login:
+
+- By default mdsh listens on 127.0.0.1, so only this machine can reach
+  it. `--serve=0.0.0.0:8080` or another machine's address lets the
+  network in, and mdsh warns when it does.
+- Every start makes a new random token and prints it in the address.
+  The first visit trades it for a cookie; without it every request is
+  refused. Don't share the address or put it in a shell history others
+  read.
+- Requests from other sites' pages are refused (their `Origin` must be
+  this server), and on 127.0.0.1 the `Host` must be a loopback name, so
+  a site can't point its own name at your machine to get in.
+- There is no TLS: the token and everything on the page cross the
+  network in the clear. To use it from another machine, keep the
+  default address and tunnel to it, for example
+  `ssh -L 8080:127.0.0.1:8080 host`, rather than listening on the
+  network.
+- The page can read and write any file the user can, through its file
+  dialogs and the commands it runs, and it shows the images and files
+  beside open documents.
+- The pages carry mdsh-gui's Content-Security-Policy, so nothing they
+  show loads from the network: a document's image from another site is
+  drawn as a note naming the host, not fetched. Other sites can't put
+  the pages in a frame.
+
+### Serving to another program
+
+`mdsh --serve=stdio` serves the notebook to the program that started
+mdsh, such as an editor plugin, instead of to a browser: the same calls,
+events and questions, as one JSON object per line on stdin and stdout.
+`mdsh-gui --serve=stdio` does the same and opens no window, so a plugin
+can use whichever is installed.
+
+```
+{"id":1,"name":"ui.App.RunBlock","args":[0],"window":1,"tab":1}   → stdin
+{"window":1,"name":"block","data":{"mdshTab":1,"data":{...}},"sender":"w1"}
+{"id":1,"result":null}                                             ← stdout
+```
+
+A call names a method of `ui.App`, and its reply carries the same `id`
+with a `result` or an `error`. Every other line is an event for a window.
+A question (`mdsh:ask`, `mdsh:prompt`) is answered with
+`{"answer":ID,"value":"..."}`. There is no token, as only the parent
+holds the pipes. Logs go to stderr, and mdsh stops, closing every shell,
+when stdin ends. The full format is in [serve/stdio.go](serve/stdio.go).
 
 ## PDF output
 
@@ -357,7 +442,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `depends=A,B` | Blocks to run first: each one that hasn't run yet is asked about |
 | `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran |
 | `confirm[="question"]` | Show the block and ask whether to run it, skip it or stop the run |
-| `timeout=30s` | Kill the block's shell after this long (stops the run) |
+| `timeout=30s` | Interrupt the block after this long, as ctrl+c would, and stop the run; the shell and what blocks set there stay |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
 | `frame=N` | With `tty`, the frame a PDF shows (default the last) |
 | `out=markdown` | Insert output as raw markdown |
@@ -709,4 +794,7 @@ passes along whatever your shell has defined when you run mdsh:
 mdsh() { command mdsh --source <(alias -L; typeset -f) "$@"; }
 ```
 
-In bash, use `<(alias -p; declare -f)`.
+In bash, use `<(unset -f mdsh _mdsh; alias -p; declare -f)`; leaving out
+the wrapper and its completion function keeps their bash-only syntax from
+stopping a `/bin/sh` that is dash. Settings › Shell in mdsh-gui can add the
+wrapper to `~/.zshrc` and `~/.bashrc`, with a line that loads completion.
