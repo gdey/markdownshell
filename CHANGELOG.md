@@ -55,6 +55,12 @@ follow [Semantic Versioning](https://semver.org/).
   code in fences only in documents of up to 20,000 lines, as parsing it
   again after each key was most of a key's time in longer ones, and the
   dependency lines are drawn near the view rather than all of them.
+- mdsh-gui draws the cards of a document with more than 1,000 parts
+  only near the view, and the rest as empty cards of about their size
+  until you scroll to them. A 100,000-line document of prose and short
+  blocks made over a million elements, which on a Mac slowed every key
+  to seconds and used gigabytes of memory; it now makes about 30,000,
+  and opens in 2 seconds rather than 8.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

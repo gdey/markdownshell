@@ -11,9 +11,12 @@
 //
 //	CGO_ENABLED=0 go build -tags server -o /tmp/mdsh-gui-server .
 //	node internal/stress/gui.cjs --server /tmp/mdsh-gui-server [--check] \
-//	    [--shapes runbook,prose] [--lines 10000,100000] [--slow 4]
+//	    [--shapes runbook,prose] [--lines 10000,100000] [--slow 4] [--lazy 100]
 //
 // --slow slows the browser's CPU that many times, closer to a laptop.
+// --lazy is the most cells a document has with every card drawn; past
+// it, cards out of sight are stubs (lazyCells in app.ts). --check sets
+// it to 100, so the short documents it types into have stubs too.
 // Each document is written by stressdoc, so go must be on the PATH.
 
 const { chromium } = require("playwright");
@@ -35,6 +38,7 @@ const shapes = String(flag("shapes", "runbook,prose,output,inputs,flat")).split(
 const sizes = String(flag("lines", check ? "3000" : "10000")).split(",").map(Number);
 const slow = Number(flag("slow", 1));
 const port = Number(flag("port", 8765));
+const lazy = flag("lazy", check ? "100" : "");
 if (!server) {
   console.error("gui.cjs: --server, the path to mdsh-gui built with -tags server, is needed");
   process.exit(2);
@@ -75,8 +79,10 @@ async function serve(file) {
 
 // cards is the rendered view's cards' HTML, without the marks of the
 // selection and the cursor, which follow the user rather than the file.
+// A stub, a card not drawn as it's out of sight, is its line and id.
 const cards = (page) =>
   page.evaluate(() => {
+    const stub = (e) => `stub ${e.dataset.line} ${e.id}`;
     const plain = (e) => {
       const c = e.cloneNode(true);
       for (const x of [c, ...c.querySelectorAll("*")]) {
@@ -87,8 +93,21 @@ const cards = (page) =>
       }
       return c.outerHTML;
     };
-    return [...document.querySelectorAll("#doc > *")].map(plain);
+    return [...document.querySelectorAll("#doc > *")].map((e) => (e.classList.contains("stub") ? stub(e) : plain(e)));
   });
+
+// sameCard says cards a and b, as cards gives them, are drawn alike,
+// or are on the same line with the same id where either is a stub.
+const sameCard = (a, b) => {
+  if (a === b) return true;
+  if (!a?.startsWith("stub ") && !b?.startsWith("stub ")) return false;
+  const at = (c) => {
+    if (c.startsWith("stub ")) return c.slice(5);
+    const tag = c.slice(0, c.indexOf(">"));
+    return `${/ data-line="(\d+)"/.exec(tag)?.[1]} ${/ id="([^"]*)"/.exec(tag)?.[1] ?? ""}`;
+  };
+  return at(a) === at(b);
+};
 
 // typeAt puts the source pane's cursor at the end of the first line
 // past the middle of the document that ends with text.
@@ -118,7 +137,7 @@ async function run(shape, lines) {
     const cdp = await page.context().newCDPSession(page);
     if (slow > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: slow });
     const t0 = Date.now();
-    await page.goto(`http://localhost:${port}/index.html?tab=1`);
+    await page.goto(`http://localhost:${port}/index.html?tab=1${lazy ? "&lazy=" + lazy : ""}`);
     await page.waitForSelector("#doc > section", { timeout: 600000 });
     const open = Date.now() - t0;
     await page.click("#view-split", { timeout: 600000 });
@@ -129,10 +148,13 @@ async function run(shape, lines) {
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) window.stress.long.push(e.duration);
       }).observe({ type: "longtask" });
+      // Stubs, and cards drawn in a stub's place as the view comes to
+      // them, are not counted: they are drawn for scrolling, not typing.
       new MutationObserver((ms) => {
         let added = 0;
         for (const m of ms) {
-          added += m.addedNodes.length;
+          if (m.removedNodes.length === 1 && m.addedNodes.length === 1 && m.removedNodes[0].classList.contains("stub")) continue;
+          added += [...m.addedNodes].filter((e) => !e.classList?.contains("stub")).length;
           window.stress.removed += m.removedNodes.length;
         }
         window.stress.added += added;
@@ -199,7 +221,7 @@ async function run(shape, lines) {
       await page.waitForSelector("#doc > section", { timeout: 600000 });
       await page.waitForTimeout(1000);
       const fresh = await cards(page);
-      const differ = typed.findIndex((c, i) => c !== fresh[i]);
+      const differ = typed.findIndex((c, i) => !sameCard(c, fresh[i]));
       if (typed.length !== fresh.length || differ >= 0) fail(`${shape}/${lines}: after typing, card ${differ} of ${typed.length} differs from a fresh draw of ${fresh.length}:\n  ${typed[differ]?.slice(0, 300)}\n  ${fresh[differ]?.slice(0, 300)}`);
     }
   } finally {

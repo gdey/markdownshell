@@ -223,10 +223,13 @@ export function markDeps() {
 // it out, which, for every card of a long document, took minutes.
 function headY(card: HTMLElement, top: number): number {
   const box = rect(card);
-  if (!card.querySelector(":scope > .head")) return box.top + Math.min(box.height / 2, 14) - top;
+  if (!card.classList.contains("block")) return box.top + Math.min(box.height / 2, 14) - top;
   if (headAt === undefined) {
-    const r = card.querySelector(":scope > .head")!.getBoundingClientRect();
-    headAt = r.top - box.top + Math.min(r.height / 2, 14);
+    // A card not drawn yet, a stub, has no head row to measure.
+    const head = card.querySelector(":scope > .head");
+    if (!head) return box.top + (lastHeadAt ?? 14) - top;
+    const r = head.getBoundingClientRect();
+    headAt = lastHeadAt = r.top - box.top + Math.min(r.height / 2, 14);
   }
   return box.top + headAt - top;
 }
@@ -243,6 +246,7 @@ let rects = new Map<HTMLElement, DOMRect>();
 // headAt is how far below its card's top a head row's anchor is, for
 // this draw.
 let headAt: number | undefined;
+let lastHeadAt: number | undefined;
 
 // footY is the y of a card's bottom anchor.
 function footY(card: HTMLElement, top: number): number {
@@ -513,7 +517,7 @@ function elbow(x: number, y1: number, y2: number): string {
 }
 
 function name(card: HTMLElement): string {
-  return card.querySelector(".head .id")?.textContent || card.querySelector("h1, h2, h3, h4, h5, h6")?.textContent || "this block";
+  return card.querySelector(".head .id")?.textContent || card.querySelector("h1, h2, h3, h4, h5, h6")?.textContent || (card.dataset.block ? "block " + (Number(card.dataset.block) + 1) : "this block");
 }
 
 // A drag makes block from depend on the block it ends on, as its k-th

@@ -335,6 +335,12 @@ th { background: var(--code-bg); }
    A card clips what is in it already, so containing its paint changes
    nothing. */
 #doc > .block { content-visibility: auto; contain-intrinsic-size: auto var(--guess, 120px); }
+/* A card of a long document not drawn yet, as it's far from the view:
+   an empty card about its height (fill in app.ts). It has nothing to
+   skip or stack, and WebKit, keeping track of every card that skips its
+   content when out of sight, took over a second a key on a document of
+   14,000 block stubs. */
+#doc > .stub { box-sizing: border-box; height: var(--guess, 64px); content-visibility: visible; contain-intrinsic-size: none; isolation: auto; }
 #doc > .heading-cell { z-index: 2; }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
