@@ -20,6 +20,16 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
 
+### Changed
+
+- mdsh-gui's Settings opens in a tab of the document window, beside
+  your files, instead of in a window of its own, as the Changelog
+  does. Settings… (cmd/ctrl+,) and About mdsh bring the tab forward if
+  it's open, at its About tab for About. It drags between windows like
+  any tab, and Close Tab closes it.
+
+  ![Settings in a tab beside hello.md, at its General tab](docs/changelog/settings-tab.png)
+
 ## [1.4.1] - 2026-11-07
 
 mdsh-gui keeps up with long documents. Scrolling is smoother, typing in

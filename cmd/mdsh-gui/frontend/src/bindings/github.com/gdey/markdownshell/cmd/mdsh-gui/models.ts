@@ -12,7 +12,7 @@ import * as collection$0 from "../../collection/models.js";
 import * as library$0 from "../../library/models.js";
 
 /**
- * About is what the Settings window's About tab shows.
+ * About is what Settings' About tab shows.
  */
 export interface About {
     "version": string;
@@ -211,7 +211,7 @@ export interface Link {
 }
 
 /**
- * NeovimInfo is what the Settings window shows about Neovim.
+ * NeovimInfo is what Settings shows about Neovim.
  */
 export interface NeovimInfo {
     "path": string;
@@ -306,6 +306,12 @@ export interface Tab {
      * Page is the page the tab shows, if not a document's.
      */
     "page"?: string;
+
+    /**
+     * ReadOnly is set for a page that can't be edited, such as the
+     * changelog.
+     */
+    "readOnly"?: boolean;
 }
 
 /**

@@ -570,8 +570,9 @@ label input[type="text"], label select { display: block; width: 100%; box-sizing
 label.check { display: flex; gap: 8px; align-items: center; }
 .buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
-/* Settings window: tabs across the top, one section showing under them */
-body.settings main { flex: 1; overflow: auto; max-width: none; margin: 0; width: 100%; box-sizing: border-box; padding: 4px 24px 24px; }
+/* Settings, in a tab: its own tabs across the top, one section showing
+   under them, kept to a readable width in a wide window */
+body.settings main { flex: 1; overflow: auto; max-width: 760px; margin: 0; width: 100%; box-sizing: border-box; padding: 4px 24px 24px; }
 .tabs { flex: none; display: flex; gap: 2px; padding: 8px 16px 0; border-bottom: 1px solid var(--border); background: var(--bg); }
 .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 6px 12px; margin-bottom: -1px; }
 .tabs button:hover:not(:disabled) { color: var(--fg); background: none; }

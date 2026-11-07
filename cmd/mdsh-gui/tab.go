@@ -23,9 +23,12 @@ type docTab struct {
 	app *App
 	id  int
 	// page is the page the tab shows in place of a document's, such as
-	// changelogPage, or "". It is set before the tab goes in a window
+	// changelogPage or settingsPage, or "". It is set before the tab goes in a window
 	// and never changes. A tab with a page has no file and opens none.
-	page    string
+	page string
+	// at is the part of page a new tab opens at, such as Settings'
+	// "about", or "". It too is set before the tab goes in a window.
+	at      string
 	answers chan run.Answer
 	done    chan struct{} // closed when the tab closes
 
@@ -212,11 +215,17 @@ type Tab struct {
 	Dirty bool   `json:"dirty"`
 	// Page is the page the tab shows, if not a document's.
 	Page string `json:"page,omitempty"`
+	// ReadOnly is set for a page that can't be edited, such as the
+	// changelog.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 func (t *docTab) info() Tab {
-	if t.page == changelogPage {
-		return Tab{ID: t.id, Title: "Changelog", URL: changelogURL, Page: t.page}
+	switch t.page {
+	case changelogPage:
+		return Tab{ID: t.id, Title: "Changelog", URL: changelogURL, Page: t.page, ReadOnly: true}
+	case settingsPage:
+		return Tab{ID: t.id, Title: "Settings", Page: settingsURL(t.at)}
 	}
 	n, err := t.notebook()
 	if err != nil {
