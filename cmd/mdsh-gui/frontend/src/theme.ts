@@ -7,6 +7,7 @@ import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import type { Settings } from "./api.js";
+import { lookFor } from "./looks.js";
 
 const highlight = HighlightStyle.define([
   { tag: [t.keyword, t.operatorKeyword, t.modifier, t.controlKeyword], color: "var(--syn-keyword)" },
@@ -64,8 +65,8 @@ systemDark.addEventListener("change", () => current && applyTheme(current));
 
 // applyTheme sets the page's theme and look from s, on the root element:
 // data-theme ("light", "dark" or none to follow the system), data-scheme
-// (the light or dark the page shows), data-look ("tty" for Teletype,
-// "blueprint", "gum" for Bubble Gum, "witch" for Witchcraft, none for plain), data-history-scheme for the History pane,
+// (the light or dark the page shows), data-look (the look's id, from
+// frontend/looks; none for Plain), data-history-scheme for the History pane,
 // data-history-focus ("cursor" or none) for how its prompt shows focus, the texture
 // switches, and the options as variables. Then it fires "mdsh-look" on
 // window, for what draws on a canvas, such as the terminals.
@@ -77,7 +78,7 @@ export function applyTheme(s: LookSettings) {
   set("theme", !!theme, theme);
   const scheme = theme || (systemDark.matches ? "dark" : "light");
   root.dataset.scheme = scheme;
-  const look = s.look === "tty" || s.look === "blueprint" || s.look === "gum" || s.look === "witch" ? s.look : "";
+  const look = lookFor(s.look).id;
   set("look", !!look, look);
   const pane = s.historyPane || (look ? "match" : "dark");
   root.dataset.historyScheme = pane === "match" ? scheme : pane === "invert" ? (scheme === "dark" ? "light" : "dark") : "dark";

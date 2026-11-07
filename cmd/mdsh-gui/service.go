@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/fonts"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/session"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
@@ -632,7 +633,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 		cur.Theme = s.Theme
 	}
 	cur.Look = ""
-	if s.Look == "tty" || s.Look == "blueprint" || s.Look == "gum" || s.Look == "witch" {
+	if looks.Valid(allLooks, s.Look) {
 		cur.Look = s.Look
 	}
 	cur.TextSize = 0

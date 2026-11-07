@@ -1,0 +1,21 @@
+{
+  "id": "tty",
+  "name": "Teletype",
+  "order": 10,
+  "since": "1.3",
+  "description": "Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark.",
+  "tagline": "for fan-fold paper and green phosphor",
+  "textSize": 115,
+  "tokens": "--tty-",
+  "contrastGaps": true,
+  "texture": {"label": "Teletype paper", "sprockets": "Sprocket strips", "rules": "Ruled lines", "shadows": "Shadows under cards"},
+  "hero": {"light": "hero-paper.png", "dark": "hero-phosphor.png", "alt": "The Teletype look"},
+  "screenshots": [
+    {"file": "teletype-paper.png", "alt": "The deploy runbook in the Teletype look, on paper, with push asking to run"},
+    {"file": "teletype-phosphor.png", "alt": "The same window in the Teletype look with the dark theme, as green phosphor"},
+    {"file": "teletype-source-paper.png", "alt": "The Teletype look with the source view open beside the rendered view"},
+    {"file": "teletype-history-phosphor.png", "alt": "The Teletype look in phosphor with the History pane open, its commands added to the file as blocks"},
+    {"file": "teletype-settings-look.png", "alt": "Settings › Look: theme, look, text size, fonts, line spacing, accent, History pane and the paper's texture"},
+    {"file": "teletype-history-inverted.png", "alt": "Paper with the History pane inverted, so it shows as phosphor"}
+  ]
+}

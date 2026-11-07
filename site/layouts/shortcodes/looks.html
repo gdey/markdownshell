@@ -1,0 +1,3 @@
+{{- /* The app's looks as a list in a sentence, "Plain, Teletype, … or
+   Witchcraft"; see the looks partial. Give "and" for "… and Witchcraft". */ -}}
+{{- partial "looks.html" (dict "or" (.Get 0)) -}}
