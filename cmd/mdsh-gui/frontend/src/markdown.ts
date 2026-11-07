@@ -98,7 +98,11 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
   const escape = new Compartment();
   const language = new Compartment();
   let nested = opts.text.split("\n", nestedLines + 1).length <= nestedLines;
-  const escapeKey = (on: boolean): Extension => (on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]));
+  // With vim on, Escape is vim's. An Escape vim leaves alone, such as one
+  // in normal mode, is still taken here: on macOS a key the page doesn't
+  // handle goes on to the window, and in fullscreen Escape leaves it.
+  const escapeKey = (on: boolean): Extension =>
+    on ? Prec.lowest(keymap.of([{ key: "Escape", run: () => true }])) : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]);
   let quiet = false; // load is changing the text
   const sync = new Synced(opts.text);
   const target: ExTarget = { view: null as unknown as EditorView, write: opts.write, close: opts.close, run: opts.run };
