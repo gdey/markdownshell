@@ -106,6 +106,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
+  app only the lines it changed. Each pause in the typing sent the whole
+  file twice, and checking the fences' `depends=` sent it again, so a
+  100,000-line runbook moved about 600 KB from the page for every pause
+  and one of a million lines about 80 MB; it is now under a kilobyte at
+  any length. Text the app writes itself, such as a run's output, comes
+  back to the source view the same way, as the lines it changed. This is
+  the first step of the plan in
+  [docs/design/ui-protocol.md](docs/design/ui-protocol.md). Nothing on
+  screen changes:
+
+  ![The source view and the rendered view of a short runbook, a line typed in the source view and a run's output come back into it](docs/changelog/line-edits.png)
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file
   mdsh is the default app for, or a file dropped on mdsh's Dock icon)
   opens the file. Before, mdsh started but showed only the start screen,

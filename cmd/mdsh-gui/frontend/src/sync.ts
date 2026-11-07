@@ -2,22 +2,40 @@
 // the user types in the pane, and Go writes into the file, as when a run
 // writes its output or an include fills its fence.
 
-import { ChangeSet, type ChangeSpec } from "@codemirror/state";
+import { ChangeSet, Text, type ChangeSpec } from "@codemirror/state";
 
-// Synced is the pane's side of the text: base, the text Go last had as
-// far as the pane knows, and local, what was typed since.
+// The pane and Go trade line edits, not whole texts (Go's
+// notebook/lines.go and docs/design/ui-protocol.md): lines [first, last)
+// became text, counting from 0, a line being the text up to and with a
+// newline, or what follows the last newline. Each change moves Go's
+// version on a tick; an edit names the version it was made against, and
+// one against an older text is turned down with the events since.
+
+// Version is a state of Go's text: which document, and how many changes
+// it has seen.
+export type Version = { doc: number; tick: number };
+
+// LineEdit says lines [first, last) became text.
+export type LineEdit = { first: number; last: number; text: string };
+
+// Synced is the pane's side of the text: base, the text Go has at
+// version as far as the pane knows; local, what was typed since and not
+// yet sent; and sending, what was sent and not yet answered.
 export class Synced {
-  base: string;
+  version: Version;
+  base: Text;
   local: ChangeSet;
+  sending: ChangeSet | null = null;
 
-  constructor(text: string) {
-    this.base = text;
-    this.local = ChangeSet.empty(text.length);
+  constructor(text: string | Text, version: Version) {
+    this.base = typeof text === "string" ? textOf(text) : text;
+    this.version = version;
+    this.local = ChangeSet.empty(this.base.length);
   }
 
   // pending is whether something was typed that Go doesn't have yet.
   get pending(): boolean {
-    return !this.local.empty;
+    return !this.local.empty || this.sending !== null;
   }
 
   // typed notes changes typed in the pane.
@@ -25,23 +43,108 @@ export class Synced {
     this.local = this.local.compose(changes);
   }
 
-  // incoming takes theirs, Go's text now, and returns the changes that
-  // bring the pane's text up to it while keeping what was typed: Go's
-  // changes since base, moved past the typing.
-  incoming(theirs: string): ChangeSet {
-    const remote = diff(this.base, theirs);
-    const changes = remote.map(this.local);
-    this.local = this.local.map(remote, true);
-    this.base = theirs;
+  // incoming takes Go's line events since version, which bring it to
+  // to, and returns the changes that bring the pane's text up to Go's
+  // while keeping what was typed: Go's changes, moved past the typing.
+  incoming(events: LineEdit[], to: Version): ChangeSet {
+    let text = this.base;
+    let remote = ChangeSet.empty(text.length);
+    for (const e of events) {
+      const c = eventChanges(text, e);
+      text = c.apply(text);
+      remote = remote.compose(c);
+    }
+    return this.merge(remote, text, to);
+  }
+
+  // reset is incoming for when the events since version aren't kept:
+  // theirs is Go's whole text, at to.
+  reset(theirs: string, to: Version): ChangeSet {
+    const remote = diff(this.base.toString(), theirs);
+    return this.merge(remote, remote.apply(this.base), to);
+  }
+
+  private merge(remote: ChangeSet, text: Text, to: Version): ChangeSet {
+    const typed = this.sending ? this.sending.compose(this.local) : this.local;
+    this.sending = null;
+    const changes = remote.map(typed);
+    this.local = typed.map(remote, true);
+    this.base = text;
+    this.version = to;
     return changes;
   }
 
-  // sent notes that Go took text, the pane's text when it was sent,
-  // after later typing made the pane's text now.
-  sent(text: string, now: string) {
-    this.base = text;
-    this.local = text === now ? ChangeSet.empty(now.length) : diff(text, now);
+  // take is what was typed as line edits against base, to send; sent or
+  // refused says how Go answered. Typing meanwhile is kept apart.
+  take(): LineEdit[] {
+    const edits = lineEditsOf(this.base, this.local);
+    this.sending = this.local;
+    this.local = ChangeSet.empty(this.local.newLength);
+    return edits;
   }
+
+  // sent notes that Go took what take gave, bringing it to version to.
+  sent(to: Version) {
+    if (this.sending) this.base = this.sending.apply(this.base);
+    this.sending = null;
+    this.version = to;
+  }
+
+  // refused notes that Go didn't take it; it is sent again later.
+  refused() {
+    if (this.sending) this.local = this.sending.compose(this.local);
+    this.sending = null;
+  }
+
+  // text is the pane's text: Go's with what was typed.
+  text(): Text {
+    const t = this.sending ? this.sending.apply(this.base) : this.base;
+    return this.local.apply(t);
+  }
+}
+
+// textOf is text as a CodeMirror Text.
+export function textOf(text: string): Text {
+  return Text.of(text.split("\n"));
+}
+
+// lineOffset is where line i, from 0, starts in text, or its end for
+// the line past the last.
+export function lineOffset(text: Text, i: number): number {
+  return i + 1 <= text.lines ? text.line(i + 1).from : text.length;
+}
+
+// lineCount is how many lines text has as Go counts them: a last line
+// with no newline counts, the empty one after a last newline doesn't.
+export function lineCount(text: Text): number {
+  return text.length === 0 ? 0 : text.line(text.lines).length === 0 ? text.lines - 1 : text.lines;
+}
+
+// eventChanges is the changes on text that a line event makes.
+export function eventChanges(text: Text, e: LineEdit): ChangeSet {
+  return ChangeSet.of({ from: lineOffset(text, e.first), to: lineOffset(text, e.last), insert: e.text }, text.length);
+}
+
+// lineEditsOf is changes, on base, as line edits: each changed run of
+// base's lines and the lines that took their place, in order.
+export function lineEditsOf(base: Text, changes: ChangeSet): LineEdit[] {
+  if (changes.empty) return [];
+  const now = changes.apply(base);
+  const count = lineCount(base);
+  const hunks: { first: number; last: number; from: number; to: number }[] = [];
+  changes.iterChanges((fromA, toA, fromB, toB) => {
+    const first = Math.min(base.lineAt(fromA).number - 1, count);
+    const last = Math.min(base.lineAt(toA).number, count);
+    const from = now.lineAt(fromB).from;
+    const lb = now.lineAt(toB);
+    const to = lb.number < now.lines ? lb.to + 1 : lb.to;
+    const h = hunks[hunks.length - 1];
+    if (h && first < h.last) {
+      h.last = Math.max(h.last, last);
+      h.to = Math.max(h.to, to);
+    } else hunks.push({ first, last, from, to });
+  });
+  return hunks.map((h) => ({ first: h.first, last: h.last, text: now.sliceString(h.from, h.to) }));
 }
 
 // diff is the changes that turn a into b, line by line, so that changes

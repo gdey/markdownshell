@@ -317,6 +317,29 @@ export interface Deleted {
 }
 
 /**
+ * DependsProblem is a name in the depends= of the block whose fence is
+ * on Line, from 1, that isn't a block that runs: there is none, or it is
+ * an input.
+ */
+export interface DependsProblem {
+    "line": number;
+    "name": string;
+    "input": boolean;
+}
+
+/**
+ * EditReply is Edit's answer: Applied says the edits were made. When
+ * they weren't, because the file changed since the version they were
+ * made against, Events and Reset say how, as Lines does.
+ */
+export interface EditReply {
+    "applied": boolean;
+    "version": Version;
+    "events": LineEvent[] | null;
+    "reset": boolean;
+}
+
+/**
  * Fix is an edit that makes a warning go away.
  */
 export interface Fix {
@@ -403,6 +426,41 @@ export interface FrontMatter {
      * Other is the other top-level keys, as YAML, in the file's order.
      */
     "other": string;
+}
+
+/**
+ * LineEdit is a LineEvent without its tick: what the source pane asks
+ * to change.
+ */
+export interface LineEdit {
+    "first": number;
+    "last": number;
+    "text": string;
+}
+
+/**
+ * LineEvent says lines [First, Last) of the text became Text, taking
+ * the file to Tick. Text is whole lines, so it ends with a newline
+ * unless it ends the file.
+ */
+export interface LineEvent {
+    "tick": number;
+    "first": number;
+    "last": number;
+    "text": string;
+}
+
+/**
+ * Lines is how the file changed after a version: Version is where it is
+ * now, and Events take a text at the version asked about there, in
+ * order. Reset is set when the events since that version are no longer
+ * kept, or it is another document's: the whole text is to be read
+ * again.
+ */
+export interface Lines {
+    "version": Version;
+    "events": LineEvent[] | null;
+    "reset": boolean;
 }
 
 /**
@@ -585,4 +643,14 @@ export interface TextboxCell {
      * the session, and saving leaves the file's text as it is.
      */
     "nosave"?: boolean;
+}
+
+/**
+ * Version names a state of the file's text: Doc, which document it is,
+ * as two tabs, or a file opened again, have their own ticks; and Tick,
+ * how many changes it has seen.
+ */
+export interface Version {
+    "doc": number;
+    "tick": number;
 }

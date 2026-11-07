@@ -811,6 +811,86 @@ func (a *App) Text(ctx context.Context) (string, error) {
 	return n.Text(), nil
 }
 
+// SourceText is the whole file and the version it is at, for a source
+// pane opening on it: later changes come as line events since.
+type SourceText struct {
+	Text    string           `json:"text"`
+	Version notebook.Version `json:"version"`
+}
+
+// TextAt is the whole file and its version.
+func (a *App) TextAt(ctx context.Context) (SourceText, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return SourceText{}, err
+	}
+	text, v := n.TextAt()
+	return SourceText{text, v}, nil
+}
+
+// LinesSince is how the file changed after version v, as line events,
+// for a source pane catching up with what Go wrote, such as a run's
+// output, without reading the whole file again.
+func (a *App) LinesSince(ctx context.Context, v notebook.Version) (notebook.Lines, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Lines{}, err
+	}
+	return n.LinesSince(v), nil
+}
+
+// Edit makes line edits typed in the source pane against version v of
+// the file, if it is still at v. When it isn't, it changes nothing and
+// says how the file changed since, so the pane can fold that in around
+// what was typed and try again. A key costs the lines it changed, not
+// the whole file twice, as SetText does.
+func (a *App) Edit(ctx context.Context, v notebook.Version, edits []notebook.LineEdit) (notebook.EditReply, error) {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.EditReply{}, err
+	}
+	r, err := n.Edit(v, edits)
+	if r.Applied {
+		t.changed()
+	}
+	return r, err
+}
+
+// SourceBlocksAt is the file's blocks, for completing depends= in the
+// source pane, and the version of the text whose lines they name.
+func (a *App) SourceBlocksAt(ctx context.Context) (SourceBlocks, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return SourceBlocks{}, err
+	}
+	b, v := n.BlocksAt()
+	return SourceBlocks{b, v}, nil
+}
+
+// DependsAt is the names in the file's depends= that aren't a block that
+// runs, for the source pane to underline, and the version of the text
+// whose lines they name.
+func (a *App) DependsAt(ctx context.Context) (Depends, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return Depends{}, err
+	}
+	p, v := n.DependsAt()
+	return Depends{p, v}, nil
+}
+
+// Depends are DependsAt's problems at a version of the file.
+type Depends struct {
+	Problems []notebook.DependsProblem `json:"problems"`
+	Version  notebook.Version          `json:"version"`
+}
+
+// SourceBlocks are blocks at a version of the file.
+type SourceBlocks struct {
+	Blocks  []notebook.SourceBlock `json:"blocks"`
+	Version notebook.Version       `json:"version"`
+}
+
 // SetText replaces the whole file, as typed in the source pane, if it
 // is still base, and reports whether it did. When it isn't, the pane
 // reads the file again, keeps what was typed and tries again.
