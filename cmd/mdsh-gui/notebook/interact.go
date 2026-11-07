@@ -17,10 +17,13 @@ import (
 // TextboxCell is a textbox, as the frontend draws it.
 type TextboxCell struct {
 	// Block is the textbox's index in the document, for SetTextbox.
-	Block       int    `json:"block"`
-	ID          string `json:"id"`
-	Text        string `json:"text"`
-	Lines       int    `json:"lines"`
+	Block int    `json:"block"`
+	ID    string `json:"id"`
+	Text  string `json:"text"`
+	Lines int    `json:"lines"`
+	// Fit is set by lines=fit: any number of lines, in a box as tall
+	// as the text.
+	Fit         bool   `json:"fit,omitempty"`
 	Placeholder string `json:"placeholder,omitempty"`
 	// Problem is why its var= binds nothing, if it doesn't.
 	Problem string `json:"problem,omitempty"`

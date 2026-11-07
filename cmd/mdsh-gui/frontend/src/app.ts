@@ -21,6 +21,7 @@ import { NvimPane, nvimColors } from "./nvim.js";
 import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
+import { textboxGrip } from "./textbox.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { Synced, diff } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
@@ -938,12 +939,15 @@ function enableTasks(e: HTMLElement, tasks: number[] | null | undefined) {
 
 // drawTextbox draws a textbox block as a box to type in. What is typed
 // goes into the block's body after a pause, as typing in the source pane
-// does. Its lines= is the most lines it takes.
+// does. Its lines= is the most lines it takes; lines=fit takes any
+// number, in a box as tall as the text. A grip under it makes it taller.
 function drawTextbox(c: Cell): HTMLElement {
   const t = c.textbox!;
-  const box = el("textarea", { className: "textbox", rows: t.lines, value: t.text, placeholder: t.placeholder ?? "", spellcheck: t.lines > 1 });
+  const most = t.fit ? Infinity : t.lines;
+  const box = el("textarea", { className: "textbox", rows: t.lines, value: t.text, placeholder: t.placeholder ?? "", spellcheck: most > 1 });
   box.setAttribute("aria-label", t.id);
   box.dataset.input = String(t.block);
+  const grip = textboxGrip(box, doc.file, t.id, !!t.fit);
   let timer = 0;
   const save = async () => {
     clearTimeout(timer);
@@ -954,11 +958,11 @@ function drawTextbox(c: Cell): HTMLElement {
     if (await edit(() => App.SetTextbox(t.block, box.value))) t.text = box.value;
   };
   box.onkeydown = (e) => {
-    if (e.key === "Enter" && !e.isComposing && box.value.split("\n").length >= t.lines) e.preventDefault();
+    if (e.key === "Enter" && !e.isComposing && box.value.split("\n").length >= most) e.preventDefault();
   };
   box.oninput = () => {
     const lines = box.value.split("\n");
-    if (lines.length > t.lines) {
+    if (lines.length > most) {
       // A paste with too many lines keeps the first ones.
       const at = box.selectionStart;
       box.value = lines.slice(0, t.lines - 1).join("\n") + (t.lines > 1 ? "\n" : "") + lines.slice(t.lines - 1).join(" ");
@@ -970,7 +974,9 @@ function drawTextbox(c: Cell): HTMLElement {
   box.onblur = () => {
     if (box.value !== t.text) void save();
   };
-  return inputCell("textbox-cell", t.id, t.problem, box, t.nosave ? "textbox" : "");
+  const cell = inputCell("textbox-cell", t.id, t.problem, box, t.nosave ? "textbox" : "");
+  box.after(grip);
+  return cell;
 }
 
 // drawChoice draws a choice block as a dropdown, radio buttons or

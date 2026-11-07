@@ -459,6 +459,25 @@ func TestCopies(t *testing.T) {
 	}
 }
 
+func TestTextboxFit(t *testing.T) {
+	src := "```textbox {#a lines=fit var=v}\none\ntwo\nthree\n```\n\n```textbox {#b lines=3}\n```\n\n" +
+		"```textbox {#c lines=fit var=v}\none\ntwo\nthree\n```\n\n```textbox {#d var=v}\none\ntwo\nthree\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := d.Block("a").Textbox(), (Textbox{Text: "one\ntwo\nthree", Lines: 1, Fit: true}); got != want {
+		t.Errorf("a = %+v, want %+v", got, want)
+	}
+	if got := d.Block("b").Textbox(); got.Fit || got.Lines != 3 {
+		t.Errorf("b = %+v", got)
+	}
+	// A fit textbox is a copy of another fit one, not of one with lines=1.
+	if d.Block("c").VarTaken != "" || !strings.Contains(d.Block("d").VarTaken, "lines= differs") {
+		t.Errorf("c: %q; d: %q", d.Block("c").VarTaken, d.Block("d").VarTaken)
+	}
+}
+
 func TestBackgroundNotTTY(t *testing.T) {
 	_, err := Parse([]byte("```sh {#a background tty}\nx\n```\n"))
 	if err == nil || !strings.Contains(err.Error(), "background") {

@@ -32,7 +32,8 @@ type AttrSpec struct {
 	// show-stderr. Flags are always bare.
 	Bare bool `json:"bare,omitempty"`
 	// Values are the choices for AttrChoice. A value ending in ":" may
-	// be followed by a path, as in out=image:plots/sales.png.
+	// be followed by a path, as in out=image:plots/sales.png. For
+	// AttrNumber they are words allowed besides numbers, as lines=fit.
 	Values []string `json:"values,omitempty"`
 	// Default says what happens without the attribute.
 	Default string `json:"default,omitempty"`
@@ -77,7 +78,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "from", Kind: AttrNumber, Include: true, Default: "the first line", Help: "The first line to include, counting from 1"},
 	{Name: "to", Kind: AttrNumber, Include: true, Default: "the last line", Help: "The last line to include"},
 	{Name: "number_on", Kind: AttrFlag, Include: true, Default: "off", Help: "Show each included line's number in the file"},
-	{Name: "lines", Kind: AttrNumber, Inputs: []string{TextboxLang}, Default: "1", Help: "The most lines a textbox holds; 1 or less is one line"},
+	{Name: "lines", Kind: AttrNumber, Values: []string{LinesFit}, Inputs: []string{TextboxLang}, Default: "1", Help: "The most lines a textbox holds, 1 or less being one line; fit holds any number and sizes the box to the text"},
 	{Name: "mode", Kind: AttrChoice, Values: []string{ChoiceDropdown, ChoiceRadio, ChoiceMulti}, Inputs: []string{ChoiceLang}, Default: ChoiceDropdown, Help: "Pick one from a dropdown or radio buttons, or check any number of boxes"},
 	{Name: "placeholder", Kind: AttrText, Inputs: []string{TextboxLang, ChoiceLang}, Default: "none", Help: "What an empty textbox, or a dropdown with nothing chosen, shows in an interactive view"},
 	{Name: "var", Kind: AttrText, Inputs: []string{TextboxLang, ChoiceLang}, Default: "none", Help: "Bind the text, or the checked options one per line, to $MDSH_VAR_<name> for blocks and conditions"},
@@ -131,7 +132,13 @@ func (s AttrSpec) Check(value string, set bool) error {
 			return fmt.Errorf("%s= is a duration such as 30s or 5m", s.Name)
 		}
 	case AttrNumber:
+		if slices.Contains(s.Values, value) {
+			return nil
+		}
 		if n, err := strconv.Atoi(value); err != nil || n < 0 && s.Name != "lines" {
+			if len(s.Values) > 0 {
+				return fmt.Errorf("%s= is a whole number or %s", s.Name, strings.Join(s.Values, ", "))
+			}
 			return fmt.Errorf("%s= is a whole number", s.Name)
 		}
 	case AttrText:

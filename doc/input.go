@@ -147,7 +147,7 @@ func controlDiff(a, b *Block) string {
 		return "it is a " + b.Lang + ", not a " + a.Lang
 	case a.NoSave() != b.NoSave():
 		return "nosave differs"
-	case a.IsTextbox() && a.Textbox().Lines != b.Textbox().Lines:
+	case a.IsTextbox() && (a.Textbox().Lines != b.Textbox().Lines || a.Textbox().Fit != b.Textbox().Fit):
 		return "lines= differs"
 	case a.IsTextbox():
 		if a.Textbox().Placeholder != b.Textbox().Placeholder {
@@ -236,12 +236,19 @@ var varName = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 // ValidVar reports whether name can follow VarPrefix in a variable.
 func ValidVar(name string) bool { return varName.MatchString(name) }
 
+// LinesFit is the lines= value that sizes a textbox to its text.
+const LinesFit = "fit"
+
 // Textbox is what a textbox block asks for.
 type Textbox struct {
 	// Text is the body without its last newline.
 	Text string
-	// Lines is the most lines the text may have, at least 1.
+	// Lines is the most lines the text may have, at least 1. With Fit
+	// it is 1 and means nothing.
 	Lines int
+	// Fit is set by lines=fit: the text may have any number of lines,
+	// and interactive views size the box to it as it is typed.
+	Fit bool
 	// Placeholder is shown while the text is empty, in interactive views
 	// only.
 	Placeholder string
@@ -250,6 +257,7 @@ type Textbox struct {
 // Textbox reads a textbox's attributes and text: the session's value for
 // a nosave textbox that has one (see SetValue), else its body.
 func (b *Block) Textbox() Textbox {
+	fit := b.Attrs["lines"] == LinesFit
 	n, _ := strconv.Atoi(b.Attrs["lines"])
 	text := strings.TrimSuffix(b.Body, "\n")
 	if v, ok := b.SessionValue(); ok {
@@ -258,6 +266,7 @@ func (b *Block) Textbox() Textbox {
 	return Textbox{
 		Text:        text,
 		Lines:       max(n, 1),
+		Fit:         fit,
 		Placeholder: b.Attrs["placeholder"],
 	}
 }

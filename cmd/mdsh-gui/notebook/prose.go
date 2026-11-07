@@ -73,7 +73,7 @@ func (n *Notebook) cells() []Cell {
 		}
 		if b.IsTextbox() {
 			t := b.Textbox()
-			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Placeholder: t.Placeholder, Problem: b.VarTaken, NoSave: b.NoSave()}, From: span.Start, To: span.End})
+			l.cells = append(l.cells, Cell{Block: -1, Textbox: &TextboxCell{Block: i, ID: b.ID, Text: t.Text, Lines: t.Lines, Fit: t.Fit, Placeholder: t.Placeholder, Problem: b.VarTaken, NoSave: b.NoSave()}, From: span.Start, To: span.End})
 			continue
 		}
 		if b.IsChoice() {

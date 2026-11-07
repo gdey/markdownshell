@@ -65,7 +65,8 @@ export interface AttrSpec {
 
     /**
      * Values are the choices for AttrChoice. A value ending in ":" may
-     * be followed by a path, as in out=image:plots/sales.png.
+     * be followed by a path, as in out=image:plots/sales.png. For
+     * AttrNumber they are words allowed besides numbers, as lines=fit.
      */
     "values"?: string[] | null;
 

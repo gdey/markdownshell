@@ -52,12 +52,15 @@ A `textbox` fence holds text. Its body is the value.
 | --- | --- |
 | `var=name` | Bind `$MDSH_VAR_name` to the text, without its last newline |
 | `lines=N` | The most lines it holds; 1 or less is a single line, the default |
+| `lines=fit` | Any number of lines, in a box as tall as the text that grows and shrinks as you type |
 | `placeholder="…"` | Shown while it is empty, in mdsh-gui only |
 | `nosave` | What you type is used for this session and not saved; the body is the default |
 | `show=COND` | Show it only when the condition holds |
 
 mdsh-gui writes what you type into the body, using a longer fence if a
-line would close it.
+line would close it. Drag the grip under a textbox, or focus it and
+press down and up, to make the box taller; a double click puts it back.
+The height lasts until the window closes and is never saved to the file.
 
 ## Choices
 

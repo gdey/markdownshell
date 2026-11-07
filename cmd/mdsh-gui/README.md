@@ -217,8 +217,11 @@ Each file opens in a tab of its own, with its own shells.
   `out=markdown`'s, work the same way until the block runs again and
   rewrites them. A
   `textbox` block (```` ```textbox {#host lines=3 placeholder="Which host?"} ````)
-  is a box to type in, at most `lines` lines high, showing `placeholder`
-  while empty; what is typed goes into the block's body. A `choice`
+  is a box to type in, at most `lines` lines high (`lines=fit` takes
+  any number and grows and shrinks with the text), showing `placeholder`
+  while empty; what is typed goes into the block's body. Drag the grip
+  under a textbox, or focus it and press down and up, to make it taller
+  until the window closes; a double click puts it back. A `choice`
   block lists its options as task list items and is drawn as a
   dropdown, radio buttons or checkboxes (`mode=dropdown`, `radio` or
   `multi`). With `var=name`, blocks and conditions read the text or
