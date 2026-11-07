@@ -50,7 +50,7 @@ or file.
 | `mdsh ctl status [--step N --of M] TEXT` | Show progress for this block |
 | `mdsh ctl help` | List these. Exit codes: 0 done, 2 refused, 3 not under mdsh |
 
-`mdsh-gui [flags] [file.md [args…] \| folder]` takes `--source FILE`,
+`mdsh-gui [flags] [file.md [args…] | folder]` takes `--source FILE`,
 `--only ID`, `--step`, `--stop-on-error` and `--version`; on Linux the
 AppImage runs the command line tool when started with `--cli` first.
 
@@ -321,9 +321,10 @@ explains an attribute and `zc`/`zo` fold.
 | Edit | Undo · Redo · Move Block Up · Move Block Down · Move Block Above Previous Block · Move Block Below Next Block · Depends On… · Front Matter · Cut · Copy · Paste · Select All · Preferences… (Linux) |
 | Run | Run Current Block · Run Section · Run All · Stop · Clear All Outputs… · Run Options… |
 | View | Source View · Rendered View · Outline · History · Console · Show Code · Show Output · Folding › Collapse All Blocks, Collapse All Sections, Expand All, Copy Folds to Source View, Copy Folds to Rendered View · Zoom In · Zoom Out · Actual Size · Toggle Full Screen · Show Next Tab · Show Previous Tab |
-| Help | Changelog |
+| Help | Cheat Sheet · Changelog |
 | Insert (right-click in the source view) | Heading · Bold · Italic · Code · Link · Image · Bulleted List · Numbered List · Task List · Quote · Table · Code Block · sh Block · sh Block, Confirm First · zsh Block · Textbox · Choice |
 
-Settings has six tabs: General, Look, Editing, Shell, Files and About.
-Right-clicking a recording offers Copy and Copy as GIF, and the History
+Settings has six tabs: General, Look, Editing, Shell, Files and About;
+About links to this cheat sheet and the changelog, which open in
+read-only tabs. Right-clicking a recording offers Copy and Copy as GIF, and the History
 transcript Copy and Select All.
