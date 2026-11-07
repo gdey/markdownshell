@@ -1,7 +1,7 @@
 // Help for the mdsh attributes in opening fences, and Vim's :w, :q and
 // :RunBlock, for the markdown editors.
 
-import { type EditorState, type Extension } from "@codemirror/state";
+import { type EditorState, type Extension, Facet } from "@codemirror/state";
 import { EditorView, hoverTooltip, type Tooltip } from "@codemirror/view";
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { type Diagnostic, linter } from "@codemirror/lint";
@@ -74,8 +74,9 @@ export function forgetEx(view: EditorView) {
 
 // attrHelp is the help for mdsh attributes in opening fences: completion
 // inside {…}, hover help and underlined mistakes.
-export function attrHelp(attrs: AttrSpec[], names: () => Names): Extension {
+export function attrHelp(attrs: AttrSpec[], names: () => Names, go?: GoBlocks): Extension {
   return [
+    go ? goBlocks.of(go) : [],
     autocompletion({ override: [attrCompletions(attrs, names)], activateOnTyping: true }),
     hoverTooltip(attrHover(attrs)),
     linter((view) => checkInfo(view.state), { delay: 300 }),
@@ -95,19 +96,73 @@ function infoRange(state: EditorState, pos: number): { from: number; text: strin
 // dependsRe finds a depends= in an info string: its value, quoted or not.
 const dependsRe = /([{\s]depends=)(?:"([^"]*)"?|([^\s}]*))/;
 
+// GoBlocks is how an editor asks Go about the blocks in its text when
+// it can do better than send Go the whole text: the source pane asks
+// about the file and maps the lines past what was typed since. blocks is
+// all of them, for completing depends=, and depends the names in
+// depends= that aren't a block that runs, for checking them, so a check
+// moves only what is wrong.
+export type GoBlocks = {
+  blocks(state: EditorState): Promise<SourceBlock[] | null>;
+  depends(state: EditorState): Promise<DependsProblem[] | null>;
+};
+
+// DependsProblem is a name in the depends= of the block whose fence is
+// on line that isn't a block that runs: there is none, or with input, it
+// is an input.
+export type DependsProblem = { line: number; name: string; input: boolean };
+
+const goBlocks = Facet.define<GoBlocks, GoBlocks | null>({ combine: (fs) => fs[0] ?? null });
+
 // sourceBlocks is the blocks in the editor's text, as Go parses it, or
 // null if it doesn't parse.
 async function sourceBlocks(state: EditorState): Promise<SourceBlock[] | null> {
   try {
-    return await App.SourceBlocks(state.doc.toString());
+    const go = state.facet(goBlocks);
+    return await (go ? go.blocks(state) : App.SourceBlocks(state.doc.toString()));
   } catch {
     return null;
   }
 }
 
+// dependsProblems is the names in the depends= of infos that aren't a
+// block that runs, or null if that can't be told.
+async function dependsProblems(state: EditorState, infos: { n: number; text: string }[]): Promise<DependsProblem[] | null> {
+  const go = state.facet(goBlocks);
+  if (go) {
+    try {
+      return await go.depends(state);
+    } catch {
+      return null;
+    }
+  }
+  const blocks = await sourceBlocks(state);
+  if (!blocks) return null;
+  const fences = new Set(blocks.map((b) => b.line));
+  const byID = new Map<string, SourceBlock>();
+  for (const b of blocks) if (!byID.has(b.id)) byID.set(b.id, b);
+  const out: DependsProblem[] = [];
+  for (const r of infos) {
+    if (!fences.has(r.n)) continue;
+    for (const name of dependsNames(r.text)) {
+      const b = byID.get(name);
+      if (!b?.runs) out.push({ line: r.n, name, input: !!b });
+    }
+  }
+  return out;
+}
+
+// dependsNames is the names an info string's depends= lists.
+function dependsNames(info: string): string[] {
+  const m = dependsRe.exec(info);
+  if (!m) return [];
+  return (m[2] ?? m[3]).split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 // checkDepends underlines the names in a fence's depends= that aren't a
-// block that runs: mdsh ignores them.
-function checkDepends(blocks: Map<string, SourceBlock>, from: number, info: string, out: Diagnostic[]) {
+// block that runs, which bad holds, with whether each is an input: mdsh
+// ignores them.
+function checkDepends(bad: Map<string, boolean>, from: number, info: string, out: Diagnostic[]) {
   const m = dependsRe.exec(info);
   if (!m) return;
   const quoted = m[2] !== undefined;
@@ -116,10 +171,8 @@ function checkDepends(blocks: Map<string, SourceBlock>, from: number, info: stri
     const name = part.trim();
     const start = at + part.indexOf(name);
     at += part.length + 1;
-    if (!name) continue;
-    const b = blocks.get(name);
-    if (b?.runs) continue;
-    const message = b ? `${name} is an input, which never runs, so depends= ignores it` : `There is no block ${name}, so depends= ignores it`;
+    if (!name || !bad.has(name)) continue;
+    const message = bad.get(name) ? `${name} is an input, which never runs, so depends= ignores it` : `There is no block ${name}, so depends= ignores it`;
     out.push({ from: start, to: start + name.length, severity: "error", message });
   }
 }
@@ -135,11 +188,6 @@ let checked = new Map<string, Promise<Problem[]>>();
 async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
   const out: Diagnostic[] = [];
   const doc = state.doc;
-  // The blocks are only needed, and parsed, if a depends= is there.
-  const blocks = doc.toString().includes("depends=") ? await sourceBlocks(state) : null;
-  const fences = new Set(blocks?.map((b) => b.line));
-  const byID = new Map<string, SourceBlock>();
-  for (const b of blocks ?? []) if (!byID.has(b.id)) byID.set(b.id, b);
   const infos: { n: number; from: number; text: string }[] = [];
   let n = 0;
   let from = 0;
@@ -148,6 +196,14 @@ async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
     if (!it.value.includes("{")) continue;
     const r = infoRange(state, from);
     if (r && r.text.trim()) infos.push({ n, ...r });
+  }
+  // Blocks are only asked about if a depends= is there.
+  const problems0 = infos.some((r) => dependsRe.test(r.text)) ? await dependsProblems(state, infos) : null;
+  const bad = new Map<number, Map<string, boolean>>(); // by line, the names that aren't a block that runs
+  for (const p of problems0 ?? []) {
+    let m = bad.get(p.line);
+    if (!m) bad.set(p.line, (m = new Map()));
+    m.set(p.name, p.input);
   }
   const now = new Map<string, Promise<Problem[]>>();
   const fresh: string[] = [];
@@ -174,7 +230,8 @@ async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
     for (const p of problems.get(r.text) ?? []) {
       out.push({ from: r.from + p.from, to: r.from + p.to, severity: p.severity === "error" ? "error" : "warning", message: p.message });
     }
-    if (blocks && fences.has(r.n)) checkDepends(byID, r.from, r.text, out);
+    const wrong = bad.get(r.n);
+    if (wrong) checkDepends(wrong, r.from, r.text, out);
     // Only one textbox or choice can bind a variable, or the last would
     // quietly win.
     const v = /^\s*(?:textbox|choice)\b/.test(r.text) && !r.text.includes("<include") ? /[{\s]var="?([A-Za-z0-9_]+)"?/.exec(r.text) : null;

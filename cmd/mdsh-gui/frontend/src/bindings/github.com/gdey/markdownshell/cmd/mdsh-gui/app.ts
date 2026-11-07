@@ -198,6 +198,15 @@ export function DeleteBlock(i: number): $CancellablePromise<notebook$0.Deleted> 
 }
 
 /**
+ * DependsAt is the names in the file's depends= that aren't a block that
+ * runs, for the source pane to underline, and the version of the text
+ * whose lines they name.
+ */
+export function DependsAt(): $CancellablePromise<$models.Depends> {
+    return $Call.ByName("main.App.DependsAt");
+}
+
+/**
  * DescribeFix says what FixWarning would do for warning, a console
  * entry's message, in the file this window shows.
  */
@@ -235,6 +244,17 @@ export function DragTab(id: number): $CancellablePromise<void> {
  */
 export function DropTab(i: number): $CancellablePromise<void> {
     return $Call.ByName("main.App.DropTab", i);
+}
+
+/**
+ * Edit makes line edits typed in the source pane against version v of
+ * the file, if it is still at v. When it isn't, it changes nothing and
+ * says how the file changed since, so the pane can fold that in around
+ * what was typed and try again. A key costs the lines it changed, not
+ * the whole file twice, as SetText does.
+ */
+export function Edit(v: notebook$0.Version, edits: notebook$0.LineEdit[] | null): $CancellablePromise<notebook$0.EditReply> {
+    return $Call.ByName("main.App.Edit", v, edits);
 }
 
 /**
@@ -355,6 +375,15 @@ export function LastSession(): $CancellablePromise<void> {
 }
 
 /**
+ * LinesSince is how the file changed after version v, as line events,
+ * for a source pane catching up with what Go wrote, such as a run's
+ * output, without reading the whole file again.
+ */
+export function LinesSince(v: notebook$0.Version): $CancellablePromise<notebook$0.Lines> {
+    return $Call.ByName("main.App.LinesSince", v);
+}
+
+/**
  * Live is what the run going on in the tab has sent so far, for a page
  * that starts partway through it.
  */
@@ -428,12 +457,14 @@ export function NewWindow(): $CancellablePromise<void> {
 }
 
 /**
- * NvimApply gives Neovim text, Go's text merged with what was typed, as
- * edits to the text Neovim last had, so typing elsewhere in the moment
- * since isn't lost. If an edit's lines changed, the whole text is set.
+ * NvimApply makes edits on Neovim's text, as the page merged Go's
+ * changes with what was typed, made against its text as of seq, the
+ * count of the nvim-lines events the page has had and its own NvimApply
+ * calls. It reports false, changing nothing, if Neovim has typing the
+ * page hasn't had: that comes as nvim-lines, and the page tries again.
  */
-export function NvimApply(text: string, edits: nvim$0.Edit[] | null): $CancellablePromise<void> {
-    return $Call.ByName("main.App.NvimApply", text, edits);
+export function NvimApply(seq: number, edits: nvim$0.LineEdit[] | null): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.NvimApply", seq, edits);
 }
 
 /**
@@ -481,21 +512,11 @@ export function NvimSaved(): $CancellablePromise<void> {
 }
 
 /**
- * NvimSetText replaces Neovim's text, as after a run writes output and
- * the page merged it with what was typed. Before Neovim runs there is
- * nothing to do: NvimStart takes the text.
- */
-export function NvimSetText(text: string): $CancellablePromise<void> {
-    return $Call.ByName("main.App.NvimSetText", text);
-}
-
-/**
  * NvimStart starts the tab's Neovim with a grid of cols by rows, editing
  * the file's text, with 'background' set to "light" or "dark" to match
- * the page. It returns the text Neovim started with, the base for
- * SetText. A running one is left as it is.
+ * the page. A running one is left as it is.
  */
-export function NvimStart(cols: number, rows: number, background: string): $CancellablePromise<string> {
+export function NvimStart(cols: number, rows: number, background: string): $CancellablePromise<$models.NvimText> {
     return $Call.ByName("main.App.NvimStart", cols, rows, background);
 }
 
@@ -792,6 +813,14 @@ export function SourceBlocks(text: string): $CancellablePromise<notebook$0.Sourc
 }
 
 /**
+ * SourceBlocksAt is the file's blocks, for completing depends= in the
+ * source pane, and the version of the text whose lines they name.
+ */
+export function SourceBlocksAt(): $CancellablePromise<$models.SourceBlocks> {
+    return $Call.ByName("main.App.SourceBlocksAt");
+}
+
+/**
  * StartScreen lists the markdown files under the start folder, and the
  * recent files that still exist.
  */
@@ -828,6 +857,13 @@ export function Templates(): $CancellablePromise<library$0.File[] | null> {
  */
 export function Text(): $CancellablePromise<string> {
     return $Call.ByName("main.App.Text");
+}
+
+/**
+ * TextAt is the whole file and its version.
+ */
+export function TextAt(): $CancellablePromise<$models.SourceText> {
+    return $Call.ByName("main.App.TextAt");
 }
 
 /**

@@ -65,20 +65,20 @@ func wait[T any](t *testing.T, c chan T, what string) T {
 func TestEditor(t *testing.T) {
 	path := testNvim(t)
 	redraws := make(chan [][]any, 100)
-	changed := make(chan string, 10)
-	written := make(chan string, 10)
+	changed := make(chan Lines, 10)
+	written := make(chan int, 10)
 	exited := make(chan error, 1)
 	e, err := Start(Options{
-		Path:    path,
-		Cols:    40,
-		Rows:    10,
-		Name:    "mdsh://test.md",
-		Text:    "# Title\n\nfirst line\n",
-		Clean:   true,
-		Redraw:  func(ev [][]any) { redraws <- ev },
-		Changed: func(text string) { changed <- text },
-		Write:   func(text string) { written <- text },
-		Exit:    func(err error) { exited <- err },
+		Path:   path,
+		Cols:   40,
+		Rows:   10,
+		Name:   "mdsh://test.md",
+		Text:   "# Title\n\nfirst line\n",
+		Clean:  true,
+		Redraw: func(ev [][]any) { redraws <- ev },
+		Lines:  func(l Lines) { changed <- l },
+		Write:  func(seq int) { written <- seq },
+		Exit:   func(err error) { exited <- err },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -101,39 +101,44 @@ func TestEditor(t *testing.T) {
 	if err := e.Input("Goadded<Esc>"); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := wait(t, changed, "change"), "# Title\n\nfirst line\nadded\n"; got != want {
-		t.Errorf("changed text = %q, want %q", got, want)
+	// Typing sends the lines it changed, not the text.
+	if got, want := wait(t, changed, "change"), (Lines{Seq: 1, First: 3, Last: 3, Text: "added\n"}); got != want {
+		t.Errorf("changed lines = %+v, want %+v", got, want)
 	}
 
 	// u undoes the edit, not the text the buffer started with.
 	if err := e.Input("u"); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := wait(t, changed, "undo"), "# Title\n\nfirst line\n"; got != want {
-		t.Errorf("text after u = %q, want %q", got, want)
+	if got, want := wait(t, changed, "undo"), (Lines{Seq: 2, First: 3, Last: 4, Text: ""}); got != want {
+		t.Errorf("lines after u = %+v, want %+v", got, want)
 	}
 
-	if err := e.Input(":w<CR>"); err != nil {
+	// :w sends what was typed first, then says which send it follows.
+	if err := e.Input("Ox<Esc>:w<CR>"); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := wait(t, written, ":w"), "# Title\n\nfirst line\n"; got != want {
-		t.Errorf("written text = %q, want %q", got, want)
+	if got, want := wait(t, changed, ":w's lines"), (Lines{Seq: 3, First: 2, Last: 2, Text: "x\n"}); got != want {
+		t.Errorf("lines before :w = %+v, want %+v", got, want)
+	}
+	if got := wait(t, written, ":w"); got != 3 {
+		t.Errorf(":w after seq %d, want 3", got)
 	}
 
-	// Text set from mdsh-gui isn't sent back as a change.
-	if err := e.SetText("# Title\n\nnew\n"); err != nil {
-		t.Fatal(err)
+	// Lines set from mdsh-gui aren't sent back as a change.
+	if ok, err := e.ApplyLines(3, []LineEdit{{First: 2, Last: 4, Text: "new\n"}}); !ok || err != nil {
+		t.Fatal(ok, err)
 	}
 	var got []string
 	if err := e.v.ExecLua("return vim.api.nvim_buf_get_lines(0, 0, -1, false)", &got); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(got, "\n") != "# Title\n\nnew" {
-		t.Errorf("buffer after SetText = %q", got)
+		t.Errorf("buffer after ApplyLines = %q", got)
 	}
 	select {
-	case text := <-changed:
-		t.Errorf("SetText sent a change back: %q", text)
+	case l := <-changed:
+		t.Errorf("ApplyLines sent a change back: %+v", l)
 	case <-time.After(500 * time.Millisecond):
 	}
 
@@ -229,26 +234,71 @@ func eventNamed(t *testing.T, events chan [2]string, name string) string {
 
 const runbook = "# Setup\n\nSome prose.\n\n```sh {#a}\necho a\n```\n\n## More\n\n```sh {#b depends=a}\necho b\n```\n"
 
-func TestApplyEdits(t *testing.T) {
-	e := startTest(t, "one\ntwo\nthree\n", make(chan [2]string, 100))
-	// Typing on the first line meanwhile doesn't stop an edit lower down.
-	if err := e.v.ExecLua(`vim.api.nvim_buf_set_lines(0, 0, 1, false, {"one!"})`, nil); err != nil {
-		t.Fatal(err)
-	}
-	err := e.ApplyEdits("one\ntwo\nTHREE\nfour\n", []Edit{{Start: 2, End: 3, Old: []string{"three"}, New: []string{"THREE", "four"}}})
+func TestApplyLines(t *testing.T) {
+	lines := make(chan Lines, 10)
+	path := testNvim(t)
+	e, err := Start(Options{Path: path, Cols: 60, Rows: 20, Name: "mdsh://test.md", Text: "one\ntwo\nthree\n", Clean: true, Lines: func(l Lines) { lines <- l }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := bufLines(t, e), "one!\ntwo\nTHREE\nfour"; got != want {
-		t.Errorf("after the edit: %q, want %q", got, want)
+	t.Cleanup(func() { e.Close() })
+	if ok, err := e.ApplyLines(0, []LineEdit{{First: 0, Last: 0, Text: "zero\n"}, {First: 2, Last: 3, Text: "THREE\nfour\n"}}); !ok || err != nil {
+		t.Fatal(ok, err)
 	}
-	// An edit whose lines changed sets the whole text.
-	err = e.ApplyEdits("x\ny\n", []Edit{{Start: 0, End: 1, Old: []string{"nope"}, New: []string{"x"}}})
+	if got, want := bufLines(t, e), "zero\none\ntwo\nTHREE\nfour"; got != want {
+		t.Errorf("after the edits: %q, want %q", got, want)
+	}
+	// Edits against an older seq change nothing.
+	if ok, err := e.ApplyLines(0, []LineEdit{{First: 0, Last: 1, Text: "nope\n"}}); ok || err != nil {
+		t.Errorf("an edit at an old seq: %v, %v", ok, err)
+	}
+	// Typing not yet sent is sent instead.
+	if err := e.v.ExecLua(`vim.api.nvim_buf_set_lines(0, 1, 2, false, {"ONE"})`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := e.ApplyLines(1, []LineEdit{{First: 0, Last: 1, Text: "nope\n"}}); ok || err != nil {
+		t.Errorf("an edit with typing not sent: %v, %v", ok, err)
+	}
+	if got, want := wait(t, lines, "typing"), (Lines{Seq: 2, First: 1, Last: 2, Text: "ONE\n"}); got != want {
+		t.Errorf("typing sent as %+v, want %+v", got, want)
+	}
+	if ok, err := e.ApplyLines(2, []LineEdit{{First: 4, Last: 5, Text: ""}}); !ok || err != nil {
+		t.Fatal(ok, err)
+	}
+	if got, want := bufLines(t, e), "zero\nONE\ntwo\nTHREE"; got != want {
+		t.Errorf("after the last edit: %q, want %q", got, want)
+	}
+	// A page catching up has the text and the seq.
+	if text, seq, err := e.Snapshot(); text != "zero\nONE\ntwo\nTHREE\n" || seq != 3 || err != nil {
+		t.Errorf("Snapshot = %q, %d, %v", text, seq, err)
+	}
+}
+
+// TestTypedLines types in two places and checks that the one Lines it
+// sends makes the text Neovim has of the text it had.
+func TestTypedLines(t *testing.T) {
+	lines := make(chan Lines, 10)
+	path := testNvim(t)
+	start := "a\nb\nc\nd\ne\nf\n"
+	e, err := Start(Options{Path: path, Cols: 60, Rows: 20, Name: "mdsh://test.md", Text: start, Clean: true, Lines: func(l Lines) { lines <- l }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := bufLines(t, e), "x\ny"; got != want {
-		t.Errorf("after a stale edit: %q, want %q", got, want)
+	t.Cleanup(func() { e.Close() })
+	for _, lua := range []string{
+		`vim.api.nvim_buf_set_lines(0, 4, 5, false, {"E1", "E2"})`,
+		`vim.api.nvim_buf_set_lines(0, 1, 2, false, {})`,
+		`vim.api.nvim_buf_set_lines(0, 0, 0, false, {"top"})`,
+	} {
+		if err := e.v.ExecLua(lua, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	l := wait(t, lines, "typing")
+	old := strings.Split(strings.TrimSuffix(start, "\n"), "\n")
+	got := append(append(append([]string{}, old[:l.First]...), splitLines(l.Text)...), old[l.Last:]...)
+	if want := bufLines(t, e); strings.Join(got, "\n") != want {
+		t.Errorf("%+v makes %q of the text, want %q", l, got, want)
 	}
 }
 
@@ -268,17 +318,18 @@ func TestCalls(t *testing.T) {
 		return out
 	}
 
-	// jump puts the cursor on a line; state reports it, and the text.
+	// jump puts the cursor on a line; state reports it, and how many
+	// times the text was sent.
 	call("jump", 6, 0, true, 0)
 	var st struct {
-		Text string `json:"text"`
+		Seq  int    `json:"seq"`
 		Mode string `json:"mode"`
 		Line int    `json:"line"`
 	}
 	if err := json.Unmarshal([]byte(call("state")), &st); err != nil {
 		t.Fatal(err)
 	}
-	if st.Line != 6 || st.Text != runbook || st.Mode != "n" {
+	if st.Line != 6 || st.Seq != 0 || st.Mode != "n" {
 		t.Errorf("state = %+v", st)
 	}
 	if got := eventNamed(t, events, "cursor"); got != `{"line":6}` {

@@ -4,6 +4,7 @@
 // input methods arrive as text and everything else as keys.
 
 import { App } from "./api.js";
+import type { Version } from "./sync.js";
 
 interface Cell {
   text: string;
@@ -84,8 +85,9 @@ export class NvimPane {
   }
 
   // start starts the tab's Neovim at the pane's size and returns the
-  // text it started with.
-  async start(): Promise<string> {
+  // file's text and version, and Neovim's text and seq (NvimText in
+  // neovim.go).
+  async start(): Promise<{ text: string; version: Version; buffer: string; seq: number }> {
     const { cols, rows } = this.size();
     const theme = document.documentElement.dataset.theme;
     const dark = theme ? theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
