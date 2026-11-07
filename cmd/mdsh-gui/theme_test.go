@@ -73,7 +73,7 @@ var lookAttr = regexp.MustCompile(`data-look="(\w+)"`)
 // in the dark, so a token added to one can't be forgotten in another and
 // show the plain color through. Each palette must be the same for the
 // window as for the History pane. And a look's own tokens (--tty-*,
-// --bp-*, --gum-*) must be set in its dark palette as well as its light one.
+// --bp-*, --gum-*, --witch-*) must be set in its dark palette as well as its light one.
 func TestLookTokens(t *testing.T) {
 	plain := cssVars(t, "frontend/style.css", palette)
 	if len(plain["light"]) < 40 || len(plain["dark"]) < 40 {
@@ -98,6 +98,7 @@ func TestLookTokens(t *testing.T) {
 		{"Teletype", "tty", "frontend/teletype.css", "--tty-"},
 		{"Blueprint", "blueprint", "frontend/blueprint.css", "--bp-"},
 		{"Bubble Gum", "gum", "frontend/bubblegum.css", "--gum-"},
+		{"Witchcraft", "witch", "frontend/witchcraft.css", "--witch-"},
 	} {
 		sets := cssVars(t, look.file, palette)
 		prefix := look.attr + " "
@@ -143,6 +144,10 @@ func TestEditedSettings(t *testing.T) {
 	edited(&cur, settings.Settings{Look: "gum"})
 	if cur.Look != "gum" {
 		t.Errorf("gum look dropped: %q", cur.Look)
+	}
+	edited(&cur, settings.Settings{Look: "witch"})
+	if cur.Look != "witch" {
+		t.Errorf("witch look dropped: %q", cur.Look)
 	}
 	edited(&cur, settings.Settings{Look: "bogus", Theme: "bogus", LineSpacing: "huge", Accent: "red", HistoryPane: "sideways", HistoryFocus: "ring"})
 	if cur.Look != "" || cur.Theme != "" || cur.LineSpacing != "" || cur.Accent != "" || cur.HistoryPane != "" || cur.HistoryFocus != "" || cur.TextSize != 0 {
@@ -206,13 +211,14 @@ func contrast(a, b string) float64 {
 // red, the link on the window. The edge pair: the accent, which
 // draws the focus ring and the selected card's outline, on the window.
 // Blueprint and Teletype have known gaps, listed in the accessibility
-// audit; the plain look and Bubble Gum must pass.
+// audit; the plain look, Bubble Gum and Witchcraft must pass.
 func TestLookContrast(t *testing.T) {
 	text := [][2]string{{"--fg", "--bg"}, {"--muted", "--bg"}, {"--fg", "--code-bg"}, {"--muted", "--code-bg"}, {"--accent-fg", "--accent"}, {"--bad-fg", "--bad"}, {"--link", "--bg"}}
 	edge := [][2]string{{"--accent", "--bg"}}
 	for _, look := range []struct{ name, file, prefix string }{
 		{"plain", "frontend/style.css", ""},
 		{"Bubble Gum", "frontend/bubblegum.css", "gum "},
+		{"Witchcraft", "frontend/witchcraft.css", "witch "},
 	} {
 		sets := cssValues(t, look.file)
 		for _, scheme := range []string{"light", "dark"} {

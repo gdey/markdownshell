@@ -361,7 +361,9 @@ Each file opens in a tab of its own, with its own shells.
   Light or Dark), the look (Plain; Teletype: the site's typewriter
   face on fan-fold paper in the light theme and green phosphor in the
   dark; Blueprint: white lines on blue paper; Bubble Gum: Hubba Bubba
-  pink with bubbles across the page, or berry in the dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts (any installed; the code font any of one width), line spacing,
+  pink with bubbles across the page, or berry in the dark; Witchcraft:
+  a framed kraft-paper scroll against a sky of stars and crescent
+  moons, or deep plum and gold in the dark), the text size (80% to 200%; the outline widens with it), the interface and code fonts (any installed; the code font any of one width), line spacing,
   an accent color, the History pane's colors (the window's, inverted,
   or always dark) and, for Teletype, the paper's sprocket strips,
   ruled lines and card shadows; Editing for autosave after
@@ -557,6 +559,12 @@ About tab with the version, build, paths and tools.
 ![The Bubble Gum look with the History pane open under the document, its command added to the file as a block](../../site/static/images/gui/bubblegum-history.png)
 
 ![Settings › Look with Bubble Gum chosen: the bubbles and the shadows under cards can be turned off](../../site/static/images/gui/bubblegum-settings-look.png)
+
+![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](../../site/static/images/gui/witchcraft-light.png)
+
+![The Witchcraft look with the dark theme: the scroll in deep plum, ruled in gold](../../site/static/images/gui/witchcraft-dark.png)
+
+![Settings › Look with Witchcraft chosen: the stars and moons and the glow around cards can be turned off](../../site/static/images/gui/witchcraft-settings-look.png)
 
 ## Install
 
