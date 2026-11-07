@@ -4,9 +4,9 @@ name: Homebrew tap
 # release into gdey/homebrew-tap, so that
 #   brew install gdey/tap/mdsh
 #   brew install --cask gdey/tap/mdsh
-# get the new version. It runs when a release is published, not when
-# goreleaser drafts it, so a draft can still be looked over first. Run it
-# by hand with a tag to redo one.
+# get the new version. release.yml calls it once the release is
+# published; it also runs when a release is published by hand, and from
+# the Actions tab with a tag to redo one.
 #
 # It needs a HOMEBREW_TAP_TOKEN secret: a fine-grained token with
 # contents read and write on gdey/homebrew-tap.
@@ -14,6 +14,11 @@ name: Homebrew tap
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       tag:

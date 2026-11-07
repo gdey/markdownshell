@@ -1,23 +1,70 @@
 name: Release
 
+# Releases mdsh when a release-prep PR merges. The PR moves Unreleased in
+# CHANGELOG.md into a dated "## [X.Y.Z] - YYYY-MM-DD" section; when that
+# lands on main and vX.Y.Z isn't tagged yet, this builds the CLI and the
+# signed desktop app, tags the merge commit vX.Y.Z, publishes the GitHub
+# release with that section as its notes, and updates the Homebrew tap.
+# A push to main whose newest section is already tagged does nothing.
+#
+# Pushing a vX.Y.Z tag by hand, or running this from the Actions tab,
+# releases that version the same way.
+
 on:
   push:
+    branches: [main]
+    paths: [CHANGELOG.md]
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+# One release at a time, and never cancel one half way.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      release: ${{ steps.v.outputs.release }}
     steps:
+      - uses: actions/checkout@v4
       - id: v
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            # The newest dated section; Unreleased has no date.
+            version="$(sed -n 's/^## \[\([0-9][0-9.]*\)\] - [0-9-]*$/\1/p' CHANGELOG.md | head -n 1)"
+            if [ -z "$version" ]; then
+              echo "CHANGELOG.md has no dated version section" >&2
+              exit 1
+            fi
+          fi
+          tag="v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" != tag ] && git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag is already tagged: nothing to release"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag already has a release: nothing to release"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "releasing $tag"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
 
   gui:
     needs: version
+    if: needs.version.outputs.release == 'true'
     uses: ./.github/workflows/gui-packages.yml
     with:
       version: ${{ needs.version.outputs.version }}
@@ -25,8 +72,10 @@ jobs:
     secrets: inherit
 
   release:
-    needs: gui
+    needs: [version, gui]
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,14 +85,14 @@ jobs:
           go-version-file: go.mod
       - name: Release notes from CHANGELOG.md
         run: |
-          # The section under "## [X.Y.Z]" for tag vX.Y.Z, up to the next
-          # heading or the link references at the end.
-          awk -v v="${GITHUB_REF_NAME#v}" '
+          # The section under "## [X.Y.Z]", up to the next heading or the
+          # link references at the end.
+          awk -v v="${TAG#v}" '
             /^## \[/ { p = index($0, "[" v "]") > 0; next }
             /^\[[^]]*\]: / { p = 0 }
             p' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           if ! grep -q . "$RUNNER_TEMP/notes.md"; then
-            echo "CHANGELOG.md has no section for $GITHUB_REF_NAME" >&2
+            echo "CHANGELOG.md has no section for $TAG" >&2
             exit 1
           fi
       - name: mdsh-gui's packages
@@ -52,6 +101,16 @@ jobs:
           pattern: gui-*
           path: gui-dist
           merge-multiple: true
+      # Only once the packages have built, so a failed build leaves no tag.
+      # A tag pushed with the workflow's own token starts no other
+      # workflow, so this doesn't run the release a second time.
+      - name: Tag
+        if: github.ref_type != 'tag'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "mdsh $TAG"
+          git push origin "$TAG"
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -59,3 +118,13 @@ jobs:
           args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ needs.version.outputs.tag }}
+
+  # Called here because a release published with the workflow's own token
+  # doesn't start tap.yml's "release: published" trigger.
+  tap:
+    needs: [version, release]
+    uses: ./.github/workflows/tap.yml
+    with:
+      tag: ${{ needs.version.outputs.tag }}
+    secrets: inherit

@@ -6,6 +6,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-07
+
+mdsh-gui keeps up with long documents. Scrolling is smoother, typing in
+the source view no longer stalls on a runbook of a few thousand lines,
+and documents of 100,000 lines and more open in seconds and stay
+editable. The app also stops losing what blocks set in their shells:
+Stop and `timeout=` interrupt the block rather than ending its shell,
+and a new Events tab in the Console says when and why a shell ended.
+Textboxes can grow with their text (`lines=fit`) and be dragged taller,
+and the docs gain a cheat sheet.
+
 ### Added
 
 - A [cheat sheet](docs/cheatsheet.md): every fence attribute, front
@@ -1286,7 +1297,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/gdey/markdownshell/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/gdey/markdownshell/compare/v1.2.0...v1.2.1

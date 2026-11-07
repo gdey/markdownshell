@@ -6,20 +6,29 @@ mdsh:
 ---
 # Release mdsh
 
-The steps for releasing mdsh itself. Run it from a checkout of main:
+The checks for releasing mdsh itself. A release happens when its
+release-prep PR merges: the PR moves `[Unreleased]` in `CHANGELOG.md`
+into a dated `## [X.Y.Z]` section, and once that is on main the release
+workflow builds everything, tags the merge commit, publishes the release
+and updates the Homebrew tap. Nobody tags by hand.
+
+Run this on the release-prep branch before merging it, to check the
+changelog is ready, or from a checkout of main:
 
 ```text
 mdsh examples/runbooks/mdsh-release.md                    # check only
 VERSION=v1.3.0 mdsh examples/runbooks/mdsh-release.md     # check another version
-PUSH=1 mdsh examples/runbooks/mdsh-release.md             # check, then tag and push
+PUSH=1 mdsh examples/runbooks/mdsh-release.md             # tag by hand, if the workflow didn't
 ```
 
 Without `PUSH` it only checks and changes nothing, which is how the tests
 run it. `VERSION` defaults to the newest release in `CHANGELOG.md`.
 
-Before running it, the release-prep PR should be merged: `CHANGELOG.md`
-has a dated `## [X.Y.Z]` section, `[Unreleased]` is empty, and the compare
-links at the bottom point at the new version.
+The release-prep PR is ready when `CHANGELOG.md` has a dated
+`## [X.Y.Z]` section, `[Unreleased]` is empty, and the compare links at
+the bottom point at the new version. The changelog checks below say so;
+the rows that need main (on main, matching origin) only matter for
+tagging by hand.
 
 ## Version
 
@@ -113,11 +122,13 @@ CI on main isn't checked here: look at the latest run on the
 [Actions page](https://github.com/gdey/markdownshell/actions?query=branch%3Amain)
 before pushing the tag.
 
-## Tag and push
+## Tag and push by hand
 
-Runs only with `PUSH` set, and asks first. Pushing the tag starts the
-release workflow, which builds the CLI for six targets and the desktop app
-packages, and makes a **draft** release with the notes above.
+Only needed when the release workflow didn't tag, for instance after its
+run was cancelled. Runs only with `PUSH` set, and asks first. Pushing the
+tag starts the same release workflow, which builds the CLI for six
+targets and the desktop app packages, publishes the release with the
+notes above, and updates the Homebrew tap.
 
 ```sh {#tag run={{$PUSH}} confirm="Tag and push the release?"}
 [ "$READY" = yes ] || { echo "not ready to tag: see the checks above" >&2; exit 1; }
@@ -126,13 +137,15 @@ git push origin "$VERSION"
 echo "pushed $VERSION"
 ```
 
-## After the tag
+## After the merge
 
 1. Watch the release workflow on the
    [Actions page](https://github.com/gdey/markdownshell/actions/workflows/release.yml).
-   If it fails, delete the tag (`git push --delete origin vX.Y.Z` and
-   `git tag -d vX.Y.Z`), fix main, and run this again.
-2. Open the draft on the
-   [Releases page](https://github.com/gdey/markdownshell/releases). Check
-   it has the six CLI archives, the `mdsh-gui` `.dmg`, `.zip` and
-   AppImage, and `checksums.txt`, then publish it.
+   If the packages fail to build, nothing is tagged: fix main and run the
+   workflow again from that page. If it fails after tagging, delete the
+   tag and the release (`git push --delete origin vX.Y.Z`), fix main, and
+   run it again.
+2. Check the release on the
+   [Releases page](https://github.com/gdey/markdownshell/releases) has
+   the six CLI archives, the `mdsh-gui` `.dmg`, `.zip` and AppImage, and
+   `checksums.txt`, and that `brew upgrade gdey/tap/mdsh` gets it.
