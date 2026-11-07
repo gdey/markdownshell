@@ -19,6 +19,17 @@ const MaxRecent = 10
 // MaxPlaces is how many files' window places are remembered.
 const MaxPlaces = 100
 
+// MaxFileViews is how many files' views are remembered.
+const MaxFileViews = 100
+
+// FileView is how a file was last shown: View is "rendered", "source"
+// or "both", and History is whether the History pane was open.
+type FileView struct {
+	File    string `json:"file"`
+	View    string `json:"view"`
+	History bool   `json:"history,omitempty"`
+}
+
 // Place is where a file's window was and how big, in the screen's
 // points. X and Y are its top left corner.
 type Place struct {
@@ -96,7 +107,8 @@ type Settings struct {
 	// History pane is on. Empty reads none.
 	HistoryRC string `json:"historyRC"`
 	// View is how a file opens: "rendered", "source" or "both".
-	// Empty keeps the view the last tab had.
+	// Empty opens a file as it was last shown (see FileViews), and a
+	// file not shown before in the rendered view.
 	View string `json:"view"`
 	// StartFolder is the folder the start screen lists when the app
 	// isn't started from a terminal. Empty means the last folder used.
@@ -120,6 +132,9 @@ type Settings struct {
 	// Places are where the windows of the files last shown alone in a
 	// new window were, newest first.
 	Places []Place `json:"places,omitempty"`
+	// FileViews are how the files shown last were left, newest first:
+	// the view and whether the History pane was open.
+	FileViews []FileView `json:"fileViews,omitempty"`
 	// SettingsWindow is the size the Settings window was left at, or
 	// nil for its default.
 	SettingsWindow *Size `json:"settingsWindow,omitempty"`
@@ -174,6 +189,7 @@ func (s Settings) clone() Settings {
 	s.Recent = slices.Clone(s.Recent)
 	s.Pinned = slices.Clone(s.Pinned)
 	s.Places = slices.Clone(s.Places)
+	s.FileViews = slices.Clone(s.FileViews)
 	if s.SettingsWindow != nil {
 		sz := *s.SettingsWindow
 		s.SettingsWindow = &sz
@@ -246,6 +262,30 @@ func (s *Settings) Placed(p Place) bool {
 	s.Places = slices.Insert(s.Places, 0, p)
 	if len(s.Places) > MaxPlaces {
 		s.Places = s.Places[:MaxPlaces]
+	}
+	return true
+}
+
+// FileView is how file was last shown, if that is remembered.
+func (s Settings) FileView(file string) (FileView, bool) {
+	i := slices.IndexFunc(s.FileViews, func(v FileView) bool { return v.File == file })
+	if i < 0 {
+		return FileView{}, false
+	}
+	return s.FileViews[i], true
+}
+
+// Viewed remembers how v.File is shown: v goes to the top of FileViews,
+// and the oldest are forgotten past MaxFileViews. It reports whether
+// that changed anything.
+func (s *Settings) Viewed(v FileView) bool {
+	if len(s.FileViews) > 0 && s.FileViews[0] == v {
+		return false
+	}
+	s.FileViews = slices.DeleteFunc(s.FileViews, func(w FileView) bool { return w.File == v.File })
+	s.FileViews = slices.Insert(s.FileViews, 0, v)
+	if len(s.FileViews) > MaxFileViews {
+		s.FileViews = s.FileViews[:MaxFileViews]
 	}
 	return true
 }

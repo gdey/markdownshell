@@ -357,7 +357,7 @@ Each file opens in a tab of its own, with its own shells.
 - **Settings** (mdsh › Settings… on macOS, Edit › Preferences… on
   Linux) has tabs: General for the
   view files open in (rendered, source or both; by default the view
-  the last tab had) and the start folder; Look for the theme (System,
+  the file was left in, rendered the first time) and the start folder; Look for the theme (System,
   Light or Dark), the look (Plain; Teletype: the site's typewriter
   face on fan-fold paper in the light theme and green phosphor in the
   dark; Blueprint: white lines on blue paper; Bubble Gum: Hubba Bubba
@@ -505,7 +505,9 @@ A `tty` block runs in a terminal in its card.
 
 View › History opens a terminal along the bottom. Each command typed
 there is added to the end of the file with its output, and each `#`
-line as prose.
+line as prose. Each file remembers whether its History pane was
+open: a file opens with it closed until you open it there, so opening
+a file doesn't start its shell unless you left History open in it.
 
 ![The History pane under a document: notes and commands typed in the pane, and the same notes as prose and commands as blocks with their output in the file](../../site/static/images/gui/history.png)
 

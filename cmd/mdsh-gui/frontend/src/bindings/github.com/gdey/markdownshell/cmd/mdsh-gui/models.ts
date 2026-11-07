@@ -184,6 +184,14 @@ export interface Doc {
      * environment the app started in (env.share with ...).
      */
     "envBanner": string;
+
+    /**
+     * LastView is how the file was last shown, "rendered", "source" or
+     * "both", or "" if that isn't remembered. LastHistory is whether
+     * its History pane was open then.
+     */
+    "lastView": string;
+    "lastHistory": boolean;
 }
 
 /**
