@@ -1,6 +1,9 @@
 // Command build bundles the frontend's TypeScript into frontend/bundle with
-// esbuild, without npm. go generate runs it after regenerating the
-// bindings:
+// esbuild, without npm, and makes what names the looks from their
+// folders in frontend/looks (see package looks): frontend/src/looks.gen.ts,
+// frontend/bundle/looks.css, the website's site/data/looks.json and the
+// GUI README's section on them. go generate runs it after regenerating
+// the bindings:
 //
 //	go generate
 //
@@ -12,10 +15,13 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
 )
 
 // vendored are the packages that frontend/vendor/codemirror.js holds, and
@@ -33,6 +39,13 @@ func main() {
 }
 
 func build() error {
+	all, err := looks.Load(os.DirFS("frontend/looks"))
+	if err != nil {
+		return err
+	}
+	if err := writeLooks(all); err != nil {
+		return err
+	}
 	if err := os.RemoveAll("frontend/bundle"); err != nil {
 		return err
 	}
@@ -77,6 +90,67 @@ func build() error {
 	opts.Splitting = false
 	if res := api.Build(opts); len(res.Errors) > 0 {
 		return errors.New("esbuild failed")
+	}
+	return bundleLooks(all)
+}
+
+// writeLooks writes the files made from the looks' manifests.
+func writeLooks(all []looks.Look) error {
+	ts, err := looks.TS(all)
+	if err != nil {
+		return err
+	}
+	site, err := looks.SiteData(all)
+	if err != nil {
+		return err
+	}
+	readme, err := os.ReadFile("README.md")
+	if err != nil {
+		return err
+	}
+	if readme, err = looks.Readme(readme, all); err != nil {
+		return err
+	}
+	if err := os.MkdirAll("../../site/data", 0o755); err != nil {
+		return err
+	}
+	for name, b := range map[string][]byte{
+		"frontend/src/looks.gen.ts":  ts,
+		"../../site/data/looks.json": site,
+		"README.md":                  readme,
+	} {
+		if err := os.WriteFile(name, b, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// bundleLooks bundles every look's look.css, in the looks' order, into
+// frontend/bundle/looks.css, the one stylesheet for the looks that the
+// pages load after style.css.
+func bundleLooks(all []looks.Look) error {
+	var imports strings.Builder
+	for _, l := range all {
+		if l.ID != "" {
+			fmt.Fprintf(&imports, "@import \"./%s/look.css\";\n", l.Dir)
+		}
+	}
+	res := api.Build(api.BuildOptions{
+		Stdin: &api.StdinOptions{
+			Contents:   imports.String(),
+			ResolveDir: "frontend/looks",
+			Sourcefile: "looks.css",
+			Loader:     api.LoaderCSS,
+		},
+		Outfile:  "frontend/bundle/looks.css",
+		Bundle:   true,
+		Banner:   map[string]string{"css": "/* " + looks.Generated + " */"},
+		Write:    true,
+		LogLevel: api.LogLevelWarning,
+	})
+	if len(res.Errors) > 0 {
+		return errors.New("esbuild failed on the looks")
 	}
 	return nil
 }

@@ -1,0 +1,54 @@
+{
+  "looks": [
+    {
+      "id": "",
+      "name": "Plain",
+      "since": "1.0",
+      "tagline": "for every day",
+      "hero": {
+        "light": "hero-light.png",
+        "dark": "hero-dark.png",
+        "alt": "The Plain look"
+      }
+    },
+    {
+      "id": "tty",
+      "name": "Teletype",
+      "since": "1.3",
+      "tagline": "for fan-fold paper and green phosphor",
+      "hero": {
+        "light": "hero-paper.png",
+        "dark": "hero-phosphor.png",
+        "alt": "The Teletype look"
+      }
+    },
+    {
+      "id": "blueprint",
+      "name": "Blueprint",
+      "since": "1.3",
+      "tagline": "for white lines on drafting blue",
+      "hero": {
+        "light": "hero-blueprint.png",
+        "dark": "hero-blueprint-dark.png",
+        "alt": "The Blueprint look"
+      }
+    },
+    {
+      "id": "gum",
+      "name": "Bubble Gum",
+      "since": "1.4",
+      "tagline": "for Hubba Bubba pink",
+      "hero": {
+        "light": "hero-bubblegum.png",
+        "dark": "hero-bubblegum-dark.png",
+        "alt": "The Bubble Gum look: pink paper with bubbles, puffy cards and pill buttons"
+      }
+    },
+    {
+      "id": "witch",
+      "name": "Witchcraft",
+      "since": "1.5",
+      "tagline": "for a purple grimoire under the moon"
+    }
+  ]
+}

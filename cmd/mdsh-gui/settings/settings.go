@@ -56,10 +56,8 @@ type Settings struct {
 	NeovimOwnColors bool `json:"neovimOwnColors"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
-	// Look is "tty" for the Teletype look, paper in the light theme and
-	// phosphor in the dark, "blueprint" for white lines on blueprint
-	// blue, "gum" for Bubble Gum pink, or "witch" for Witchcraft
-	// purple; empty is the plain look.
+	// Look is a look's id from its look.json in frontend/looks, such as
+	// "tty" for Teletype; empty is the plain look.
 	Look string `json:"look"`
 	// TextSize is the text's size in percent, 80 to 150; 0 is the
 	// look's own (100 for plain, 115 for Teletype).

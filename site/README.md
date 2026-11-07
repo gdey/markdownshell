@@ -31,7 +31,15 @@ also holds the layout). `<html data-theme="tty">` or `"plain"` picks
 it; the `[tty] [plain]` switch in the header saves the choice in
 `localStorage`, and a few lines in `<head>` read it before the first
 paint. The teletype palette is the app's Teletype look, from
-`cmd/mdsh-gui/frontend/teletype.css`; keep the two in step.
+`cmd/mdsh-gui/frontend/looks/teletype/look.css`; keep the two in step.
+
+## The app's looks
+
+The home page's looks band and the `{{< looks >}}` shortcode ("Plain,
+Teletype, … or Witchcraft") read `data/looks.json`, which `go generate`
+in `cmd/mdsh-gui` makes from the app's looks; don't edit it by hand. A
+look's band picture is its `hero` in its `look.json`; see
+[`docs/looks.md`](../docs/looks.md).
 
 ## The changelog page and the cheat sheet
 

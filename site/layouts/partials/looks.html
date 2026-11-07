@@ -1,0 +1,15 @@
+{{- /* The app's looks, from site/data/looks.json (made from
+   cmd/mdsh-gui/frontend/looks by go generate), as a list in a sentence:
+   "Plain, Teletype, Blueprint or Bubble Gum". Takes a dict: taglines
+   (true for "Plain for every day, Teletype for fan-fold paper, …",
+   joined by commas) and or (the last joining word, "or" by default). */ -}}
+{{- $looks := site.Data.looks.looks -}}
+{{- $n := len $looks -}}
+{{- $or := .or | default "or" -}}
+{{- range $i, $l := $looks -}}
+  {{- if $.taglines -}}
+    {{- if $i }}, {{ end }}{{ $l.name }} {{ $l.tagline -}}
+  {{- else -}}
+    {{- if and $i (eq (add $i 1) $n) }} {{ $or }} {{ else if $i }}, {{ end }}{{ $l.name -}}
+  {{- end -}}
+{{- end -}}

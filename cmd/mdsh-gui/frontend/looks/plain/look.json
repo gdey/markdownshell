@@ -1,0 +1,12 @@
+{
+  "id": "",
+  "name": "Plain",
+  "order": 0,
+  "since": "1.0",
+  "description": "Plain is the everyday look: the system's own face, white in the light theme and near black in the dark.",
+  "tagline": "for every day",
+  "hero": {"light": "hero-light.png", "dark": "hero-dark.png", "alt": "The Plain look"},
+  "screenshots": [
+    {"file": "dark.png", "alt": "The deploy runbook in the dark theme"}
+  ]
+}

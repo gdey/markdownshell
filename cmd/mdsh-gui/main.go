@@ -27,6 +27,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/lsp"
@@ -39,10 +40,26 @@ import (
 //go:generate go run ./internal/build
 
 // build/appicon.svg is the app's icon, for the Settings window's About
-// tab.
+// tab. frontend/looks describe the looks, whose CSS is
+// bundled into frontend/bundle/looks.css.
 //
-//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/style.css frontend/teletype.css frontend/blueprint.css frontend/bubblegum.css frontend/witchcraft.css frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
+//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/style.css frontend/looks frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
 var frontend embed.FS
+
+// allLooks are the looks in frontend/looks; see package looks.
+var allLooks = loadLooks()
+
+func loadLooks() []looks.Look {
+	dir, err := fs.Sub(frontend, "frontend/looks")
+	if err != nil {
+		panic(err)
+	}
+	all, err := looks.Load(dir)
+	if err != nil {
+		panic("frontend/looks: " + err.Error())
+	}
+	return all
+}
 
 func main() {
 	// --lsp serves the language server on stdin and stdout, for the
