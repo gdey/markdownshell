@@ -742,8 +742,16 @@ func (a *App) Names(ctx context.Context) (notebook.Names, error) {
 	return n.Names(), nil
 }
 
-// CheckInfo checks the attributes in a fence's info string.
-func (a *App) CheckInfo(info string) []notebook.Problem { return notebook.CheckInfo(info) }
+// CheckInfos checks the attributes in fences' info strings. The source
+// pane asks about every new one in one call: a long document has
+// thousands, and asking about each in turn took seconds.
+func (a *App) CheckInfos(infos []string) [][]notebook.Problem {
+	out := make([][]notebook.Problem, len(infos))
+	for i, info := range infos {
+		out[i] = notebook.CheckInfo(info)
+	}
+	return out
+}
 
 // SourceBlocks lists the blocks in the source pane's text, for
 // completing and checking depends=.

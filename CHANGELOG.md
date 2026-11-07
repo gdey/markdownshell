@@ -8,6 +8,59 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- mdsh-gui scrolls long documents more smoothly. Moving the pointer
+  over a card no longer lays the whole document out again, each frame
+  paints much less of the page, the dependency lines redraw several
+  times faster when the page changes size, and the source view finds
+  the matching cell without measuring every cell above it.
+  Nothing on screen changes:
+
+  ![A runbook in mdsh-gui with dependency lines, fold buttons and an output's copy button shown on hover, drawn as before](docs/changelog/long-documents.png)
+- Typing in mdsh-gui's source view no longer stalls on a long document.
+  Each pause in the typing drew every card of the rendered view again,
+  which on a runbook of a few thousand lines took long enough to swallow
+  keystrokes. Now only the cards whose markdown changed are drawn again.
+  The fence checker also stopped asking for every fence's attributes
+  again after each pause, and moving the cursor along a line no longer
+  re-selects its block on every key.
+
+  ![The source view and the rendered view side by side, a heading edited in one and drawn in the other, in a 2,900-line runbook](docs/changelog/typing-long-documents.png)
+- mdsh-gui laid out a document's cells in time that grew with the
+  square of its length, and does that after every pause in typing: a
+  10,000-line runbook took 3.5 seconds, and one mostly of prose 10. Each
+  cell asked the document questions, such as where a block could move to
+  and what uses it, that read the whole document again. It now works
+  those out once, and the same documents take 30 and 70 milliseconds.
+- mdsh-gui opens and edits documents of 100,000 lines and more. A
+  100,000-line runbook took 23 seconds to open with the source view and
+  now takes 8, typing in it is about three times as quick, and one of a
+  million lines, which never finished opening, opens in about a minute
+  and a half. Cards out of sight are no longer laid out or painted,
+  copying folds between the views and placing the dependency lines no
+  longer take time that grows with the square of the length, the source
+  view's fold arrows are worked out again only around each edit, and the
+  fence checker asks Go about every new fence in one call.
+- Adding a block in mdsh-gui's source view, such as typing a ```` ```text ````
+  fence to paste captured output into, no longer redraws every card
+  below it. Each block after it was numbered anew, and an unnamed one
+  renamed for its new line, which drew its card again; now the number
+  and name are changed in place. While the new fence is still open, and
+  everything below it reads as its code, the rendered view waits for the
+  typing to settle before drawing it.
+- mdsh-gui's rendered view now follows typing in the source view of a
+  10,000-line document within about a fifth of a second, rather than
+  half a second after you stop, with no stall in between; a document
+  that takes longer to draw still waits for a pause. On 100,000 lines
+  keys take a third of the time they did. The source pane colors the
+  code in fences only in documents of up to 20,000 lines, as parsing it
+  again after each key was most of a key's time in longer ones, and the
+  dependency lines are drawn near the view rather than all of them.
+- mdsh-gui draws the cards of a document with more than 1,000 parts
+  only near the view, and the rest as empty cards of about their size
+  until you scroll to them. A 100,000-line document of prose and short
+  blocks made over a million elements, which on a Mac slowed every key
+  to seconds and used gigabytes of memory; it now makes about 30,000,
+  and opens in 2 seconds rather than 8.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

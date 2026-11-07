@@ -2,9 +2,6 @@ package doc
 
 import (
 	"sort"
-
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/text"
 )
 
 // Heading is a top-level heading and the section it opens.
@@ -19,22 +16,7 @@ type Heading struct {
 // a block quote, the front matter, or a block's output aren't sections
 // and are left out.
 func (d *Document) Headings() []Heading {
-	body := d.bodyStart()
-	root := gfm.Parser().Parse(text.NewReader(d.Src))
-	var hs []Heading
-	for c := root.FirstChild(); c != nil; c = c.NextSibling() {
-		h, ok := c.(*ast.Heading)
-		if !ok {
-			continue
-		}
-		s, ok := nodeStart(c, d.Src)
-		if !ok || s < body || d.inside(s) {
-			continue
-		}
-		hs = append(hs, Heading{Level: h.Level, Span: Span{s, len(d.Src)}})
-	}
-	CloseSections(hs, len(d.Src))
-	return hs
+	return d.NewIndex().Headings()
 }
 
 // CloseSections sets each heading's Span.End to the start of the next

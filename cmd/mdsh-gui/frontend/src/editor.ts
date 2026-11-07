@@ -7,7 +7,7 @@ import { autocompletion, type Completion, type CompletionContext, type Completio
 import { type Diagnostic, linter } from "@codemirror/lint";
 import { Vim } from "@replit/codemirror-vim";
 
-import { App, AttrKind, type AttrSpec, type Names, type SourceBlock } from "./api.js";
+import { App, AttrKind, type AttrSpec, type Names, type Problem, type SourceBlock } from "./api.js";
 
 // fence matches an opening fence line: the fence, then the info string.
 const fence = /^(\s*(?:`{3,}|~{3,}))(.*)$/;
@@ -107,7 +107,7 @@ async function sourceBlocks(state: EditorState): Promise<SourceBlock[] | null> {
 
 // checkDepends underlines the names in a fence's depends= that aren't a
 // block that runs: mdsh ignores them.
-function checkDepends(blocks: SourceBlock[], from: number, info: string, out: Diagnostic[]) {
+function checkDepends(blocks: Map<string, SourceBlock>, from: number, info: string, out: Diagnostic[]) {
   const m = dependsRe.exec(info);
   if (!m) return;
   const quoted = m[2] !== undefined;
@@ -117,12 +117,18 @@ function checkDepends(blocks: SourceBlock[], from: number, info: string, out: Di
     const start = at + part.indexOf(name);
     at += part.length + 1;
     if (!name) continue;
-    const b = blocks.find((b) => b.id === name);
+    const b = blocks.get(name);
     if (b?.runs) continue;
     const message = b ? `${name} is an input, which never runs, so depends= ignores it` : `There is no block ${name}, so depends= ignores it`;
     out.push({ from: start, to: start + name.length, severity: "error", message });
   }
 }
+
+// checked holds the problems Go finds in each info string in the text,
+// or is finding, so that Go is asked only about the ones that are new: a
+// long document has thousands of fences, and their info strings rarely
+// change. A check that starts while another waits shares its answers.
+let checked = new Map<string, Promise<Problem[]>>();
 
 // checkInfo checks the attributes of every fence with some, as mdsh's
 // language server (the lsp package) does for the Neovim source pane.
@@ -132,23 +138,49 @@ async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
   // The blocks are only needed, and parsed, if a depends= is there.
   const blocks = doc.toString().includes("depends=") ? await sourceBlocks(state) : null;
   const fences = new Set(blocks?.map((b) => b.line));
+  const byID = new Map<string, SourceBlock>();
+  for (const b of blocks ?? []) if (!byID.has(b.id)) byID.set(b.id, b);
+  const infos: { n: number; from: number; text: string }[] = [];
+  let n = 0;
+  let from = 0;
+  for (const it = doc.iterLines(); !it.next().done; from += it.value.length + 1) {
+    n++;
+    if (!it.value.includes("{")) continue;
+    const r = infoRange(state, from);
+    if (r && r.text.trim()) infos.push({ n, ...r });
+  }
+  const now = new Map<string, Promise<Problem[]>>();
+  const fresh: string[] = [];
+  for (const { text } of infos) {
+    if (now.has(text)) continue;
+    const p = checked.get(text);
+    if (p) now.set(text, p);
+    else fresh.push(text);
+  }
+  if (fresh.length) {
+    const asked = App.CheckInfos(fresh);
+    // A check that failed is asked again next time.
+    const forget = (text: string) => () => {
+      checked.delete(text);
+      return [];
+    };
+    fresh.forEach((text, i) => now.set(text, asked.then((all) => all?.[i] ?? [], forget(text))));
+  }
+  checked = now;
+  const problems = new Map<string, Problem[]>();
+  for (const [text, p] of now) problems.set(text, await p);
   const vars = new Map<string, number>(); // var= names, and the line binding each
-  for (let n = 1; n <= doc.lines; n++) {
-    const line = doc.line(n);
-    if (!line.text.includes("{")) continue;
-    const r = infoRange(state, line.from);
-    if (!r || !r.text.trim()) continue;
-    const problems = (await App.CheckInfo(r.text)) ?? [];
-    for (const p of problems) {
+  for (const r of infos) {
+    for (const p of problems.get(r.text) ?? []) {
       out.push({ from: r.from + p.from, to: r.from + p.to, severity: p.severity === "error" ? "error" : "warning", message: p.message });
     }
-    if (blocks && fences.has(n)) checkDepends(blocks, r.from, r.text, out);
+    if (blocks && fences.has(r.n)) checkDepends(byID, r.from, r.text, out);
     // Only one textbox or choice can bind a variable, or the last would
     // quietly win.
     const v = /^\s*(?:textbox|choice)\b/.test(r.text) && !r.text.includes("<include") ? /[{\s]var="?([A-Za-z0-9_]+)"?/.exec(r.text) : null;
     if (!v) continue;
     const first = vars.get(v[1]);
-    if (first === undefined) vars.set(v[1], n);
+    if (first === undefined) vars.set(v[1], r.n);
     else out.push({ from: r.from + v.index + 1, to: r.from + v.index + v[0].length, severity: "error", message: `var=${v[1]} is already bound on line ${first}, so this one is ignored` });
   }
   return out;

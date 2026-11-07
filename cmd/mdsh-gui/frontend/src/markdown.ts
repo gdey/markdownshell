@@ -28,7 +28,8 @@ export interface MarkdownEditorOptions {
   // extensions are added to the editor's own, such as the source pane's
   // run buttons.
   extensions?: Extension[];
-  onChange?(text: string): void;
+  // onChange is called as the text is typed in.
+  onChange?(): void;
   // onCursor reports the line the cursor moved to.
   onCursor?(line: number): void;
   // write applies the edit and saves the file, for :w.
@@ -95,6 +96,8 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
   const vimMode = new Compartment();
   const spell = new Compartment();
   const escape = new Compartment();
+  const language = new Compartment();
+  let nested = opts.text.split("\n", nestedLines + 1).length <= nestedLines;
   const escapeKey = (on: boolean): Extension => (on ? [] : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]));
   let quiet = false; // load is changing the text
   const sync = new Synced(opts.text);
@@ -111,7 +114,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         history(),
         drawSelection(),
         highlightActiveLine(),
-        markdown({ codeLanguages }),
+        language.of(markdownLanguage(nested)),
         editorLook,
         attrMarks,
         Prec.high(keymap.of([{ key: "Mod-Enter", run: modEnter(opts) }, ...barKeys, { key: "Tab", run: tableTab(1) }, { key: "Shift-Tab", run: tableTab(-1) }])),
@@ -124,9 +127,13 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         // The name a screen reader says for the editor's text.
         EditorView.contentAttributes.of({ "aria-label": "Markdown source" }),
         EditorView.updateListener.of((u) => {
+          if (u.docChanged && (u.state.doc.lines <= nestedLines) !== nested) {
+            nested = !nested;
+            queueMicrotask(() => view.dispatch({ effects: language.reconfigure(markdownLanguage(nested)) }));
+          }
           if (u.docChanged && !quiet) {
             sync.typed(u.changes);
-            opts.onChange?.(u.state.doc.toString());
+            opts.onChange?.();
           }
           if (u.selectionSet || u.docChanged) opts.onCursor?.(u.state.doc.lineAt(u.state.selection.main.head).number);
         }),
@@ -171,6 +178,18 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
       view.destroy();
     },
   };
+}
+
+// nestedLines is the longest a document can be, in lines, for the code
+// in its fences to be parsed as their languages, for their colors. On a
+// longer one, parsing every fence's code again after each key took most
+// of the key's time: a 100,000-line runbook took 50 to 80 milliseconds a
+// key. Its fences' code is shown plain in the source pane, and in color
+// in the rendered view as always.
+const nestedLines = 20000;
+
+function markdownLanguage(nested: boolean): Extension {
+  return nested ? markdown({ codeLanguages }) : markdown();
 }
 
 // Markdown bar commands. Each inserts or wraps markdown at the cursor or

@@ -102,63 +102,14 @@ func (d *Document) cut(s, e int) []byte {
 // the document uses its id, such as a depends= or a placeholder. It is
 // nil when b can go, or when b isn't a top-level block.
 func (d *Document) DeleteBlockers(b *Block) []string {
-	u, err := d.Unit(b)
-	if err != nil {
-		return nil
-	}
-	return d.users(b.ID, u)
+	return d.NewIndex().DeleteBlockers(b)
 }
 
 // users names what outside span uses block id: blocks that depend on it
 // or read it in a condition, tapes for it, placeholders, and sections or
 // folds whose condition reads it.
 func (d *Document) users(id string, span Span) []string {
-	var out []string
-	add := func(s string) {
-		if !slices.Contains(out, s) {
-			out = append(out, s)
-		}
-	}
-	in := func(pos int) bool { return pos >= span.Start && pos < span.End }
-	for _, p := range d.Placeholders {
-		if p.BlockID == id && !in(p.Span.Start) {
-			add(p.Ref.String())
-		}
-	}
-	for _, o := range d.Blocks {
-		if in(o.Span.Start) {
-			continue
-		}
-		if slices.Contains(o.Depends(), id) {
-			add(d.name(o) + "'s depends=")
-		}
-		for _, a := range condAttrs {
-			if c, ok := o.Cond(a); ok && c.Ref != nil && c.Ref.BlockID == id {
-				add(fmt.Sprintf("%s's %s=", d.name(o), a))
-			}
-		}
-		if o.IsTape() && o.Attrs["for"] == id {
-			add("the tape at line " + fmt.Sprint(lineNo(d.Src, o.Span.Start)))
-		}
-		if o.IsTape() && !o.IsInclude() {
-			for _, r := range TextRefs(o.Body) {
-				if r.BlockID == id {
-					add(fmt.Sprintf("the tape at line %d", lineNo(d.Src, o.Span.Start)))
-				}
-			}
-		}
-	}
-	for _, sec := range d.Sections {
-		if sec.Cond.Ref != nil && sec.Cond.Ref.BlockID == id {
-			add(fmt.Sprintf("the mdsh:if at line %d", lineNo(d.Src, sec.If.Start)))
-		}
-	}
-	for _, f := range d.Folds {
-		if f.Cond.Ref != nil && f.Cond.Ref.BlockID == id {
-			add(fmt.Sprintf("the mdsh:collapse at line %d", lineNo(d.Src, f.Span.Start)))
-		}
-	}
-	return out
+	return d.NewIndex().users(id, span)
 }
 
 // countCopies is how many output copies in d are of block id.

@@ -292,6 +292,11 @@ button.fold svg, #outline .mark.fold svg { width: 12px; height: 12px; fill: curr
 .heading-cell .fold-note:empty { display: none; }
 .heading-cell button.run-section { margin-left: 6px; padding: 2px 5px; vertical-align: middle; color: var(--accent); opacity: 0.55; }
 .heading-cell:hover button.run-section, .heading-cell.selected button.run-section { opacity: 1; }
+/* Buttons that a hover shows by their opacity are stacking contexts
+   whatever their opacity, so showing one only paints it: going to 1 and
+   back would otherwise lay the whole document out again, on every card
+   the pointer crosses as a long document scrolls under it. */
+.heading-cell button.run-section, .block .output-tools > button.copy-output { isolation: isolate; }
 .heading-cell button.run-section svg { width: 12px; height: 12px; fill: currentColor; display: block; }
 .heading-cell.selected { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 #doc > .in-fold { display: none !important; }
@@ -317,6 +322,26 @@ th, td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; v
 th { background: var(--code-bg); }
 
 .block { border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; background: var(--bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+/* Each card and heading is a stacking context, so painting a frame
+   walks the layers inside one (its fold buttons, its scrolling code)
+   only when it is on screen, not every card's in the document. A
+   heading's fold button sits in the margin over the dependency lines'
+   clear layer (#deps-ui, z-index 1), so its heading stacks above that;
+   a card's buttons are inside the card, clear of the lines. */
+#doc > .block { isolation: isolate; }
+/* A card out of sight is neither laid out nor painted, only kept at the
+   size it last had, or else the size drawCell guesses from its lines, so
+   the page's work as a long document changes is for the cards in view.
+   A card clips what is in it already, so containing its paint changes
+   nothing. */
+#doc > .block { content-visibility: auto; contain-intrinsic-size: auto var(--guess, 120px); }
+/* A card of a long document not drawn yet, as it's far from the view:
+   an empty card about its height (fill in app.ts). It has nothing to
+   skip or stack, and WebKit, keeping track of every card that skips its
+   content when out of sight, took over a second a key on a document of
+   14,000 block stubs. */
+#doc > .stub { box-sizing: border-box; height: var(--guess, 64px); content-visibility: visible; contain-intrinsic-size: none; isolation: auto; }
+#doc > .heading-cell { z-index: 2; }
 .block.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 .block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* The trash keeps its place while hidden: if it took space only once

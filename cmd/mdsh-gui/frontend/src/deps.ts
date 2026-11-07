@@ -110,6 +110,7 @@ export function initDeps(scrollView: HTMLElement, h: Host) {
   };
   const bar = el("div", { id: "deps-bar" }, toggle);
   scroll.prepend(bar, svg, ui);
+  scroll.addEventListener("scroll", paintNear, { passive: true });
   const ro = new ResizeObserver(() => drawDeps());
   ro.observe(scroll);
   const main = scroll.querySelector("main");
@@ -216,16 +217,40 @@ export function markDeps() {
 // where its own lines leave and are dragged from, and the bottom one,
 // where lines from the blocks that depend on it arrive.
 
-// headY is the y of a card's top anchor.
+// headY is the y of a card's top anchor. Every head row is drawn alike,
+// so one is measured, and the others are found from their cards: a card
+// out of sight isn't laid out, and measuring what is inside it would lay
+// it out, which, for every card of a long document, took minutes.
 function headY(card: HTMLElement, top: number): number {
-  const head = card.querySelector(":scope > .head") ?? card;
-  const r = head.getBoundingClientRect();
-  return r.top + Math.min(r.height / 2, 14) - top;
+  const box = rect(card);
+  if (!card.classList.contains("block")) return box.top + Math.min(box.height / 2, 14) - top;
+  if (headAt === undefined) {
+    // A card not drawn yet, a stub, has no head row to measure.
+    const head = card.querySelector(":scope > .head");
+    if (!head) return box.top + (lastHeadAt ?? 14) - top;
+    const r = head.getBoundingClientRect();
+    headAt = lastHeadAt = r.top - box.top + Math.min(r.height / 2, 14);
+  }
+  return box.top + headAt - top;
 }
+
+// rect is card's box, measured once a draw.
+function rect(card: HTMLElement): DOMRect {
+  let r = rects.get(card);
+  if (!r) rects.set(card, (r = card.getBoundingClientRect()));
+  return r;
+}
+
+let rects = new Map<HTMLElement, DOMRect>();
+
+// headAt is how far below its card's top a head row's anchor is, for
+// this draw.
+let headAt: number | undefined;
+let lastHeadAt: number | undefined;
 
 // footY is the y of a card's bottom anchor.
 function footY(card: HTMLElement, top: number): number {
-  const r = card.getBoundingClientRect();
+  const r = rect(card);
   return r.bottom - Math.min(r.height / 2, 12) - top;
 }
 
@@ -283,7 +308,8 @@ function draw() {
     layer.setAttribute("viewBox", `0 0 ${width} ${height}`);
   }
 
-  type Line = Edge & { a: Anchor; b: Anchor; lane: number };
+  headAt = undefined;
+  rects = new Map();
   const lines: Line[] = [];
   for (const e of edges) {
     const a = anchorOf(e.from, top, "top");
@@ -292,14 +318,27 @@ function draw() {
   }
   // Lanes: the shortest lines nearest the cards, and a line takes the
   // first lane where no line already there runs over the same rows.
-  const lanes: Line[][] = [];
+  // A lane's lines don't overlap, so kept in order down the page, a line
+  // can only run over the ones either side of where it would go.
+  const lanes: { lo: number; hi: number }[][] = [];
   const span = (l: Line) => Math.abs(l.a.y - l.b.y);
   for (const l of [...lines].sort((p, q) => span(p) - span(q))) {
     const lo = Math.min(l.a.y, l.b.y);
     const hi = Math.max(l.a.y, l.b.y);
     let i = 0;
-    while (lanes[i]?.some((o) => Math.min(o.a.y, o.b.y) < hi && lo < Math.max(o.a.y, o.b.y))) i++;
-    (lanes[i] ??= []).push(l);
+    for (; ; i++) {
+      const lane = (lanes[i] ??= []);
+      let a = 0;
+      let b = lane.length;
+      while (a < b) {
+        const m = (a + b) >> 1;
+        if (lane[m].lo < lo) a = m + 1;
+        else b = m;
+      }
+      if ((a > 0 && lane[a - 1].hi > lo) || (a < lane.length && lane[a].lo < hi && lo < lane[a].hi)) continue;
+      lane.splice(a, 0, { lo, hi });
+      break;
+    }
     l.lane = i;
   }
   // The side: the left margin when the lanes fit there, else the right
@@ -317,6 +356,38 @@ function draw() {
   // The button sits over the lanes nearest the cards, 18px wide.
   if (toggle) toggle.style.left = edge + dir * laneGap - 9 + "px";
 
+  // Every card is measured before any anchor moves, since moving one
+  // would have the next measure lay the page out again. The first card
+  // has nothing above it to depend on, and the last nothing below it to
+  // depend on it.
+  const at = cards.map((card, i): [number, number] => [i > 0 ? headY(card, top) : NaN, i < cards.length - 1 ? footY(card, top) : NaN]);
+  rects = new Map();
+  layout = { lines, fit, edge, dir, cards, at, ax: String(edge + dir * 6) };
+  painted = null;
+  paint();
+}
+
+type Line = Edge & { a: Anchor; b: Anchor; lane: number };
+
+// layout is where the last draw put everything; paint draws the part
+// of it near the view.
+let layout: { lines: Line[]; fit: number; edge: number; dir: number; cards: HTMLElement[]; at: [number, number][]; ax: string } | null = null;
+
+// painted is the stretch of the page, in content coordinates, that
+// paint drew the lines and anchors of. A long document has thousands of
+// each, and drawing them all after every edit, though most were out of
+// sight, took as long as the rest of the edit; the view's own height
+// above and below it is drawn too, and scrolling near either end draws
+// again.
+let painted: { lo: number; hi: number } | null = null;
+
+function paint() {
+  if (!layout || !svg || !ui) return;
+  const { lines, fit, edge, dir, cards, at, ax } = layout;
+  const view = scroll.clientHeight;
+  const lo = scroll.scrollTop - view;
+  const hi = scroll.scrollTop + 2 * view;
+  painted = { lo, hi };
   const out: SVGGElement[] = [];
   const hits: SVGElement[] = [];
   const dots: SVGElement[] = []; // over the hit paths, which cross them
@@ -324,6 +395,7 @@ function draw() {
     const x = edge + dir * (laneGap + laneStep * Math.min(l.lane, fit));
     const y1 = l.a.y;
     const y2 = l.b.y;
+    if (Math.max(y1, y2) < lo || Math.min(y1, y2) > hi) continue;
     const color = "dep-" + (l.k < colors ? l.k + 1 : "more");
     const g = make("g", { class: "dep " + color + (l.from === lit ? " lit" : "") });
     g.append(make("path", { d: elbow(x, y1, y2) }));
@@ -331,10 +403,16 @@ function draw() {
     // What is clicked: the line, unseen and wider, and the dot at its
     // corner on the dependency's row, in its own lane.
     const hit = make("path", { class: "hit", d: elbow(x, y1, y2) });
-    const title = make("title", {});
-    title.textContent = `${name(l.a.card)} depends on ${name(l.b.card)}`;
-    hit.append(title);
-    hit.onpointerenter = () => g.classList.add("hover");
+    // The tooltip names the blocks when the pointer gets there: naming
+    // them for every line on every redraw took most of a redraw's time
+    // in a long document.
+    hit.onpointerenter = () => {
+      g.classList.add("hover");
+      if (hit.querySelector("title")) return;
+      const title = make("title", {});
+      title.textContent = `${name(l.a.card)} depends on ${name(l.b.card)}`;
+      hit.append(title);
+    };
     hit.onpointerleave = () => g.classList.remove("hover");
     hit.ondblclick = (ev) => {
       ev.preventDefault();
@@ -352,30 +430,80 @@ function draw() {
   }
   // Lit lines go last, over the rest.
   out.sort((p, q) => Number(p.classList.contains("lit")) - Number(q.classList.contains("lit")));
-  // The anchors: a ring at each card's top, to drag a new line from
-  // (the first card has nothing above it to depend on), and a port at
-  // its bottom, where lines arrive (the last card has nothing below it
-  // to depend on it).
+  // The anchors: a ring at each card's top, to drag a new line from,
+  // and a port at its bottom, where lines arrive.
   const rings: SVGElement[] = [];
   cards.forEach((card, i) => {
-    const block = Number(card.dataset.block);
-    if (i > 0) {
-      const ring = make("circle", { class: "handle", cx: edge + dir * 6, cy: headY(card, top), r: 4.5 });
-      const hint = make("title", {});
-      hint.textContent = `Drag onto a block above to make ${name(card)} depend on it`;
-      ring.append(hint);
-      ring.onpointerdown = (ev) => startDrag(ev, block, dependencies(block).length, card);
-      rings.push(ring);
+    const [ring, port] = at[i];
+    const near = (y: number) => y >= lo && y <= hi;
+    if (!near(ring) && !near(port)) return;
+    let a = anchors.get(card);
+    if (!a) {
+      a = { ring: makeRing(card), port: make("circle", { class: "port", r: 3 }) };
+      anchors.set(card, a);
     }
-    if (i < cards.length - 1) {
-      const port = make("circle", { class: "port", cx: edge + dir * 6, cy: footY(card, top), r: 3 });
-      port.dataset.block = String(block);
-      rings.push(port);
-    }
+    if (a.port.dataset.block !== card.dataset.block) a.port.dataset.block = card.dataset.block;
+    if (near(ring)) rings.push(place(a.ring, ax, ring));
+    if (near(port)) rings.push(place(a.port, ax, port));
   });
+  // The anchors stay in the layer from one draw to the next, and only
+  // move: on a long document, making them again each time the page
+  // changes size is most of the work of a draw.
+  if (rings.length !== anchorList.length || rings.some((r, i) => r !== anchorList[i])) {
+    anchorList = rings;
+    anchorLayer.replaceChildren(...rings);
+  }
   svg.replaceChildren(...out);
-  ui.replaceChildren(...hits, ...dots, ...rings, ...(ghost ? [ghost] : []));
+  ui.replaceChildren(...hits, ...dots, anchorLayer, ...(ghost ? [ghost] : []));
   redrawGhost?.();
+}
+
+// paintNear draws the lines near the view again when scrolling takes it
+// close to the edge of what was drawn.
+function paintNear() {
+  if (!painted) return;
+  const view = scroll.clientHeight;
+  if (scroll.scrollTop - view / 2 >= painted.lo && scroll.scrollTop + 1.5 * view <= painted.hi) return;
+  if (!paintFrame) {
+    paintFrame = requestAnimationFrame(() => {
+      paintFrame = 0;
+      paint();
+    });
+  }
+}
+
+let paintFrame = 0;
+
+// The anchors drawn for each card, made once and moved after: a ring
+// at its top and a port at its bottom. They are kept in a group of
+// their own, over the lines' dots.
+const anchors = new WeakMap<HTMLElement, { ring: SVGCircleElement; port: SVGCircleElement }>();
+const anchorLayer = make("g", {});
+let anchorList: SVGElement[] = [];
+
+// makeRing is the ring at card's top, to drag a new dependency from.
+function makeRing(card: HTMLElement): SVGCircleElement {
+  const ring = make("circle", { class: "handle", r: 4.5 });
+  // Its hint is named on the way in, not as the layer is drawn: looking
+  // up every card's name each time is slow on a long document, and the
+  // tooltip waits for the pointer anyway.
+  ring.onpointerenter = () => {
+    const hint = ring.querySelector("title") ?? ring.appendChild(make("title", {}));
+    hint.textContent = `Drag onto a block above to make ${name(card)} depend on it`;
+  };
+  ring.onpointerdown = (ev) => {
+    const block = Number(card.dataset.block);
+    startDrag(ev, block, dependencies(block).length, card);
+  };
+  return ring;
+}
+
+// place moves an anchor to x, y, touching it only when it moved.
+function place(e: SVGElement, x: string, y: number): SVGElement {
+  const cy = String(y);
+  if (e.getAttribute("cx") !== x) e.setAttribute("cx", x);
+  if (e.getAttribute("cy") !== cy) e.setAttribute("cy", cy);
+  return e;
 }
 
 // elbow is a line's path: out from the cards' edge at y1 to lane x, along
@@ -389,7 +517,7 @@ function elbow(x: number, y1: number, y2: number): string {
 }
 
 function name(card: HTMLElement): string {
-  return card.querySelector(".head .id")?.textContent || card.querySelector("h1, h2, h3, h4, h5, h6")?.textContent || "this block";
+  return card.querySelector(".head .id")?.textContent || card.querySelector("h1, h2, h3, h4, h5, h6")?.textContent || (card.dataset.block ? "block " + (Number(card.dataset.block) + 1) : "this block");
 }
 
 // A drag makes block from depend on the block it ends on, as its k-th

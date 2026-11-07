@@ -92,10 +92,12 @@ export function Changelog(): $CancellablePromise<string> {
 }
 
 /**
- * CheckInfo checks the attributes in a fence's info string.
+ * CheckInfos checks the attributes in fences' info strings. The source
+ * pane asks about every new one in one call: a long document has
+ * thousands, and asking about each in turn took seconds.
  */
-export function CheckInfo(info: string): $CancellablePromise<notebook$0.Problem[] | null> {
-    return $Call.ByName("main.App.CheckInfo", info);
+export function CheckInfos(infos: string[] | null): $CancellablePromise<(notebook$0.Problem[] | null)[] | null> {
+    return $Call.ByName("main.App.CheckInfos", infos);
 }
 
 /**
