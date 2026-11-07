@@ -3,9 +3,12 @@ package env
 import (
 	"context"
 	"fmt"
+	"io"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // TopLevel is the name of the env blocks run in when they set no env=.
@@ -21,11 +24,16 @@ type Env struct {
 // Stack creates envs on first use and keeps them for reuse.
 type Stack struct {
 	cfg  Config
+	mu   sync.Mutex // guards envs, for KillBusy
 	envs map[string]*Env
 	// OnStart, if set, is called as each env's shell starts, with the
 	// share it was made with (nil for the top level, whose Config.Env
 	// is already filtered) and the names of the variables it was given.
 	OnStart func(e *Env, share, names []string)
+	// OnExited, if set, is called when Get finds that e's shell has
+	// ended, as a block calling exit or a kill does, with its exit
+	// status, before it starts a new one in its place.
+	OnExited func(e *Env, status int)
 	// Strict makes share lists pass only what they name, without the
 	// Base set. It is for documents loaded from a URL, which must not get
 	// even PATH or HOME unless they ask (see FilterStrict).
@@ -43,12 +51,20 @@ func NewStack(cfg Config) *Stack {
 // whose shell has exited is created again, with a fresh shell.
 func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, error) {
 	name = strings.Trim(name, "/")
-	if e, ok := s.envs[name]; ok {
+	s.mu.Lock()
+	e, ok := s.envs[name]
+	s.mu.Unlock()
+	if ok {
 		if !e.Shell.Exited() {
 			return e, nil
 		}
+		if s.OnExited != nil {
+			s.OnExited(e, e.Shell.ExitStatus())
+		}
 		e.Shell.Close()
+		s.mu.Lock()
 		delete(s.envs, name)
+		s.mu.Unlock()
 	}
 	if name == TopLevel {
 		sh, err := Start(s.cfg)
@@ -56,7 +72,9 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 			return nil, err
 		}
 		e := &Env{Name: TopLevel, Shell: sh}
+		s.mu.Lock()
 		s.envs[name] = e
+		s.mu.Unlock()
 		s.started(e, nil, s.cfg.Env)
 		return e, nil
 	}
@@ -84,8 +102,10 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 	if err != nil {
 		return nil, err
 	}
-	e := &Env{Name: name, Parent: parent, Shell: sh}
+	e = &Env{Name: name, Parent: parent, Shell: sh}
+	s.mu.Lock()
 	s.envs[name] = e
+	s.mu.Unlock()
 	s.started(e, share, cfg.Env)
 	return e, nil
 }
@@ -103,8 +123,45 @@ func (s *Stack) started(e *Env, share, environ []string) {
 	s.OnStart(e, share, names)
 }
 
+// SetArgs sets the positional parameters in every shell started, and
+// in those started from now on. Call it while no script runs.
+func (s *Stack) SetArgs(ctx context.Context, args []string) error {
+	s.cfg.Args = args
+	s.mu.Lock()
+	envs := slices.Collect(maps.Values(s.envs))
+	s.mu.Unlock()
+	for _, e := range envs {
+		if e.Shell.Exited() {
+			continue
+		}
+		if _, _, err := e.Shell.Run(ctx, "set -- "+quoteAll(args)+"\n", io.Discard, io.Discard); err != nil {
+			return fmt.Errorf("env %q: %w", e.Name, err)
+		}
+	}
+	return nil
+}
+
+// KillBusy kills the shells running a script (see Shell.Kill) and
+// reports whether there were any. Unlike the stack's other methods, it
+// may be called while a script runs.
+func (s *Stack) KillBusy() bool {
+	s.mu.Lock()
+	envs := slices.Collect(maps.Values(s.envs))
+	s.mu.Unlock()
+	killed := false
+	for _, e := range envs {
+		if e.Shell.Busy() {
+			e.Shell.Kill()
+			killed = true
+		}
+	}
+	return killed
+}
+
 // Close ends every shell in the stack.
 func (s *Stack) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, e := range s.envs {
 		e.Shell.Close()
 	}

@@ -7,6 +7,7 @@
 import { Terminal } from "@xterm/xterm";
 import { Clipboard } from "/wails/runtime.js";
 import { App, message } from "./api.js";
+import { confirmShells, lostWarning } from "./confirm.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
 import { keyHint } from "./keys.js";
@@ -43,8 +44,9 @@ export interface HistoryHooks {
   toggle: () => void;
   // stop stops what runs, as Run › Stop does.
   stop: () => void;
-  // restart starts the shells again.
-  restart: () => Promise<void>;
+  // restart starts the shells again, once the user says so, and
+  // reports whether it did.
+  restart: () => Promise<boolean>;
   // say shows text in the status line.
   say: (text: string) => void;
 }
@@ -248,7 +250,7 @@ export function showBar(on: boolean, prompt = true) {
 export async function showHistory(on: boolean, docHas: boolean) {
   if (!on) {
     slide(false);
-    if (docHas) await App.SetHistory(false).catch(() => {});
+    if (docHas) await App.SetHistory(false, false).catch(() => {});
     return;
   }
   const t = ensureTerm();
@@ -257,13 +259,37 @@ export async function showHistory(on: boolean, docHas: boolean) {
   fitHistory();
   if (!docHas) {
     try {
-      if (await App.SetHistory(true)) say("\x1b[2m(The shells started again, on a terminal, so variables that blocks set are gone.)\x1b[0m");
+      await setHistoryOn();
     } catch (err) {
       say(`\x1b[31m${message(err)}\x1b[0m`);
     }
   }
   await updatePrompt();
   input().focus();
+}
+
+// setHistoryOn turns the History pane on for the file. If that needs the
+// shells started again, on a terminal, after blocks have run in them, it
+// asks first; told no, the shells stay as they are and the pane says it
+// can't run commands until they are restarted.
+async function setHistoryOn() {
+  try {
+    if (await App.SetHistory(true, false)) say("\x1b[2m(The shells started on a terminal, for the History pane. No block had run in them yet.)\x1b[0m");
+    return;
+  } catch (err) {
+    if (!message(err).includes("need to start again")) throw err;
+  }
+  const ok = await confirmShells(
+    "Start the shells again?",
+    "Commands typed in the History pane run on a terminal, and this file's shells were started without one. Starting them again, on a terminal, lets the pane run commands. " + lostWarning,
+    "Restart Shells",
+  );
+  if (!ok) {
+    say("\x1b[2m(The shells were kept. Commands typed here need shells on a terminal: press Restart Shells, the ↻ in the bar, when you're ready to lose what blocks set.)\x1b[0m");
+    return;
+  }
+  await App.SetHistory(true, true);
+  say("\x1b[2m(The shells started again, on a terminal, so what blocks set in them is gone.)\x1b[0m");
 }
 
 // focusHistory puts the keyboard in the pane's input, if it is open.
@@ -672,7 +698,7 @@ export function initHistory(h: HistoryHooks) {
   // Stop does.
   $("history-stop").onclick = () => (block >= 0 ? typeKeys("\x03") : hooks.stop());
   $("history-restart").onclick = async () => {
-    await hooks.restart();
+    if (!(await hooks.restart())) return;
     if (term) say("\x1b[2m(The shells started again, so variables that blocks set are gone.)\x1b[0m");
     await updatePrompt();
   };

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gdey/markdownshell/audit"
@@ -43,6 +44,11 @@ type Session struct {
 	// Result.Duration.
 	startMu sync.Mutex
 	started map[*doc.Block]time.Time
+	// ended holds the envs whose shell a block's run was logged ending,
+	// and restarts those whose shell has started, for the audit log.
+	ended, restarts map[string]bool
+	// killed is set by Kill, so the shell's end is logged as killed.
+	killed atomic.Bool
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -72,18 +78,20 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 		opts:     opts,
 		selected: selected,
 		stack: env.NewStack(env.Config{
-			Path: shell,
-			Env:  TopEnv(d, opts),
-			Dir:  opts.Dir,
-			Args: opts.Args,
-			TTY:  hasTTY(d) || opts.PTY,
-			Init: init,
+			Path:      shell,
+			Env:       TopEnv(d, opts),
+			Dir:       opts.Dir,
+			Args:      opts.Args,
+			TTY:       hasTTY(d) || opts.PTY,
+			Init:      init,
+			KillAfter: opts.KillAfter,
 		}),
 		tty: hasTTY(d) || opts.PTY,
 	}
 	s.stack.Strict = opts.Remote
 	if opts.Audit != nil {
 		s.stack.OnStart = s.logEnv
+		s.stack.OnExited = s.logExited
 	}
 	// Includes are part of the document, not steps of the run, so they
 	// are read whatever runs.
@@ -152,9 +160,35 @@ func (s *Session) refs() {
 }
 
 // SetFile renames the document the session runs: blocks run from now on
-// see file as MDSH_FILE and save their assets in <file>.assets. The
-// shells and their working directory stay as they are.
-func (s *Session) SetFile(file string) { s.opts.File = file }
+// see file as MDSH_FILE and save their assets in <file>.assets, linked
+// from file's folder. The shells and their working directory stay as
+// they are.
+func (s *Session) SetFile(file string) {
+	if s.opts.LinkDir != "" && s.opts.LinkDir == filepath.Dir(s.opts.File) {
+		s.opts.LinkDir = filepath.Dir(file)
+	}
+	s.opts.File = file
+}
+
+// SetArgs sets the positional parameters, $1 and on, in every shell
+// the session has started, and for those it starts later, keeping what
+// blocks set in them. Call it while nothing runs.
+func (s *Session) SetArgs(ctx context.Context, args []string) error {
+	s.opts.Args = args
+	return s.stack.SetArgs(ctx, args)
+}
+
+// SetChoices changes what runs and how, as --only, --step and
+// --stop-on-error do, keeping the shells and what blocks set in them.
+// Call it while nothing runs.
+func (s *Session) SetChoices(only string, step, stopOnError bool) error {
+	selected, err := selectBlocks(s.d, only)
+	if err != nil {
+		return err
+	}
+	s.selected, s.opts.Only, s.opts.Step, s.opts.StopOnError = selected, only, step, stopOnError
+	return nil
+}
 
 // Results returns one result per block, in order. A block run again gets
 // a new result, so hold on to the slice only while nothing runs.
@@ -251,6 +285,19 @@ func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (
 		return "", err
 	}
 	return out.String(), nil
+}
+
+// Kill ends the shell a block is running in, at once, as when a block
+// that was stopped won't stop. What blocks set there is gone; the next
+// block in that env starts a new shell. It reports whether a block was
+// running. It is safe to call while a block runs.
+func (s *Session) Kill() bool {
+	s.killed.Store(true)
+	if !s.stack.KillBusy() {
+		s.killed.Store(false)
+		return false
+	}
+	return true
 }
 
 // PTY reports whether the session's shells have terminals of their own,
@@ -404,7 +451,8 @@ func (s *Session) RunRange(ctx context.Context, from, to int) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if r.Exited || (r.Failed() && stopOnError(d, b, opts)) {
+		// A timeout stops the run, though the block's shell is kept.
+		if r.Exited || r.TimedOut || (r.Failed() && stopOnError(d, b, opts)) {
 			break
 		}
 	}

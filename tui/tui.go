@@ -77,6 +77,9 @@ type Model struct {
 
 	events chan tea.Msg
 	cancel context.CancelFunc
+	// stopping is set once the user stopped the run going, so stopping
+	// it again kills the shell of a block that won't stop.
+	stopping bool
 	// active is the block running now, or -1.
 	active  int
 	running bool
@@ -506,7 +509,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, nil
 	case runDoneMsg:
-		m.running, m.active = false, -1
+		m.running, m.active, m.stopping = false, -1, false
 		m.cancel()
 		if msg.hist != nil {
 			m.typedDone(msg.hist)
@@ -581,11 +584,27 @@ func (m *Model) event(e run.Event) {
 	}
 }
 
+// stop stops the run going. A block stopped is interrupted, as ctrl+c
+// would, and its shell, with what blocks set there, stays. Stopping
+// again kills the shell of a block that won't stop: the user asked
+// twice, so it is theirs to lose.
+func (m *Model) stop() {
+	if !m.stopping {
+		m.stopping = true
+		m.cancel()
+		m.status = "stopping; if the block won't stop, stop again to kill its shell, losing what blocks set there"
+		return
+	}
+	if m.sess.Kill() {
+		m.status = "killed the block's shell; the next block there starts a new one"
+	}
+}
+
 func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// While a tty block runs in its card, keys are for it.
 	if m.termBlock >= 0 {
 		if k.String() == "ctrl+]" {
-			m.cancel()
+			m.stop()
 		} else {
 			m.pane.typeKey(k)
 		}
@@ -633,7 +652,7 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
 	case "ctrl+c":
 		if m.running {
-			m.cancel()
+			m.stop()
 			return m, nil
 		}
 		return m, tea.Quit

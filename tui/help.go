@@ -47,8 +47,11 @@ var helpItems = []helpItem{
 		return ""
 	}},
 	{group: "Run", keys: "ctrl+c", key: tea.KeyMsg{Type: tea.KeyCtrlC}, what: func(m *Model) string {
-		if m.running {
-			return "stop the run"
+		switch {
+		case m.stopping:
+			return "kill the shell of the block that won't stop"
+		case m.running:
+			return "stop the run, keeping the shells"
 		}
 		return "quit"
 	}},

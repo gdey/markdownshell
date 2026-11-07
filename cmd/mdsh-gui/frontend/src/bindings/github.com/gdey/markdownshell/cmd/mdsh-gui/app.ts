@@ -247,6 +247,16 @@ export function EndDrag(id: number, outside: boolean, x: number, y: number): $Ca
 }
 
 /**
+ * Events is the event log of the file this window shows: its shells
+ * starting and ending, and why, blocks running, the file changing on
+ * disk and mdsh ctl calls, oldest first. New events come as "audit"
+ * events.
+ */
+export function Events(): $CancellablePromise<notebook$0.AuditEvent[] | null> {
+    return $Call.ByName("main.App.Events");
+}
+
+/**
  * FixWarning makes the fix a console entry offers for warning, its
  * message, in the file this window shows. Undo takes it back.
  */
@@ -325,6 +335,15 @@ export function HistoryPrompt(cols: number, rows: number): $CancellablePromise<n
  */
 export function InstallCLI(): $CancellablePromise<$models.CLI> {
     return $Call.ByName("main.App.InstallCLI");
+}
+
+/**
+ * KillShell ends the shell the running block runs in, at once, for a
+ * block that Stop didn't stop, once the user has said to. What blocks
+ * set in that shell is gone. It reports whether a block was running.
+ */
+export function KillShell(): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.KillShell");
 }
 
 /**
@@ -542,6 +561,8 @@ export function Redo(): $CancellablePromise<string> {
 
 /**
  * Reload reads the file from disk again, dropping output not saved.
+ * The shells keep what blocks set in them, unless the front matter
+ * changed the shell, env.share or env.source.
  */
 export function Reload(): $CancellablePromise<void> {
     return $Call.ByName("main.App.Reload");
@@ -563,7 +584,8 @@ export function ReportStart(): $CancellablePromise<$models.ReportStart> {
 
 /**
  * RestartShells starts the file's shells again, as if nothing had run,
- * without changing the file.
+ * without changing the file. The page asks the user first: it is the
+ * one way the app ends shells that blocks set things up in.
  */
 export function RestartShells(): $CancellablePromise<void> {
     return $Call.ByName("main.App.RestartShells");
@@ -670,12 +692,14 @@ export function SetFrontMatter(f: notebook$0.FrontMatter): $CancellablePromise<v
 
 /**
  * SetHistory turns the History pane on or off for the file. Turning it
- * on may start the shells again, so commands can run on a terminal; it
- * reports whether it did. The shells read the rc file Settings names as
- * it is now.
+ * on needs shells on a terminal: if theirs have none and blocks have
+ * run in them, it starts them again only with restart, the user having
+ * said so, and otherwise fails with notebook.ErrRestartNeeded. It
+ * reports whether they started again. The shells read the rc file
+ * Settings names as it is now.
  */
-export function SetHistory(on: boolean): $CancellablePromise<boolean> {
-    return $Call.ByName("main.App.SetHistory", on);
+export function SetHistory(on: boolean, restart: boolean): $CancellablePromise<boolean> {
+    return $Call.ByName("main.App.SetHistory", on, restart);
 }
 
 /**
@@ -777,7 +801,8 @@ export function StartScreen(): $CancellablePromise<$models.Start> {
 
 /**
  * Stop stops the running block, answering stop if a block is waiting
- * to be confirmed.
+ * to be confirmed. The block is interrupted, as ctrl+c would, and its
+ * shell lives on.
  */
 export function Stop(): $CancellablePromise<void> {
     return $Call.ByName("main.App.Stop");

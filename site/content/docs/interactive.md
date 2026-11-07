@@ -61,7 +61,7 @@ with the reason.
 | `h` | History: a shell whose commands are added to the file |
 | `i` or `:` | type a new block and run it |
 | `,` | run options |
-| ctrl+c | stop the run; quits when nothing runs |
+| ctrl+c | stop the run, keeping the shells and what blocks set there; again kills the shell of a block that won't stop. Quits when nothing runs |
 | ctrl+] | stop a `tty` block running in its card |
 | `e` / `E` | edit the block, or the whole file, in `$EDITOR` |
 | `y` | copy the block's code to the clipboard |

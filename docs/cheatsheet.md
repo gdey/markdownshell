@@ -88,7 +88,7 @@ attributes are kept as written.
 | `depends=A,B` | Blocks to run first, in order; each one that hasn't run this session is asked about |
 | `always` | As a dependency, run again each time a block that depends on it runs |
 | `confirm[="Question?"]` | Ask before running, with this question if given |
-| `timeout=30s` | Kill the block's shell after this long and stop the run; a `background` block is killed alone |
+| `timeout=30s` | Interrupt the block after this long and stop the run; its shell stays. A `background` block is killed alone |
 | `background` | Start the block and go on to the next; the run waits for it at the end. `$MDSH_BG_<id>` holds its PID for `wait` |
 | `tty` | Run on a terminal, for `docker run -it`, `ssh`, an editor; the session is saved as an asciinema cast |
 | `frame=N` | With `tty`, or on a `cast` fence, the frame still views show and the player opens at, from 1 |
@@ -244,7 +244,7 @@ env starts in the document's folder.
 | `i`, `:` | Type a new `sh` block and run it; esc cancels |
 | `h` | History: a shell along the bottom whose commands are added to the file as `#history-N skip links` blocks |
 | `,` | Run options: arguments, `--only`, step, stop on error |
-| ctrl+c | Stop the run; quits when nothing runs |
+| ctrl+c | Stop the run, keeping the shells; again kills the shell of a block that won't stop. Quits when nothing runs |
 | ctrl+] | Stop a `tty` block running in its card |
 | `e` | Edit the block in `$VISUAL`, `$EDITOR` or `vi`; enter runs it |
 | `E` | Edit the whole file the same way, at the block |

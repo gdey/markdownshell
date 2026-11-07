@@ -1317,3 +1317,44 @@ func TestStaleDependent(t *testing.T) {
 		t.Errorf("one: %q", st)
 	}
 }
+
+// TestStopKeepsShell checks ctrl+c interrupts a block and keeps its
+// shell, and that ctrl+c again kills the shell of a block that won't
+// stop.
+func TestStopKeepsShell(t *testing.T) {
+	src := "```sh {#set}\nV=kept\n```\n\n```sh {#slow}\nsleep 30\n```\n\n```sh {#show}\necho \"v=$V\"\n```\n\n```sh {#stuck}\ntrap '' INT\nwhile :; do :; done\n```\n"
+	m, _ := newModel(t, src, Options{})
+	runAt := func(i int) {
+		t.Helper()
+		m.cursor = i
+		press(m, "enter")
+	}
+	runAt(0)
+	pump(t, m)
+	runAt(1)
+	time.Sleep(300 * time.Millisecond)
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	pump(t, m)
+	runAt(2)
+	pump(t, m)
+	if got := string(m.results[2].Stdout); got != "v=kept\n" {
+		t.Errorf("after ctrl+c, show printed %q, want the shell kept", got)
+	}
+	runAt(3)
+	time.Sleep(300 * time.Millisecond)
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if !strings.Contains(m.status, "stop again to kill") {
+		t.Errorf("status after ctrl+c = %q", m.status)
+	}
+	time.Sleep(300 * time.Millisecond)
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	pump(t, m)
+	if !m.results[3].Exited {
+		t.Errorf("stuck after ctrl+c twice: %+v, want its shell killed", m.results[3])
+	}
+	runAt(2)
+	pump(t, m)
+	if got := string(m.results[2].Stdout); got != "v=\n" {
+		t.Errorf("after the kill, show printed %q, want a new shell", got)
+	}
+}

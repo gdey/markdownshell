@@ -36,20 +36,27 @@ func TestHistory(t *testing.T) {
 	if err := n.RunBlock(0); err != nil {
 		t.Fatal(err)
 	}
-	restarted, err := n.SetHistory(true)
+	// A block ran, so the shells start again only when the user says so.
+	if restarted, err := n.SetHistory(true, false); !errors.Is(err, ErrRestartNeeded) || restarted {
+		t.Fatalf("SetHistory without leave to restart: restarted %v, err %v", restarted, err)
+	}
+	if err := n.Enter("true"); !errors.Is(err, ErrHistoryOff) {
+		t.Fatalf("Enter after the restart was refused: %v", err)
+	}
+	restarted, err := n.SetHistory(true, true)
 	if err != nil || !restarted {
 		t.Fatalf("SetHistory: restarted %v, err %v", restarted, err)
 	}
-	if restarted, _ := n.SetHistory(true); restarted {
+	if restarted, _ := n.SetHistory(true, true); restarted {
 		t.Error("restarted shells that had terminals")
 	}
-	if restarted, _ := n.SetHistory(false); restarted {
+	if restarted, _ := n.SetHistory(false, true); restarted {
 		t.Error("restarted shells to turn the pane off")
 	}
 	if err := n.Enter("true"); !errors.Is(err, ErrHistoryOff) {
 		t.Fatalf("Enter with the pane off again: %v", err)
 	}
-	if restarted, _ := n.SetHistory(true); restarted {
+	if restarted, _ := n.SetHistory(true, true); restarted {
 		t.Error("restarted shells that had terminals")
 	}
 	for _, in := range []string{
@@ -108,7 +115,7 @@ func TestHistoryNumbers(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if _, err := n.SetHistory(true); err != nil {
+	if _, err := n.SetHistory(true, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := n.Enter("true"); err != nil {
@@ -242,7 +249,7 @@ func TestHistoryRC(t *testing.T) {
 	if p, _ := n.Prompt(); p.PS1 == "rc> " {
 		t.Fatal("read the rc file with History off")
 	}
-	if _, err := n.SetHistory(true); err != nil {
+	if _, err := n.SetHistory(true, true); err != nil {
 		t.Fatal(err)
 	}
 	if p, _ := n.Prompt(); p.PS1 != "rc> " {
@@ -256,7 +263,7 @@ func TestHistoryBackground(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if _, err := n.SetHistory(true); err != nil {
+	if _, err := n.SetHistory(true, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := n.Enter("sleep 0.3; echo later &  "); err != nil {
@@ -327,7 +334,7 @@ func TestSetHistoryWaitsForPrompt(t *testing.T) {
 	n.mu.Unlock()
 	done := make(chan error, 1)
 	go func() {
-		_, err := n.SetHistory(true)
+		_, err := n.SetHistory(true, true)
 		done <- err
 	}()
 	select {
@@ -354,7 +361,7 @@ func TestSetHistoryWaitsForPrompt(t *testing.T) {
 	n.mu.Lock()
 	n.running = true
 	n.mu.Unlock()
-	if _, err := n.SetHistory(false); err != ErrBusy {
+	if _, err := n.SetHistory(false, true); err != ErrBusy {
 		t.Errorf("SetHistory while a block runs = %v; want ErrBusy", err)
 	}
 	n.mu.Lock()
@@ -370,7 +377,7 @@ func TestHistorySkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if _, err := n.SetHistory(true); err != nil {
+	if _, err := n.SetHistory(true, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := n.Enter("echo typed >> count"); err != nil {
@@ -402,7 +409,7 @@ func TestPromptFollowsSize(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if _, err := n.SetHistory(true); err != nil {
+	if _, err := n.SetHistory(true, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := n.RunBlock(0); err != nil {
@@ -475,7 +482,7 @@ function cd() { __zoxide_doctor; builtin cd "$@"; }
 		t.Fatal(err)
 	}
 	defer n.Close()
-	if _, err := n.SetHistory(true); err != nil {
+	if _, err := n.SetHistory(true, true); err != nil {
 		t.Fatal(err)
 	}
 	if p, _ := n.Prompt(); p.PS1 == "zsh> " {

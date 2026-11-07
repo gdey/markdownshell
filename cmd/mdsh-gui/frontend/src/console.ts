@@ -9,9 +9,16 @@
 //
 // A warning an edit fixed stays, struck through. One with a fix, about
 // this tab's file, has a Fix button, which asks first.
+//
+// Its Events tab shows this tab's file's event log, in mdsh --audit's
+// events: its shells starting and ending, and why, blocks running and
+// skipped, the file changing on disk and mdsh ctl calls. An event that
+// lost what blocks set in a shell, its variables, functions and
+// aliases, stands out, counts toward the toolbar's badge and shows in
+// the status line. Copy there copies the events as JSON lines.
 
 import { Clipboard, Events } from "/wails/runtime.js";
-import { App, type ConsoleEntry } from "./api.js";
+import { App, type AuditEvent, type ConsoleEntry } from "./api.js";
 import { $, el } from "./dom.js";
 import { hinted } from "./keys.js";
 
@@ -34,9 +41,16 @@ export interface ConsoleHooks {
   // fix offers to make the fix for warning, a line's message, in the
   // file this tab shows.
   fix: (warning: string) => void;
+  // lost tells of an event that lost what blocks set in a shell.
+  lost: (text: string) => void;
 }
 
 let hooks: ConsoleHooks;
+// tab is which of the pane's tabs shows.
+let tab: "log" | "events" = "log";
+const tabKey = "mdsh.consoleTab";
+let events: AuditEvent[] = [];
+let lastEvent = 0;
 // here is the file this tab shows, for telling which lines are about it.
 let here = "";
 
@@ -140,7 +154,7 @@ function stale(seqs: number[]) {
 function drawAll() {
   const log = $("console-log");
   log.replaceChildren(...entries.map(row));
-  $("console-empty").hidden = entries.length > 0;
+  $("console-empty").hidden = tab !== "log" || entries.length > 0;
   log.scrollTop = log.scrollHeight;
 }
 
@@ -205,10 +219,13 @@ function dragGrip(e: PointerEvent) {
   };
 }
 
-// copy puts the selected lines on the clipboard, or every line.
+// copy puts the selected lines on the clipboard, or every line: in the
+// Events tab, every event as a line of JSON.
 async function copy() {
   const sel = window.getSelection()?.toString() ?? "";
-  const text = sel && $("console-log").contains(window.getSelection()!.anchorNode) ? sel : entries.map(line).join("\n");
+  const log = tab === "events" ? $("events-log") : $("console-log");
+  const all = tab === "events" ? events.map((e) => e.json).join("\n") : entries.map(line).join("\n");
+  const text = sel && log.contains(window.getSelection()!.anchorNode) ? sel : all;
   try {
     await Clipboard.SetText(text);
     flash("Copied");
@@ -223,6 +240,85 @@ function flash(text: string) {
   s.textContent = text;
   clearTimeout(flashTimer);
   flashTimer = window.setTimeout(() => (s.textContent = ""), 1500);
+}
+
+// eventRow draws one event.
+function eventRow(e: AuditEvent): HTMLElement {
+  const r = el("div", { className: "entry" + (e.lost ? " lost" : "") }, el("time", {}, time(e.time)), el("span", { className: "event" }, e.event), el("span", { className: "message" }, e.text));
+  r.title = e.json;
+  return r;
+}
+
+function drawEvents() {
+  const log = $("events-log");
+  log.replaceChildren(...events.map(eventRow));
+  $("events-empty").hidden = tab !== "events" || events.length > 0;
+  log.scrollTop = log.scrollHeight;
+}
+
+// loadEvents reads this tab's file's event log again, as when another
+// file opens in the tab.
+export async function loadEvents() {
+  events = (await App.Events().catch(() => null)) ?? [];
+  lastEvent = events.length ? events[events.length - 1].seq : 0;
+  drawEvents();
+}
+
+// addEvent shows a new event of this tab's file's log.
+export function addEvent(e: AuditEvent) {
+  if (e.seq <= lastEvent) return;
+  // One missed on the way, as when many come at once: read them all.
+  if (e.seq !== lastEvent + 1 && lastEvent !== 0) return void loadEvents();
+  events.push(e);
+  lastEvent = e.seq;
+  const log = $("events-log");
+  const atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 8;
+  log.append(eventRow(e));
+  if (events.length > 2000) {
+    events.shift();
+    log.firstElementChild?.remove();
+  }
+  $("events-empty").hidden = true;
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  if (e.lost) {
+    hooks.lost(e.text);
+    if (!open || tab !== "events") {
+      unseen++;
+      badge();
+    }
+  }
+}
+
+// showTab shows the Console's log or its Events.
+function showTab(which: "log" | "events", focus = false) {
+  tab = which;
+  const ev = which === "events";
+  for (const [id, on] of [
+    ["console-tab-log", !ev],
+    ["console-tab-events", ev],
+  ] as const) {
+    $(id).setAttribute("aria-selected", String(on));
+    $(id).tabIndex = on ? 0 : -1;
+  }
+  $("console-log").hidden = ev;
+  $("events-log").hidden = !ev;
+  $("console-empty").hidden = ev || entries.length > 0;
+  $("events-empty").hidden = !ev || events.length > 0;
+  $("console-clear").hidden = ev;
+  $("console-copy").title = ev ? "Copy the selected lines, or every event as JSON lines" : "Copy the selected lines, or all of them";
+  const log = ev ? $("events-log") : $("console-log");
+  log.scrollTop = log.scrollHeight;
+  if (focus) $(ev ? "console-tab-events" : "console-tab-log").focus();
+  try {
+    localStorage.setItem(tabKey, which);
+  } catch {
+    // Not remembered, then.
+  }
+}
+
+// showEvents opens the pane on its Events tab.
+export function showEvents() {
+  showTab("events");
 }
 
 // showConsole opens or closes the pane.
@@ -261,6 +357,20 @@ export function initConsole(h: ConsoleHooks) {
     }
   };
   $("console-log").onclick = click;
+  $("console-tab-log").onclick = () => showTab("log");
+  $("console-tab-events").onclick = () => showTab("events");
+  for (const id of ["console-tab-log", "console-tab-events"]) {
+    $(id).onkeydown = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      showTab(tab === "log" ? "events" : "log", true);
+    };
+  }
+  try {
+    if (localStorage.getItem(tabKey) === "events") showTab("events");
+  } catch {
+    // The Console it is.
+  }
   $("console-clear").onclick = () => void App.ClearConsole().catch(() => {});
   $("console-copy").onclick = () => void copy();
   $("console-close").onclick = () => hooks.toggle();

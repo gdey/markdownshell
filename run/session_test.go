@@ -3,7 +3,9 @@ package run_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/run"
@@ -339,5 +342,54 @@ func TestAsk(t *testing.T) {
 	}
 	if got, _ := s.Ask(ctx, `printf '%s %s' "$PWD" "${Y-unset}"`); got != "/ unset" {
 		t.Errorf("after Ask: %q", got)
+	}
+}
+
+// TestSessionLogsShellEnds checks the audit log says when and why a
+// shell ended, and that the next block got a new one.
+func TestSessionLogsShellEnds(t *testing.T) {
+	d := parse(t, "```sh {#bye}\nexit 4\n```\n\n```sh {#ok}\ntrue\n```\n\n```sh {#doomed}\n(sleep 0.1; kill -KILL $$) >/dev/null 2>&1 &\n```\n\n```sh {#slow timeout=50ms}\nsleep 5\n```\n\n```sh {#stuck timeout=50ms}\ntrap '' INT\nwhile :; do :; done\n```\n")
+	var log bytes.Buffer
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Audit: audit.New(&log), KillAfter: 300 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	for _, i := range []int{0, 1, 2} {
+		if _, err := s.RunBlock(ctx, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(500 * time.Millisecond) // for doomed's kill
+	// slow is interrupted and keeps its shell; stuck won't stop, so
+	// KillAfter ends its shell.
+	for _, i := range []int{1, 3, 4} {
+		if _, err := s.RunBlock(ctx, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var got []string
+	for line := range strings.Lines(log.String()) {
+		var e struct {
+			Event, Reason, Block string
+			Again                bool
+		}
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatal(err)
+		}
+		switch e.Event {
+		case "env.start":
+			got = append(got, fmt.Sprintf("start again=%v", e.Again))
+		case "env.end":
+			got = append(got, "end "+e.Reason+" "+e.Block)
+		}
+	}
+	want := "start again=false|end exit bye|start again=true|end died |start again=true|end timeout stuck"
+	if g := strings.Join(got, "|"); g != want {
+		t.Errorf("shell events:\n got %s\nwant %s", g, want)
+	}
+	if got := run.ShellEnd(&run.Result{Err: context.Canceled}); got != "stopped" {
+		t.Errorf("ShellEnd(canceled) = %q, want stopped", got)
 	}
 }

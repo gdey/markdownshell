@@ -194,14 +194,20 @@ func TestRunScripted(t *testing.T) {
 func TestRunScriptedInputEnds(t *testing.T) {
 	defer func(g time.Duration) { tapeGrace = g }(tapeGrace)
 	tapeGrace = 200 * time.Millisecond
-	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
-	if err != nil {
-		t.Skip("no pseudo-terminals:", err)
-	}
-	defer sh.Close()
-	_, _, err = sh.RunScripted(context.Background(), "read -r l\n", 80, 24, io.Discard, func(context.Context, io.Writer) error { return nil })
-	if !errors.Is(err, ErrTapeEnded) {
-		t.Errorf("err = %v, want ErrTapeEnded", err)
+	// bash and zsh go on reading a terminal through the interrupt, so
+	// the shell is killed in the end.
+	for _, path := range shells(t) {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			sh, err := Start(Config{Path: path, Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+			if err != nil {
+				t.Skip("no pseudo-terminals:", err)
+			}
+			defer sh.Close()
+			_, _, err = sh.RunScripted(context.Background(), "read -r l\n", 80, 24, io.Discard, func(context.Context, io.Writer) error { return nil })
+			if !errors.Is(err, ErrTapeEnded) {
+				t.Errorf("err = %v, want ErrTapeEnded", err)
+			}
+		})
 	}
 }
 

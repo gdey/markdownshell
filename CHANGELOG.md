@@ -14,6 +14,21 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The cheat sheet on the site: the docs section with Cheat sheet last in the sidebar, and the Command line table](docs/changelog/cheatsheet.png)
 
+- mdsh-gui's Console has an **Events** tab: the file's event log, in
+  the events `mdsh --audit` writes, said in words. It shows the shells
+  starting and ending, and why, blocks running and being skipped, the
+  file changing on disk and being reloaded, and `mdsh ctl` calls. When
+  the shells lose what blocks set in them, the event is in bold, counts
+  on the Console badge and shows in the status line, so a missing
+  variable, function or alias has a visible cause. Copy gives the
+  events as JSON lines. The audit log has new events for this:
+  `env.end` with its reason (`exit`, `timeout`, `stopped`, `killed`,
+  `died`), `env.start` with `again`, and in the GUI `session.start`,
+  `session.end`, `restart.needed`, `args`, `outputs.clear`,
+  `file.changed` and `file.reload`.
+
+  ![The Events tab after a block ran exit 3: block events, then env.end in bold saying the block ended the shell for the top level, and the same note in the status line](docs/changelog/shell-events.png)
+
 ### Fixed
 
 - mdsh-gui scrolls long documents more smoothly. Moving the pointer
@@ -69,6 +84,21 @@ follow [Semantic Versioning](https://semver.org/).
   blocks made over a million elements, which on a Mac slowed every key
   to seconds and used gigabytes of memory; it now makes about 30,000,
   and opens in 2 seconds rather than 8.
+- mdsh-gui never ends a shell, and the variables, functions and aliases
+  blocks set in it, without asking. Stop and a block's `timeout=` now
+  interrupt the block, as ctrl+c would, and the shell lives on; a block
+  still running three seconds after Stop gets a **Kill Shell**
+  question. `mdsh -i` and `mdsh` keep the shell the same way: in
+  `mdsh -i`, ctrl+c again kills the shell of a block that won't stop,
+  and `mdsh` kills it 5 seconds after its timeout or ctrl+c. A timeout
+  still stops the run. Restart Shells asks first. Reload, Clear All Outputs, Save
+  As and new arguments in Run Options keep the shells (the arguments
+  are set with `set --`); a new `shell:` or the first `tty` block waits
+  for Restart Shells, and opening the History pane asks before starting
+  the shells again on a terminal. A block that runs `exit` still ends
+  its own shell, and the Events tab says so.
+
+  ![Asked before killing a shell: The block hasn't stopped, with Cancel and Kill Shell](docs/changelog/kill-shell.png)
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

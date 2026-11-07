@@ -83,7 +83,7 @@ Block attributes in v1:
 | `depends=A,B` | Blocks to run first, in order; each that hasn't run this session is asked about | none |
 | `always` | As a dependency, run again each time a block that depends on it runs, even if it already ran this session | off |
 | `confirm[="question"]` | Ask before running: run the block or stop the run | off |
-| `timeout=30s` | Kill the block's shell after this long; stops the run. A `background` block is killed alone | none |
+| `timeout=30s` | Interrupt the block after this long, as ctrl+c would, and stop the run; the shell and what blocks set there stay. A block that won't stop is killed with its shell 5s later on the command line; mdsh-gui and `mdsh -i` ask first. A `background` block is killed alone | none |
 | `background` | Start the block and go on to the next; its output is kept apart, and the run waits for it at the end | off |
 | `tty` | Run on the terminal, for commands that need one (`docker run -it`); the session is saved as an asciinema cast, which mdsh-gui plays | off |
 | `frame=N` | With `tty`, the frame of the GIF that still views (PDF, and later the TUI and GUI) show, counting from 1 | the last |
@@ -173,7 +173,7 @@ v1 ships on `sh` plus a few markdown helpers.
 
 ## Control socket and audit log (partly built)
 
-Built so far: the socket on macOS and Linux, `$MDSH_SOCK` and `$MDSH_TOKEN`, the protocol, `mdsh ctl set`, `unset`, `get` and `status`, and `--audit FILE` for CLI runs with the `run`, `env.start`, `block`, `ctl`, `var` and `write` events. Not built yet: `check`, `uncheck`, `ask` and `confirm` (and so the `task` and `ask` events), the named pipe on Windows (blocks there run without `$MDSH_SOCK`, so `mdsh ctl` exits 3), placeholders reading variables that `set` made, status on the TUI and GUI cards, and audit logs for `mdsh -i` and mdsh-gui (`--audit` is refused with `-i` for now).
+Built so far: the socket on macOS and Linux, `$MDSH_SOCK` and `$MDSH_TOKEN`, the protocol, `mdsh ctl set`, `unset`, `get` and `status`, and `--audit FILE` for CLI runs with the `run`, `env.start`, `block`, `ctl`, `var` and `write` events. Not built yet: `check`, `uncheck`, `ask` and `confirm` (and so the `task` and `ask` events), the named pipe on Windows (blocks there run without `$MDSH_SOCK`, so `mdsh ctl` exits 3), placeholders reading variables that `set` made, status on the TUI and GUI cards, and an audit log for `mdsh -i` (`--audit` is refused with `-i` for now). mdsh-gui keeps one per file, in memory, for the Events tab: the last 2,000 events, kept across reloads; it isn't written to a file yet.
 
 A block can talk back to the run that started it with `mdsh ctl`: set variables for later blocks, tick tasks, ask the user a question, and report progress. Every run also writes an audit log of what happened, socket calls included, so a run that `ctl` changed can be reviewed afterwards.
 
@@ -239,7 +239,11 @@ mdsh handles calls one at a time, in the order they arrive, so calls from backgr
 **Audit log.** `--audit FILE` writes one JSON object per line, in order, for the whole run. mdsh-gui and `mdsh -i` keep a log for each run in the session, and the GUI can save one. Every event has `v`, `seq` (counting from 1), `t` (RFC 3339 with milliseconds) and `event`, plus `block` and `env` when they apply. Events:
 
 - `run.start`: the file, a SHA-256 of its bytes, `$MDSH_MODE`, the flags and arguments, the mdsh version. `run.end`: the exit code and whether the run stopped early.
-- `env.start`: an env's shell starting, with its parent and the names `share` let through (names only, no values).
+- `env.start`: an env's shell starting, with its parent and the names `share` let through (names only, no values), and `again: true` when it replaces one that ended.
+- `env.end`: an env's shell ending before the session does, so what blocks set there is gone, with the `reason`: `exit` (a block ended it, with its `exit` status), `timeout` (a block's `timeout=`), `stopped` (the run was stopped), `killed` (mdsh-gui's Kill Shell, or ctrl+c twice in `mdsh -i`) or `died` (it was found ended, not by a block's run). A stop or a timeout interrupts the block and keeps the shell, so neither logs `env.end` unless the block won't stop: then `mdsh` on the command line kills the shell 5s later, logged as `timeout` or `stopped`.
+- `session.start` (with `lost` when blocks had run in the old shells), `session.end` (mdsh-gui): the file's shells being readied or ended together, with the `reason`: `open`, `restart` (Restart Shells, which asks first), `history pane` (the shells need a terminal; it asks first when blocks have run), `save as` and `tty block` (only before any block has run), or `close`.
+- `restart.needed` (mdsh-gui): a change that needs new shells (a new `shell:`, `env.share` or `env.source` on reload, a new shell in Run Options, or the first `tty` block) waiting for Restart Shells instead of starting them.
+- `args`, `outputs.clear`, `file.changed`, `file.reload` (mdsh-gui): new arguments set in the shells, Clear All Outputs, the file changing on disk, and reading it again. None of these ends a shell.
 - `block.start`, `block.end` (with the exit code and the time taken), `block.skip` (with the reason: `skip`, `run=` and the value it saw, `once`, `--only`, a stop or a confirm answer).
 - `ctl`: every call, with the calling block, the command, its arguments, the result and the exit code. Refused calls are logged too.
 - `var`: a variable changing, with the old and new values and what changed it (`ctl`, an input, a placeholder read).
@@ -253,7 +257,7 @@ mdsh handles calls one at a time, in the order they arrive, so calls from backgr
 
 - Should `check` also reach tasks in a block's `out=markdown` output, as clicks in mdsh-gui can? *For now, no:* `check` reaches tasks in the file only. Output is rewritten on the next run, so a tick there is lost, and a block can print its output ticked in the first place.
 - Should `set` on a name an input binds update the input, instead of being refused? *For now, no:* it is refused with code 2, as above. Changing an input changes the file's prose, which `ctl` otherwise can't do.
-- Does the audit log need its own viewer in mdsh-gui, or is a file enough for now? *For now, a file:* `--audit FILE`, and Save in the GUI. JSON Lines reads with `jq`.
+- Does the audit log need its own viewer in mdsh-gui, or is a file enough? *A viewer:* the Console pane's Events tab shows the file's events in words, and Copy there copies them as JSON Lines, which read with `jq`.
 
 **Built details.** The socket is `ctl.sock` in a directory made by `mkdtemp` with mode 0700; the socket itself is 0600. On Linux and macOS mdsh also checks the caller's user ID (`SO_PEERCRED`, `LOCAL_PEERCRED`) and refuses another user's call. A request line may be at most 1 MiB and must arrive within 10 seconds of connecting. `unset` on a name that `set` didn't make does nothing and exits 0. `get` on a name nothing set prints an empty line. The audit log is created with mode 0600. `block.end` has `exit`, `ms` (the time taken), and `exited` and `error` when they apply; `block.skip` for `run=` has `cond` (as written) and `saw`; a block whose `depends=` failed is skipped with reason `depends` and the block in `failed`. `env.start` has `shared: "all"` when no `share` applies. `write` is one event per save of the document, with `what: "document"`, for now. A `var` event comes just before the `ctl` event for the call that made it.
 

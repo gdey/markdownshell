@@ -148,7 +148,8 @@ var tapeGrace = 10 * time.Second
 // by rows, with no person at it: drive types the input, writing to keys,
 // while the script runs, and everything the script shows goes to out.
 // If drive fails, or the script is still running 10s after drive is
-// done, the shell is killed and the error returned.
+// done, the script is interrupted, or if it won't stop the shell is
+// killed, and the error returned.
 func (s *Shell) RunScripted(ctx context.Context, script string, cols, rows int, out io.Writer, drive func(ctx context.Context, keys io.Writer) error) (status int, exited bool, err error) {
 	if s.pty == nil {
 		return 0, false, ErrNoPTY
@@ -194,8 +195,18 @@ func (s *Shell) RunScripted(ctx context.Context, script string, cols, rows int, 
 			}
 		}
 		if derr != nil {
+			// Interrupt the script first, which keeps the shell. Should
+			// it not stop, as bash's read on a terminal won't, nobody is
+			// there to ask, so the shell is killed.
 			stopRun(derr)
-			res = <-ran
+			t := time.NewTimer(interruptFor + time.Second)
+			defer t.Stop()
+			select {
+			case res = <-ran:
+			case <-t.C:
+				s.Kill()
+				res = <-ran
+			}
 			res.err = derr
 		}
 	}

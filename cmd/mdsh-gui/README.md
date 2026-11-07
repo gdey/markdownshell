@@ -73,9 +73,21 @@ Each file opens in a tab of its own, with its own shells.
   or the toolbar's eraser button) and Run Options… for the file's
   arguments, `--only`, step mode and stop on error. Clear All Outputs
   is off while there is no output to clear. It asks first, then takes every block's output, output copy and stored
-  block value out of the document and starts the shells again, as if
-  nothing had run. It isn't saved until you save; with the source view
-  open, undo there brings the output back. A block marked
+  block value out of the document and forgets what ran; the shells
+  keep what blocks set in them. It isn't saved until you save; with the source view
+  open, undo there brings the output back.
+  **The app never ends a shell without asking.** Stop, and a block's
+  `timeout=`, interrupt the block, as ctrl+c would, and its shell lives
+  on with the variables, functions and aliases blocks set. A block
+  still running three seconds after Stop, such as a loop that ignores
+  ctrl+c, gets a question: Kill Shell ends it, and its shell. Restart
+  Shells (the ↻ in the History bar) asks first too. New arguments in
+  Run Options are set in the shells as they are. Clear All Outputs,
+  Reload and Save As keep the shells. What needs new shells, a new
+  `shell:` in the front matter or the first `tty` block, waits for
+  Restart Shells, and the History pane, which needs shells on a
+  terminal, asks before starting them again. A block that runs `exit`
+  still ends its own shell. A block marked
   `tty` runs in a terminal in its card: type at it as you would in a
   terminal. It is as wide as the card and 24 lines high, unless
   `cols:` and `rows:` under `terminal:` in the front matter say
@@ -102,10 +114,20 @@ Each file opens in a tab of its own, with its own shells.
   id in a `depends=` that names no block that runs is taken out. Fix
   says what it will do and asks first; Edit › Undo takes it back.
   Code in the app reports to it by logging with `log/slog`.
+  Its **Events** tab shows the tab's file's event log, the same events
+  `mdsh --audit` writes, in words: the shells starting and ending, and
+  why, blocks starting, ending and being skipped, the file changing on
+  disk and being reloaded, and `mdsh ctl` calls. An event that cost the
+  shells what blocks set in them (a block's `exit`, Kill Shell, a
+  shell found dead, Restart Shells) is in bold, counts toward the badge and
+  shows in the status line. Copy there copies the events as JSON
+  lines. The log keeps the last 2,000 events, and lasts as long as the
+  file is open in the tab, reloads included.
 - **History** (View › History, cmd/ctrl+shift+H): a terminal along the
   bottom that works like a paper tape. Closed, it is a status bar with
   the shell's prompt, the status, and buttons to stop (ctrl+c for a
-  command typed in the pane), start the shells again, and open it, when
+  command typed in the pane), start the shells again (it asks first),
+  and open it, when
   the terminal slides up out of the bar. Type a command and press enter:
   it runs in the file's shell, sharing variables and the working
   directory with the blocks (while it runs the prompt dims and the
@@ -363,7 +385,10 @@ Each file opens in a tab of its own, with its own shells.
   version: the release's, or for a `go install` or `go build` build the
   module version or the commit it was built from.
 
-If the file changes on disk, a banner offers to reload it.
+If the file changes on disk, a banner offers to reload it. Reloading
+keeps the shells, and the variables, functions and aliases blocks set
+in them; a change to the front matter's `shell:`, `env.share` or
+`env.source` waits for Restart Shells.
 
 ## A tour
 

@@ -234,7 +234,7 @@ func TestStopNote(t *testing.T) {
 		// The timeout is long enough for the shell to start the block
 		// under the race detector, since a timeout before then is
 		// reported without ending the shell.
-		"sleep 5": "block a timed out after 1s, which ended its shell",
+		"sleep 5": "block a timed out after 1s, so the run stopped there",
 	} {
 		attrs := "#a"
 		if body == "sleep 5" {

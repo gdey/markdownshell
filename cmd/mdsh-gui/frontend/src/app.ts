@@ -14,7 +14,8 @@ import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { busyFrontMatter, frontMatterOpen, initFrontMatter, loadFrontMatter, showFrontMatter } from "./frontmatter.js";
 import { linkify } from "./links.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
-import { consoleFile, initConsole, showConsole } from "./console.js";
+import { confirmShells, dismissShells, lostWarning } from "./confirm.js";
+import { addEvent, consoleFile, initConsole, loadEvents, showConsole } from "./console.js";
 import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, selectAllHistory, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
 import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
@@ -76,6 +77,35 @@ function fail(err: unknown) {
   status(message(err));
 }
 
+// lostNote says what the running run lost of what blocks set in the
+// shells, as the Events tab tells it, for the status line once it ends.
+let lostNote = "";
+
+// stopWait is how long a stopped block has to stop before the page asks
+// whether to kill its shell.
+const stopWait = 3000;
+let killTimer = 0;
+let askingKill = false;
+
+// stopRun stops the running block: it is interrupted, as ctrl+c would,
+// and its shell lives on. A block that hasn't stopped stopWait later,
+// such as a loop that ignores ctrl+c, can have its shell killed, if the
+// user says so.
+async function stopRun() {
+  await App.Stop();
+  clearTimeout(killTimer);
+  killTimer = window.setTimeout(async () => {
+    if (!running) return;
+    askingKill = true;
+    const kill = await confirmShells("The block hasn't stopped", "It was interrupted, as ctrl+c would, but it is still running. Kill its shell to end it? The variables, functions and aliases that blocks set in that shell will be gone.", "Kill Shell");
+    askingKill = false;
+    if (kill && running) await App.KillShell();
+  }, stopWait);
+}
+
+// eventsFile is the file whose event log the Events tab shows.
+let eventsFile: string | null = null;
+
 // refresh reads the document's state and draws whichever screen fits.
 async function refresh() {
   doc = await App.Doc();
@@ -84,6 +114,12 @@ async function refresh() {
   wantTerminalSize(doc.termCols, doc.termRows);
   fitHistory();
   const open = doc.file !== "";
+  // The Events tab shows this file's log: read it when the file is new
+  // to the page.
+  if (doc.file !== eventsFile) {
+    eventsFile = doc.file;
+    void loadEvents();
+  }
   consoleFile(doc.file);
   $("toolbar").hidden = !open;
   $("workspace").hidden = !open;
@@ -1619,7 +1655,7 @@ const backgroundNote = "running in the background…";
 function backgroundStatus() {
   if (running) return;
   const n = document.querySelectorAll("#doc .block.background").length;
-  status(n ? n + " in background" : "");
+  status(n ? n + " in background" : lostNote);
 }
 
 // viewImage shows an output image full size over the window, until a
@@ -1761,6 +1797,11 @@ function busy(on: boolean) {
   document.body.classList.toggle("running", on);
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   if (!on) stopTimers();
+  if (!on) {
+    // The block stopped on its own: no need to ask about its shell.
+    clearTimeout(killTimer);
+    if (askingKill) dismissShells();
+  }
   runAllButton();
   historyBusy(on);
   busyFrontMatter(on);
@@ -1780,6 +1821,11 @@ function start(method: "RunBlock" | "RunFrom", block: number) {
 // may have scrolled away, up to the blocks it depends on. Scrolling by
 // hand during the run leaves the view where it is. home finds the card
 // anew, since the run draws the document again.
+function shellLost(text: string) {
+  lostNote = text;
+  status(text);
+}
+
 async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   if (running) return;
   const back = home ? homeOffset(home()) : null;
@@ -1788,10 +1834,12 @@ async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   sizeTerminal();
   busy(true);
   ranHere = true;
+  lostNote = "";
   status("running");
   try {
     await call();
-    status("");
+    // A shell the run ended, or new shells, are worth saying after it.
+    status(lostNote);
   } catch (err) {
     fail(err);
   }
@@ -2890,7 +2938,7 @@ const actions: Record<string, () => Promise<void> | void> = {
   runcurrent: () => runCurrent(),
   runsection: () => runCurrentSection(),
   report: () => (doc.file && !running ? openReport() : undefined),
-  stop: () => App.Stop(),
+  stop: () => void stopRun(),
   runoptions: () => openRunOptions(),
   split: () => toggle("split"),
   rendered: () => toggle("rendered"),
@@ -4053,6 +4101,7 @@ Events.On(
 );
 
 Events.On("opened", mine(() => ((selected = -1), void refresh())));
+Events.On("audit", mine(addEvent));
 Events.On(
   "saved",
   mine<string>((file) => {
@@ -4126,17 +4175,20 @@ initHistory({
   toggle: () => void actions.history(),
   stop: () => void actions.stop(),
   async restart() {
+    if (!(await confirmShells("Restart the shells?", "This file's shells end, along with any background block, and new ones start with the next block. " + lostWarning, "Restart Shells"))) return false;
     try {
       await App.RestartShells();
     } catch (err) {
       fail(err);
+      return false;
     }
     await refresh();
+    return true;
   },
   say: status,
 });
 initFrontMatter({ edit });
-initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line), fix: (warning) => void fixWarning(warning) });
+initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line), fix: (warning) => void fixWarning(warning), lost: shellLost });
 initReport({
   dirty: () => !$("dirty").hidden,
   before: applySource,

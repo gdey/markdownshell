@@ -192,7 +192,8 @@ func (a *App) ClearOutputs(ctx context.Context) error {
 }
 
 // RestartShells starts the file's shells again, as if nothing had run,
-// without changing the file.
+// without changing the file. The page asks the user first: it is the
+// one way the app ends shells that blocks set things up in.
 func (a *App) RestartShells(ctx context.Context) error {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
@@ -203,8 +204,20 @@ func (a *App) RestartShells(ctx context.Context) error {
 	return err
 }
 
+// KillShell ends the shell the running block runs in, at once, for a
+// block that Stop didn't stop, once the user has said to. What blocks
+// set in that shell is gone. It reports whether a block was running.
+func (a *App) KillShell(ctx context.Context) bool {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return false
+	}
+	return n.Kill()
+}
+
 // Stop stops the running block, answering stop if a block is waiting
-// to be confirmed.
+// to be confirmed. The block is interrupted, as ctrl+c would, and its
+// shell lives on.
 func (a *App) Stop(ctx context.Context) {
 	t, err := a.tab(ctx)
 	if err != nil {
@@ -409,12 +422,34 @@ func (a *App) saveAs(t *docTab, n *notebook.Notebook, message string) (bool, err
 }
 
 // Reload reads the file from disk again, dropping output not saved.
+// The shells keep what blocks set in them, unless the front matter
+// changed the shell, env.share or env.source.
 func (a *App) Reload(ctx context.Context) error {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
 	}
-	return t.open(n.File(), n.RunOptions())
+	if _, err := n.Reload(); err != nil {
+		return err
+	}
+	t.mu.Lock()
+	t.warned = false
+	t.mu.Unlock()
+	t.changed()
+	t.emit("opened", n.File())
+	return nil
+}
+
+// Events is the event log of the file this window shows: its shells
+// starting and ending, and why, blocks running, the file changing on
+// disk and mdsh ctl calls, oldest first. New events come as "audit"
+// events.
+func (a *App) Events(ctx context.Context) ([]notebook.AuditEvent, error) {
+	t, err := a.tab(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return t.eventLog().List(), nil
 }
 
 // SetRunOptions sets the arguments (one line, split as a shell would),
@@ -430,20 +465,23 @@ func (a *App) SetRunOptions(ctx context.Context, args, only string, step, stopOn
 	}
 	ro := n.RunOptions()
 	ro.Args, ro.Only, ro.Step, ro.StopOnError = list, only, step, stopOnError
-	return n.SetRunOptions(ro)
+	_, err = n.SetRunOptions(ro)
+	return err
 }
 
 // SetHistory turns the History pane on or off for the file. Turning it
-// on may start the shells again, so commands can run on a terminal; it
-// reports whether it did. The shells read the rc file Settings names as
-// it is now.
-func (a *App) SetHistory(ctx context.Context, on bool) (bool, error) {
+// on needs shells on a terminal: if theirs have none and blocks have
+// run in them, it starts them again only with restart, the user having
+// said so, and otherwise fails with notebook.ErrRestartNeeded. It
+// reports whether they started again. The shells read the rc file
+// Settings names as it is now.
+func (a *App) SetHistory(ctx context.Context, on, restart bool) (bool, error) {
 	_, n, err := a.notebook(ctx)
 	if err != nil {
 		return false, err
 	}
 	n.SetHistoryRC(a.settings.Get().HistoryRC)
-	return n.SetHistory(on)
+	return n.SetHistory(on, restart)
 }
 
 // HistoryEnter takes what was typed in the History pane: a note is added

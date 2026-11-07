@@ -366,6 +366,10 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		Environ:     reportOpts.Env,
 		Mode:        mode,
 		Audit:       log,
+		// A stopped or timed-out block is interrupted and its shell
+		// kept; one that won't stop has its shell killed after this,
+		// as nobody may be there to ask.
+		KillAfter: run.KillAfter,
 	}
 	if file != "" {
 		if abs, err := filepath.Abs(file); err == nil {
@@ -529,6 +533,8 @@ func stopNote(d *doc.Document, results []*run.Result) string {
 		case r.Declined:
 			return fmt.Sprintf("stopped before block %s", d.Label(r.Block))
 		case !r.Ran || !unreached(results[i+1:]):
+		case r.TimedOut && !r.Exited:
+			return fmt.Sprintf("block %s %v, so the run stopped there", d.Label(r.Block), r.Err)
 		case r.Exited && r.Err != nil:
 			return fmt.Sprintf("block %s %v, which ended its shell, so the run stopped there", d.Label(r.Block), r.Err)
 		case r.Exited:

@@ -83,6 +83,12 @@ func (s *Shell) Background(ctx context.Context, script, pidVar string) (*Job, er
 	if j.PID, err = strconv.Atoi(out.String()); err != nil {
 		return nil, fmt.Errorf("starting background job: bad pid %q", out.String())
 	}
+	s.jobMu.Lock()
+	if s.jobs == nil {
+		s.jobs = map[int]bool{}
+	}
+	s.jobs[j.PID] = true
+	s.jobMu.Unlock()
 	return j, nil
 }
 

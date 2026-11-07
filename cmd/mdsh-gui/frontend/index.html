@@ -137,7 +137,10 @@
   <section id="console" aria-label="Console" hidden>
     <div id="console-grip" title="Drag to resize" role="separator" aria-orientation="horizontal" aria-label="Height of the console: drag, or press up and down" aria-valuemin="48" aria-valuemax="2000" aria-valuenow="160" tabindex="0"></div>
     <div class="console-bar">
-      <span class="console-title">Console</span>
+      <div class="console-tabs" role="tablist" aria-label="Console">
+        <button id="console-tab-log" role="tab" aria-selected="true" aria-controls="console-log" title="What the app logs: errors and notes">Console</button>
+        <button id="console-tab-events" role="tab" aria-selected="false" aria-controls="events-log" tabindex="-1" title="What this file's shells and blocks did, and why">Events</button>
+      </div>
       <span id="console-note" role="status"></span>
       <button id="console-copy" title="Copy the selected lines, or all of them">Copy</button>
       <button id="console-clear" title="Clear the console in every window">Clear</button>
@@ -145,6 +148,8 @@
     </div>
     <div id="console-log" role="log" tabindex="0"></div>
     <p id="console-empty" class="muted">Errors and notes from mdsh show up here.</p>
+    <div id="events-log" role="log" tabindex="0" aria-label="Events" hidden></div>
+    <p id="events-empty" class="muted" hidden>What this file's shells and blocks do shows up here: shells starting and ending, and why, blocks running and the file changing on disk.</p>
   </section>
   <section id="history" class="closed" aria-label="History" hidden>
     <div id="history-grip" title="Drag to resize" role="separator" aria-orientation="horizontal" aria-label="Height of the history transcript, in lines: drag, or press up and down" aria-valuemin="1" aria-valuemax="200" aria-valuenow="12" tabindex="0"></div>
@@ -305,10 +310,20 @@
   <dialog id="clear-dialog" aria-labelledby="clear-title">
     <form method="dialog">
       <h2 id="clear-title">Clear all outputs?</h2>
-      <p class="muted">Every block's output, output copy and stored value goes from the document, and the shells start again. Nothing is saved until you save.</p>
+      <p class="muted">Every block's output, output copy and stored value goes from the document. The shells keep the variables, functions and aliases blocks set; Restart Shells clears those. Nothing is saved until you save.</p>
       <div class="buttons">
         <button value="cancel" formnovalidate>Cancel</button>
         <button id="clear-ok" value="clear" class="danger">Clear</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="shell-dialog" aria-labelledby="shell-title" aria-describedby="shell-text">
+    <form method="dialog">
+      <h2 id="shell-title"></h2>
+      <p id="shell-text" class="muted"></p>
+      <div class="buttons">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="shell-ok" value="ok" class="danger"></button>
       </div>
     </form>
   </dialog>
