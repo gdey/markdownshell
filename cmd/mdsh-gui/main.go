@@ -185,7 +185,14 @@ func mdshGUI(o options) error {
 	a.app = app
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		a.started.Store(true)
+		go a.systemOpensReady()
 		go cons.send(app.Context(), func(e ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
+	})
+	// Finder's Open With, a double click on a file mdsh is the default
+	// for, or a file dropped on the Dock icon arrives here, not in
+	// os.Args.
+	app.Event.OnApplicationEvent(events.Common.ApplicationOpenedWithFile, func(e *application.ApplicationEvent) {
+		a.openFromSystem(e.Context().Filename())
 	})
 	a.menu = a.buildMenu()
 	a.buildSourceMenu()
