@@ -2685,6 +2685,15 @@ function drawOutline() {
   // same entry.
   const focused = nav.contains(document.activeElement) ? (document.activeElement as HTMLElement).closest<HTMLElement>(".row")?.dataset.line : undefined;
   nav.replaceChildren(...(items.length ? items : [el("p", { className: "muted" }, "No headings or blocks")]));
+  outlineRows = new Map();
+  activeRows = [];
+  for (const row of items) {
+    const key = row.dataset.block !== undefined ? "b" + row.dataset.block : row.dataset.section ? "s" + row.dataset.section : "";
+    if (!key) continue;
+    const list = outlineRows.get(key) ?? [];
+    outlineRows.set(key, list);
+    list.push(row);
+  }
   if (focused !== undefined) nav.querySelector<HTMLElement>(`.row[data-line="${focused}"] .item`)?.focus();
   markOutline();
 }
@@ -2700,18 +2709,67 @@ $("outline").addEventListener("keydown", (e) => {
 });
 
 // markOutline shows the play button on the selected block's or
-// heading's entry.
+// heading's entry. Only the entries marked before and the ones to mark
+// now are touched, found in outlineRows: going through every entry, on
+// each move of the selection, was slow on a long document.
+//
+// A newly selected entry is scrolled into the outline's view. The
+// outline doesn't follow the rendered view's scrolling, and once the
+// outline is scrolled by hand it stays there until something else is
+// selected.
 function markOutline() {
   const b = blocks()[selected]?.dataset.block;
-  for (const row of document.querySelectorAll<HTMLElement>("#outline .row")) {
-    const on = row.dataset.section !== undefined ? !!selectedSection && row.dataset.section === selectedSection : row.dataset.block === b;
-    row.classList.toggle("active", on);
-    const item = row.querySelector(".item");
-    if (on) item?.setAttribute("aria-current", "true");
-    else item?.removeAttribute("aria-current");
+  const key = selectedSection ? "s" + selectedSection : b !== undefined ? "b" + b : "";
+  const rows = (key && outlineRows.get(key)) || [];
+  for (const row of activeRows) {
+    if (rows.includes(row)) continue;
+    row.classList.remove("active");
+    row.querySelector(".item")?.removeAttribute("aria-current");
   }
+  for (const row of rows) {
+    row.classList.add("active");
+    row.querySelector(".item")?.setAttribute("aria-current", "true");
+  }
+  activeRows = rows;
+  if (key !== outlineShown) revealRow(key, rows[0]);
   markDeps();
 }
+
+// outlineRows holds the outline's entries by what selects them: "b"
+// and a block's number, or "s" and a heading's section.
+let outlineRows = new Map<string, HTMLElement[]>();
+let activeRows: HTMLElement[] = [];
+
+// outlineShown is what was last scrolled into the outline's view, so that
+// drawing the outline again, or selecting the same block again as the
+// view redraws, leaves the outline where the user scrolled it.
+let outlineShown = "";
+
+// revealRow scrolls the outline just enough to show row, the entry for
+// key, once the browser is ready to paint, so the selection doesn't
+// wait for the page to be laid out. With the outline hidden, or the
+// entry not drawn yet, it waits for the next time the outline is marked.
+function revealRow(key: string, row: HTMLElement | undefined) {
+  if (!key) {
+    outlineShown = "";
+    return;
+  }
+  const nav = $("outline");
+  if (!row || nav.hidden || !nav.contains(row)) return;
+  outlineShown = key;
+  cancelAnimationFrame(revealFrame);
+  revealFrame = requestAnimationFrame(() => {
+    if (!nav.contains(row)) return;
+    const box = nav.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    if (r.top >= box.top && r.bottom <= box.bottom) return;
+    const by = r.top < box.top ? r.top - box.top - 8 : r.bottom - box.bottom + 8;
+    // A long way goes at once, as the rendered view's jumps do.
+    nav.scrollTo({ top: nav.scrollTop + by, behavior: Math.abs(by) > nav.clientHeight ? "auto" : scrollBehavior() });
+  });
+}
+
+let revealFrame = 0;
 
 // blockMark is the mark for a block card's state: ? waiting for an
 // answer, ▶ the run's current step, ◐ running in the background, ✗

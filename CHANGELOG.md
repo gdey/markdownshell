@@ -20,6 +20,20 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
 
+### Changed
+
+- mdsh-gui's outline keeps the selected block or heading in sight.
+  Selecting one in the rendered view, by clicking it, moving to it with
+  j and k, or moving the source view's cursor into it, scrolls the
+  outline just enough to show its entry. Scrolling the rendered view
+  leaves the outline where it is, so the entry stays there to go back
+  to, and an outline scrolled by hand stays put until something else is
+  selected. Marking the selected entry also no longer goes through
+  every entry of the outline, which made each move of the selection
+  slow on documents of 100,000 lines with the outline open.
+
+  ![The rendered view scrolled back to the top, the outline still showing the selected block, step61, near its bottom](docs/changelog/outline-follows-selection.png)
+
 ## [1.4.1] - 2026-11-07
 
 mdsh-gui keeps up with long documents. Scrolling is smoother, typing in
