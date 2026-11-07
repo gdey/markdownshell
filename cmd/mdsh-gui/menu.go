@@ -318,10 +318,11 @@ func (a *App) recentItems() {
 	}
 }
 
-// addHelpMenu adds the Help menu, whose Changelog opens the changelog
-// built into the app in a read-only tab.
+// addHelpMenu adds the Help menu, whose Cheat Sheet and Changelog open
+// the pages built into the app, each in a read-only tab.
 func (a *App) addHelpMenu(m *application.Menu) {
 	help := m.AddSubmenu("Help")
+	help.Add("Cheat Sheet").OnClick(func(*application.Context) { go a.ShowCheatsheet() })
 	help.Add("Changelog").OnClick(func(*application.Context) { go a.ShowChangelog() })
 }
 

@@ -92,6 +92,13 @@ export function Changelog(): $CancellablePromise<string> {
 }
 
 /**
+ * Cheatsheet is the app's cheat sheet, rendered, for its tab.
+ */
+export function Cheatsheet(): $CancellablePromise<string> {
+    return $Call.ByName("main.App.Cheatsheet");
+}
+
+/**
  * CheckInfos checks the attributes in fences' info strings. The source
  * pane asks about every new one in one call: a long document has
  * thousands, and asking about each in turn took seconds.
@@ -789,6 +796,14 @@ export function Settings(): $CancellablePromise<settings$0.Settings> {
  */
 export function ShowChangelog(): $CancellablePromise<void> {
     return $Call.ByName("main.App.ShowChangelog");
+}
+
+/**
+ * ShowCheatsheet brings the cheat sheet's tab forward, opening one as
+ * ShowChangelog does.
+ */
+export function ShowCheatsheet(): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ShowCheatsheet");
 }
 
 /**
