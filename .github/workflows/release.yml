@@ -4,7 +4,8 @@ name: Release
 # CHANGELOG.md into a dated "## [X.Y.Z] - YYYY-MM-DD" section; when that
 # lands on main and vX.Y.Z isn't tagged yet, this builds the CLI and the
 # signed desktop app, tags the merge commit vX.Y.Z, publishes the GitHub
-# release with that section as its notes, and updates the Homebrew tap.
+# release with that section and a What's Changed list of the pull
+# requests as its notes, and updates the Homebrew tap.
 # A push to main whose newest section is already tagged does nothing.
 #
 # Pushing a vX.Y.Z tag by hand, or running this from the Actions tab,
@@ -83,18 +84,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Release notes from CHANGELOG.md
-        run: |
-          # The section under "## [X.Y.Z]", up to the next heading or the
-          # link references at the end.
-          awk -v v="${TAG#v}" '
-            /^## \[/ { p = index($0, "[" v "]") > 0; next }
-            /^\[[^]]*\]: / { p = 0 }
-            p' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
-          if ! grep -q . "$RUNNER_TEMP/notes.md"; then
-            echo "CHANGELOG.md has no section for $TAG" >&2
-            exit 1
-          fi
+      # Fail before tagging if the changelog has no section for this
+      # version; the notes job writes the release notes from it.
+      - name: CHANGELOG.md has a section
+        run: grep -q "^## \[${TAG#v}\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $TAG" >&2; exit 1; }
       - name: mdsh-gui's packages
         uses: actions/download-artifact@v4
         with:
@@ -115,10 +108,18 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --release-notes ${{ runner.temp }}/notes.md
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ needs.version.outputs.tag }}
+
+  # goreleaser published v1.4.1 with empty notes (its changelog is off), so
+  # they are written here: the CHANGELOG.md section and What's Changed.
+  notes:
+    needs: [version, release]
+    uses: ./.github/workflows/release-notes.yml
+    with:
+      tag: ${{ needs.version.outputs.tag }}
 
   # Called here because a release published with the workflow's own token
   # doesn't start tap.yml's "release: published" trigger.
