@@ -43,71 +43,98 @@ show()
 -- after this; a config that opens its own buffer shouldn't hide ours.
 vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = show })
 
--- :w hands the text to mdsh-gui, which saves the file.
-vim.api.nvim_create_autocmd("BufWriteCmd", {
-  group = group,
-  buffer = buf,
-  callback = function()
-    vim.rpcnotify(chan, "mdsh_write", table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n") .. "\n")
-  end,
-})
-
--- Typing sends the whole text after a short pause, as the CodeMirror
--- source pane does.
+-- Typing sends the lines it changed after a short pause, as the
+-- CodeMirror source pane does, rather than the whole text: dirty is the
+-- lines typed in since the last send, as lines [lo, old) of the text as
+-- last sent that are lines [lo, new) now. seq counts what changed the
+-- text as mdsh-gui knows it: each send, and each of mdsh-gui's edits.
+local dirty = nil
+local seq = 0
 local timer = vim.uv.new_timer()
 local function send()
-  if vim.api.nvim_buf_is_valid(buf) then
-    vim.rpcnotify(chan, "mdsh_text", table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n") .. "\n")
+  timer:stop()
+  if not dirty or not vim.api.nvim_buf_is_valid(buf) then
+    return
   end
+  local d = dirty
+  dirty = nil
+  seq = seq + 1
+  vim.rpcnotify(chan, "mdsh_lines", seq, d.lo, d.old, vim.api.nvim_buf_get_lines(buf, d.lo, d.new, false))
 end
 vim.api.nvim_buf_attach(buf, false, {
-  on_lines = function()
+  on_lines = function(_, _, _, first, last, new_last)
     if applying then
       return
+    end
+    if not dirty then
+      dirty = { lo = first, old = last, new = new_last }
+    else
+      -- Lines past dirty.new are dirty.new - dirty.old further on now
+      -- than in the text as last sent.
+      dirty = {
+        lo = math.min(dirty.lo, first),
+        old = math.max(dirty.old, last - dirty.new + dirty.old),
+        new = math.max(dirty.new, last) + new_last - last,
+      }
     end
     timer:stop()
     timer:start(300, 0, vim.schedule_wrap(send))
   end,
 })
 
+-- :w sends what was typed, then asks mdsh-gui to save the file once it
+-- has it.
+vim.api.nvim_create_autocmd("BufWriteCmd", {
+  group = group,
+  buffer = buf,
+  callback = function()
+    send()
+    vim.rpcnotify(chan, "mdsh_write", seq)
+  end,
+})
+
 -- mdsh is what mdsh-gui calls into.
 _G.mdsh = {
-  -- set_text replaces the text, as after a run writes its output,
-  -- keeping the view where it was.
-  set_text = function(l)
-    local wins = vim.fn.win_findbuf(buf)
-    local views = {}
-    for _, w in ipairs(wins) do
-      views[w] = vim.api.nvim_win_call(w, vim.fn.winsaveview)
-    end
-    set_lines(l)
-    for w, v in pairs(views) do
-      vim.api.nvim_win_call(w, function() vim.fn.winrestview(v) end)
-    end
-  end,
   -- saved marks the buffer unchanged once mdsh-gui wrote the file.
   saved = function()
     vim.bo[buf].modified = false
   end,
 }
 
--- apply makes edits, each replacing lines [start, end), counted from 0,
--- that hold old with new, last first. If any edit's lines don't hold old
--- any more, as when typing moved them, it changes nothing and returns
--- false: mdsh-gui then sets the whole text.
-function mdsh.apply(edits)
-  for _, e in ipairs(edits) do
-    if not vim.deep_equal(vim.api.nvim_buf_get_lines(buf, e.start, e["end"], false), e.old or {}) then
-      return false
-    end
+-- apply_lines makes mdsh-gui's edits, each replacing lines [first,
+-- last), counted from 0, with lines, in order and not overlapping, made
+-- against the text as of seen, mdsh-gui's count of what changed it. If
+-- something was typed that mdsh-gui hasn't had, it sends that, changes
+-- nothing and returns false: mdsh-gui folds the typing in and tries
+-- again.
+function mdsh.apply_lines(seen, edits)
+  if dirty then
+    send()
+    return false
+  end
+  if seen ~= seq then
+    return false
   end
   applying = true
-  for i = #edits, 1, -1 do
-    local e = edits[i]
-    vim.api.nvim_buf_set_lines(buf, e.start, e["end"], false, e.new or {})
-  end
+  local ok, err = pcall(function()
+    for i = #edits, 1, -1 do
+      local e = edits[i]
+      vim.api.nvim_buf_set_lines(buf, e.first, e.last, true, e.lines or {})
+    end
+  end)
   applying = false
+  seq = seq + 1
+  if not ok then
+    error(err)
+  end
   return true
+end
+
+-- snapshot is the buffer's lines and seq, once what was typed is sent,
+-- for a page catching up with a Neovim already running.
+function mdsh.snapshot()
+  send()
+  return { lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false), seq = seq }
 end
 
 -- What mdsh-gui hears from the buffer, as "mdsh_event" notifications
@@ -141,14 +168,15 @@ function mdsh.call(fn, args)
   return vim.json.encode(out)
 end
 
--- state is the text as it is now, sent at once rather than after the
--- pause typing waits for, with the mode, the cursor and, in visual
--- mode, the other end of the selection. Lines count from 1 and columns
+-- state sends what was typed at once, rather than after the pause
+-- typing waits for, and reports seq once it is sent, the mode, the
+-- cursor and, in visual mode, the other end of the selection. Lines count from 1 and columns
 -- are bytes from 0.
 function calls.state()
+  send()
   local w = win()
   local st = {
-    text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n") .. "\n",
+    seq = seq,
     mode = vim.api.nvim_get_mode().mode,
   }
   if w then

@@ -8,13 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
 )
 
 // The source pane as an embedded Neovim, for the frontend's nvim.ts.
 // Each tab with the pane open has its own Neovim. Its redraws come to the
-// page as "nvim-redraw" events, its edits as "nvim-text" and :w as
-// "nvim-write", and what else the buffer reports (the cursor moving,
+// page as "nvim-redraw" events, the lines typed in it as "nvim-lines"
+// and :w as "nvim-write", and what else the buffer reports (the cursor moving,
 // :RunBlock, …) as "nvim-event"; "nvim-exit" says it quit.
 
 // NeovimInfo is what the Settings window shows about Neovim.
@@ -40,24 +41,25 @@ func (a *App) Neovim() NeovimInfo {
 
 // NvimStart starts the tab's Neovim with a grid of cols by rows, editing
 // the file's text, with 'background' set to "light" or "dark" to match
-// the page. It returns the text Neovim started with, the base for
-// SetText. A running one is left as it is.
-func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) (string, error) {
+// the page. A running one is left as it is.
+func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) (NvimText, error) {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
-		return "", err
+		return NvimText{}, err
 	}
 	t.mu.Lock()
-	running := t.nvim != nil
+	running := t.nvim
 	t.mu.Unlock()
-	text := n.Text()
-	if running {
-		return text, nil
+	text, v := n.TextAt()
+	st := NvimText{Text: text, Version: v, Buffer: text}
+	if running != nil {
+		st.Buffer, st.Seq, err = running.Snapshot()
+		return st, err
 	}
 	s := a.settings.Get()
 	f, err := nvim.Find(s.NeovimPath)
 	if err != nil {
-		return "", err
+		return NvimText{}, err
 	}
 	// The language server is this program, run with --lsp.
 	var lspCmd []string
@@ -66,18 +68,18 @@ func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) 
 	}
 	var e *nvim.Editor
 	e, err = nvim.Start(nvim.Options{
-		Path:    f.Path,
-		Cols:    cols,
-		Rows:    rows,
-		Name:    "mdsh://" + filepath.Base(n.File()),
-		Text:    text,
-		Clean:   s.NeovimClean,
-		Dark:    background == "dark",
-		LSP:     lspCmd,
-		Redraw:  func(ev [][]any) { t.emitNow("nvim-redraw", ev) },
-		Changed: func(text string) { t.emitNow("nvim-text", text) },
-		Write:   func(text string) { t.emitNow("nvim-write", text) },
-		Event:   func(name, data string) { t.emitNow("nvim-event", NvimEvent{name, data}) },
+		Path:   f.Path,
+		Cols:   cols,
+		Rows:   rows,
+		Name:   "mdsh://" + filepath.Base(n.File()),
+		Text:   text,
+		Clean:  s.NeovimClean,
+		Dark:   background == "dark",
+		LSP:    lspCmd,
+		Redraw: func(ev [][]any) { t.emitNow("nvim-redraw", ev) },
+		Lines:  func(l nvim.Lines) { t.emitNow("nvim-lines", l) },
+		Write:  func(seq int) { t.emitNow("nvim-write", seq) },
+		Event:  func(name, data string) { t.emitNow("nvim-event", NvimEvent{name, data}) },
 		Exit: func(err error) {
 			t.mu.Lock()
 			if t.nvim == e {
@@ -92,12 +94,24 @@ func (a *App) NvimStart(ctx context.Context, cols, rows int, background string) 
 		},
 	})
 	if err != nil {
-		return "", err
+		return NvimText{}, err
 	}
 	t.mu.Lock()
 	t.nvim = e
 	t.mu.Unlock()
-	return text, nil
+	return st, nil
+}
+
+// NvimText is what NvimStart answers: the file's text and its version,
+// for Edit, and Neovim's text and seq, the count of its changes it sent
+// and edits it took. A Neovim that just started has the file's text, at
+// seq 0; one already running has its own, typing the file doesn't have
+// yet included.
+type NvimText struct {
+	Text    string           `json:"text"`
+	Version notebook.Version `json:"version"`
+	Buffer  string           `json:"buffer"`
+	Seq     int              `json:"seq"`
 }
 
 var errNoNvim = errors.New("Neovim isn't running")
@@ -156,32 +170,17 @@ func (a *App) NvimResize(ctx context.Context, cols, rows int) error {
 	return e.Resize(cols, rows)
 }
 
-// NvimSetText replaces Neovim's text, as after a run writes output and
-// the page merged it with what was typed. Before Neovim runs there is
-// nothing to do: NvimStart takes the text.
-func (a *App) NvimSetText(ctx context.Context, text string) error {
+// NvimApply makes edits on Neovim's text, as the page merged Go's
+// changes with what was typed, made against its text as of seq, the
+// count of the nvim-lines events the page has had and its own NvimApply
+// calls. It reports false, changing nothing, if Neovim has typing the
+// page hasn't had: that comes as nvim-lines, and the page tries again.
+func (a *App) NvimApply(ctx context.Context, seq int, edits []nvim.LineEdit) (bool, error) {
 	e, err := a.editor(ctx)
-	if errors.Is(err, errNoNvim) {
-		return nil
-	}
 	if err != nil {
-		return err
+		return false, err
 	}
-	return e.SetText(text)
-}
-
-// NvimApply gives Neovim text, Go's text merged with what was typed, as
-// edits to the text Neovim last had, so typing elsewhere in the moment
-// since isn't lost. If an edit's lines changed, the whole text is set.
-func (a *App) NvimApply(ctx context.Context, text string, edits []nvim.Edit) error {
-	e, err := a.editor(ctx)
-	if errors.Is(err, errNoNvim) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return e.ApplyEdits(text, edits)
+	return e.ApplyLines(seq, edits)
 }
 
 // NvimEvent is something the Neovim buffer reports: its name, such as

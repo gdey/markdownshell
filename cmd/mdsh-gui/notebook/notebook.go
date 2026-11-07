@@ -237,6 +237,8 @@ type Notebook struct {
 	quit    chan struct{}
 	// undo and redo are the rendered view's edits, for Undo and Redo.
 	undo, redo []change
+	// lines is the text's changes as line events, for Edit.
+	lines lineLog
 }
 
 // reapEvery is how often a notebook checks on background blocks while
@@ -281,6 +283,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		bg:      map[*doc.Block]bool{},
 		quit:    make(chan struct{}),
 		noteEnd: -1,
+		lines:   newLineLog(d.Src),
 	}
 	n.idle = sync.NewCond(&n.mu)
 	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer(), diagramTransformer()), goldmark.WithRendererOptions(diagramRendererOption()))
