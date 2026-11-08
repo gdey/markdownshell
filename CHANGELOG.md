@@ -48,6 +48,13 @@ follow [Semantic Versioning](https://semver.org/).
   the window in front.
 
   ![mdsh opened from Finder's Open With, showing the file in its window rather than the start screen](docs/changelog/open-with.png)
+- On macOS, Escape in mdsh-gui's code editor with vim mode on no longer
+  takes a fullscreen window out of fullscreen. An Escape that vim had
+  nothing to do with, such as one in normal mode or the second of a
+  double press, went on to the window, which left fullscreen. To leave
+  fullscreen use View › Exit Full Screen (⌃⌘F) or the green button.
+
+  ![mdsh-gui still fullscreen after Escape in vim normal mode, the block cursor in the code editor](docs/changelog/vim-escape-fullscreen.png)
 
 ## [1.4.1] - 2026-11-07
 
