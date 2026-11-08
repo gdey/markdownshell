@@ -3,6 +3,7 @@ module github.com/gdey/markdownshell/cmd/mdsh-gui
 go 1.27
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/evanw/esbuild v0.28.2
 	github.com/gdey/markdownshell v0.0.0
 	github.com/neovim/go-client v1.2.1
