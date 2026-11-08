@@ -1,4 +1,31 @@
-/* The Witchcraft look (Settings › Look): purple, and a little occult.
+/* +++
+id = "witch"
+name = "Witchcraft"
+order = 40
+since = "1.5"
+description = "Witchcraft writes the document on a scroll of speckled kraft paper, framed in a double line with flourishes, against a sky of stars and crescent moons, with carved capitals for headings, or deep plum and gold when the theme is dark."
+tagline = "for a purple grimoire under the moon"
+tokens = "--witch-"
+
+[texture]
+label = "Grimoire"
+rules = "Stars and moons"
+shadows = "Glow around cards"
+
+[[screenshots]]
+file = "witchcraft-light.png"
+alt = "The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run"
+
+[[screenshots]]
+file = "witchcraft-dark.png"
+alt = "The Witchcraft look with the dark theme: the scroll in deep plum, ruled in gold"
+
+[[screenshots]]
+file = "witchcraft-settings-look.png"
+alt = "Settings › Look with Witchcraft chosen: the stars and moons and the glow around cards can be turned off"
++++
+
+   The Witchcraft look (Settings › Look): purple, and a little occult.
    The light theme is a grimoire: the document written in aubergine ink
    on a scroll of speckled kraft paper, framed in a double line with a
    flourish in each corner, hung against a lavender sky of stars and

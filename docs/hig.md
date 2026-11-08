@@ -58,7 +58,7 @@ is the GUI's design, and the accessibility audit lives in the project's
 | History shell | no | `h` pane | cmd/ctrl+shift+H pane |
 | Outline | no | `o` | cmd/ctrl+shift+O, sidebar icon |
 | Help | `-h`, `mdsh ctl help` | `?` panel, grouped, greyed with a reason when a key does nothing | menus with accelerators; tooltips name the key |
-| Themes | terminal colors | light and dark adaptive colors | System / Light / Dark, Looks: Plain, Blueprint, Teletype, Bubble Gum, Witchcraft; text size, fonts, accent |
+| Themes | terminal colors | light and dark adaptive colors | System / Light / Dark, a Look (Plain, or one of those in `cmd/mdsh-gui/frontend/looks`); text size, fonts, accent |
 
 ## Errors, warnings and status
 
@@ -245,7 +245,7 @@ messages and the changelog.
 | save, Save As…, autosave, "output not saved" | write, dirty, modified | saving |
 | report | export | a PDF, HTML or markdown copy of a run |
 | session | daily note | a file named for the day in the sessions folder |
-| Look | theme, skin | Plain, Blueprint, Teletype, Bubble Gum, Witchcraft; "theme" is System, Light, Dark |
+| Look | theme, skin | Plain, Teletype and the others in Settings › Look; "theme" is System, Light, Dark |
 | depends on | requires, needs | the `depends=` attribute |
 | collection | folder, workspace | a folder with an `.mdsh.yaml` |
 
