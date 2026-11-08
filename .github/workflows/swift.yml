@@ -20,7 +20,9 @@ on:
 
 jobs:
   macos:
-    runs-on: macos-15
+    # On the Neo, the self-hosted Mac set aside for this work. Pull requests
+    # from forks stay on GitHub's runners, so outside code never runs there.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'neo' || 'macos-15' }}
     permissions:
       contents: write
     defaults:
@@ -32,6 +34,8 @@ jobs:
         with:
           go-version-file: cmd/mdsh-swift/bridge/go.mod
           cache-dependency-path: cmd/mdsh-swift/bridge/go.sum
+          # A self-hosted runner keeps Go's caches on its own disk.
+          cache: ${{ runner.environment != 'self-hosted' }}
       - name: Test the bridge
         working-directory: cmd/mdsh-swift/bridge
         run: |
@@ -42,8 +46,16 @@ jobs:
         run: scripts/build-app.sh debug
       - name: Test MdshKit against the bridge
         run: MDSH_SWIFT_BRIDGE="$PWD/build/mdsh-swift-bridge" swift test
+      # The screenshots open windows, and threads drive the Neo's desktop
+      # by hand, so take turns. neo-desktop is installed on the Neo.
+      - name: Wait for the desktop
+        if: runner.environment == 'self-hosted'
+        run: neo-desktop acquire "ci-run-$GITHUB_RUN_ID"
       - name: Screenshots
         run: scripts/screenshots.sh build/screenshots
+      - name: Give the desktop back
+        if: always() && runner.environment == 'self-hosted'
+        run: neo-desktop release "ci-run-$GITHUB_RUN_ID"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
