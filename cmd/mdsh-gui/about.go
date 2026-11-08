@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/shellrc"
+	"github.com/gdey/markdownshell/shellrc"
 )
 
 // version is set by release builds with -ldflags "-X main.version=...",

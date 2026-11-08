@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/nvim"
+	"github.com/gdey/markdownshell/notebook"
+	"github.com/gdey/markdownshell/nvim"
 )
 
 // The source pane as an embedded Neovim, for the frontend's nvim.ts.

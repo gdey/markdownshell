@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
 	"github.com/gdey/markdownshell/docroot"
+	"github.com/gdey/markdownshell/notebook"
 )
 
 // docCSP is the Content-Security-Policy sent with the files beside the
@@ -22,7 +22,7 @@ const docCSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inli
 func (a *App) assets(pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/appicon.svg" {
-			http.ServeFileFS(w, r, frontend, "build/appicon.svg")
+			http.ServeFileFS(w, r, appicon, "build/appicon.svg")
 			return
 		}
 		if name, ok := strings.CutPrefix(r.URL.Path, changelogImages); ok {

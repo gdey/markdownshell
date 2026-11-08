@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
+	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/web"
 )
 
 var (
@@ -76,7 +77,7 @@ var lookAttr = regexp.MustCompile(`data-look="(\w+)"`)
 // tokens prefix, such as --tty-*) must be set in its dark palette as well
 // as its light one.
 func TestLookTokens(t *testing.T) {
-	plain := cssVars(t, "frontend/style.css", palette)
+	plain := cssVars(t, "../../web/style.css", palette)
 	if len(plain["light"]) < 40 || len(plain["dark"]) < 40 {
 		t.Fatalf("found %d light and %d dark tokens in style.css; is the parse right?", len(plain["light"]), len(plain["dark"]))
 	}
@@ -95,7 +96,7 @@ func TestLookTokens(t *testing.T) {
 		}
 	}
 	paneCovers("plain", plain, "")
-	for _, look := range allLooks[1:] {
+	for _, look := range web.Looks[1:] {
 		sets := cssVars(t, lookCSS(look), palette)
 		prefix := look.ID + " "
 		for _, scheme := range []string{"light", "dark"} {
@@ -133,7 +134,7 @@ func TestEditedSettings(t *testing.T) {
 	if cur.SessionFolder != "~/notes" || cur.SessionTemplate != "/t/session.md" {
 		t.Errorf("session settings = %q, %q", cur.SessionFolder, cur.SessionTemplate)
 	}
-	for _, look := range allLooks {
+	for _, look := range web.Looks {
 		edited(&cur, settings.Settings{Look: look.ID})
 		if cur.Look != look.ID {
 			t.Errorf("%s look dropped: %q", look.Name, cur.Look)
@@ -206,8 +207,8 @@ func TestLookContrast(t *testing.T) {
 	text := [][2]string{{"--fg", "--bg"}, {"--muted", "--bg"}, {"--fg", "--code-bg"}, {"--muted", "--code-bg"}, {"--accent-fg", "--accent"}, {"--bad-fg", "--bad"}, {"--link", "--bg"}}
 	edge := [][2]string{{"--accent", "--bg"}}
 	type checked struct{ name, file, prefix string }
-	checks := []checked{{"plain", "frontend/style.css", ""}}
-	for _, look := range allLooks[1:] {
+	checks := []checked{{"plain", "../../web/style.css", ""}}
+	for _, look := range web.Looks[1:] {
 		if !look.ContrastGaps {
 			checks = append(checks, checked{look.Name, lookCSS(look), look.ID + " "})
 		}

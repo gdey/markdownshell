@@ -13,18 +13,19 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/fonts"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/session"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/shellrc"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/docroot"
+	"github.com/gdey/markdownshell/fonts"
 	"github.com/gdey/markdownshell/library"
+	"github.com/gdey/markdownshell/looks"
+	"github.com/gdey/markdownshell/notebook"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/session"
+	"github.com/gdey/markdownshell/settings"
+	"github.com/gdey/markdownshell/shellrc"
 	"github.com/gdey/markdownshell/termrec"
+	"github.com/gdey/markdownshell/web"
 	"github.com/gdey/markdownshell/writable"
 )
 
@@ -718,7 +719,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 		cur.Theme = s.Theme
 	}
 	cur.Look = ""
-	if looks.Valid(allLooks, s.Look) {
+	if looks.Valid(web.Looks, s.Look) {
 		cur.Look = s.Look
 	}
 	cur.TextSize = 0

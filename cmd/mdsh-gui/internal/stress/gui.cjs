@@ -17,7 +17,8 @@
 // --lazy is the most cells a document has with every card drawn; past
 // it, cards out of sight are stubs (lazyCells in app.ts). --check sets
 // it to 100, so the short documents it types into have stubs too.
-// Each document is written by stressdoc, so go must be on the PATH.
+// Each document is written by stressdoc, in the root module's
+// internal/stress, so go must be on the PATH.
 
 const { chromium } = require("playwright");
 const { execFileSync, spawn } = require("child_process");
@@ -45,6 +46,7 @@ if (!server) {
 }
 
 const gui = path.resolve(__dirname, "../..");
+const root = path.resolve(gui, "../..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mdsh-stress-"));
 let failed = false;
 
@@ -128,7 +130,7 @@ const typeAt = (page, text) =>
 
 async function run(shape, lines) {
   const file = path.join(tmp, `${shape}-${lines}.md`);
-  fs.writeFileSync(file, execFileSync("go", ["run", "./internal/stress/stressdoc", "-shape", shape, "-lines", String(lines)], { cwd: gui, maxBuffer: 1 << 30 }));
+  fs.writeFileSync(file, execFileSync("go", ["run", "./internal/stress/stressdoc", "-shape", shape, "-lines", String(lines)], { cwd: root, maxBuffer: 1 << 30 }));
   const proc = await serve(file);
   const browser = await chromium.launch();
   try {

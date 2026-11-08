@@ -66,7 +66,7 @@ echo "CHANGELOG.md is ready for $VERSION"
 Every minor release brings a new look for the desktop app (1.3 brought
 Teletype and Blueprint, 1.4 Bubble Gum, 1.5 Witchcraft; see
 [Adding a look](../../docs/looks.md)). For an `X.Y.0` release this
-checks that a look in `cmd/mdsh-gui/frontend/looks` has
+checks that a look in `web/looks` has
 `since = "X.Y"` and that the release's changelog section names it.
 Patch releases skip it.
 
@@ -75,7 +75,7 @@ v="${VERSION#v}"
 case "$v" in
   *.0)
     minor="${v%.0}"
-    looks="$(grep -l "^since = \"$minor\"$" cmd/mdsh-gui/frontend/looks/*/look.css 2>/dev/null)"
+    looks="$(grep -l "^since = \"$minor\"$" web/looks/*/look.css 2>/dev/null)"
     [ -n "$looks" ] ||
       { echo "no look has since = \"$minor\": every minor release brings a new look (docs/looks.md)" >&2; exit 1; }
     section="$(awk -v v="$v" '

@@ -13,11 +13,11 @@ import (
 var hardHint = regexp.MustCompile(`"[^"\n]*(?i:cmd/ctrl|ctrl/cmd)[^"\n]*"`)
 
 func TestShortcutHintsAreWrittenForThePlatform(t *testing.T) {
-	files, err := filepath.Glob("frontend/src/*.ts")
+	files, err := filepath.Glob("../../web/src/*.ts")
 	if err != nil {
 		t.Fatal(err)
 	}
-	files = append(files, "frontend/index.html", "frontend/window.html", "frontend/settings.html")
+	files = append(files, "../../web/index.html", "../../web/window.html", "../../web/settings.html")
 	for _, f := range files {
 		src, err := os.ReadFile(f)
 		if err != nil {

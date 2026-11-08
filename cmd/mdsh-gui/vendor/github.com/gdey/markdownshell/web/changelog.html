@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Nothing a document holds may load from the network; see csp_test.go. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OKxuUMfPrzQq3XhEnBLzaiAjTx/xY9aFq+d83FQkwSw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'self'; base-uri 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Changelog</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="bundle/looks.css">
+  <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <script type="module" src="bundle/changelog.js"></script>
+</head>
+<body class="changelog">
+  <header aria-label="Changelog">
+    <span id="file">Changelog</span>
+    <span class="chip" title="The changelog built into this app. It can't be edited or run.">Read-only</span>
+    <span id="status" class="muted"></span>
+  </header>
+  <div id="changelog-scroll">
+    <main id="changelog" class="prose" tabindex="-1" aria-busy="true"></main>
+  </div>
+</body>
+</html>

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/notebook"
 )
 
 // The rendered view doesn't load images from other sites on its own:

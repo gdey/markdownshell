@@ -8,6 +8,31 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Each block's output says how long ago the run that made it started,
+  from its `at=`: "42 secs ago" under a minute, then minutes, hours,
+  days, weeks, months and years. mdsh-gui shows it on the output's
+  title bar and keeps it current, with the exact time in its tooltip.
+  `mdsh -i` shows it on the saved output's label, "saved output, 3 mins
+  ago:", and after a block's time in its header once it runs this
+  session.
+
+  ![mdsh-gui's rendered view: three blocks' outputs, each with how long ago it ran on its title bar: 6 mins, 2 hours and 1 year ago](docs/changelog/output-ago.png)
+
+  ![mdsh -i: the build block's header reads ✓ 0.0s · 4 secs ago, and the saved outputs below it read saved output, 2 hours ago and saved output, 1 year ago](docs/changelog/output-ago-tui.png)
+
+- The History pane shows the shell's working directory, `~` for your
+  home folder, on the separator over its input in mdsh-gui and on its
+  rule in `mdsh -i`. It is asked for with the prompt, so it follows a
+  `cd` typed in the pane or run in a block. A button beside the one
+  that closes the pane has it fill the tab, up to the tab bar, in place
+  of the toolbar and the document, until it is pressed again or the
+  pane closes; in `mdsh -i`, `Z` has it fill the screen, and esc gives
+  the document its place back.
+
+  ![mdsh-gui's History pane filling the tab, with ~/proj/src/app on the separator over the input and the button that gives the document its place back](docs/changelog/history-fill.png)
+
+  ![mdsh -i with Z pressed: the History pane over the whole screen, its rule reading History ~/proj/src/app](docs/changelog/history-fill-tui.png)
+
 - The site's docs have an [HTTP requests](site/content/docs/http.md)
   page: how to write an `http` block, its checks and captures, the
   placeholders that read a response, what is saved and what is masked,

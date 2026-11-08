@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/notebook"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
