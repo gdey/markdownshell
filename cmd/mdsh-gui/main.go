@@ -43,7 +43,7 @@ import (
 // frontend/looks holds the looks, whose CSS is bundled into
 // frontend/bundle/looks.css.
 //
-//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/style.css frontend/looks frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
+//go:embed frontend/index.html frontend/window.html frontend/settings.html frontend/changelog.html frontend/cheatsheet.html frontend/style.css frontend/looks frontend/bundle frontend/vendor/codemirror.js frontend/vendor/xterm.js frontend/vendor/xterm.css build/appicon.svg
 var frontend embed.FS
 
 // allLooks are the looks in frontend/looks; see package looks.

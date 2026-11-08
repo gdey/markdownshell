@@ -226,6 +226,8 @@ func (t *docTab) info() Tab {
 		return Tab{ID: t.id, Title: "Changelog", URL: changelogURL, Page: t.page, ReadOnly: true}
 	case settingsPage:
 		return Tab{ID: t.id, Title: "Settings", Page: settingsURL(t.at)}
+	case cheatsheetPage:
+		return Tab{ID: t.id, Title: "Cheat sheet", URL: cheatsheetURL, Page: t.page, ReadOnly: true}
 	}
 	n, err := t.notebook()
 	if err != nil {

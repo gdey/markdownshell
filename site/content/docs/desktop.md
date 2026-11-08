@@ -171,8 +171,10 @@ This page is the reference.
 - **Reports.** Save writes the output into the file, and File › Create
   Report… makes a PDF, HTML or markdown report, and shows the `mdsh`
   command that makes the same one.
-- **Changelog.** Help › Changelog opens the changelog of the build
-  you're running in a read-only tab, with its screenshots.
+- **Cheat sheet and changelog.** Help › Cheat Sheet opens the
+  [cheat sheet]({{< relref "cheatsheet" >}}) in a read-only tab, and
+  Help › Changelog the changelog of the build you're running, with its
+  screenshots. Settings › About links to both.
 
 {{< shot name="outline" title="deploy.md · outline" >}}The outline beside the notebook.{{< /shot >}}
 

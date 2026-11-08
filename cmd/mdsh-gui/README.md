@@ -377,10 +377,13 @@ Each file opens in a tab of its own, with its own shells.
   build, the Go version and platform, where the settings file, `.zshrc`
   and the folders from Settings are, whether `zsh`, `sh`, `mdsh` and the
   shell from Settings are on the app's PATH and their versions, and
-  links to the changelog, docs, source and releases; Copy puts it on
-  the clipboard for a bug report. The changelog is built into the app:
-  its link, or Help › Changelog, opens it in a read-only tab, with its
-  screenshots, so it says what changed in the build you're running. `mdsh-gui --version` prints the same
+  links to the cheat sheet, the changelog, docs, source and releases;
+  Copy puts it on the clipboard for a bug report. The cheat sheet and
+  the changelog are built into the app: their links, or Help › Cheat
+  Sheet and Help › Changelog, open each in a read-only tab. The cheat
+  sheet is `docs/cheatsheet.md`, every attribute, key and flag on one
+  page, and the changelog, with its screenshots, says what changed in
+  the build you're running. `mdsh-gui --version` prints the same
   version: the release's, or for a `go install` or `go build` build the
   module version or the commit it was built from.
 
