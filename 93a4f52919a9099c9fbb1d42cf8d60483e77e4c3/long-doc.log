@@ -1,0 +1,2 @@
+mdsh-swift: opened long.md (15001 cells) in 5.22s
+mdsh-swift: snapshot: BridgeError(message: "no window to draw (1 windows)")

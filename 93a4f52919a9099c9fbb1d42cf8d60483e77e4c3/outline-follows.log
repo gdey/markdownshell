@@ -1,0 +1,2 @@
+mdsh-swift: opened parts.md (400 cells) in 0.13s
+2026-11-08 15:36:45.446 mdsh-swift[73942:1464179] WARNING: Application performed a reentrant operation in its NSTableView delegate. This warning will become an assert in the future.

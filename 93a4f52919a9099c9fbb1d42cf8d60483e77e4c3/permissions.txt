@@ -1,0 +1,5 @@
+accessibility (AXIsProcessTrusted): false
+screen recording (CGPreflightScreenCaptureAccess): false
+36:47: execution error: System Events got an error: osascript is not allowed to send keystrokes. (1002)
+System Events key code: refused
+user: claude, session: Aqua
