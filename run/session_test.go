@@ -345,12 +345,43 @@ func TestAsk(t *testing.T) {
 	}
 }
 
+// expiring is a context whose deadline passes when expire is called.
+type expiring struct {
+	context.Context
+	done chan struct{}
+	once sync.Once
+}
+
+func newExpiring() *expiring {
+	return &expiring{Context: context.Background(), done: make(chan struct{})}
+}
+
+func (c *expiring) expire()               { c.once.Do(func() { close(c.done) }) }
+func (c *expiring) Done() <-chan struct{} { return c.done }
+func (c *expiring) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+
 // TestSessionLogsShellEnds checks the audit log says when and why a
 // shell ended, and that the next block got a new one.
 func TestSessionLogsShellEnds(t *testing.T) {
-	d := parse(t, "```sh {#bye}\nexit 4\n```\n\n```sh {#ok}\ntrue\n```\n\n```sh {#doomed}\n(sleep 0.1; kill -KILL $$) >/dev/null 2>&1 &\n```\n\n```sh {#slow timeout=50ms}\nsleep 5\n```\n\n```sh {#stuck timeout=50ms}\ntrap '' INT\nwhile :; do :; done\n```\n")
+	d := parse(t, "```sh {#bye}\nexit 4\n```\n\n```sh {#ok}\ntrue\n```\n\n```sh {#doomed}\n(sleep 0.1; kill -KILL $$) >/dev/null 2>&1 &\n```\n\n```sh {#slow timeout=50ms}\nsleep 5\n```\n\n```sh {#stuck}\ntrap '' INT\necho armed\nwhile :; do :; done\n```\n")
 	var log bytes.Buffer
-	s, err := run.NewSession(d, run.Options{Environ: []string{}, Audit: audit.New(&log), KillAfter: 300 * time.Millisecond})
+	// stuck's deadline passes once it says its trap is set. A timeout=
+	// could pass before then, and the interrupt would end it as it
+	// does slow.
+	deadline := newExpiring()
+	onEvent := func(e run.Event) {
+		if e.Kind == run.Stdout && e.Block.ID == "stuck" && bytes.Contains(e.Data, []byte("armed")) {
+			deadline.expire()
+		}
+	}
+	s, err := run.NewSession(d, run.Options{Environ: []string{}, Audit: audit.New(&log), KillAfter: 300 * time.Millisecond, OnEvent: onEvent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,10 +395,13 @@ func TestSessionLogsShellEnds(t *testing.T) {
 	time.Sleep(500 * time.Millisecond) // for doomed's kill
 	// slow is interrupted and keeps its shell; stuck won't stop, so
 	// KillAfter ends its shell.
-	for _, i := range []int{1, 3, 4} {
+	for _, i := range []int{1, 3} {
 		if _, err := s.RunBlock(ctx, i); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if _, err := s.RunBlock(deadline, 4); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("stuck: err %v", err)
 	}
 	var got []string
 	for line := range strings.Lines(log.String()) {
