@@ -55,6 +55,11 @@ type Doc struct {
 	// EnvBanner, if set, says that the front matter brings in the whole
 	// environment the app started in (env.share with ...).
 	EnvBanner string `json:"envBanner"`
+	// LastView is how the file was last shown, "rendered", "source" or
+	// "both", or "" if that isn't remembered. LastHistory is whether
+	// its History pane was open then.
+	LastView    string `json:"lastView"`
+	LastHistory bool   `json:"lastHistory"`
 }
 
 // Doc describes the open file. File is "" while the start screen shows.
@@ -73,7 +78,8 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	t.mu.Unlock()
 	ro := n.RunOptions()
 	cols, rows := n.TerminalSize()
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows, EnvBanner: n.EnvBanner()}, nil
+	last, _ := a.settings.Get().FileView(n.File())
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows, EnvBanner: n.EnvBanner(), LastView: last.View, LastHistory: last.History}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
@@ -1059,6 +1065,23 @@ func (a *App) SetView(ctx context.Context, v View) {
 	if a.currentTab() == t {
 		a.showView(v)
 	}
+}
+
+// RememberView notes how file is shown, for the next time it opens:
+// view is "rendered", "source" or "both", and history is whether the
+// History pane is open.
+func (a *App) RememberView(file, view string, history bool) error {
+	if view != "rendered" && view != "source" && view != "both" {
+		return fmt.Errorf("remember view: unknown view %q", view)
+	}
+	if !filepath.IsAbs(file) {
+		return fmt.Errorf("remember view %q: not an absolute path", file)
+	}
+	v := settings.FileView{File: filepath.Clean(file), View: view, History: history}
+	if last, ok := a.settings.Get().FileView(v.File); ok && last == v {
+		return nil
+	}
+	return a.settings.Update(func(s *settings.Settings) { s.Viewed(v) })
 }
 
 // ReportStart is what the Report dialog starts with.
