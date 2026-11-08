@@ -26,9 +26,10 @@ run it. `VERSION` defaults to the newest release in `CHANGELOG.md`.
 
 The release-prep PR is ready when `CHANGELOG.md` has a dated
 `## [X.Y.Z]` section, `[Unreleased]` is empty, and the compare links at
-the bottom point at the new version. The changelog checks below say so;
-the rows that need main (on main, matching origin) only matter for
-tagging by hand.
+the bottom point at the new version. A minor release (`X.Y.0`) also
+brings a new look, named in its changelog section. The changelog and
+look checks below say so; the rows that need main (on main, matching
+origin) only matter for tagging by hand.
 
 ## Version
 
@@ -58,6 +59,38 @@ grep -q "^\[$v\]: .*/compare/.*\.\.\.$VERSION$" CHANGELOG.md ||
 grep -q "^\[Unreleased\]: .*/compare/$VERSION\.\.\.HEAD$" CHANGELOG.md ||
   { echo "the [Unreleased] link doesn't compare from $VERSION" >&2; exit 1; }
 echo "CHANGELOG.md is ready for $VERSION"
+```
+
+## New look
+
+Every minor release brings a new look for the desktop app (1.3 brought
+Teletype and Blueprint, 1.4 Bubble Gum, 1.5 Witchcraft; see
+[Adding a look](../../docs/looks.md)). For an `X.Y.0` release this
+checks that a look in `cmd/mdsh-gui/frontend/looks` has
+`since = "X.Y"` and that the release's changelog section names it.
+Patch releases skip it.
+
+```sh {#look}
+v="${VERSION#v}"
+case "$v" in
+  *.0)
+    minor="${v%.0}"
+    looks="$(grep -l "^since = \"$minor\"$" cmd/mdsh-gui/frontend/looks/*/look.css 2>/dev/null)"
+    [ -n "$looks" ] ||
+      { echo "no look has since = \"$minor\": every minor release brings a new look (docs/looks.md)" >&2; exit 1; }
+    section="$(awk -v v="$v" '
+      /^## \[/ { p = index($0, "[" v "]") > 0; next }
+      /^\[[^]]*\]: / { p = 0 }
+      p' CHANGELOG.md)"
+    for f in $looks; do
+      name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$f" | head -n 1)"
+      printf '%s\n' "$section" | grep -q "$name" ||
+        { echo "the $v changelog section doesn't name its new look, $name" >&2; exit 1; }
+      echo "$v brings the $name look"
+    done
+    ;;
+  *) echo "$v is a patch release: no new look needed" ;;
+esac
 ```
 
 The release notes, cut from `CHANGELOG.md` with the same awk as

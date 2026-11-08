@@ -6,6 +6,29 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-10
+
+mdsh-gui settles in. Settings and the cheat sheet open in tabs beside
+your files, each file reopens in the view it was left in, and the
+outline keeps the selected block in sight. Typing in the source view
+hands the app only the lines it changed, so long documents stay quick to
+edit. 1.5's new look is Witchcraft, a purple scroll under the stars, and
+looks are now one folder each, made into everything else by
+`go generate`. A cast recording prints as a picture, a GIF or text outside
+the app, and in it can be replaced with its frame's text or a GIF. A
+file whose front matter doesn't parse now opens, under a banner that
+gives the error and offers to fix it, with running blocked until it's
+fixed. On macOS, Finder's Open With opens the file, and Escape in vim
+mode no longer leaves fullscreen. mdsh now asks before it reads a
+document's `env.source` files into its shells, so an unattended run of a
+document that names any stops until it's approved once or given `--yes`.
+A document's includes, `out=` files and report images must now stay
+inside its repository or folder unless you pass `--allow-outside`. Links
+to files no longer open scripts or apps, a skipped block another one
+depends on asks before it runs, secrets stay masked in the source pane
+and `mdsh -i`, and escape sequences in a document print as text rather
+than reaching the terminal.
+
 ### Added
 
 - mdsh-gui asks whether a document may reach outside its repository,
@@ -153,7 +176,6 @@ follow [Semantic Versioning](https://semver.org/).
   ![mdsh asking whether to run wipe, marked skip, which publish depends on](docs/changelog/dep-skip-cli.png)
 
   ![mdsh -i asking the same in the card of the skip block](docs/changelog/dep-skip-tui.png)
-
 - mdsh-gui writes its settings, `gui.json`, so only you can read them
   (0600, in a 0700 folder when it makes one). They name your recent
   files, the shell and the Neovim to run, and were readable by every
@@ -242,6 +264,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `cast` block, a recording kept in the document, no longer prints as
+  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
+  frame) as a picture, HTML reports play it as a GIF, and the terminal,
+  as with `mdsh -n`, shows that frame's text.
 - A file whose front matter doesn't parse, such as `title: Setup: the
   first steps` with its colon not in quotes, now opens. mdsh-gui and
   `mdsh -i` used to refuse it with only the YAML error. Now the file
@@ -258,7 +284,6 @@ follow [Semantic Versioning](https://semver.org/).
   line.
 
   ![A runbook whose title has an unquoted colon, open in mdsh-gui under a red banner: the front matter error, "Blocks can't run until it is fixed", and Add quotes and Edit in source buttons; the run buttons are greyed](docs/changelog/bad-front-matter.png)
-
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
   app only the lines it changed. Each pause in the typing sent the whole
   file twice, and checking the fences' `depends=` sent it again, so a
@@ -401,10 +426,6 @@ and the docs gain a cheat sheet.
   its own shell, and the Events tab says so.
 
   ![Asked before killing a shell: The block hasn't stopped, with Cancel and Kill Shell](docs/changelog/kill-shell.png)
-- A `cast` block, a recording kept in the document, no longer prints as
-  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
-  frame) as a picture, HTML reports play it as a GIF, and the terminal,
-  as with `mdsh -n`, shows that frame's text.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed
@@ -1582,7 +1603,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/gdey/markdownshell/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/gdey/markdownshell/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0
