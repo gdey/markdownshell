@@ -185,6 +185,7 @@ async function catchUp() {
   for (const e of (await App.Live()) ?? []) {
     if (e.name === "block") onBlock(e.data as BlockEvent);
     else if (e.name === "confirm") onConfirm(e.data as Question);
+    else if (e.name === "sources") onSources(e.data as SourcesQuestion);
   }
 }
 
@@ -4174,7 +4175,30 @@ function onConfirm({ block, question, of }: Question) {
   run.focus({ preventScroll: true });
 }
 
+// SourcesQuestion asks, before a shell starts, whether to read in the
+// files the front matter's env.source names.
+interface SourcesQuestion {
+  files: string[];
+}
+
+// onSources asks whether the shell may read in files, in a dialog, since
+// the question isn't any one block's: a run or the History pane's prompt
+// is waiting to start a shell. Cancel, the focus, and Esc stop it.
+function onSources({ files }: SourcesQuestion) {
+  const dialog = $<HTMLDialogElement>("sources-dialog");
+  $("sources-list").replaceChildren(...files.map((f) => el("li", {}, el("code", {}, tilde(f)))));
+  dialog.returnValue = "";
+  dialog.onclose = () => {
+    status("");
+    void App.Answer(dialog.returnValue || "stop").catch(fail);
+  };
+  if (!dialog.open) dialog.showModal();
+  $("sources-cancel").focus();
+  status("waiting for you");
+}
+
 Events.On("block", mine(onBlock));
+Events.On("sources", mine(onSources));
 Events.On("confirm", mine(onConfirm));
 // A run this page didn't start is over.
 Events.On(

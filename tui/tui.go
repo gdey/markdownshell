@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -28,6 +29,7 @@ import (
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
+	"github.com/gdey/markdownshell/trust"
 	"github.com/gdey/markdownshell/writable"
 )
 
@@ -60,6 +62,10 @@ type Options struct {
 	Style string
 	// View is how the file is shown at first.
 	View View
+	// Trust remembers, for each file, whether its env.source files may
+	// be read into its shells, so each file asks once. Nil remembers
+	// nothing.
+	Trust *trust.Store
 }
 
 // Model is the TUI's state. It is a tea.Model.
@@ -93,6 +99,11 @@ type Model struct {
 	started  map[int]time.Time
 	clocking bool
 	prompt   *confirmMsg
+	// srcAsk is the env.source question while it is up, and src the
+	// answer given, which the run's goroutine reads.
+	srcAsk *srcPrompt
+	srcMu  sync.Mutex
+	src    *srcAnswer
 	// input is the prompt for a new block, while typing is set.
 	input  textinput.Model
 	typing bool
@@ -299,6 +310,7 @@ func (m *Model) newSession(ro run.Options) (*run.Session, error) {
 	ro.OnEvent = func(e run.Event) { m.send(eventMsg(e)) }
 	ro.Confirm = m.confirm
 	ro.Depend = m.depend
+	ro.ApproveSources = m.approveSources
 	// tty blocks run in a terminal drawn in their card.
 	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
 	// Commands typed in the History pane run on a terminal.
@@ -630,6 +642,11 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.form != nil {
 		return m, m.formed(k)
+	}
+	if m.srcAsk != nil {
+		cmd := m.answerSources(k.String())
+		m.refresh()
+		return m, cmd
 	}
 	if m.prompt != nil {
 		m.answer(k.String())
@@ -1083,7 +1100,7 @@ func (m *Model) start(all bool) {
 		m.status = "a block is running; ctrl+c stops it"
 		return
 	}
-	if len(m.nav) == 0 || m.askBeforeRun(func() { m.start(all) }) {
+	if len(m.nav) == 0 || m.askBeforeRun(func() { m.start(all) }) || m.askSources(func() tea.Cmd { m.start(all); return nil }) {
 		return
 	}
 	i := m.cur()
@@ -1111,7 +1128,7 @@ func (m *Model) startSection() {
 		return
 	}
 	i := m.cur()
-	if i < 0 || m.askBeforeRun(m.startSection) {
+	if i < 0 || m.askBeforeRun(m.startSection) || m.askSources(func() tea.Cmd { m.startSection(); return nil }) {
 		return
 	}
 	h, ok := doc.SectionAt(m.d.Headings(), m.d.Blocks[i].Span.Start)
@@ -1346,6 +1363,7 @@ func (m *Model) vpHeight() int {
 	if m.envBanner() != "" {
 		h--
 	}
+	h -= len(m.srcBanner())
 	return max(h, 1)
 }
 
@@ -1372,6 +1390,12 @@ func (m *Model) View() string {
 		// One line, cut short to fit: the names it leaves out are in the
 		// front matter.
 		view = envBannerStyle.Width(m.width).Render(ansi.Truncate(b, m.width-2, "…")) + "\n" + view
+	}
+	if lines := m.srcBanner(); lines != nil {
+		for i := range lines {
+			lines[i] = envBannerStyle.Width(m.width).Render(ansi.Truncate(lines[i], m.width-2, "…"))
+		}
+		view = strings.Join(lines, "\n") + "\n" + view
 	}
 	if m.changed {
 		view = bannerStyle.Width(m.width).Render("The file changed on disk.  R reload it · M keep yours") + "\n" + view
@@ -1421,6 +1445,8 @@ func (m *Model) footer() string {
 		help = helpStyle.Render(formHelp + "save · esc cancel")
 	case m.form != nil:
 		help = helpStyle.Render(formHelp + "apply · esc cancel")
+	case m.srcAsk != nil:
+		help = promptStyle.Render("Read them in? Remembered for this file.") + helpStyle.Render(" y yes · n run without them · s stop")
 	case m.prompt != nil && m.prompt.of != nil:
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", termsafe.Visible(m.d.Label(m.prompt.of)), termsafe.Visible(m.d.Label(m.prompt.block))))
 	case m.prompt != nil:
