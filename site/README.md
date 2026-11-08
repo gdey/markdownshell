@@ -31,7 +31,7 @@ also holds the layout). `<html data-theme="tty">` or `"plain"` picks
 it; the `[tty] [plain]` switch in the header saves the choice in
 `localStorage`, and a few lines in `<head>` read it before the first
 paint. The teletype palette is the app's Teletype look, from
-`cmd/mdsh-gui/frontend/looks/teletype/look.css`; keep the two in step.
+`web/looks/teletype/look.css`; keep the two in step.
 
 ## The app's looks
 

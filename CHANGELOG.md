@@ -29,7 +29,7 @@ follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `mdsh-gui`: each look is now one file, `look.css` in its own folder
-  in `cmd/mdsh-gui/frontend/looks`. It opens with the look's front
+  in `web/looks`. It opens with the look's front
   matter in TOML, between `+++` lines in its first comment, that says
   what the look is, and the rules after it paint it. Everything else
   that names the looks is made from those files by `go generate`:

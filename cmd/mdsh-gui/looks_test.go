@@ -10,16 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
+	"github.com/gdey/markdownshell/looks"
+	"github.com/gdey/markdownshell/web"
 )
 
 // lookCSS is a look's stylesheet.
-func lookCSS(l looks.Look) string { return filepath.Join("frontend/looks", l.Dir, "look.css") }
+func lookCSS(l looks.Look) string { return filepath.Join("../../web/looks", l.Dir, "look.css") }
 
 // stylesheets are the pages' stylesheets: style.css and every look's.
 func stylesheets() []string {
-	files := []string{"frontend/style.css"}
-	for _, l := range allLooks[1:] {
+	files := []string{"../../web/style.css"}
+	for _, l := range web.Looks[1:] {
 		files = append(files, lookCSS(l))
 	}
 	return files
@@ -28,11 +29,11 @@ func stylesheets() []string {
 // The files made from the looks' front matter must be made again when one
 // changes: go generate does it.
 func TestLooksGenerated(t *testing.T) {
-	ts, err := looks.TS(allLooks)
+	ts, err := looks.TS(web.Looks)
 	if err != nil {
 		t.Fatal(err)
 	}
-	site, err := looks.SiteData(allLooks)
+	site, err := looks.SiteData(web.Looks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,12 +41,12 @@ func TestLooksGenerated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := looks.Readme(readme, allLooks)
+	want, err := looks.Readme(readme, web.Looks)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for file, want := range map[string][]byte{
-		"frontend/src/looks.gen.ts":  ts,
+		"../../web/src/looks.gen.ts":  ts,
 		"../../site/data/looks.toml": site,
 		"README.md":                  want,
 	} {
@@ -54,16 +55,16 @@ func TestLooksGenerated(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !bytes.Equal(got, want) {
-			t.Errorf("%s is out of date with frontend/looks; run go generate", file)
+			t.Errorf("%s is out of date with web/looks; run go generate", file)
 		}
 	}
-	bundle, err := os.ReadFile("frontend/bundle/looks.css")
+	bundle, err := os.ReadFile("../../web/bundle/looks.css")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range allLooks[1:] {
-		if !bytes.Contains(bundle, []byte("/* frontend/looks/"+l.Dir+"/look.css */")) {
-			t.Errorf("frontend/bundle/looks.css has no %s; run go generate", l.Name)
+	for _, l := range web.Looks[1:] {
+		if !bytes.Contains(bundle, []byte("/* looks/"+l.Dir+"/look.css */")) {
+			t.Errorf("web/bundle/looks.css has no %s; run go generate", l.Name)
 		}
 	}
 }
@@ -75,7 +76,7 @@ var dataLook = regexp.MustCompile(`\[data-look="?(\w+)"?\]`)
 // @keyframes are the exceptions, since they select nothing; a look's
 // keyframes should still be named for it.
 func TestLookCSSScoped(t *testing.T) {
-	for _, l := range allLooks[1:] {
+	for _, l := range web.Looks[1:] {
 		src, err := os.ReadFile(lookCSS(l))
 		if err != nil {
 			t.Fatal(err)
@@ -103,7 +104,7 @@ var textScale = regexp.MustCompile(`--text-scale:\s*([\d.]+)`)
 // The Text size slider shows a look's own size from its front matter, which
 // must be the size its CSS sets.
 func TestLookTextSize(t *testing.T) {
-	for _, l := range allLooks[1:] {
+	for _, l := range web.Looks[1:] {
 		src, err := os.ReadFile(lookCSS(l))
 		if err != nil {
 			t.Fatal(err)
@@ -126,7 +127,7 @@ func TestLookTextSize(t *testing.T) {
 
 // The pictures a look's front matter names must be in the site's images.
 func TestLookPictures(t *testing.T) {
-	for _, l := range allLooks {
+	for _, l := range web.Looks {
 		var files []string
 		for _, s := range l.Screenshots {
 			files = append(files, "../../site/static/images/gui/"+s.File)
@@ -169,7 +170,7 @@ func splitSelectors(list string) []string {
 // go run ./internal/newlook leaves TODOs in a new look's files; a look
 // isn't done while any are left.
 func TestLooksFinished(t *testing.T) {
-	for _, l := range allLooks {
+	for _, l := range web.Looks {
 		b, err := os.ReadFile(lookCSS(l))
 		if err != nil {
 			t.Fatal(err)
@@ -191,8 +192,8 @@ var lookSelector = regexp.MustCompile(`^(:root|html)?\[data-look=`)
 // and every rule, the bundle's first among them, must start with the
 // look it selects.
 func TestLooksCSSParses(t *testing.T) {
-	files := []string{"frontend/bundle/looks.css"}
-	for _, l := range allLooks[1:] {
+	files := []string{"../../web/bundle/looks.css"}
+	for _, l := range web.Looks[1:] {
 		files = append(files, lookCSS(l))
 	}
 	for _, file := range files {

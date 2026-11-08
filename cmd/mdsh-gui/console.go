@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/notebook"
 )
 
 // The console keeps what the app logs, errors from calls the frontend

@@ -43,14 +43,14 @@ func cssProps(t *testing.T, file string) map[string]map[string]bool {
 // landmark, has to undo it, or it shrinks to the rule's padding: the
 // window's #frames did, and every tab's page with it.
 func TestOtherMainsUndoTheDocumentColumn(t *testing.T) {
-	props := cssProps(t, "frontend/style.css")
+	props := cssProps(t, "../../web/style.css")
 	for _, p := range []string{"max-width", "margin", "padding"} {
 		if !props["main"][p] {
 			t.Fatalf("style.css main rule does not set %s; is the parse right?", p)
 		}
 	}
 	for _, page := range []string{"index.html", "window.html", "settings.html"} {
-		src, err := os.ReadFile("frontend/" + page)
+		src, err := os.ReadFile("../../web/" + page)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,11 +109,11 @@ func TestOutputPartHidesByClassNotHasEmpty(t *testing.T) {
 			}
 		}
 	}
-	if !cssProps(t, "frontend/style.css")[".block .output-part.empty"]["display"] {
+	if !cssProps(t, "../../web/style.css")[".block .output-part.empty"]["display"] {
 		t.Error("style.css: .block .output-part.empty doesn't hide the empty output part")
 	}
 	for _, file := range []string{"app.ts", "terminal.ts"} {
-		src, err := os.ReadFile("frontend/src/" + file)
+		src, err := os.ReadFile("../../web/src/" + file)
 		if err != nil {
 			t.Fatal(err)
 		}

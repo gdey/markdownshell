@@ -133,7 +133,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
 <section class="band">
   <div class="wrap">
     {{- /* The looks are site/data/looks.toml, made from the app's
-       cmd/mdsh-gui/frontend/looks by go generate. */ -}}
+       web/looks by go generate. */ -}}
     {{- $looks := site.Data.looks.looks }}
     {{- $count := slice "No" "One" "Two" "Three" "Four" "Five" "Six" "Seven" "Eight" "Nine" "Ten" "Eleven" "Twelve" }}
     <h2>{{ if lt (len $looks) (len $count) }}{{ index $count (len $looks) }}{{ else }}{{ len $looks }}{{ end }} looks. Light and dark.</h2>
