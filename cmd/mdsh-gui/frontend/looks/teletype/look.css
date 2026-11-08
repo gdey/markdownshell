@@ -1,4 +1,51 @@
-/* The Teletype look (Settings › Look): the site's fan-fold
+/* +++
+id = "tty"
+name = "Teletype"
+order = 10
+since = "1.3"
+description = "Teletype sets everything in a typewriter face on fan-fold paper, or green phosphor when the theme is dark."
+tagline = "for fan-fold paper and green phosphor"
+textSize = 115
+tokens = "--tty-"
+contrastGaps = true
+
+[texture]
+label = "Teletype paper"
+sprockets = "Sprocket strips"
+rules = "Ruled lines"
+shadows = "Shadows under cards"
+
+[hero]
+light = "hero-paper.png"
+dark = "hero-phosphor.png"
+alt = "The Teletype look"
+
+[[screenshots]]
+file = "teletype-paper.png"
+alt = "The deploy runbook in the Teletype look, on paper, with push asking to run"
+
+[[screenshots]]
+file = "teletype-phosphor.png"
+alt = "The same window in the Teletype look with the dark theme, as green phosphor"
+
+[[screenshots]]
+file = "teletype-source-paper.png"
+alt = "The Teletype look with the source view open beside the rendered view"
+
+[[screenshots]]
+file = "teletype-history-phosphor.png"
+alt = "The Teletype look in phosphor with the History pane open, its commands added to the file as blocks"
+
+[[screenshots]]
+file = "teletype-settings-look.png"
+alt = "Settings › Look: theme, look, text size, fonts, line spacing, accent, History pane and the paper's texture"
+
+[[screenshots]]
+file = "teletype-history-inverted.png"
+alt = "Paper with the History pane inverted, so it shows as phosphor"
++++
+
+   The Teletype look (Settings › Look): the site's fan-fold
    paper in the light theme and green phosphor in the dark. It sets the
    same tokens style.css does, plus a few of its own (--tty-*), and adds
    texture rules. Apart from the larger text (--text-scale), a look

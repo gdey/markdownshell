@@ -1,6 +1,7 @@
 import { App, type Settings, message } from "./api.js";
 import { $, el } from "./dom.js";
 import { applyTheme } from "./theme.js";
+import { looks, lookFor } from "./looks.js";
 import { Events } from "/wails/runtime.js";
 import type { About, CLI, Tool } from "./bindings/github.com/gdey/markdownshell/cmd/mdsh-gui/models.js";
 
@@ -10,6 +11,9 @@ let cli: CLI | null = await App.CLIState().catch(() => null);
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const select = (id: string) => $<HTMLSelectElement>(id);
+
+// The Look menu lists the looks in frontend/looks.
+select("look").replaceChildren(...looks.map((l) => el("option", { value: l.id }, l.name)));
 
 // The tabs across the top: one section shows at a time.
 const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -223,7 +227,9 @@ fillFonts("code-font", system?.mono?.length ? system.mono : fonts.code.filter(in
 const presets = ["", "#3fb950", "#d4a017", "#2f81f7", "#d1495b", "#8250df"];
 
 function drawLook() {
-  const own = s.look === "tty" ? 115 : 100;
+  const look = lookFor(s.look);
+  $("look-about").textContent = look.description;
+  const own = look.textSize;
   input("text-size").value = String(s.textSize || own);
   $("text-size-value").textContent = `${s.textSize || own}%${s.textSize ? "" : ", the look's own"}.`;
   input("text-size").setAttribute("aria-valuetext", `${s.textSize || own} percent${s.textSize ? "" : ", the look's own"}`);
@@ -237,18 +243,14 @@ function drawLook() {
   if (custom) input("accent-custom").value = s.accent;
   select("history-pane").value = s.historyPane;
   select("history-focus").value = s.historyFocus;
-  // Teletype's paper has sprockets, rules and shadows; Blueprint's
-  // sheet only its grid; Bubble Gum's wrapper has bubbles and shadows;
-  // Witchcraft's grimoire has its night sky and the glow around cards.
-  const tty = s.look === "tty";
-  const gum = s.look === "gum";
-  const witch = s.look === "witch";
-  $("paper").hidden = !tty && !gum && !witch && s.look !== "blueprint";
-  $("paper-label").textContent = tty ? "Teletype paper" : gum ? "Bubble gum wrapper" : witch ? "Grimoire" : "Blueprint sheet";
-  $("sprockets-check").hidden = !tty;
-  $("shadows-check").hidden = !tty && !gum && !witch;
-  $("shadows-label").textContent = witch ? "Glow around cards" : "Shadows under cards";
-  $("rules-label").textContent = tty ? "Ruled lines" : gum ? "Bubbles" : witch ? "Stars and moons" : "Grid";
+  // The texture switches the look draws, under its names for them.
+  const texture = look.texture;
+  $("paper").hidden = !texture;
+  $("paper-label").textContent = texture?.label ?? "";
+  for (const name of ["sprockets", "rules", "shadows"] as const) {
+    $(`${name}-check`).hidden = !texture?.[name];
+    $(`${name}-label`).textContent = texture?.[name] ?? "";
+  }
   input("sprockets").checked = !s.noSprockets;
   input("rules").checked = !s.noRules;
   input("shadows").checked = !s.noShadows;

@@ -132,13 +132,16 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
 
 <section class="band">
   <div class="wrap">
-    <h2>Five looks. Light and dark.</h2>
-    <p class="sub">Plain for every day, Teletype for fan-fold paper and green phosphor, Blueprint for white lines on drafting blue, Bubble Gum for Hubba Bubba pink, Witchcraft for a purple grimoire under the moon. Settings › Look tunes the type, spacing and accent.</p>
+    {{- /* The looks are site/data/looks.toml, made from the app's
+       cmd/mdsh-gui/frontend/looks by go generate. */ -}}
+    {{- $looks := site.Data.looks.looks }}
+    {{- $count := slice "No" "One" "Two" "Three" "Four" "Five" "Six" "Seven" "Eight" "Nine" "Ten" "Eleven" "Twelve" }}
+    <h2>{{ if lt (len $looks) (len $count) }}{{ index $count (len $looks) }}{{ else }}{{ len $looks }}{{ end }} looks. Light and dark.</h2>
+    <p class="sub">{{ partial "looks.html" (dict "taglines" true) }}. Settings › Look tunes the type, spacing and accent.</p>
     <div class="looks">
-      <figure>{{ partial "shot.html" (dict "src" "hero-light.png" "dark" "hero-dark.png" "title" "Plain" "alt" "The Plain look") }}</figure>
-      <figure>{{ partial "shot.html" (dict "src" "hero-paper.png" "dark" "hero-phosphor.png" "title" "Teletype" "alt" "The Teletype look") }}</figure>
-      <figure>{{ partial "shot.html" (dict "src" "hero-blueprint.png" "dark" "hero-blueprint-dark.png" "title" "Blueprint" "alt" "The Blueprint look") }}</figure>
-      <figure>{{ partial "shot.html" (dict "src" "hero-bubblegum.png" "dark" "hero-bubblegum-dark.png" "title" "Bubble Gum" "alt" "The Bubble Gum look: pink paper with bubbles, puffy cards and pill buttons") }}</figure>
+      {{- range $looks }}{{ $name := .name }}{{ with .hero }}
+      <figure>{{ partial "shot.html" (dict "src" .light "dark" .dark "title" $name "alt" .alt) }}</figure>
+      {{- end }}{{ end }}
     </div>
   </div>
 </section>

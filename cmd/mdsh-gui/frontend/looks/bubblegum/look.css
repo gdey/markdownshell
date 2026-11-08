@@ -1,4 +1,40 @@
-/* The Bubble Gum look (Settings › Look): Hubba Bubba pink. The light
+/* +++
+id = "gum"
+name = "Bubble Gum"
+order = 30
+since = "1.4"
+description = "Bubble Gum is Hubba Bubba pink with bubbles across the page, puffy cards and bubble-lettered headings, or berry when the theme is dark."
+tagline = "for Hubba Bubba pink"
+tokens = "--gum-"
+
+[texture]
+label = "Bubble gum wrapper"
+rules = "Bubbles"
+shadows = "Shadows under cards"
+
+[hero]
+light = "hero-bubblegum.png"
+dark = "hero-bubblegum-dark.png"
+alt = "The Bubble Gum look: pink paper with bubbles, puffy cards and pill buttons"
+
+[[screenshots]]
+file = "bubblegum-light.png"
+alt = "The deploy runbook in the Bubble Gum look: pink paper with bubbles, puffy cards and bubble-lettered headings, with push asking to run"
+
+[[screenshots]]
+file = "bubblegum-dark.png"
+alt = "The Bubble Gum look with the dark theme, in berry"
+
+[[screenshots]]
+file = "bubblegum-history.png"
+alt = "The Bubble Gum look with the History pane open under the document, its command added to the file as a block"
+
+[[screenshots]]
+file = "bubblegum-settings-look.png"
+alt = "Settings › Look with Bubble Gum chosen: the bubbles and the shadows under cards can be turned off"
++++
+
+   The Bubble Gum look (Settings › Look): Hubba Bubba pink. The light
    theme is a fresh stick of gum: pale pink paper with a hot pink accent
    and bubbles blown across the page; the dark theme is the same pink
    gone to berry, deep plum with pink chalk lettering. It sets the same

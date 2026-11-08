@@ -1,4 +1,40 @@
-/* The Blueprint look (Settings › Look): white lines on blueprint blue
+/* +++
+id = "blueprint"
+name = "Blueprint"
+order = 20
+since = "1.3"
+description = "Blueprint draws in white lines on blue paper with a drafting grid, a deeper night blue when the theme is dark."
+tagline = "for white lines on drafting blue"
+tokens = "--bp-"
+contrastGaps = true
+
+[texture]
+label = "Blueprint sheet"
+rules = "Grid"
+
+[hero]
+light = "hero-blueprint.png"
+dark = "hero-blueprint-dark.png"
+alt = "The Blueprint look"
+
+[[screenshots]]
+file = "blueprint-light.png"
+alt = "The deploy runbook in the Blueprint look: white lines on blue paper with a drafting grid"
+
+[[screenshots]]
+file = "blueprint-dark.png"
+alt = "The Blueprint look with the dark theme, in night blue, with push asking to run"
+
+[[screenshots]]
+file = "blueprint-history.png"
+alt = "The Blueprint look with the History pane open under the document"
+
+[[screenshots]]
+file = "blueprint-settings-look.png"
+alt = "Settings › Look with Blueprint chosen: the sheet's grid can be turned off"
++++
+
+   The Blueprint look (Settings › Look): white lines on blueprint blue
    with a drafting grid behind the document, in the light theme, and a
    deeper night blue with pale cyan lines in the dark. Both are blue
    paper; the light one is the brighter. It sets the same tokens

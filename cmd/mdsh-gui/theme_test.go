@@ -72,8 +72,9 @@ var lookAttr = regexp.MustCompile(`data-look="(\w+)"`)
 // Each look must set every token the plain look does, in the light and
 // in the dark, so a token added to one can't be forgotten in another and
 // show the plain color through. Each palette must be the same for the
-// window as for the History pane. And a look's own tokens (--tty-*,
-// --bp-*, --gum-*, --witch-*) must be set in its dark palette as well as its light one.
+// window as for the History pane. And a look's own tokens (its front matter's
+// tokens prefix, such as --tty-*) must be set in its dark palette as well
+// as its light one.
 func TestLookTokens(t *testing.T) {
 	plain := cssVars(t, "frontend/style.css", palette)
 	if len(plain["light"]) < 40 || len(plain["dark"]) < 40 {
@@ -94,25 +95,20 @@ func TestLookTokens(t *testing.T) {
 		}
 	}
 	paneCovers("plain", plain, "")
-	for _, look := range []struct{ name, attr, file, own string }{
-		{"Teletype", "tty", "frontend/teletype.css", "--tty-"},
-		{"Blueprint", "blueprint", "frontend/blueprint.css", "--bp-"},
-		{"Bubble Gum", "gum", "frontend/bubblegum.css", "--gum-"},
-		{"Witchcraft", "witch", "frontend/witchcraft.css", "--witch-"},
-	} {
-		sets := cssVars(t, look.file, palette)
-		prefix := look.attr + " "
+	for _, look := range allLooks[1:] {
+		sets := cssVars(t, lookCSS(look), palette)
+		prefix := look.ID + " "
 		for _, scheme := range []string{"light", "dark"} {
 			for _, v := range slices.Sorted(maps.Keys(plain[scheme])) {
 				if !sets[prefix+scheme][v] {
-					t.Errorf("%s %s does not set %s", look.name, scheme, v)
+					t.Errorf("%s %s does not set %s", look.Name, scheme, v)
 				}
 			}
 		}
-		paneCovers(look.name, sets, prefix)
+		paneCovers(look.Name, sets, prefix)
 		for v := range sets[prefix+"light"] {
-			if strings.HasPrefix(v, look.own) && !sets[prefix+"dark"][v] {
-				t.Errorf("%s dark does not set %s", look.name, v)
+			if strings.HasPrefix(v, look.Tokens) && !sets[prefix+"dark"][v] {
+				t.Errorf("%s dark does not set %s", look.Name, v)
 			}
 		}
 	}
@@ -137,17 +133,11 @@ func TestEditedSettings(t *testing.T) {
 	if cur.SessionFolder != "~/notes" || cur.SessionTemplate != "/t/session.md" {
 		t.Errorf("session settings = %q, %q", cur.SessionFolder, cur.SessionTemplate)
 	}
-	edited(&cur, settings.Settings{Look: "blueprint"})
-	if cur.Look != "blueprint" {
-		t.Errorf("blueprint look dropped: %q", cur.Look)
-	}
-	edited(&cur, settings.Settings{Look: "gum"})
-	if cur.Look != "gum" {
-		t.Errorf("gum look dropped: %q", cur.Look)
-	}
-	edited(&cur, settings.Settings{Look: "witch"})
-	if cur.Look != "witch" {
-		t.Errorf("witch look dropped: %q", cur.Look)
+	for _, look := range allLooks {
+		edited(&cur, settings.Settings{Look: look.ID})
+		if cur.Look != look.ID {
+			t.Errorf("%s look dropped: %q", look.Name, cur.Look)
+		}
 	}
 	edited(&cur, settings.Settings{Look: "bogus", Theme: "bogus", LineSpacing: "huge", Accent: "red", HistoryPane: "sideways", HistoryFocus: "ring"})
 	if cur.Look != "" || cur.Theme != "" || cur.LineSpacing != "" || cur.Accent != "" || cur.HistoryPane != "" || cur.HistoryFocus != "" || cur.TextSize != 0 {
@@ -211,15 +201,18 @@ func contrast(a, b string) float64 {
 // red, the link on the window. The edge pair: the accent, which
 // draws the focus ring and the selected card's outline, on the window.
 // Blueprint and Teletype have known gaps, listed in the accessibility
-// audit; the plain look, Bubble Gum and Witchcraft must pass.
+// audit (contrastGaps in their front matter); every other look must pass.
 func TestLookContrast(t *testing.T) {
 	text := [][2]string{{"--fg", "--bg"}, {"--muted", "--bg"}, {"--fg", "--code-bg"}, {"--muted", "--code-bg"}, {"--accent-fg", "--accent"}, {"--bad-fg", "--bad"}, {"--link", "--bg"}}
 	edge := [][2]string{{"--accent", "--bg"}}
-	for _, look := range []struct{ name, file, prefix string }{
-		{"plain", "frontend/style.css", ""},
-		{"Bubble Gum", "frontend/bubblegum.css", "gum "},
-		{"Witchcraft", "frontend/witchcraft.css", "witch "},
-	} {
+	type checked struct{ name, file, prefix string }
+	checks := []checked{{"plain", "frontend/style.css", ""}}
+	for _, look := range allLooks[1:] {
+		if !look.ContrastGaps {
+			checks = append(checks, checked{look.Name, lookCSS(look), look.ID + " "})
+		}
+	}
+	for _, look := range checks {
 		sets := cssValues(t, look.file)
 		for _, scheme := range []string{"light", "dark"} {
 			p := sets[look.prefix+scheme]

@@ -20,6 +20,24 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
 
+### Changed
+
+- `mdsh-gui`: each look is now one file, `look.css` in its own folder
+  in `cmd/mdsh-gui/frontend/looks`. It opens with the look's front
+  matter in TOML, between `+++` lines in its first comment, that says
+  what the look is, and the rules after it paint it. Everything else
+  that names the looks is made from those files by `go generate`:
+  Settings › Look's menu, description and texture switches, the one
+  stylesheet the pages load, the looks the app accepts, the tests every
+  look must pass, the website's looks band and the GUI README's
+  pictures. `go run ./internal/newlook <folder> "<Name>"` starts a new
+  look that passes the tests from the start, and `docs/looks.md` says
+  the rest.
+  Settings › Look now describes the look that is chosen, rather than
+  all of them at once.
+
+  ![Settings › Look with Witchcraft chosen: its description under the menu and its Grimoire switches, Stars and moons and Glow around cards](docs/changelog/looks-settings.png)
+
 ### Fixed
 
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file
