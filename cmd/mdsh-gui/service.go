@@ -612,7 +612,7 @@ func (a *App) Pin(file string, pin bool) error {
 // Settings are the app-wide settings.
 func (a *App) Settings() settings.Settings { return a.settings.Get() }
 
-// SetSettings saves the settings the Settings window edits (see
+// SetSettings saves the settings edited in Settings (see
 // edited). Open windows hear of it with a "settings" event.
 func (a *App) SetSettings(s settings.Settings) error {
 	err := a.settings.Update(func(cur *settings.Settings) { edited(cur, s) })
@@ -622,7 +622,7 @@ func (a *App) SetSettings(s settings.Settings) error {
 	return err
 }
 
-// edited copies into cur what the Settings window edits from s:
+// edited copies into cur what Settings edits from s:
 // autosave, Vim mode, spell checking, theme, the look and its options,
 // shell, the History pane's rc file, the view files open in, the start
 // folder, the templates folder, and the sessions folder and template. The rest, such as Recent, stays as

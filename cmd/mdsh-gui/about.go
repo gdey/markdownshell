@@ -87,7 +87,7 @@ func thisBuild() build {
 	return buildInfo(version, bi)
 }
 
-// About is what the Settings window's About tab shows.
+// About is what Settings' About tab shows.
 type About struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit"`

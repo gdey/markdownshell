@@ -147,21 +147,19 @@ func TestStorePlaces(t *testing.T) {
 	}
 	err = st.Update(func(s *Settings) {
 		s.Placed(Place{File: "/a.md", X: 1, Y: 2, Width: 3, Height: 4})
-		s.SettingsWindow = &Size{Width: 700, Height: 640}
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := st.Get()
 	got.Places[0].Width = 99
-	got.SettingsWindow.Width = 99
 	st2, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range []Settings{st.Get(), st2.Get()} {
-		if p, _ := s.Place("/a.md"); p.Width != 3 || s.SettingsWindow == nil || s.SettingsWindow.Width != 700 {
-			t.Errorf("read back %+v, %+v", s.Places, s.SettingsWindow)
+		if p, _ := s.Place("/a.md"); p.Width != 3 {
+			t.Errorf("read back %+v", s.Places)
 		}
 	}
 }

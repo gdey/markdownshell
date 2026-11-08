@@ -114,7 +114,7 @@ func TestLookTokens(t *testing.T) {
 	}
 }
 
-// The Settings window's edits must all be saved, the look among them,
+// The Settings tab's edits must all be saved, the look among them,
 // or the other windows never hear of a change.
 func TestEditedSettings(t *testing.T) {
 	cur := settings.Settings{Recent: []string{"/a.md"}, Pinned: []string{"/p.md"}, LastFolder: "/a"}

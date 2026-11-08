@@ -71,3 +71,12 @@ func TestAppMenuAbout(t *testing.T) {
 		}
 	}
 }
+
+func TestSettingsTab(t *testing.T) {
+	for at, page := range map[string]string{"": "/settings.html", "about": "/settings.html#about"} {
+		got := (&docTab{id: 5, page: settingsPage, at: at}).info()
+		if got.Title != "Settings" || got.Page != page || got.ReadOnly || got.File != "" || got.URL != "" {
+			t.Errorf("at %q: info = %+v", at, got)
+		}
+	}
+}

@@ -1,3 +1,6 @@
+// Settings, in a tab of its own. Its changes save as they are made.
+
+import "./tab.js";
 import { App, type Settings, message } from "./api.js";
 import { $, el } from "./dom.js";
 import { applyTheme } from "./theme.js";
@@ -48,6 +51,11 @@ const first = location.hash.slice(1);
 showTab(named(first) ? first : "general");
 Events.On("settings-tab", (ev: { data: string }) => {
   if (named(ev.data)) showTab(ev.data);
+});
+// Edit › Undo and Redo come to a tab's page as menu actions; here they
+// are the text fields' own.
+Events.On("menu", (ev: { data: string }) => {
+  if (ev.data === "undo" || ev.data === "redo") document.execCommand(ev.data);
 });
 
 function draw() {
@@ -149,7 +157,7 @@ function showError(err: unknown) {
   $("error").hidden = false;
 }
 
-// Changes save as they are made, like a settings window should.
+// Changes save as they are made, as settings should.
 async function save() {
   try {
     await App.SetSettings(s);

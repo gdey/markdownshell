@@ -23,8 +23,9 @@ func (a *App) send(action string) func(*application.Context) {
 
 // undo is Edit › Undo's action, or Redo's. A document window decides
 // what to undo by where its focus is: an editor's own history, a text
-// field's, or the rendered view's edits (see Notebook.Undo). Any other
-// window, such as Settings, gets the browser's undo.
+// field's, or the rendered view's edits (see Notebook.Undo); the
+// Settings tab, its text field's. Any other window gets the browser's
+// undo.
 func (a *App) undo(action string) func(*application.Context) {
 	return func(*application.Context) {
 		win := a.app.Window.Current()
@@ -327,7 +328,7 @@ func (a *App) addHelpMenu(m *application.Menu) {
 // addAppMenu adds macOS's app menu: About, Settings, Hide and Quit.
 func (a *App) addAppMenu(m *application.Menu) {
 	app := m.AddSubmenu("mdsh")
-	// About opens the Settings window's About tab, which says much
+	// About opens Settings' About tab, which says much
 	// more than the stock Cocoa panel the About role shows.
 	app.Add("About mdsh").OnClick(func(*application.Context) { a.openSettingsTab("about") })
 	app.AddSeparator()

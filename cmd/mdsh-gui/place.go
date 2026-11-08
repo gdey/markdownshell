@@ -13,10 +13,8 @@ import (
 // The sizes windows open at when there is none to remember. Each is cut
 // down to fit the screen.
 const (
-	docWidth       = 1280
-	docHeight      = 900
-	settingsWidth  = 720
-	settingsHeight = 720
+	docWidth  = 1280
+	docHeight = 900
 )
 
 // keepPlace is whether a window goes back where it was, not just to its
@@ -222,30 +220,4 @@ func (w *docWindow) flushPlace() {
 	}
 	w.app.mu.Unlock()
 	w.savePlace()
-}
-
-// settingsSize is the size the Settings window opens at.
-func (a *App) settingsSize() (int, int) {
-	if sz := a.settings.Get().SettingsWindow; sz != nil && sz.Width > 0 && sz.Height > 0 {
-		return sz.Width, sz.Height
-	}
-	return settingsWidth, settingsHeight
-}
-
-// saveSettingsSize remembers the Settings window's size.
-func (a *App) saveSettingsSize(win *application.WebviewWindow) {
-	if !steady(win) {
-		return
-	}
-	width, height := win.Size()
-	if width <= 0 || height <= 0 {
-		return
-	}
-	if sz := a.settings.Get().SettingsWindow; sz != nil && sz.Width == width && sz.Height == height {
-		return
-	}
-	err := a.settings.Update(func(s *settings.Settings) { s.SettingsWindow = &settings.Size{Width: width, Height: height} })
-	if err != nil {
-		a.app.Logger.Warn("saving settings", "err", err)
-	}
 }
