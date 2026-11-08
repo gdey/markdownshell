@@ -62,6 +62,18 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![Settings in a tab beside hello.md, at its General tab](docs/changelog/settings-tab.png)
 
+- mdsh-gui's outline keeps the selected block or heading in sight.
+  Selecting one in the rendered view, by clicking it, moving to it with
+  j and k, or moving the source view's cursor into it, scrolls the
+  outline just enough to show its entry. Scrolling the rendered view
+  leaves the outline where it is, so the entry stays there to go back
+  to, and an outline scrolled by hand stays put until something else is
+  selected. Marking the selected entry also no longer goes through
+  every entry of the outline, which made each move of the selection
+  slow on documents of 100,000 lines with the outline open.
+
+  ![The rendered view scrolled back to the top, the outline still showing the selected block, step61, near its bottom](docs/changelog/outline-follows-selection.png)
+
 ### Fixed
 
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file
