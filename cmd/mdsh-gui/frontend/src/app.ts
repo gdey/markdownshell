@@ -1203,7 +1203,7 @@ function drawBlock(c: Cell): HTMLElement {
   // too, until the block runs again.
   enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
   enableDiagrams(block.querySelector<HTMLElement>(".output")!);
-  enableCasts(block.querySelector<HTMLElement>(".output")!, { frame: Number(/(?:^|\s)frame=(\d+)/.exec(c.attrs ?? "")?.[1] ?? 0) || undefined, save: (n) => void saveFrame(c.block, "", n) });
+  enableCasts(block.querySelector<HTMLElement>(".output")!, { frame: Number(/(?:^|\s)frame=(\d+)/.exec(c.attrs ?? "")?.[1] ?? 0) || undefined, save: (n) => void saveFrame(c.block, "", n), replace: (as, n) => void replaceCast(c.block, as, n) });
   block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
     const img = (e.target as HTMLElement).closest("img");
     if (img) viewImage(img);
@@ -1435,6 +1435,28 @@ async function saveFolds(list: Fold[]) {
   }
   // Where the file folds by a condition, nothing changed.
   $("dirty").hidden = !(await App.Doc()).dirty;
+}
+
+// replaceCast swaps tty block i's recording, in the file, for the text
+// of frame n or an animated GIF of it, without asking, since the bar's
+// Undo puts it back.
+async function replaceCast(i: number, as: "text" | "gif", n: number) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  try {
+    await App.ReplaceCast(i, as, n);
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  const what = as === "text" ? `the text of frame ${n}` : "an animated GIF";
+  $("moved-text").textContent = `Replaced the recording with ${what}.`;
+  $("moved-undo").onclick = () => {
+    $("moved").hidden = true;
+    void undoEdit(false);
+  };
+  $("moved").hidden = false;
+  status("replaced the recording");
 }
 
 // saveFrame writes frame=n, where a recording's player was left, to tty

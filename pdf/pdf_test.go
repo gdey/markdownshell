@@ -184,3 +184,52 @@ func sameImage(a, b image.Image) bool {
 	}
 	return true
 }
+
+// A cast fence, a recording kept in the document, is drawn as one frame
+// of it, its frame= or the last, not as its JSON. One that isn't a
+// recording is drawn as code.
+func TestCastFence(t *testing.T) {
+	rec := termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{
+		{At: 0, Data: []byte("first")},
+		{At: time.Second, Data: []byte("\x1b[2J\x1b[Hsecond")},
+	}}
+	var cast bytes.Buffer
+	if err := termrec.WriteCast(&cast, rec); err != nil {
+		t.Fatal(err)
+	}
+	render := func(info, body string) []byte {
+		t.Helper()
+		out, err := Render([]byte("# T\n\n```"+info+"\n"+body+"```\n"), Options{Title: "t"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	last := render("cast", cast.String())
+	if n := bytes.Count(last, []byte("/Subtype /Image")); n != 1 {
+		t.Fatalf("%d images for a cast fence, want 1", n)
+	}
+	for _, info := range []string{"cast {frame=2}", "cast {frame=9}"} {
+		if got := render(info, cast.String()); !bytes.Equal(imageData(t, got), imageData(t, last)) {
+			t.Errorf("%s: not the last frame", info)
+		}
+	}
+	if first := render("cast {frame=1}", cast.String()); bytes.Equal(imageData(t, first), imageData(t, last)) {
+		t.Error("frame=1 drew the last frame")
+	}
+	if n := bytes.Count(render("cast", "not a recording\n"), []byte("/Subtype /Image")); n != 0 {
+		t.Errorf("%d images for a cast fence that isn't a recording, want 0", n)
+	}
+}
+
+// imageData is the stream of the one image in pdf.
+func imageData(t *testing.T, pdf []byte) []byte {
+	t.Helper()
+	i := bytes.Index(pdf, []byte("/Subtype /Image"))
+	if i < 0 {
+		t.Fatal("no image in the PDF")
+	}
+	s := bytes.Index(pdf[i:], []byte("stream"))
+	e := bytes.Index(pdf[i:], []byte("endstream"))
+	return pdf[i+s : i+e]
+}

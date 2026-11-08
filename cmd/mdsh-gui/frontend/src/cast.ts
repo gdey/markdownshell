@@ -4,7 +4,9 @@
 // pause, a scrubber and frame by frame stepping. Text on the screen can
 // be selected and copied, as in a terminal, and the copy button copies
 // the recording as an animated GIF. Where the head is left is written to
-// the file as frame=N, so it opens there again. The cast is read from
+// the file as frame=N, so it opens there again. On a tty block's output,
+// two more buttons swap the recording in the file for the text of the
+// frame shown, or for an animated GIF. The cast is read from
 // the window's own asset server, or from its data: URI, never the
 // network.
 //
@@ -209,6 +211,10 @@ export type CastOptions = {
   // save writes where the player was left to the file: frame, counting
   // from 1, or 0 for the last. body is the recording, for a cast fence.
   save?: (frame: number, body: string) => void;
+  // replace, for a tty block's output, swaps the recording in the file
+  // for the text of frame, counting from 1, or for an animated GIF of it.
+  // The player then offers both.
+  replace?: (as: "text" | "gif", frame: number) => void;
 };
 
 // heads are where each recording's player was left, by its cast, so a
@@ -330,8 +336,19 @@ function player(src: string, alt: string, opts: CastOptions, body: string): HTML
   const fwd = iconButton("stepForward", "Next frame", () => show(frame + 1));
   const shotBtn = iconButton("camera", "Copy this frame as text", () => void copyFrame());
   const copyBtn = iconButton("copy", "Copy as an animated GIF", () => void copyGIF());
-  for (const b of [playBtn, back, fwd, shotBtn, copyBtn]) b.disabled = true;
-  box.append(el("div", { className: "cast-controls" }, back, playBtn, fwd, scrub, note, status, shotBtn, copyBtn));
+  const swaps: HTMLButtonElement[] = [];
+  if (opts.replace) {
+    const swap = opts.replace;
+    swaps.push(
+      iconButton("text", "Replace the recording with this frame's text", () => swap("text", frame + 1)),
+      iconButton("image", "Replace the recording with an animated GIF", () => swap("gif", 0)),
+    );
+  }
+  const buttons = [playBtn, back, fwd, shotBtn, copyBtn, ...swaps];
+  for (const b of buttons) b.disabled = true;
+  const controls = el("div", { className: "cast-controls" }, back, playBtn, fwd, scrub, note, status, shotBtn, copyBtn);
+  if (swaps.length) controls.append(el("span", { className: "cast-sep" }), ...swaps);
+  box.append(controls);
 
   const selected = () => (term?.hasSelection() ? plain(term.getSelection()) : "");
 
@@ -562,7 +579,7 @@ function player(src: string, alt: string, opts: CastOptions, body: string): HTML
       });
       scrub.max = String(d.frames.length);
       scrub.disabled = false;
-      for (const b of [playBtn, back, fwd, shotBtn, copyBtn]) b.disabled = false;
+      for (const b of buttons) b.disabled = false;
       saved = want > 0 && want < d.frames.length ? want - 1 : -1;
       const left = heads.get(key);
       show(left ?? (saved < 0 ? d.frames.length - 1 : saved));

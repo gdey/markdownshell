@@ -189,6 +189,9 @@ func (r *renderer) block(n ast.Node) {
 		r.endLine()
 	case *ast.FencedCodeBlock:
 		r.gap(r.lineHeight() * 0.5)
+		if r.castFence(n) {
+			break
+		}
 		r.code(string(n.Language(r.src)), n.Info, lines(n, r.src))
 	case *ast.CodeBlock:
 		r.gap(r.lineHeight() * 0.5)
@@ -569,10 +572,46 @@ func (r *renderer) table(t *east.Table) {
 	r.f.SetCellMargin(1)
 }
 
+// castFence draws a cast fenced block, an asciinema recording kept in
+// the document, as one frame of it: its frame=, or the last. It reports
+// false, for the code to be drawn instead, when the block isn't one or
+// its body isn't a recording.
+func (r *renderer) castFence(n *ast.FencedCodeBlock) bool {
+	if string(n.Language(r.src)) != "cast" {
+		return false
+	}
+	var body bytes.Buffer
+	for i := range n.Lines().Len() {
+		s := n.Lines().At(i)
+		body.Write(s.Value(r.src))
+	}
+	if !termrec.IsCast(body.Bytes()) {
+		return false
+	}
+	frame := 0
+	if n.Info != nil {
+		_, attrs := doc.ParseInfo(string(n.Info.Segment.Value(r.src)))
+		frame, _ = strconv.Atoi(attrs["frame"])
+	}
+	data, err := castPNG(body.Bytes(), frame)
+	if err != nil {
+		return false
+	}
+	r.picture("recording", data, "PNG")
+	r.endLine()
+	return true
+}
+
 // image draws an image on its own lines, scaled to fit the page.
 func (r *renderer) image(n *ast.Image) {
 	alt := plain(n, r.src)
 	data, typ := r.load(string(n.Destination))
+	r.picture(alt, data, typ)
+}
+
+// picture draws data, an image of type typ, on its own lines, scaled to
+// fit the page, or alt in its place when it can't.
+func (r *renderer) picture(alt string, data []byte, typ string) {
 	if typ == "SVG" {
 		// fpdf can't draw SVG, but mdsh's own screenshots are just text.
 		if txt, ok := textimg.FromSVG(data); ok {
@@ -637,16 +676,13 @@ func (r *renderer) load(dest string) ([]byte, string) {
 	if v, ok := strings.CutPrefix(frag, "frame="); ok {
 		n, _ = strconv.Atoi(v)
 	}
-	var img image.Image
-	var err error
-	if typ == "GIF" {
-		img, err = termrec.Frame(data, n)
-	} else {
-		var rec termrec.Recording
-		if rec, err = termrec.ReadCast(bytes.NewReader(data)); err == nil {
-			img, err = termrec.Still(rec, n)
+	if typ == "CAST" {
+		if data, err := castPNG(data, n); err == nil {
+			return data, "PNG"
 		}
+		return nil, ""
 	}
+	img, err := termrec.Frame(data, n)
 	if err != nil {
 		return nil, ""
 	}
@@ -655,6 +691,24 @@ func (r *renderer) load(dest string) ([]byte, string) {
 		return nil, ""
 	}
 	return b.Bytes(), "PNG"
+}
+
+// castPNG draws frame n of an asciinema cast, counting from 1, or the
+// last for n <= 0, as a PNG.
+func castPNG(data []byte, n int) ([]byte, error) {
+	rec, err := termrec.ReadCast(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	img, err := termrec.Still(rec, n)
+	if err != nil {
+		return nil, err
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, double(img)); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 // double scales img up 2x, pixel for pixel. Images are laid out at half

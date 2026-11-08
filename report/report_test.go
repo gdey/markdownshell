@@ -113,3 +113,28 @@ func TestInlineCast(t *testing.T) {
 		t.Errorf("inline = %.40q, want a GIF data: URI", got)
 	}
 }
+
+// A cast fence, a recording kept in the document, plays in the page as
+// a GIF made from it, not as its JSON. One that isn't a recording shows
+// as code.
+func TestCastFence(t *testing.T) {
+	var cast bytes.Buffer
+	termrec.WriteCast(&cast, termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{{At: 0, Data: []byte("hi")}}})
+	out, err := page([]byte("```cast {frame=1}\n"+cast.String()+"```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(out, []byte(`<figure class="cast"><img alt="recording" src="data:image/gif;base64,`)) {
+		t.Errorf("no GIF for the cast fence:\n%s", out)
+	}
+	if bytes.Contains(out, []byte("&quot;version&quot;")) {
+		t.Error("the cast's JSON is in the page")
+	}
+	out, err = page([]byte("```cast\nnot a recording\n```\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(out, []byte(`<code class="language-cast">not a recording`)) {
+		t.Errorf("a cast fence that isn't a recording isn't code:\n%s", out)
+	}
+}

@@ -74,6 +74,14 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The rendered view scrolled back to the top, the outline still showing the selected block, step61, near its bottom](docs/changelog/outline-follows-selection.png)
 
+- mdsh-gui: a tty block's recording player has two more buttons. One
+  replaces the recording in the file with the text of the frame shown,
+  as an ordinary output block; the other replaces it with an animated
+  GIF, saved beside the cast. Undo puts the recording back, and running
+  the block again records a new one.
+
+  ![A tty block's recording player, with the new buttons at the right: replace with this frame's text, and replace with an animated GIF](docs/changelog/cast-replace.png)
+
 ### Security
 
 - mdsh asks before it reads a document's `env.source` files into its
@@ -228,6 +236,10 @@ and the docs gain a cheat sheet.
   its own shell, and the Events tab says so.
 
   ![Asked before killing a shell: The block hasn't stopped, with Cancel and Kill Shell](docs/changelog/kill-shell.png)
+- A `cast` block, a recording kept in the document, no longer prints as
+  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
+  frame) as a picture, HTML reports play it as a GIF, and the terminal,
+  as with `mdsh -n`, shows that frame's text.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed
