@@ -179,3 +179,44 @@ func TestLooksFinished(t *testing.T) {
 		}
 	}
 }
+
+var lookSelector = regexp.MustCompile(`^(:root|html)?\[data-look=`)
+
+// The looks' stylesheets, and the bundle the pages load, must read as
+// CSS the way a browser reads them. A comment that holds */, as a path
+// glob like looks/*/look.css does, ends early: the rest of it runs into
+// the next rule's selector and the browser drops that rule. The bundle's
+// banner did this once, and the Teletype paper lost its colours and so
+// its background. So no */ may be left once the comments are taken out,
+// and every rule, the bundle's first among them, must start with the
+// look it selects.
+func TestLooksCSSParses(t *testing.T) {
+	files := []string{"frontend/bundle/looks.css"}
+	for _, l := range allLooks[1:] {
+		files = append(files, lookCSS(l))
+	}
+	for _, file := range files {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		css := cssComment.ReplaceAllString(string(src), "")
+		if i := strings.Index(css, "*/"); i >= 0 {
+			t.Errorf("%s: a comment holds */ and ends early, before %q", file, strings.TrimSpace(css[i:min(len(css), i+60)]))
+		}
+		css = regexp.MustCompile(`(?s)@(font-face|keyframes[^{]*)\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}`).ReplaceAllString(css, "")
+		css = regexp.MustCompile(`@media[^{]*\{`).ReplaceAllString(css, "")
+		rules := cssRule.FindAllStringSubmatch(css, -1)
+		if len(rules) == 0 {
+			t.Errorf("%s has no rules", file)
+		}
+		for _, m := range rules {
+			for _, sel := range splitSelectors(m[1]) {
+				sel = strings.Join(strings.Fields(strings.TrimLeft(sel, " \n\t}")), " ")
+				if sel != "" && !lookSelector.MatchString(sel) {
+					t.Errorf("%s: a rule's selector %q doesn't start with its look; the browser drops it", file, sel)
+				}
+			}
+		}
+	}
+}
