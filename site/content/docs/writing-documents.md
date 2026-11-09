@@ -61,7 +61,7 @@ hello from a sub-env
 | `collapse-output[=COND]` | The same for the output |
 | `links` | Make web addresses (`http:`, `https:`, `mailto:`) in the output clickable in mdsh-gui and `mdsh -i`; History adds it to commands typed there |
 | `nosave` | Keep the value out of the file: the block runs and shows its output, but saving leaves what the file holds. Works on textboxes, choices and `output` fences too |
-| `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, and as with `nosave` the output isn't saved to the file |
+| `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, reports print them as `(secret)`, and as with `nosave` the output isn't saved to the file |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |
@@ -130,6 +130,9 @@ the block's code and output until you press the eye on its card, then
 masks them again after a minute (Settings › Editing › Show secrets
 for) or when the window loses focus. Copying still works, and on macOS
 the copy is marked concealed, so clipboard managers leave it out.
+Reports (`--pdf`, `--html`, and the ones mdsh-gui and `mdsh -i` make)
+print the block's code and output as `(secret)`; pass
+`--show-secrets` to put them in.
 
 ````markdown
 ```sh {#token secret}

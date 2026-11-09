@@ -155,6 +155,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	outFile := fs.String("o", "", "like -w, but write to this file and leave the input alone")
 	pdfFile := fs.String("pdf", "", "write what would be printed to this PDF file instead (- for stdout)")
 	htmlFile := fs.String("html", "", "write what would be printed to this HTML file instead (- for stdout)")
+	showSecrets := fs.Bool("show-secrets", false, "with --pdf or --html, print blocks marked secret as they are, not as (secret)")
 	only := fs.String("only", "", "run only this block, plus earlier blocks in its env chain")
 	stop := fs.Bool("stop-on-error", false, "stop at the first failing block")
 	yes := fs.Bool("yes", false, "run blocks marked confirm, and the blocks depends= names, and read the files env.source names, without asking")
@@ -209,7 +210,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	if *interactive {
 		set := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
-		for _, name := range []string{"w", "o", "pdf", "html", "no-run", "n", "only", "hide-code", "hide-output", "audit"} {
+		for _, name := range []string{"w", "o", "pdf", "html", "show-secrets", "no-run", "n", "only", "hide-code", "hide-output", "audit"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with -i", name)
 			}
@@ -329,7 +330,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 		return writeFile(reportFile, out, 0o644)
 	}
-	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose), AllowOutside: *allowOutside}
+	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, ShowSecrets: *showSecrets, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose), AllowOutside: *allowOutside}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are

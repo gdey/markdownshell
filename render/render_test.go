@@ -323,3 +323,34 @@ func TestRecordingAsText(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// TestMaskSecrets checks that a report prints a secret block's code and
+// output, run or saved, as (secret), and leaves other blocks alone
+// (finding 9 of the v1.4.0 security review).
+func TestMaskSecrets(t *testing.T) {
+	src := "# T\n\n```sh {#tok secret}\nvault read token\n```\n\n```sh {#old secret}\ncat key\n```\n\n```output {for=old exit=0}\nsaved-key\n```\n\n```sh {#none secret}\ntrue\n```\n\n```sh {#plain}\necho hi\n```\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Stdout: []byte("s3cr3t\n")},
+		nil,
+		{Block: d.Blocks[2], Ran: true},
+		{Block: d.Blocks[3], Ran: true, Stdout: []byte("hi\n")},
+	}
+	want := "# T\n\n```sh {#tok secret}\n(secret)\n```\n\n```output {for=tok}\n(secret)\n```\n\n```sh {#old secret}\n(secret)\n```\n\n```output {for=old}\n(secret)\n```\n\n```sh {#none secret}\n(secret)\n```\n\n```sh {#plain}\necho hi\n```\n\n```output {for=plain exit=0}\nhi\n```\n"
+	if got := string(Markdown(d, results, Options{MaskSecrets: true})); got != want {
+		t.Errorf("masked:\ngot  %q\nwant %q", got, want)
+	}
+	got := string(Markdown(d, results, Options{}))
+	for _, s := range []string{"s3cr3t", "vault read token", "saved-key"} {
+		if !strings.Contains(got, s) {
+			t.Errorf("unmasked lacks %q:\n%s", s, got)
+		}
+	}
+	// Write-back never masks: the file keeps its code.
+	if got := string(Markdown(d, results, Options{MaskSecrets: true, WriteBack: true})); !strings.Contains(got, "vault read token") {
+		t.Errorf("write-back masked the code:\n%s", got)
+	}
+}

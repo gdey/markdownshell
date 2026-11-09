@@ -75,6 +75,10 @@ type Options struct {
 	// Title is the report's title. Empty means none for a PDF and
 	// "mdsh report" for an HTML page.
 	Title string
+	// ShowSecrets prints blocks marked secret as they are. Otherwise
+	// their code and output are "(secret)": a report is made to be read
+	// by others (see render.Options.MaskSecrets).
+	ShowSecrets bool
 }
 
 // Render makes a report of d with results, matched to its blocks as
@@ -82,7 +86,7 @@ type Options struct {
 // saved in the file, so run.Includes(d, ...) as results reports the file
 // as it was last saved, running nothing.
 func Render(d *doc.Document, results []*run.Result, opts Options) ([]byte, error) {
-	md := render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env})
+	md := render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env, MaskSecrets: !opts.ShowSecrets})
 	switch opts.Format {
 	case Markdown, "":
 		return md, nil
