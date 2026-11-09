@@ -15,9 +15,9 @@ import (
 	_ "image/jpeg" // decode JPEGs
 	"image/png"
 	"io"
-	"os"
 	"strings"
 
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/termrec"
 	xdraw "golang.org/x/image/draw"
 )
@@ -36,7 +36,8 @@ func Load(link string) (image.Image, error) {
 		}
 		data, err = base64.StdEncoding.DecodeString(enc)
 	} else {
-		data, err = os.ReadFile(link)
+		// A plain file of at most 16 MB: not a device or a FIFO.
+		data, err = docroot.ReadFile("", link, 0)
 	}
 	if err != nil {
 		return nil, err

@@ -26,6 +26,7 @@ behaves.
 | `mdsh --expose DEBUG doc.md` | Let `{{$DEBUG}}` read your environment; repeatable or comma-separated. `MDSH_EXPOSE=A,B` does the same |
 | `mdsh --source defs.zsh doc.md` | Source a file into every shell before its first block; repeatable; a pipe works |
 | `mdsh --audit run.jsonl doc.md` | Also write a JSON Lines log of the run |
+| `mdsh --allow-outside doc.md` | Let includes, `out=` files and report images reach outside the document's git repository (or its folder); only for documents you trust |
 | `mdsh --pdf doc.pdf doc.md` | Write what would be printed as a PDF (`-` for stdout); the hide flags, `--only` and `--step` apply |
 | `mdsh --html doc.html doc.md` | The same as a standalone HTML page; not with `--pdf` |
 | `mdsh --color=never doc.md` | No styling on a terminal; `--no-color` and `NO_COLOR` too (`auto`, `always`, `never`) |

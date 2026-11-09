@@ -353,6 +353,12 @@ func main() {
 | `number_on` | Show each line with its line number in the file |
 
 - The fence's language is the language the lines are shown in.
+- The file must be inside the document's git repository (or Mercurial,
+  Jujutsu or Subversion), or the document's folder when it isn't in one,
+  and a regular file of at most 16 MB. A repository at your home folder,
+  such as one for dotfiles, doesn't count. `out=` paths and the images
+  `--html` and `--pdf` read are held to the same folder. For a document
+  you trust, `mdsh --allow-outside` lifts this.
 - An include block never runs, even as `sh` or `zsh`, and has no name: `#id`,
   `env=`, `share=`, `run=` and the other step attributes are errors on it,
   and placeholders can't refer to it.

@@ -69,3 +69,40 @@ func TestIsCast(t *testing.T) {
 		}
 	}
 }
+
+// A cast made to be huge is refused before anything is allocated for
+// it (security review v1.4.0, finding 4).
+func TestReadCastLimits(t *testing.T) {
+	for _, src := range []string{
+		`{"version":2,"width":100000,"height":100000}` + "\n",
+		`{"version":2,"width":80,"height":501}` + "\n",
+		`{"version":2,"width":-1,"height":24}` + "\n",
+	} {
+		if _, err := ReadCast(strings.NewReader(src)); err == nil {
+			t.Errorf("ReadCast(%q) = nil error", src)
+		}
+	}
+	var b strings.Builder
+	b.WriteString(`{"version":2,"width":80,"height":24}` + "\n")
+	for range MaxEvents + 1 {
+		b.WriteString(`[0,"o","x"]` + "\n")
+	}
+	if _, err := ReadCast(strings.NewReader(b.String())); err == nil || !strings.Contains(err.Error(), "events") {
+		t.Errorf("too many events: err = %v", err)
+	}
+}
+
+// Past maxCells, shots keeps the last screen and drops the ones before.
+func TestShotsBudget(t *testing.T) {
+	rec := Recording{Cols: MaxCols, Rows: MaxRows}
+	for i := range 200 {
+		rec.Events = append(rec.Events, Event{At: time.Duration(i) * time.Second, Data: []byte(strings.Repeat("x", i+1) + "\r\n")})
+	}
+	frames, _, _ := shots(rec)
+	if n := len(frames); n*MaxCols*MaxRows > maxCells || n < 2 {
+		t.Fatalf("%d frames of %d cells, budget %d", n, MaxCols*MaxRows, maxCells)
+	}
+	if last := frames[len(frames)-1]; last.at != 199*time.Second {
+		t.Errorf("last frame at %v, want the last write", last.at)
+	}
+}

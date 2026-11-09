@@ -68,6 +68,10 @@ type Options struct {
 	// Dir is where relative image links are read from, for HTML and
 	// PDF. Empty means the working directory.
 	Dir string
+	// AllowOutside reads images from anywhere, as mdsh --allow-outside
+	// does. Otherwise a local image must be inside Dir's root: see
+	// package docroot.
+	AllowOutside bool
 	// Title is the report's title. Empty means none for a PDF and
 	// "mdsh report" for an HTML page.
 	Title string
@@ -85,7 +89,7 @@ func Render(d *doc.Document, results []*run.Result, opts Options) ([]byte, error
 	case HTML:
 		return page(md, opts)
 	case PDF:
-		out, err := pdf.Render(md, pdf.Options{Dir: opts.Dir, Title: opts.Title})
+		out, err := pdf.Render(md, pdf.Options{Dir: opts.Dir, Title: opts.Title, AllowOutside: opts.AllowOutside})
 		if err != nil {
 			return nil, fmt.Errorf("pdf: %w", err)
 		}

@@ -5,11 +5,11 @@ import (
 	"encoding/base64"
 	"html"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/termrec"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -29,7 +29,7 @@ var exitRE = regexp.MustCompile(`\bexit=(\d+)`)
 func page(md []byte, opts Options) ([]byte, error) {
 	gm := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(parser.WithASTTransformers(util.Prioritized(images{opts.Dir}, 100))),
+		goldmark.WithParserOptions(parser.WithASTTransformers(util.Prioritized(newImages(opts), 100))),
 		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(fences{}, 100))),
 	)
 	var body bytes.Buffer
@@ -131,8 +131,17 @@ func (fences) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 }
 
 // images puts local images into the page as data: URIs, read from dir.
-// Remote links and files it can't read are left as they are.
-type images struct{ dir string }
+// Remote links and files it can't read, or that are outside root (when
+// root is set), are left as they are.
+type images struct{ dir, root string }
+
+func newImages(opts Options) images {
+	t := images{dir: opts.Dir}
+	if !opts.AllowOutside {
+		t.root = docroot.Root(opts.Dir)
+	}
+	return t
+}
 
 func (t images) Transform(root *ast.Document, _ text.Reader, _ parser.Context) {
 	ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -154,7 +163,7 @@ func (t images) inline(dest string) string {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(t.dir, path)
 	}
-	data, err := os.ReadFile(path)
+	data, err := docroot.ReadFile(t.root, path, 0)
 	if err != nil {
 		return ""
 	}

@@ -97,7 +97,7 @@ _mdsh() {
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --only --source --stop-on-error --yes --step --color --no-color -i --autosave --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --only --source --stop-on-error --yes --step --color --no-color -i --autosave --allow-outside --version -h" -- "$cur"))
 		return
 	fi
 
@@ -153,6 +153,7 @@ _mdsh() {
 		'--no-color[same as --color=never]' \
 		'-i[open in the terminal UI]' \
 		'--autosave[with -i, save after every block that runs]' \
+		"--allow-outside[let includes and out= files reach outside the document's repository]" \
 		'--version[print the version]' \
 		'-h[show help]' \
 		'1:markdown file:_files -g "*.md"' \

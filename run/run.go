@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/tape"
 	"github.com/gdey/markdownshell/termrec"
@@ -40,6 +42,10 @@ type Options struct {
 	Args []string
 	// Environ is the caller's environment. Defaults to os.Environ().
 	Environ []string
+	// AllowOutside lets includes and out= files reach outside the
+	// document's root (see package docroot), as mdsh --allow-outside
+	// does. Leave it off unless the document is trusted.
+	AllowOutside bool
 	// Remote marks a document loaded from a URL (http, https, ftp,
 	// sftp). Its shells get only the caller's variables its env.share
 	// and share= name, without env.Base (PATH, HOME, USER, ...), and
@@ -702,7 +708,7 @@ func saveRecording(b *doc.Block, rec termrec.Recording, opts Options) (string, e
 	if !b.Attrs.Has("embed") || b.Attrs["embed"] != "inline" {
 		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
 	}
-	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes()); err != nil {
+	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes(), opts); err != nil {
 		return "", err
 	}
 	return saveAsset(b, rel, data, "image/gif", ".gif", opts)
@@ -756,7 +762,7 @@ func saveAsset(b *doc.Block, rel string, data []byte, mime, ext string, opts Opt
 		rel = defaultAsset(b, ext, opts)
 	}
 	path := assetPath(b, rel, ext, opts)
-	if err := writeAsset(path, data); err != nil {
+	if err := writeAsset(path, data, opts); err != nil {
 		return "", err
 	}
 	if opts.LinkDir != "" {
@@ -816,11 +822,28 @@ func assetPath(b *doc.Block, rel, ext string, opts Options) string {
 	return filepath.Join(opts.Dir, filepath.FromSlash(rel))
 }
 
-func writeAsset(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+// writeAsset writes a block's file, which must be inside the
+// document's root unless opts.AllowOutside. A symlink at path is
+// replaced, not followed.
+func writeAsset(path string, data []byte, opts Options) error {
+	err := docroot.WriteFile(docRoot(opts), path, data)
+	if pe := (*fs.PathError)(nil); errors.As(err, &pe) {
+		return fmt.Errorf("can't write %s: %w", path, pe.Err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	return err
+}
+
+// docRoot is the folder opts' reads and writes must stay in, or "" with
+// opts.AllowOutside: see docroot.Root.
+func docRoot(opts Options) string {
+	if opts.AllowOutside {
+		return ""
+	}
+	dir := opts.Dir
+	if dir == "" && opts.File != "" {
+		dir = filepath.Dir(opts.File)
+	}
+	return docroot.Root(dir)
 }
 
 func sniffImage(data []byte) (mime, ext string) {
