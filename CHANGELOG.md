@@ -104,6 +104,12 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh-gui asking whether to read ~/ops/setup.sh and ~/.aliases into the shell, with Cancel, Run without them and Allow](docs/changelog/source-prompt.png)
 
+- mdsh-gui writes its settings, `gui.json`, so only you can read them
+  (0600, in a 0700 folder when it makes one). They name your recent
+  files, the shell and the Neovim to run, and were readable by every
+  user on the machine; a file left that way is fixed on the next save
+  (finding 12 of the v1.4.0 security review).
+
 ### Fixed
 
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
