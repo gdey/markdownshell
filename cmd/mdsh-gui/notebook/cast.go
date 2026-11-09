@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"os"
 	pathpkg "path"
 	"path/filepath"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termrec"
@@ -125,7 +125,7 @@ func (n *Notebook) ReplaceCast(i int, as string, frame int) error {
 			repl = "data:image/gif;base64," + base64.StdEncoding.EncodeToString(data)
 		} else {
 			gifPath := strings.TrimSuffix(path, filepath.Ext(path)) + ".gif"
-			if err := os.WriteFile(gifPath, data, 0o644); err != nil {
+			if err := docroot.WriteFile(docroot.Root(filepath.Dir(n.file)), gifPath, data); err != nil {
 				return err
 			}
 			repl = strings.TrimSuffix(dest, pathpkg.Ext(dest)) + ".gif"
@@ -172,7 +172,8 @@ func (n *Notebook) castRegion(b *doc.Block) (start, end int, link string, err er
 }
 
 // readCast reads the cast at dest, a data: URI or a path relative to
-// the document, and returns the file's path, "" for a data: URI.
+// the document, and returns the file's path, "" for a data: URI. A file
+// must be inside the document's root: see package docroot.
 func (n *Notebook) readCast(dest string) (data []byte, path string, err error) {
 	if rest, ok := strings.CutPrefix(dest, "data:"); ok {
 		meta, payload, _ := strings.Cut(rest, ",")
@@ -186,7 +187,7 @@ func (n *Notebook) readCast(dest string) (data []byte, path string, err error) {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(filepath.Dir(n.file), path)
 	}
-	data, err = os.ReadFile(path)
+	data, err = docroot.ReadFile(docroot.Root(filepath.Dir(n.file)), path, 0)
 	return data, path, err
 }
 

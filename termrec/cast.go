@@ -71,8 +71,19 @@ func IsCast(data []byte) bool {
 	return len(line) > 0 && line[0] == '{' && json.Unmarshal(line, &h) == nil && h.Version == 2 && h.Width > 0
 }
 
+// Limits on the casts ReadCast reads, so a file made to be huge can't
+// make a report or the GUI allocate without bound. MaxCols and MaxRows
+// match the front matter's own limits on terminal size.
+const (
+	MaxCols   = 1000
+	MaxRows   = 500
+	MaxEvents = 100_000
+	MaxOutput = 16 << 20
+)
+
 // ReadCast reads an asciicast v2 file. Events other than output are
-// skipped.
+// skipped. A cast wider than MaxCols, taller than MaxRows, or with more
+// than MaxEvents writes or MaxOutput bytes of them is refused.
 func ReadCast(r io.Reader) (Recording, error) {
 	dec := json.NewDecoder(r)
 	var h castHeader
@@ -82,7 +93,11 @@ func ReadCast(r io.Reader) (Recording, error) {
 	if h.Version != 2 {
 		return Recording{}, fmt.Errorf("cast version %d, want 2", h.Version)
 	}
+	if h.Width < 0 || h.Height < 0 || h.Width > MaxCols || h.Height > MaxRows {
+		return Recording{}, fmt.Errorf("cast is %d by %d; at most %d by %d", h.Width, h.Height, MaxCols, MaxRows)
+	}
 	rec := Recording{Cols: h.Width, Rows: h.Height}
+	size := 0
 	if h.Timestamp != 0 {
 		rec.Start = time.Unix(h.Timestamp, 0)
 	}
@@ -100,6 +115,12 @@ func ReadCast(r io.Reader) (Recording, error) {
 			return rec, fmt.Errorf("cast event %v: want [seconds, type, text]", ev)
 		}
 		if kind == "o" {
+			if len(rec.Events) >= MaxEvents {
+				return rec, fmt.Errorf("cast has more than %d events", MaxEvents)
+			}
+			if size += len(data); size > MaxOutput {
+				return rec, fmt.Errorf("cast has more than %d bytes of output", MaxOutput)
+			}
 			rec.Events = append(rec.Events, Event{At: time.Duration(at * float64(time.Second)), Data: []byte(data)})
 		}
 	}

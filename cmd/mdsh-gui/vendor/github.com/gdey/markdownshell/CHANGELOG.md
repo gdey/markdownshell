@@ -74,6 +74,14 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The rendered view scrolled back to the top, the outline still showing the selected block, step61, near its bottom](docs/changelog/outline-follows-selection.png)
 
+- mdsh-gui: a tty block's recording player has two more buttons. One
+  replaces the recording in the file with the text of the frame shown,
+  as an ordinary output block; the other replaces it with an animated
+  GIF, saved beside the cast. Undo puts the recording back, and running
+  the block again records a new one.
+
+  ![A tty block's recording player, with the new buttons at the right: replace with this frame's text, and replace with an animated GIF](docs/changelog/cast-replace.png)
+
 ### Security
 
 - mdsh asks before it reads a document's `env.source` files into its
@@ -95,9 +103,44 @@ follow [Semantic Versioning](https://semver.org/).
   are yours and aren't asked about.
 
   ![mdsh-gui asking whether to read ~/ops/setup.sh and ~/.aliases into the shell, with Cancel, Run without them and Allow](docs/changelog/source-prompt.png)
+- A document can no longer read or write files outside where it lives.
+  Include blocks, `out=image:`, `out=screenshot:` and `out=recording:`
+  paths, and the images `--html` and `--pdf` put in a report must be
+  inside the document's git repository (or Mercurial, Jujutsu or
+  Subversion), or its folder when it isn't in one. A repository at your
+  home folder doesn't count, so a dotfiles repository doesn't open up
+  all of `~`. Symlinks are resolved first, and an `out=` file that is a
+  symlink is replaced rather than written through. Before, `{<include
+  file=/etc/hostname}` or `file=../../.ssh/id_ed25519` put that file in
+  the output, and `out=screenshot:../../.zshrc` could overwrite it.
+  `mdsh --allow-outside` lifts this for a document you trust. Files read
+  this way, and the `env.source` files you approve, must be regular
+  files of at most 16 MB.
+- A recording (`.cast`) wider than 1000 columns, taller than 500 rows
+  or with more than 100,000 writes is refused, and turning one into a GIF
+  keeps memory bounded, so a crafted cast linked as an image can't make
+  `--html`, `--pdf` or mdsh-gui's Copy as GIF run out of memory.
+
+- mdsh-gui writes its settings, `gui.json`, so only you can read them
+  (0600, in a 0700 folder when it makes one). They name your recent
+  files, the shell and the Neovim to run, and were readable by every
+  user on the machine; a file left that way is fixed on the next save
+  (finding 12 of the v1.4.0 security review).
 
 ### Fixed
 
+- Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
+  app only the lines it changed. Each pause in the typing sent the whole
+  file twice, and checking the fences' `depends=` sent it again, so a
+  100,000-line runbook moved about 600 KB from the page for every pause
+  and one of a million lines about 80 MB; it is now under a kilobyte at
+  any length. Text the app writes itself, such as a run's output, comes
+  back to the source view the same way, as the lines it changed. This is
+  the first step of the plan in
+  [docs/design/ui-protocol.md](docs/design/ui-protocol.md). Nothing on
+  screen changes:
+
+  ![The source view and the rendered view of a short runbook, a line typed in the source view and a run's output come back into it](docs/changelog/line-edits.png)
 - On macOS, **Open With › mdsh** in Finder (and a double click on a file
   mdsh is the default app for, or a file dropped on mdsh's Dock icon)
   opens the file. Before, mdsh started but showed only the start screen,
@@ -228,6 +271,10 @@ and the docs gain a cheat sheet.
   its own shell, and the Events tab says so.
 
   ![Asked before killing a shell: The block hasn't stopped, with Cancel and Kill Shell](docs/changelog/kill-shell.png)
+- A `cast` block, a recording kept in the document, no longer prints as
+  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
+  frame) as a picture, HTML reports play it as a GIF, and the terminal,
+  as with `mdsh -n`, shows that frame's text.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed

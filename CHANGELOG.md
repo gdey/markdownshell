@@ -103,6 +103,23 @@ follow [Semantic Versioning](https://semver.org/).
   are yours and aren't asked about.
 
   ![mdsh-gui asking whether to read ~/ops/setup.sh and ~/.aliases into the shell, with Cancel, Run without them and Allow](docs/changelog/source-prompt.png)
+- A document can no longer read or write files outside where it lives.
+  Include blocks, `out=image:`, `out=screenshot:` and `out=recording:`
+  paths, and the images `--html` and `--pdf` put in a report must be
+  inside the document's git repository (or Mercurial, Jujutsu or
+  Subversion), or its folder when it isn't in one. A repository at your
+  home folder doesn't count, so a dotfiles repository doesn't open up
+  all of `~`. Symlinks are resolved first, and an `out=` file that is a
+  symlink is replaced rather than written through. Before, `{<include
+  file=/etc/hostname}` or `file=../../.ssh/id_ed25519` put that file in
+  the output, and `out=screenshot:../../.zshrc` could overwrite it.
+  `mdsh --allow-outside` lifts this for a document you trust. Files read
+  this way, and the `env.source` files you approve, must be regular
+  files of at most 16 MB.
+- A recording (`.cast`) wider than 1000 columns, taller than 500 rows
+  or with more than 100,000 writes is refused, and turning one into a GIF
+  keeps memory bounded, so a crafted cast linked as an image can't make
+  `--html`, `--pdf` or mdsh-gui's Copy as GIF run out of memory.
 
 - mdsh-gui writes its settings, `gui.json`, so only you can read them
   (0600, in a 0700 folder when it makes one). They name your recent

@@ -164,6 +164,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	showVersion := fs.Bool("version", false, "print the version and exit")
+	allowOutside := fs.Bool("allow-outside", false, "let include blocks, out= files and report images reach outside the document's git repository (or its folder, outside a repository); only for documents you trust")
 	auditFile := fs.String("audit", "", "write an audit log of the run to this file, one JSON object per line")
 	// Files are read as the flag is parsed, so a pipe such as
 	// <(alias -L) is read once, however many shells start.
@@ -217,7 +218,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		if fs.NArg() > 1 {
 			args = fs.Args()[1:]
 		}
-		return interactiveCmd(fs.Arg(0), args, sources.String(), expose, *stop, *step, *yes, *autosave, stdin, stdout)
+		return interactiveCmd(fs.Arg(0), args, sources.String(), expose, *stop, *step, *yes, *autosave, *allowOutside, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -328,14 +329,14 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 		return writeFile(reportFile, out, 0o644)
 	}
-	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose)}
+	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose), AllowOutside: *allowOutside}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are
 	// still filled in, since reading a file runs nothing. -o saves what
 	// would be printed, unstyled.
 	if noRun || (*hideCode && *hideOutput && !*write) {
-		results := run.Includes(d, run.Options{File: file})
+		results := run.Includes(d, run.Options{File: file, AllowOutside: *allowOutside})
 		if *outFile != "" {
 			out, _ := report.Render(d, results, reportOpts)
 			err = writeFile(*outFile, out, 0o644)
@@ -358,15 +359,16 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	defer cancel()
 
 	opts := run.Options{
-		File:        file,
-		Args:        blockArgs,
-		StopOnError: *stop,
-		Only:        *only,
-		Step:        *step,
-		Source:      sources.String(),
-		Environ:     reportOpts.Env,
-		Mode:        mode,
-		Audit:       log,
+		File:         file,
+		Args:         blockArgs,
+		StopOnError:  *stop,
+		Only:         *only,
+		Step:         *step,
+		Source:       sources.String(),
+		Environ:      reportOpts.Env,
+		Mode:         mode,
+		Audit:        log,
+		AllowOutside: *allowOutside,
 		// A stopped or timed-out block is interrupted and its shell
 		// kept; one that won't stop has its shell killed after this,
 		// as nobody may be there to ask.
@@ -654,7 +656,7 @@ func (s *streamer) finish(results []*run.Result) error {
 // TUI starts with a list of the markdown files under it to pick from.
 // Output is saved when asked, or with autosave after every block that
 // runs.
-func interactiveCmd(file string, args []string, source string, expose []string, stop, step, yes, autosave bool, stdin io.Reader, stdout io.Writer) error {
+func interactiveCmd(file string, args []string, source string, expose []string, stop, step, yes, autosave, allowOutside bool, stdin io.Reader, stdout io.Writer) error {
 	if file == "-" {
 		return errors.New("-i needs a file, not stdin")
 	}
@@ -700,14 +702,15 @@ func interactiveCmd(file string, args []string, source string, expose []string, 
 		}
 		return d, tui.Options{
 			Run: run.Options{
-				File:        abs,
-				LinkDir:     filepath.Dir(abs),
-				Args:        args,
-				Environ:     run.WithExpose(run.WithMode(os.Environ(), run.ModeInteractive), expose),
-				Source:      source,
-				StopOnError: stop,
-				Step:        step,
-				Mode:        run.ModeInteractive,
+				File:         abs,
+				LinkDir:      filepath.Dir(abs),
+				Args:         args,
+				Environ:      run.WithExpose(run.WithMode(os.Environ(), run.ModeInteractive), expose),
+				Source:       source,
+				StopOnError:  stop,
+				AllowOutside: allowOutside,
+				Step:         step,
+				Mode:         run.ModeInteractive,
 			},
 			Yes:      yes,
 			Save:     func(file string, out []byte) error { return writeFile(file, out, 0o644) },

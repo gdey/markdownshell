@@ -333,9 +333,10 @@ func (m *Model) writeReport(r pendingReport) {
 		HideOutput: r.HideOutput,
 		// The report's conditions see $MDSH_MODE report, so
 		// show={{$MDSH_MODE}}!=report leaves a block out of it.
-		Env:   run.WithMode(m.environ(), run.ModeReport),
-		Title: report.Title(r.File),
-		Dir:   filepath.Dir(r.File),
+		Env:          run.WithMode(m.environ(), run.ModeReport),
+		Title:        report.Title(r.File),
+		Dir:          filepath.Dir(r.File),
+		AllowOutside: m.opts.Run.AllowOutside,
 	}
 	out, err := func() ([]byte, error) {
 		if !r.saved {
@@ -349,7 +350,7 @@ func (m *Model) writeReport(r pendingReport) {
 		if err != nil {
 			return nil, err
 		}
-		return report.Render(d, run.Includes(d, run.Options{File: r.File}), opts)
+		return report.Render(d, run.Includes(d, run.Options{File: r.File, AllowOutside: m.opts.Run.AllowOutside}), opts)
 	}()
 	if err == nil {
 		err = os.WriteFile(r.Dest, out, 0o644)

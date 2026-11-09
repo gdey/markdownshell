@@ -10,13 +10,13 @@ import (
 	"image"
 	"image/png"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
 	"github.com/go-pdf/fpdf"
@@ -53,6 +53,10 @@ type Options struct {
 	Dir string
 	// Title is the PDF's title metadata.
 	Title string
+	// AllowOutside reads images from anywhere. Otherwise a local image
+	// must be inside Dir's root (see package docroot): its repository,
+	// or Dir itself.
+	AllowOutside bool
 }
 
 // Render lays out md as a PDF. Front matter is left out. Images that
@@ -82,6 +86,9 @@ func Render(md []byte, opts Options) ([]byte, error) {
 	f.AddPage()
 
 	r := &renderer{f: f, src: md, dir: opts.Dir, left: margin}
+	if !opts.AllowOutside {
+		r.root = docroot.Root(opts.Dir)
+	}
 	r.blocks(root)
 	if err := f.Error(); err != nil {
 		return nil, err
@@ -97,6 +104,8 @@ type renderer struct {
 	f   *fpdf.Fpdf
 	src []byte
 	dir string
+	// root is the folder local images must be in, or "" for anywhere.
+	root string
 
 	// Inline state: the font family, style flags and size in use.
 	mono, bold, italic, strike bool
@@ -747,7 +756,7 @@ func (r *renderer) read(dest string) ([]byte, string) {
 			dest = filepath.Join(r.dir, filepath.FromSlash(dest))
 		}
 		var err error
-		if data, err = os.ReadFile(dest); err != nil {
+		if data, err = docroot.ReadFile(r.root, dest, 0); err != nil {
 			return nil, ""
 		}
 	}

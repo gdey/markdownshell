@@ -109,7 +109,7 @@ func TestInlineCast(t *testing.T) {
 	var cast bytes.Buffer
 	termrec.WriteCast(&cast, termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{{At: 0, Data: []byte("hi")}}})
 	os.WriteFile(filepath.Join(dir, "r.cast"), cast.Bytes(), 0o644)
-	if got := (images{dir}).inline("r.cast#frame=1"); !strings.HasPrefix(got, "data:image/gif;base64,") {
+	if got := newImages(Options{Dir: dir}).inline("r.cast#frame=1"); !strings.HasPrefix(got, "data:image/gif;base64,") {
 		t.Errorf("inline = %.40q, want a GIF data: URI", got)
 	}
 }
@@ -136,5 +136,20 @@ func TestCastFence(t *testing.T) {
 	}
 	if !bytes.Contains(out, []byte(`<code class="language-cast">not a recording`)) {
 		t.Errorf("a cast fence that isn't a recording isn't code:\n%s", out)
+	}
+}
+
+// An image outside the document's folder stays a link, unless
+// AllowOutside.
+func TestInlineOutside(t *testing.T) {
+	top := t.TempDir()
+	dir := filepath.Join(top, "doc")
+	os.Mkdir(dir, 0o755)
+	os.WriteFile(filepath.Join(top, "x.gif"), []byte("GIF89a"), 0o644)
+	if got := newImages(Options{Dir: dir}).inline("../x.gif"); got != "" {
+		t.Errorf("inline outside = %.40q, want it left as a link", got)
+	}
+	if got := newImages(Options{Dir: dir, AllowOutside: true}).inline("../x.gif"); !strings.HasPrefix(got, "data:image/gif") {
+		t.Errorf("inline with AllowOutside = %.40q, want a data: URI", got)
 	}
 }
