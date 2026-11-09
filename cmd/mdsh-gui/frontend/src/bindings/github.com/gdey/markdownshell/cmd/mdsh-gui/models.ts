@@ -75,6 +75,12 @@ export interface CLI {
     "broken": string;
 
     /**
+     * OtherApp is whether Broken is still there: another mdsh.app, such
+     * as an older release's, rather than where this one used to be.
+     */
+    "otherApp": boolean;
+
+    /**
      * Linked is another mdsh on PATH that is this app's, such as the
      * Homebrew cask's link, which comes first on PATH.
      */

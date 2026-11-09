@@ -113,6 +113,8 @@ function drawCLI() {
   } else if (c.other) {
     status.replaceChildren("Another mdsh is on PATH at ", code(tilde(c.other, c.home)), ". Remove it to use this app's.");
     install = false;
+  } else if (c.broken && c.otherApp) {
+    status.replaceChildren(code(link), " runs another mdsh.app, at ", code(tilde(c.broken, c.home)), ". Install points it at this one.");
   } else if (c.broken) {
     status.replaceChildren(code(link), " is broken: it points at ", code(c.broken), ". Install points it here.");
   } else if (c.installed && !c.inPath) {

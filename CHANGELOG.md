@@ -174,6 +174,18 @@ follow [Semantic Versioning](https://semver.org/).
   History pane's output and prompt, keep their colors and drop the
   rest. Printed to a file or a pipe, `mdsh` leaves the markdown as it
   is.
+- mdsh-gui no longer takes over the `mdsh` command when any copy of it
+  is launched. At launch it pointed `/usr/local/bin/mdsh` at itself
+  whenever the link went into another `mdsh.app`, so opening an older
+  release from a mounted `.dmg`, or a fork's build, quietly made it the
+  `mdsh` every terminal ran; and an older AppImage replaced a newer copy
+  in `~/.local/bin` (finding 7 of the v1.4.0 security review). Now the
+  link is repaired only when its target is gone or is a place this app
+  has stood, the AppImage copy is only ever brought forward, and the
+  Console says when either happens. Settings › Shell says "runs another
+  mdsh.app" for a link it left, and Install points it here. Installing
+  the command no longer clears the quarantine flag on the app, which is
+  notarized.
 
 ### Fixed
 

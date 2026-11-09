@@ -183,10 +183,20 @@ func mdshGUI(o options) error {
 	slog.SetDefault(logger)
 	a := &App{console: cons, settings: store, trust: trust.OpenDefault(), cwd: cwd, dir: dir, source: o.source, windows: map[uint]*docWindow{}, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}, cli: newCLIHost()}
 	// A link left by a moved app is pointed back here, and an
-	// AppImage's copy brought up to this version, quietly.
+	// AppImage's copy brought up to this version, without asking; the
+	// Console says when it happens.
+	a.cli.known = store.Get().CLIPaths
+	a.cli.saw = func(path string) {
+		if err := store.Update(func(s *settings.Settings) { s.SawCLI(path) }); err != nil {
+			slog.Warn("saving where the mdsh command line tool points", "err", err)
+		}
+	}
 	go func() {
-		if err := a.cli.repair(); err != nil {
+		changed, err := a.cli.repair()
+		if err != nil {
 			slog.Warn("updating the mdsh command line tool", "err", err)
+		} else if changed != "" {
+			slog.Info("mdsh command line tool: " + changed)
 		}
 	}()
 	app := application.New(application.Options{

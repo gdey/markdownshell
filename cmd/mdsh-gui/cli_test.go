@@ -29,8 +29,8 @@ func TestCLILink(t *testing.T) {
 	if c := h.state(); c.Installed || c.Other != "" || c.Broken != "" || !c.InPath {
 		t.Fatalf("before install: %+v", c)
 	}
-	unq := 0
-	h.unquarantine = func() error { unq++; return nil }
+	var saw []string
+	h.saw = func(p string) { saw = append(saw, p) }
 	if err := h.install(); err != nil {
 		t.Fatal(err)
 	}
@@ -40,8 +40,8 @@ func TestCLILink(t *testing.T) {
 	if !h.state().Installed {
 		t.Error("not installed after install")
 	}
-	if unq != 1 {
-		t.Errorf("unquarantine ran %d times, want 1", unq)
+	if len(saw) != 1 || saw[0] != h.bundled {
+		t.Errorf("install noted %q, want this app's helper", saw)
 	}
 	if err := h.uninstall(); err != nil {
 		t.Fatal(err)
@@ -63,11 +63,71 @@ func TestCLIMovedApp(t *testing.T) {
 	if c := h.state(); c.Broken != old || c.Installed || c.Other != "" {
 		t.Fatalf("moved app: %+v", c)
 	}
-	if err := h.repair(); err != nil {
+	changed, err := h.repair()
+	if err != nil {
 		t.Fatal(err)
 	}
 	if !h.state().Installed {
 		t.Error("repair didn't point the link at this app")
+	}
+	if !strings.Contains(changed, old) {
+		t.Errorf("repair said %q, want the old target named", changed)
+	}
+}
+
+// TestCLIOtherApp checks that launching an mdsh.app doesn't take over a
+// link into another mdsh.app that is still there, such as an older
+// release on a mounted .dmg, unless this app stood there before
+// (finding 7 of the v1.4.0 security review).
+func TestCLIOtherApp(t *testing.T) {
+	tmp := t.TempDir()
+	bin := filepath.Join(tmp, "bin")
+	os.MkdirAll(bin, 0o755)
+	installed := fakeApp(t, filepath.Join(tmp, "Applications"))
+	h := &cliHost{bundled: fakeApp(t, filepath.Join(tmp, "Volumes", "mdsh-1.3")), link: filepath.Join(bin, "mdsh"), pathDirs: []string{bin}}
+	if err := os.Symlink(installed, h.link); err != nil {
+		t.Fatal(err)
+	}
+	if c := h.state(); c.Broken != installed || !c.OtherApp {
+		t.Errorf("state = %+v, want another app", c)
+	}
+	changed, err := h.repair()
+	if err != nil || changed != "" {
+		t.Fatalf("repair = %q, %v", changed, err)
+	}
+	if target, _ := os.Readlink(h.link); target != installed {
+		t.Errorf("another app's launch moved the link to %q", target)
+	}
+	// Where this app has stood before is its own.
+	h.known = []string{installed}
+	if _, err := h.repair(); err != nil {
+		t.Fatal(err)
+	}
+	if !h.state().Installed {
+		t.Error("repair left a link to a place this app stood")
+	}
+}
+
+func TestOlderVersion(t *testing.T) {
+	for _, tc := range []struct {
+		a, b string
+		want bool
+	}{
+		{"1.4.0", "1.5.0", true},
+		{"1.5.0", "1.4.0", false},
+		{"1.5.0", "1.5.0", false},
+		{"1.4.9", "1.10.0", true},
+		{"1.5.0-rc.1", "1.5.0", true},
+		{"1.5.0", "1.5.0-rc.1", false},
+		{"1.5.0-rc.1", "1.5.0-rc.2", true},
+		{"0.0.0-dev.12", "1.4.0", true},
+		{"", "1.4.0", true},
+		{"1.4.0", "", false},
+		{"junk", "other", false},
+	} {
+		if got := olderVersion(tc.a, tc.b); got != tc.want {
+			t.Errorf("olderVersion(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+		}
 	}
 }
 
@@ -149,19 +209,34 @@ func TestCLICopy(t *testing.T) {
 		t.Error("not installed after install")
 	}
 
-	// The same version: repair leaves it. A new one: repair copies.
+	// The same version: repair leaves it. A new one: repair copies. An
+	// older one, such as an old AppImage opened again: repair leaves the
+	// newer copy alone.
 	os.WriteFile(bundled, []byte("v2"), 0o755)
 	h.repair()
 	if b, _ := os.ReadFile(h.link); string(b) != "v1" {
 		t.Errorf("repair at the same version copied: %q", b)
 	}
 	h.version = "1.5.0"
-	if err := h.repair(); err != nil {
+	changed, err := h.repair()
+	if err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(h.link); string(b) != "v2" {
 		t.Errorf("repair at a new version left %q", b)
 	}
+	if !strings.Contains(changed, "1.4.0 to 1.5.0") {
+		t.Errorf("repair said %q", changed)
+	}
+	os.WriteFile(bundled, []byte("old"), 0o755)
+	h.version = "1.3.0"
+	if changed, err := h.repair(); err != nil || changed != "" {
+		t.Errorf("repair from an older AppImage = %q, %v", changed, err)
+	}
+	if b, _ := os.ReadFile(h.link); string(b) != "v2" {
+		t.Errorf("an older AppImage replaced the copy: %q", b)
+	}
+	h.version = "1.5.0"
 	if left, _ := filepath.Glob(filepath.Join(bin, ".mdsh.tmp*")); len(left) != 0 {
 		t.Errorf("temporary files left: %v", left)
 	}
