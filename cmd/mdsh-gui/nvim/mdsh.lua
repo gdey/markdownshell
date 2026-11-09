@@ -299,6 +299,54 @@ function calls.set_runs(blocks, sections)
 end
 vim.api.nvim_set_hl(0, "mdshRun", { default = true, link = "DiagnosticOk" })
 
+-- Secrets: a secret block's code, and the output of a block whose output
+-- may hold a secret, are drawn in the background's color, as mdsh-gui
+-- masks them on the block's card, until its eye button shows them. The
+-- fences stay as they are. code and output are the lines the fences
+-- open on.
+local secrets = vim.api.nvim_create_namespace("mdsh_secrets")
+
+function calls.set_secrets(code, output)
+  vim.api.nvim_buf_clear_namespace(buf, secrets, 0, -1)
+  local n = vim.api.nvim_buf_line_count(buf)
+  local function mask(line)
+    if line < 1 or line > n then
+      return
+    end
+    local open = vim.api.nvim_buf_get_lines(buf, line - 1, line, false)[1] or ""
+    local fence = open:match("^%s*(```+)") or open:match("^%s*(~~~+)")
+    if not fence then
+      return
+    end
+    local last = n
+    for i = line + 1, n do
+      local text = vim.api.nvim_buf_get_lines(buf, i - 1, i, false)[1] or ""
+      local f = text:match("^%s*(" .. fence:sub(1, 1):gsub("%p", "%%%0") .. "+)%s*$")
+      if f and #f >= #fence then
+        last = i - 1
+        break
+      end
+    end
+    if last > line then
+      vim.api.nvim_buf_set_extmark(buf, secrets, line, 0, { end_row = last, end_col = 0, hl_group = "mdshSecret", hl_eol = true, priority = 10000, strict = false })
+    end
+  end
+  for _, l in ipairs(code) do
+    mask(l)
+  end
+  for _, l in ipairs(output) do
+    mask(l)
+  end
+end
+
+-- mdshSecret draws text in the background's color, so it can't be read.
+local function secret_hl()
+  local bg = vim.api.nvim_get_hl(0, { name = "Normal", link = false }).bg
+  vim.api.nvim_set_hl(0, "mdshSecret", { fg = bg or (vim.o.background == "dark" and 0 or 0xffffff), bg = bg })
+end
+secret_hl()
+vim.api.nvim_create_autocmd({ "ColorScheme", "OptionSet" }, { callback = secret_hl })
+
 -- run_mark is the line of the run button under the mouse, or nil. The
 -- marks move with the text, so they are read back from the buffer.
 local function run_mark()
@@ -753,6 +801,7 @@ local function app_colors(c)
   hl("DiagnosticUnderlineInfo", { sp = c.accent, undercurl = true })
   hl("DiagnosticUnderlineHint", { sp = c.muted, undercurl = true })
   hl("mdshRun", { fg = c.accent })
+  secret_hl()
 
   vim.g.colors_name = "mdsh"
 end

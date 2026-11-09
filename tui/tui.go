@@ -73,6 +73,11 @@ type Model struct {
 	d    *doc.Document
 	opts Options
 	sess *run.Session
+	// secretVars are the session's SecretVars as of the last refresh,
+	// and secretShown is the block whose secret x showed, plus one, or
+	// 0; see masked.
+	secretVars  []string
+	secretShown int
 	// results are the latest result of each block. They are copied from
 	// run events, so drawing and saving never read the session while a
 	// run is going.
@@ -773,6 +778,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "o":
 		return m, m.toggle(&m.shown.Outline)
+	case "x":
+		m.toggleSecret()
 	case "C":
 		return m, m.toggle(&m.shown.HideCode)
 	case "O":
@@ -1316,6 +1323,9 @@ func (m *Model) navAt(n int) int {
 
 // moveTo puts the cursor on block i and scrolls it into view.
 func (m *Model) moveTo(i int) {
+	if m.secretShown != i+1 {
+		m.secretShown = 0
+	}
 	for n, b := range m.nav {
 		if b == i {
 			m.cursor = n
@@ -1483,4 +1493,22 @@ func (m *Model) envBanner() string {
 		return ""
 	}
 	return m.d.Options.FullEnvBanner()
+}
+
+// toggleSecret shows the selected block's masked code and output, or
+// masks them again.
+func (m *Model) toggleSecret() {
+	i := m.cur()
+	if i < 0 {
+		return
+	}
+	if code, output := m.secret(i); !code && !output {
+		m.status = "this block isn't secret"
+		return
+	}
+	if m.secretShown == i+1 {
+		m.secretShown = 0
+		return
+	}
+	m.secretShown = i + 1
 }

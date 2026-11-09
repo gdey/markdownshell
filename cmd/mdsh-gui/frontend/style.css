@@ -199,6 +199,8 @@ main { max-width: 860px; margin: 0 auto; padding: 16px 16px 40px 28px; }
 #source-editor .cm-run-gutter .cm-gutterElement { display: flex; align-items: center; padding: 0 3px; }
 .cm-run { display: inline-flex; color: var(--accent); cursor: pointer; border-radius: 3px; }
 .cm-run:hover { background: var(--hover); }
+/* A secret block's lines in the source pane, masked as on its card. */
+.cm-secret { filter: blur(5px); }
 .cm-run svg { width: 11px; height: 11px; fill: currentColor; }
 #doc-scroll { flex: 1; overflow: auto; min-width: 0; position: relative; isolation: isolate; }
 /* For a frame after a long jump, so WebKit paints the view afresh. */

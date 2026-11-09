@@ -92,6 +92,7 @@ var helpItems = []helpItem{
 
 	{group: "View", keys: "v", key: runeKey("v"), what: says("show the block's image full screen"), off: noImage},
 	{group: "View", keys: "o", key: runeKey("o"), what: says("show or hide the outline")},
+	{group: "View", keys: "x", key: runeKey("x"), what: says("show or hide the block's secret, until you move off it"), off: noSecret},
 	{group: "View", keys: "C", key: runeKey("C"), what: says("show or hide code")},
 	{group: "View", keys: "O", key: runeKey("O"), what: says("show or hide output")},
 	{group: "View", keys: "?", key: runeKey("?"), what: says("this help")},
@@ -110,6 +111,15 @@ func noBlocks(m *Model) string {
 		return "the file has no blocks"
 	}
 	return ""
+}
+
+func noSecret(m *Model) string {
+	if i := m.cur(); i >= 0 {
+		if code, output := m.secret(i); code || output {
+			return ""
+		}
+	}
+	return "the block isn't secret"
 }
 
 func busy(m *Model) string {

@@ -296,3 +296,27 @@ func (s *Session) SecretVars() []string {
 	sort.Strings(names)
 	return names
 }
+
+// NamesAny reports whether code names any of the variables in names, as
+// a whole word: $NAME, ${NAME} and {{$NAME}} all do. With SecretVars, it
+// says whether a block's output may hold a secret.
+func NamesAny(code string, names []string) bool {
+	word := func(c byte) bool {
+		return c == '_' || '0' <= c && c <= '9' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+	}
+	for _, name := range names {
+		for i := 0; ; {
+			j := strings.Index(code[i:], name)
+			if j < 0 {
+				break
+			}
+			j += i
+			end := j + len(name)
+			if (j == 0 || !word(code[j-1])) && (end == len(code) || !word(code[end])) {
+				return true
+			}
+			i = j + 1
+		}
+	}
+	return false
+}

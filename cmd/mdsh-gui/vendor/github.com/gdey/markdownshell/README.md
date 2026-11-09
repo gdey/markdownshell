@@ -277,6 +277,7 @@ its output.
 | `u` | undo the last move |
 | `v` | show the block's image or recording full screen; enter goes back |
 | `o` | show or hide the outline: the headings and blocks down the left, with each block's state (✓ ran, ✗ failed, ? waiting for an answer, … running) |
+| `x` | show or hide the selected block's secret: a `secret` block's code and output, masked until then, and masked again when you move off it |
 | `C` / `O` | hide or show the code / the output of blocks |
 | `p` | create a report, as `mdsh-gui`'s Create Report: PDF, HTML or markdown, with or without code and output, of this run, of a run of every block, or of the file as saved. It shows the `mdsh` command that makes the same report |
 | `,` | run options for this file: the arguments `$1` and on, `--only`, `--step` and `--stop-on-error`. Setting them starts new shells, and the file keeps them when opened again |
@@ -355,7 +356,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
 | `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
 | `nosave` | Keep the value out of the file: the block's output, or what is typed in a textbox or picked in a choice, lives in the session, and saving leaves what the file holds. On an `output` fence, keeps just that fence |
-| `secret` | The code and output hold a secret: mdsh-gui masks them until you show them, reports print them as `(secret)` unless `--show-secrets`, and as with `nosave` the output isn't saved to the file |
+| `secret` | The code and output hold a secret: mdsh-gui and `mdsh -i` mask them until you show them, reports print them as `(secret)` unless `--show-secrets`, and as with `nosave` the output isn't saved to the file |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides `PATH`, `HOME`, `USER` and the rest of the base set (default all; empty for just the base set; `-PATH` drops one) |
 | `on_error=stop` | Stop the run if this block fails |

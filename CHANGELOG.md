@@ -132,6 +132,19 @@ follow [Semantic Versioning](https://semver.org/).
   of the `.md` only, so a PDF of the run carried the secret to whoever
   you sent it to (finding 9 of the v1.4.0 security review). Pass
   `--show-secrets` to put them in.
+- A secret no longer shows in mdsh-gui's source pane or in `mdsh -i`.
+  The source pane, and the Neovim one, mask the lines of a `secret`
+  block's code, and the output of a block whose code names a variable
+  set with `mdsh ctl set --secret`, as the block's card does, until its
+  eye button shows them. `mdsh -i` had no notion of `secret`: it now
+  shows such code and output as `•••••••• secret` until you press `x`
+  on the block, and masks them again when you move off it. Copying a
+  secret on Linux and Windows says a clipboard manager may keep a
+  copy, since only macOS can mark it concealed (finding 9 of the
+  v1.4.0 security review).
+
+  ![mdsh-gui's source pane blurring a secret block's code next to its blurred card](docs/changelog/secret-source.png)
+  ![mdsh -i showing a secret block's code and output as dots, with x shows it](docs/changelog/secret-tui.png)
 
 ### Fixed
 

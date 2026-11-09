@@ -407,6 +407,23 @@ func TestCalls(t *testing.T) {
 		t.Errorf("with the app's colors off: %+v", scheme)
 	}
 
+	// set_secrets masks the lines inside the fences named, not the
+	// fences: block a's code is line 6.
+	call("set_secrets", []int{5}, []int{})
+	var masked [][]any
+	if err := e.v.ExecLua(`return vim.api.nvim_buf_get_extmarks(0, vim.api.nvim_get_namespaces().mdsh_secrets, 0, -1, {details = true})`, &masked); err != nil {
+		t.Fatal(err)
+	}
+	if len(masked) != 1 || fmt.Sprint(masked[0][1]) != "5" {
+		t.Errorf("secret marks = %v, want one from line 6", masked)
+	} else if d, _ := masked[0][3].(map[string]any); fmt.Sprint(d["end_row"]) != "6" || d["hl_group"] != "mdshSecret" {
+		t.Errorf("secret mark = %v, want to the start of line 7 in mdshSecret", d)
+	}
+	call("set_secrets", []int{}, []int{})
+	if err := e.v.ExecLua(`return vim.api.nvim_buf_get_extmarks(0, vim.api.nvim_get_namespaces().mdsh_secrets, 0, -1, {})`, &masked); err != nil || len(masked) != 0 {
+		t.Errorf("secret marks after clearing = %v, %v", masked, err)
+	}
+
 	call("set_spell", true)
 	var spell bool
 	if err := e.v.ExecLua(`return vim.wo.spell`, &spell); err != nil || !spell {
