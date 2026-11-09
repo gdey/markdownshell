@@ -19,6 +19,13 @@ follow [Semantic Versioning](https://semver.org/).
   both themes, and `TestLookContrast` now checks it too.
 
   ![The deploy runbook in the Witchcraft look: a framed kraft-paper scroll against a sky of stars and crescent moons, with ship asking to run](docs/changelog/witchcraft.png)
+- `mdsh --serve` serves the notebook mdsh-gui shows to a web browser,
+  at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
+  address can run commands as you, so it listens on loopback by default;
+  see Serving to a browser in the README.
+- `mdsh --serve=stdio` and `mdsh-gui --serve=stdio` serve the notebook to
+  the program that started them, such as an editor plugin, as JSON lines
+  on stdin and stdout.
 
 - mdsh-gui shows the cheat sheet beside the changelog: Help › Cheat
   Sheet, or its link on Settings › About, opens it in a read-only tab,
@@ -29,7 +36,7 @@ follow [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - `mdsh-gui`: each look is now one file, `look.css` in its own folder
-  in `cmd/mdsh-gui/frontend/looks`. It opens with the look's front
+  in `web/looks`. It opens with the look's front
   matter in TOML, between `+++` lines in its first comment, that says
   what the look is, and the rules after it paint it. Everything else
   that names the looks is made from those files by `go generate`:

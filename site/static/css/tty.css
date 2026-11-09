@@ -1,7 +1,7 @@
 /* The teletype skin: fan-fold paper by day, green phosphor by night.
    It only repaints the layout in site.css, under
    <html data-theme="tty">, with the palette of the app's Teletype look
-   (cmd/mdsh-gui/frontend/looks/teletype/look.css), so the site and the app match. */
+   (web/looks/teletype/look.css), so the site and the app match. */
 :root[data-theme="tty"] {
   --bg: #e6dec4;
   --paper: #f3edd9;

@@ -1,5 +1,5 @@
 // Command newlook starts a new look for mdsh-gui: a folder in
-// frontend/looks with a look.css that opens with the look's front
+// web/looks with a look.css that opens with the look's front
 // matter (TOML between +++ lines in its first comment) and sets the
 // plain look's colors under the new look's name, so it passes the tests
 // from the start. Run it from cmd/mdsh-gui:
@@ -25,10 +25,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
+	"github.com/gdey/markdownshell/looks"
 )
 
-const dir = "frontend/looks"
+const dir = "../../web/looks"
 
 var folderPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
@@ -77,7 +77,7 @@ func newLook(folder, name, id, since string) error {
 			return err
 		}
 	}
-	style, err := os.ReadFile("frontend/style.css")
+	style, err := os.ReadFile("../../web/style.css")
 	if err != nil {
 		return err
 	}

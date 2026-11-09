@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdey/markdownshell/cmd/mdsh-gui/looks"
+	"github.com/gdey/markdownshell/looks"
 )
 
 // The new look's palettes come from style.css; if its layout changes,
 // newlook must change with it.
 func TestLookCSS(t *testing.T) {
-	style, err := os.ReadFile("../../frontend/style.css")
+	style, err := os.ReadFile("../../../../web/style.css")
 	if err != nil {
 		t.Fatal(err)
 	}

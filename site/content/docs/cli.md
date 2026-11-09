@@ -29,6 +29,7 @@ weight: 50
 | `mdsh ctl set NAME value` | From inside a block: sets a variable for the blocks after it (`unset`, `get` and `status` too); see [Talking back to mdsh]({{< relref "control" >}}) | No |
 | `mdsh lsp` | A language server for block attributes, for your editor | No |
 | `mdsh completion bash\|zsh` | A completion script | No |
+| `mdsh --serve [doc.md]` | Nothing; serves the notebook to a web browser at 127.0.0.1:8080, see [Browser]({{< relref "browser" >}}) | When you save in the page |
 | `mdsh --version` | The version | No |
 
 - `mdsh doc.md` is short for `mdsh run doc.md`, so `#!/usr/bin/env mdsh`

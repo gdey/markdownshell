@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Nothing a document holds may load from the network; see csp_test.go. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OKxuUMfPrzQq3XhEnBLzaiAjTx/xY9aFq+d83FQkwSw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'self'; base-uri 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="bundle/looks.css">
+  <script>document.documentElement.dataset.scheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";</script>
+  <script type="module" src="bundle/settings.js"></script>
+</head>
+<body class="settings">
+  <nav class="tabs" role="tablist" aria-label="Settings">
+    <button role="tab" data-tab="general" aria-selected="true">General</button>
+    <button role="tab" data-tab="look-tab">Look</button>
+    <button role="tab" data-tab="editing">Editing</button>
+    <button role="tab" data-tab="shell">Shell</button>
+    <button role="tab" data-tab="files">Files</button>
+    <button role="tab" data-tab="about">About</button>
+  </nav>
+  <main>
+    <section id="general" role="tabpanel">
+      <div class="setting">
+        <div class="text">
+          <label for="view">Open files in</label>
+          <p class="muted">The view a file opens in. Each tab can switch views from its toolbar.</p>
+        </div>
+        <select id="view">
+          <option value="">The view the file was left in</option>
+          <option value="rendered">The rendered view</option>
+          <option value="source">The source view</option>
+          <option value="both">Both, side by side</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="start-mode">Start folder</label>
+          <p class="muted">What the start screen lists when mdsh isn't started from a terminal. From a terminal, it lists the current folder.</p>
+        </div>
+        <select id="start-mode">
+          <option value="last">The last folder used</option>
+          <option value="fixed">A fixed folder</option>
+        </select>
+      </div>
+      <div id="fixed" class="setting path" hidden>
+        <input id="start-folder" type="text" spellcheck="false" readonly>
+        <button id="choose">Choose…</button>
+      </div>
+    </section>
+
+    <section id="look-tab" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="theme">Theme</label>
+          <p class="muted">The editors' colors follow it. Match the system follows the OS.</p>
+        </div>
+        <select id="theme">
+          <option value="">Match the system</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="look">Look</label>
+          <p class="muted" id="look-about"></p>
+        </div>
+        <select id="look"></select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="text-size">Text size</label>
+          <p class="muted">Scales all the text, code and terminals too. <span id="text-size-value"></span></p>
+        </div>
+        <input id="text-size" type="range" min="80" max="200" step="5">
+        <button id="text-size-reset">Default</button>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="ui-font">Interface font</label>
+          <p class="muted">The face for menus, prose and Settings. It lists the fonts on this computer.</p>
+        </div>
+        <select id="ui-font"><option value="">The look's own</option></select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="code-font">Code font</label>
+          <p class="muted">The face for code, output and the terminals. It lists the fonts on this computer whose letters are all one width.</p>
+        </div>
+        <select id="code-font"><option value="">The look's own</option></select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="line-spacing">Line spacing</label>
+          <p class="muted">The space between lines of prose and code.</p>
+        </div>
+        <select id="line-spacing">
+          <option value="compact">Compact</option>
+          <option value="">Normal</option>
+          <option value="relaxed">Relaxed</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="accent">Accent color</label>
+          <p class="muted">Links, run buttons and what is selected.</p>
+        </div>
+        <input id="accent-custom" type="color" aria-label="Custom accent color" hidden>
+        <select id="accent">
+          <option value="">The look's own</option>
+          <option value="#3fb950">Green</option>
+          <option value="#d4a017">Amber</option>
+          <option value="#2f81f7">Blue</option>
+          <option value="#d1495b">Red</option>
+          <option value="#8250df">Purple</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="history-pane">History pane</label>
+          <p class="muted">Inverted is light under a dark window and dark under a light one. The look's own is always dark for Plain and the window's for every other look.</p>
+        </div>
+        <select id="history-pane">
+          <option value="">The look's own</option>
+          <option value="match">Match the window</option>
+          <option value="invert">Inverted</option>
+          <option value="dark">Always dark</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="history-focus">History prompt focus</label>
+          <p class="muted">How the History pane's prompt shows it has the keyboard: an outline around it, or a blinking block cursor where you type.</p>
+        </div>
+        <select id="history-focus">
+          <option value="">Outline</option>
+          <option value="cursor">Blinking cursor</option>
+        </select>
+      </div>
+      <div id="paper" class="setting">
+        <div class="text">
+          <span class="label-text" id="paper-label">Teletype paper</span>
+          <p class="muted">What the paper is drawn with.</p>
+        </div>
+        <div class="checks" role="group" aria-labelledby="paper-label">
+          <label id="sprockets-check" class="check"><input id="sprockets" type="checkbox"> <span id="sprockets-label">Sprocket strips</span></label>
+          <label id="rules-check" class="check"><input id="rules" type="checkbox"> <span id="rules-label">Ruled lines</span></label>
+          <label id="shadows-check" class="check"><input id="shadows" type="checkbox"> <span id="shadows-label">Shadows under cards</span></label>
+        </div>
+      </div>
+    </section>
+
+    <section id="editing" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="autosave">Save the file after each run</label>
+          <p class="muted">Off by default: the window shows • while output isn't saved.</p>
+        </div>
+        <input id="autosave" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="secret-show">Show secrets for</label>
+          <p class="muted">How long a block marked secret stays shown after you press its eye button, and how long a secret you copy stays on the clipboard.</p>
+        </div>
+        <select id="secret-show">
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="0">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="vim">Vim key bindings in the code editor</label>
+          <p class="muted">Normal, insert and visual modes; :w saves the file and :q closes the editor.</p>
+        </div>
+        <input id="vim" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="neovim">Use Neovim for the source pane <span class="experimental">Experimental</span></label>
+          <p class="muted">Still has rough edges. Needs Vim key bindings on. <span id="neovim-info"></span></p>
+        </div>
+        <input id="neovim" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="neovim-clean">Start Neovim without my config</label>
+          <p class="muted">Runs it with <code>--clean</code>, skipping your init.lua or init.vim and plugins.</p>
+        </div>
+        <input id="neovim-clean" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="neovim-colors">Use the app's colors in Neovim</label>
+          <p class="muted">Neovim follows the Theme, as the built-in editor does. Off keeps the colorscheme from your config.</p>
+        </div>
+        <input id="neovim-colors" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="neovim-path">Neovim to run</label>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="neovim-path" type="text" spellcheck="false" placeholder="Found on the PATH or in the usual places">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="spellcheck">Check spelling in the code editor</label>
+          <p class="muted">Underlines misspelled words in the prose, not in code, links or HTML.</p>
+        </div>
+        <input id="spellcheck" type="checkbox">
+      </div>
+    </section>
+
+    <section id="shell" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="shell">Shell for every file</label>
+          <p class="muted">Overrides the shell from each file's front matter. Empty uses the file's: zsh when it has zsh blocks, else sh.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="shell" type="text" spellcheck="false" placeholder="From the file's front matter (default)">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="history-rc">File the History pane's shell reads</label>
+          <p class="muted">Read as History is turned on, as an interactive shell reads its rc file, for your aliases, functions and prompt. Blocks get them too while History is on. A file named for one shell, such as <code>.zshrc</code> or <code>.bashrc</code>, is read only when blocks run in that shell.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="history-rc" type="text" spellcheck="false" placeholder="None, or a file such as ~/.zshrc">
+      </div>
+      <div class="setting" id="cli-row" hidden>
+        <div class="text">
+          <span class="label-text" id="cli-label">Command line tool</span>
+          <p class="muted" id="cli-status"></p>
+        </div>
+        <button id="cli-install">Install</button>
+        <button id="cli-remove" hidden>Remove</button>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="zsh-wrapper">Give blocks your shell's aliases and functions</label>
+          <p class="muted">Adds an <code>mdsh</code> function to <span id="zshrc">~/.zshrc</span><span id="bashrc-note" hidden> and <span id="bashrc">~/.bashrc</span></span> that passes them to <code>mdsh</code> in a terminal with <code>--source</code>, and turns on tab completion for <code>mdsh</code>. New terminals pick it up. This app isn't started from your shell, so it can't see them.</p>
+        </div>
+        <input id="zsh-wrapper" type="checkbox">
+      </div>
+      <div class="setting" id="wrapper-needs-cli" role="alert" hidden>
+        <div class="text"><p class="muted">The function calls <code>mdsh</code>, which isn't on your PATH yet. Install the command line tool first?</p></div>
+        <button id="wrapper-install" class="primary">Install and Turn On</button>
+        <button id="wrapper-cancel">Cancel</button>
+      </div>
+    </section>
+
+    <section id="files" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="text">
+          <label for="template-folder">Templates folder</label>
+          <p class="muted">New File… offers the markdown files in this folder to start from, as well as a blank file.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="template-folder" type="text" spellcheck="false" readonly placeholder="None: new files start blank">
+        <button id="choose-templates">Choose…</button>
+        <button id="clear-templates">Clear</button>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="session-folder">Sessions folder</label>
+          <p class="muted">New Session on the start screen opens the day's file here, such as 2026-11-02.md, making it the first time. Last Session opens the file here changed last. Both open with History.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="session-folder" type="text" spellcheck="false" readonly placeholder="~/.mdsh/sessions (default)">
+        <button id="choose-sessions">Choose…</button>
+        <button id="reset-sessions">Default</button>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="session-template">Session template</label>
+          <p class="muted">A new session starts as a copy of this markdown file.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="session-template" type="text" spellcheck="false" readonly placeholder="None: a session starts with the date as its heading">
+        <button id="choose-session-template">Choose…</button>
+        <button id="clear-session-template">Clear</button>
+      </div>
+    </section>
+
+    <section id="about" role="tabpanel" hidden>
+      <div class="app">
+        <img src="appicon.svg" alt="" width="64" height="64">
+        <div>
+          <h1>mdsh-gui <span id="version"></span></h1>
+          <p class="muted" id="build"></p>
+        </div>
+        <button id="copy" title="Copy the version, build, paths and tools, for a bug report" aria-label="Copy the version, build, paths and tools, for a bug report">Copy</button>
+      </div>
+      <h2>Paths</h2>
+      <dl id="paths" class="info"></dl>
+      <h2>Tools</h2>
+      <p class="muted">Programs mdsh-gui runs, as found on this app's PATH.</p>
+      <dl id="tools" class="info"></dl>
+      <h2>Links</h2>
+      <p id="links" class="links"></p>
+    </section>
+
+    <p id="error" class="error" role="alert" hidden></p>
+  </main>
+</body>
+</html>

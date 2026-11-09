@@ -3,7 +3,7 @@
 A look is the desktop app's paint: Plain, Teletype, Blueprint, Bubble
 Gum, Witchcraft, and one more each minor release. Each look is one
 file, `look.css`, in its own folder in
-[`cmd/mdsh-gui/frontend/looks`](../cmd/mdsh-gui/frontend/looks). Its
+[`web/looks`](../web/looks). Its
 first comment opens with the look's **front matter**, TOML between
 `+++` lines that says what the look is; the rules after it paint it:
 
@@ -40,8 +40,8 @@ entry:
 
 | Made from the folders | By |
 | --- | --- |
-| Settings › Look's menu, its description, the look's own text size and texture switches | `frontend/src/looks.gen.ts`, made by `go generate` |
-| The stylesheet every page loads | `frontend/bundle/looks.css`, made by `go generate` |
+| Settings › Look's menu, its description, the look's own text size and texture switches | `web/src/looks.gen.ts`, made by `go generate` |
+| The stylesheet every page loads | `web/bundle/looks.css`, made by `go generate` |
 | The looks the app accepts in its settings | `looks.Load`, at start |
 | The tests every look must pass | `allLooks`, in the tests |
 | The website's looks band and its lists of the looks | `site/data/looks.toml`, made by `go generate` |
@@ -57,7 +57,7 @@ From `cmd/mdsh-gui`:
    go run ./internal/newlook moss "Moss"
    ```
 
-   This makes `frontend/looks/moss/look.css`: front matter with every
+   This makes `web/looks/moss/look.css`: front matter with every
    key, the ones it can't guess marked TODO and the optional ones
    commented out, then the plain look's colors under
    `[data-look="moss"]`. The id
