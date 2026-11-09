@@ -628,6 +628,32 @@ func TestDepend(t *testing.T) {
 	}
 }
 
+// A dependency marked skip is asked about with a question that says
+// so, and skip runs the block without it.
+func TestDependOff(t *testing.T) {
+	file := write(t, "```sh {#build skip}\necho built\n```\n\n```sh {#deploy depends=build}\necho deploy\n```\n")
+	var asked []string
+	n, err := Open(file, Options{
+		Depend: func(i, of int, q string) run.Answer {
+			asked = append(asked, q)
+			return run.Skip
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(1); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"deploy depends on this block, which is marked skip. Run it anyway? Skip goes on as if it had run."}; !slices.Equal(asked, want) {
+		t.Errorf("asked %q, want %q", asked, want)
+	}
+	if c := n.Cells(); c[0].Ran || !c[1].Ran {
+		t.Errorf("build ran %v, deploy ran %v; want only deploy", c[0].Ran, c[1].Ran)
+	}
+}
+
 // An include's cell holds the file's lines as they are, number_on or
 // not, and FirstLine starts the view's line numbers at from=, so the
 // code shows one column of numbers, the file's.

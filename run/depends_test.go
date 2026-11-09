@@ -25,6 +25,12 @@ func (a *asker) depend(dep, b *doc.Block) run.Answer {
 	return a.answers[dep.ID]
 }
 
+// off answers DependOff the same way, noting the question as dep<of!why.
+func (a *asker) off(dep, b *doc.Block, why string) run.Answer {
+	a.asked = append(a.asked, dep.ID+"<"+b.ID+"!"+why)
+	return a.answers[dep.ID]
+}
+
 func ran(s *run.Session) []string {
 	var ids []string
 	for _, r := range s.Results() {
@@ -43,15 +49,15 @@ func TestRunBlockDepends(t *testing.T) {
 		asked   []string
 		ran     []string
 	}{
-		{"all", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"fetch", "build", "login", "deploy"}},
-		{"skip", map[string]run.Answer{"fetch": run.Go, "build": run.Skip, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"fetch", "login", "deploy"}},
-		{"skip top", map[string]run.Answer{"fetch": run.Skip, "build": run.Go, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"build", "login", "deploy"}},
-		{"stop", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Stop}, []string{"fetch<build", "build<deploy", "login<deploy"}, []string{"fetch", "build"}},
+		{"all", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy!skip"}, []string{"fetch", "build", "login", "deploy"}},
+		{"skip", map[string]run.Answer{"fetch": run.Go, "build": run.Skip, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy!skip"}, []string{"fetch", "login", "deploy"}},
+		{"skip top", map[string]run.Answer{"fetch": run.Skip, "build": run.Go, "login": run.Go}, []string{"fetch<build", "build<deploy", "login<deploy!skip"}, []string{"build", "login", "deploy"}},
+		{"stop", map[string]run.Answer{"build": run.Go, "fetch": run.Go, "login": run.Stop}, []string{"fetch<build", "build<deploy", "login<deploy!skip"}, []string{"fetch", "build"}},
 		{"stop top", map[string]run.Answer{"fetch": run.Stop}, []string{"fetch<build"}, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := &asker{answers: tc.answers}
-			s, err := run.NewSession(parse(t, dependsDoc), run.Options{Environ: []string{}, Depend: a.depend})
+			s, err := run.NewSession(parse(t, dependsDoc), run.Options{Environ: []string{}, Depend: a.depend, DependOff: a.off})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -194,8 +200,9 @@ func TestRunDepends(t *testing.T) {
 	a := &asker{answers: map[string]run.Answer{"early": run.Go, "late": run.Go}}
 	var started []string
 	results, err := run.Run(context.Background(), d, run.Options{
-		Environ: []string{},
-		Depend:  a.depend,
+		Environ:   []string{},
+		Depend:    a.depend,
+		DependOff: a.off,
 		OnEvent: func(e run.Event) {
 			if e.Kind == run.Started {
 				started = append(started, e.Block.ID)
@@ -417,5 +424,52 @@ func TestRunBlockDependsStaleOnTheWay(t *testing.T) {
 	}
 	if got := run.Stale(d, s.Results()); slices.Contains(got, true) {
 		t.Errorf("stale after b: %v", got)
+	}
+}
+
+// A dependency marked skip, or whose run= is false, isn't run unless
+// DependOff says so, even when Depend answers Go to everything, as
+// mdsh --yes does (security review v1.4.0, finding 8). Skip treats it
+// as done, so the block that needs it still runs.
+func TestDependOff(t *testing.T) {
+	yes := func(_, _ *doc.Block) run.Answer { return run.Go }
+	for _, tc := range []struct {
+		name string
+		src  string
+		why  string
+		ran  []string
+	}{
+		{"skip, nobody to ask", "```sh {#setup skip}\necho setup\n```\n\n```sh {#main depends=setup}\necho main\n```\n", "", []string{"main"}},
+		{"skip, answered skip", "```sh {#setup skip}\necho setup\n```\n\n```sh {#main depends=setup}\necho main\n```\n", "skip", []string{"main"}},
+		{"skip, answered run", "```sh {#setup skip}\necho setup\n```\n\n```sh {#main depends=setup}\necho main\n```\n", "skip", []string{"setup", "main"}},
+		{"skip, answered stop", "```sh {#setup skip}\necho setup\n```\n\n```sh {#main depends=setup}\necho main\n```\n", "skip", nil},
+		{"run=false", "```sh {#setup run=false}\necho setup\n```\n\n```sh {#main depends=setup}\necho main\n```\n", "run=", []string{"setup", "main"}},
+		{"run=true is asked as usual", "```sh {#setup run=true}\necho setup\n```\n\n```sh {#main depends=setup}\necho main\n```\n", "", []string{"setup", "main"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var asked []string
+			answer := map[string]run.Answer{"skip, answered skip": run.Skip, "skip, answered run": run.Go, "skip, answered stop": run.Stop, "run=false": run.Go}[tc.name]
+			opts := run.Options{Environ: []string{}, Depend: yes}
+			if tc.name != "skip, nobody to ask" {
+				opts.DependOff = func(dep, b *doc.Block, why string) run.Answer {
+					asked = append(asked, why)
+					return answer
+				}
+			}
+			s, err := run.NewSession(parse(t, tc.src), opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			if _, err := s.RunBlock(context.Background(), 1); err != nil {
+				t.Fatal(err)
+			}
+			if want := []string{tc.why}; tc.why != "" && !slices.Equal(asked, want) || tc.why == "" && len(asked) != 0 {
+				t.Errorf("DependOff asked %q, want %q", asked, tc.why)
+			}
+			if got := ran(s); !slices.Equal(got, tc.ran) {
+				t.Errorf("ran %q, want %q", got, tc.ran)
+			}
+		})
 	}
 }

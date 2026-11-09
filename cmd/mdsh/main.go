@@ -422,20 +422,21 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 
 	// The terminal, if there is one, asks the questions and runs blocks
 	// marked tty.
-	tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	tty, ttyErr := openTTY()
 	if ttyErr == nil {
 		defer tty.Close()
 		opts.TTY = tty
 	}
-	if *yes {
-		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
-		opts.Depend = func(_, _ *doc.Block) run.Answer { return run.Go }
-		opts.ApproveSources = func([]string) run.Answer { return run.Go }
-	} else if tty == nil {
-		opts.ApproveSources = trust.OpenDefault().Ask(opts.File, nil)
-	} else {
-		p := newPrompter(tty, tty)
-		opts.ApproveSources = trust.OpenDefault().Ask(opts.File, p.sources)
+	// A dependency marked skip, or whose run= is false, is asked
+	// about whenever there is a terminal, --yes or not. With none, it
+	// is skipped, with a warning.
+	opts.DependOff = func(dep, b *doc.Block, why string) run.Answer {
+		fmt.Fprintf(stderr, "mdsh: %s depends on %s, which %s; going on without running it\n", termsafe.Visible(d.Label(b)), termsafe.Visible(d.Label(dep)), run.OffReason(dep, why))
+		return run.Skip
+	}
+	var p *prompter
+	if tty != nil {
+		p = newPrompter(tty, tty)
 		p.d = d
 		// The streamed document already shows the code, unless it is
 		// hidden.
@@ -443,6 +444,16 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		if live != nil {
 			p.shown = live.codeShown
 		}
+		opts.DependOff = p.dependOff
+	}
+	if *yes {
+		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
+		opts.Depend = func(_, _ *doc.Block) run.Answer { return run.Go }
+		opts.ApproveSources = func([]string) run.Answer { return run.Go }
+	} else if p == nil {
+		opts.ApproveSources = trust.OpenDefault().Ask(opts.File, nil)
+	} else {
+		opts.ApproveSources = trust.OpenDefault().Ask(opts.File, p.sources)
 		opts.Confirm = p.confirm
 		opts.Depend = p.depend
 	}
@@ -455,6 +466,13 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		opts.Depend = func(dep, b *doc.Block) run.Answer {
 			live.upTo(b)
 			return depend(dep, b)
+		}
+	}
+	if live != nil && p != nil {
+		dependOff := opts.DependOff
+		opts.DependOff = func(dep, b *doc.Block, why string) run.Answer {
+			live.upTo(b)
+			return dependOff(dep, b, why)
 		}
 	}
 
@@ -769,6 +787,11 @@ func (p *prompter) warnControl(b *doc.Block) {
 	}
 }
 
+// openTTY opens the terminal, which asks the questions. Tests replace
+// it, so a run under test never waits on the terminal it was started
+// from.
+var openTTY = func() (*os.File, error) { return os.OpenFile("/dev/tty", os.O_RDWR, 0) }
+
 func newPrompter(in io.Reader, out io.Writer) *prompter {
 	return &prompter{in: bufio.NewReader(in), out: out}
 }
@@ -811,6 +834,32 @@ func (p *prompter) depend(dep, b *doc.Block) run.Answer {
 	p.warnControl(dep)
 	for {
 		fmt.Fprintf(p.out, "Run %s first? [r]un / s[k]ip / [s]top: ", p.label(dep))
+		line, err := p.in.ReadString('\n')
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "r", "run", "y", "yes":
+			return run.Go
+		case "k", "skip":
+			return run.Skip
+		case "s", "stop", "n", "no", "":
+			return run.Stop
+		}
+		if err != nil {
+			return run.Stop
+		}
+	}
+}
+
+// dependOff asks about dep, a block b depends on that is switched off
+// where it stands (see run.Options.DependOff). Skip goes on as if it
+// had run.
+func (p *prompter) dependOff(dep, b *doc.Block, why string) run.Answer {
+	fmt.Fprintf(p.out, "\n--- block %s depends on %s, which %s ---\n", p.label(b), p.label(dep), run.OffReason(dep, why))
+	if !p.quiet || dep.Span.Start > b.Span.Start || !p.printed(dep) {
+		fmt.Fprintf(p.out, "%s---\n", termsafe.Visible(dep.Body))
+	}
+	p.warnControl(dep)
+	for {
+		fmt.Fprintf(p.out, "Run %s anyway? [r]un / s[k]ip, going on as if it ran / [s]top: ", p.label(dep))
 		line, err := p.in.ReadString('\n')
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":

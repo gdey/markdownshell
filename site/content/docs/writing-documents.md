@@ -198,9 +198,17 @@ mdsh asks
 `Run build first? [r]un / s[k]ip / [s]top`:
 
 - `r` checks that block's own `depends=` the same way, then runs it. Its
-  `skip`, `run=` and `confirm` don't apply, since you just said to run it.
+  `confirm` doesn't apply, since you just said to run it.
 - `k` goes on without it.
 - `s`, or just enter, runs neither it nor `deploy`.
+
+A dependency marked `skip`, or whose `run=` is false (or `run=once` that
+has run), is asked about differently: `Run build anyway? [r]un / s[k]ip,
+going on as if it ran / [s]top`. It is asked whenever there is a
+terminal, even with `--yes`, since `skip` reads as "this won't run". `k`
+treats it as done without running it, so `deploy` still runs. With no
+terminal it is skipped, with a warning on stderr. mdsh-gui and `mdsh -i`
+ask the same, and `mdsh -i --yes` asks too.
 
 If a dependency fails, `deploy` doesn't run. In a whole run, the run then
 goes on or stops as the dependency's `on_error` says, and a block already

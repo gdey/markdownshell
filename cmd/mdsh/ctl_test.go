@@ -15,11 +15,15 @@ import (
 )
 
 // TestMain lets the test binary stand in for mdsh, so blocks that call
-// mdsh ctl reach the run under test.
+// mdsh ctl reach the run under test. The tests themselves run as with no
+// terminal, wherever they are started: one would be asked questions
+// nobody answers, as a dependency marked skip is asked about even with
+// --yes.
 func TestMain(m *testing.M) {
 	if filepath.Base(os.Args[0]) == "mdsh" {
 		os.Exit(mdsh(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 	}
+	openTTY = func() (*os.File, error) { return nil, os.ErrNotExist }
 	os.Exit(m.Run())
 }
 
