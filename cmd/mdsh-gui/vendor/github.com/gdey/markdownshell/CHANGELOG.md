@@ -127,6 +127,13 @@ follow [Semantic Versioning](https://semver.org/).
   user on the machine; a file left that way is fixed on the next save
   (finding 12 of the v1.4.0 security review).
 
+- Reports print a block marked `secret` as `(secret)`, its code and its
+  output, whether it ran or the output was saved: `--pdf`, `--html` and
+  the reports mdsh-gui and `mdsh -i` make. `secret` kept the output out
+  of the `.md` only, so a PDF of the run carried the secret to whoever
+  you sent it to (finding 9 of the v1.4.0 security review). Pass
+  `--show-secrets` to put them in.
+
 ### Fixed
 
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the

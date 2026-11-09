@@ -97,7 +97,7 @@ _mdsh() {
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --only --source --stop-on-error --yes --step --color --no-color -i --autosave --allow-outside --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --show-secrets --only --source --stop-on-error --yes --step --color --no-color -i --autosave --allow-outside --version -h" -- "$cur"))
 		return
 	fi
 
@@ -144,6 +144,7 @@ _mdsh() {
 		'-o[write the -w result to this file]:output file:_files' \
 		'--pdf[write what would be printed as a PDF]:pdf file:_files -g "*.pdf"' \
 		'--html[write what would be printed as an HTML page]:html file:_files -g "*.html"' \
+		'--show-secrets[put blocks marked secret in --pdf and --html as they are]' \
 		'--only[run only this block and what it needs]:block:_mdsh_blocks' \
 		'*--source[source this file into every shell]:file:_files' \
 		'--stop-on-error[stop at the first failing block]' \

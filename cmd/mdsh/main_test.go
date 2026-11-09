@@ -697,3 +697,26 @@ func TestPrintEscapesCode(t *testing.T) {
 		t.Errorf("-w changed the code: %q", got)
 	}
 }
+
+// TestReportSecrets checks that --html prints a secret block as
+// (secret) unless --show-secrets asks for it.
+func TestReportSecrets(t *testing.T) {
+	in := filepath.Join(t.TempDir(), "doc.md")
+	if err := os.WriteFile(in, []byte("```sh {#tok secret}\necho s3cr3t-value\n```\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if rc := mdsh([]string{"--html", "-", in}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	if s := stdout.String(); strings.Contains(s, "s3cr3t-value") || !strings.Contains(s, "(secret)") {
+		t.Errorf("--html shows the secret:\n%s", s)
+	}
+	stdout.Reset()
+	if rc := mdsh([]string{"--html", "-", "--show-secrets", in}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "s3cr3t-value") {
+		t.Errorf("--show-secrets hides the secret:\n%s", stdout.String())
+	}
+}

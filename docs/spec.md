@@ -76,7 +76,7 @@ Block attributes in v1:
 | `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line if COND holds | expanded |
 | `nosave` | Saving keeps what the file holds: the block's output, or a textbox's text or a choice's picks, lives in the session only. On an `output` fence, keeps that fence | off |
 | `links` | Make web addresses (`http:`, `https:` and `mailto:` only) in the block's output clickable: links in mdsh-gui, OSC 8 hyperlinks in `mdsh -i`. Commands typed in History get it | off |
-| `secret` | The block's code and output hold a secret: mdsh-gui masks them until you show them with the card's eye button. Copying still works. It implies `nosave`, so the output isn't saved to the file. A block whose code names a variable set with `mdsh ctl set --secret` has its output masked without it | off |
+| `secret` | The block's code and output hold a secret: mdsh-gui masks them until you show them with the card's eye button. Copying still works. Reports print its code and output as `(secret)` unless `--show-secrets` is given. It implies `nosave`, so the output isn't saved to the file. A block whose code names a variable set with `mdsh ctl set --secret` has its output masked without it | off |
 | `env=<name>` | Run in a named sub-env; `a/b` stacks `b` on `a` | top-level env |
 | `share=A,B` | Exported vars a new sub-env gets from its parent, besides PATH, HOME, USER and the rest of the base set; empty for just the base set | front matter `env.share`, else all |
 | `on_error=stop` | Stop the run if this block fails (`continue` overrides front matter) | front matter `on_error` |

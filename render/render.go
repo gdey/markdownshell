@@ -14,6 +14,10 @@ import (
 	"github.com/gdey/markdownshell/termsafe"
 )
 
+// Masked stands for a secret block's code and output when
+// Options.MaskSecrets is set.
+const Masked = "(secret)"
+
 // Options control what Markdown prints.
 type Options struct {
 	// HideCode leaves out runnable blocks. Other code blocks are part of
@@ -37,6 +41,11 @@ type Options struct {
 	// code blocks are shown as ^[ and the like (see termsafe.Visible),
 	// so the code on the screen is the code that runs.
 	Terminal bool
+	// MaskSecrets prints a block marked secret with "(secret)" in place
+	// of its code and its output, run or saved, for a report someone
+	// else may read: secret keeps the output out of the file, and a
+	// report shouldn't carry it out either.
+	MaskSecrets bool
 	// PlainIncludes leaves a number_on include's lines unnumbered, for a
 	// caller that draws the numbers in a gutter of its own, as mdsh-gui
 	// does. Otherwise printing puts each line's number in front of it.
@@ -135,7 +144,12 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 		}
 		showCode := !(opts.HideCode && run.Runnable(b)) && shown(b, "show")
 		showOutput := !opts.HideOutput && shown(b, "show-output")
-		if showCode {
+		secret := opts.MaskSecrets && !opts.WriteBack && b.Attrs.Has("secret")
+		if showCode && secret {
+			buf.Write(src[b.Span.Start:lineEnd(src, b.Span.Start)])
+			buf.WriteString(b.Prefix + Masked + "\n")
+			buf.Write(src[b.BodySpan.End:b.Span.End])
+		} else if showCode {
 			code := src[b.Span.Start:b.Span.End]
 			if opts.Terminal && !opts.WriteBack {
 				code = []byte(termsafe.Visible(string(castFrame(src, b, code))))
@@ -145,6 +159,22 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 		buf = &bufs[3*i+2]
 		if !showOutput {
 			if !showCode {
+				pos = skipBlankLine(src, pos)
+			}
+			continue
+		}
+		if secret {
+			// Run or saved, the output is the secret: say there was
+			// some, and nothing of it.
+			if r != nil && r.Ran && Output(r, showStderr(d, b, r, after(b))) != "" || (r == nil || !r.Ran) && b.HasOutput() {
+				if showCode && !bytes.HasSuffix(src[b.Span.Start:b.Span.End], []byte("\n")) {
+					buf.WriteByte('\n')
+				}
+				if showCode {
+					buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+				}
+				buf.WriteString(indent(Fence("output", "for="+attrValue(b.ID), Masked+"\n"), b.Prefix))
+			} else if !showCode {
 				pos = skipBlankLine(src, pos)
 			}
 			continue
