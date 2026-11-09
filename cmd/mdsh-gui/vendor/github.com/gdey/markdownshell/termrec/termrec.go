@@ -85,11 +85,16 @@ type shot struct {
 	screen [][]cell
 }
 
+// maxCells caps the screen cells shots keeps across all its frames,
+// about 256 MB: some 17,000 frames of 80 by 24, or 67 of 1000 by 500.
+const maxCells = 1 << 25
+
 // shots plays rec through a terminal emulator and returns its frames,
 // and how many rows the session used. Writes less than step apart share
 // a frame, and a write that changes nothing on screen makes none. The
 // GUI's cast player steps through the same frames, so frame=N means
-// the same screen there and in a still view.
+// the same screen there and in a still view. Past maxCells, only the
+// last screen is kept.
 func shots(rec Recording) (frames []shot, cols, used int) {
 	cols, rows := rec.Cols, rec.Rows
 	if cols <= 0 || rows <= 0 {
@@ -97,9 +102,15 @@ func shots(rec Recording) (frames []shot, cols, used int) {
 	}
 	vt := vt10x.New(vt10x.WithSize(cols, rows))
 	used = 1
+	budget := maxCells
 	for i, e := range rec.Events {
 		vt.Write(e.Data)
-		if i+1 < len(rec.Events) && len(frames) > 0 && rec.Events[i+1].At-frames[len(frames)-1].at < step {
+		last := i+1 == len(rec.Events)
+		if !last && len(frames) > 0 && rec.Events[i+1].At-frames[len(frames)-1].at < step {
+			continue
+		}
+		if !last && budget < 2*cols*rows {
+			// Out of room: keep the last screen only.
 			continue
 		}
 		screen := snapshot(vt, cols, rows)
@@ -109,6 +120,7 @@ func shots(rec Recording) (frames []shot, cols, used int) {
 			}
 		}
 		frames = append(frames, shot{e.At, screen})
+		budget -= cols * rows
 		used = max(used, usedRows(screen))
 	}
 	return frames, cols, used

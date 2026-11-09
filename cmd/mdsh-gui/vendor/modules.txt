@@ -84,6 +84,7 @@ github.com/gdey/markdownshell/audit
 github.com/gdey/markdownshell/collection
 github.com/gdey/markdownshell/ctl
 github.com/gdey/markdownshell/doc
+github.com/gdey/markdownshell/docroot
 github.com/gdey/markdownshell/env
 github.com/gdey/markdownshell/history
 github.com/gdey/markdownshell/library

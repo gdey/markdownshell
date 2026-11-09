@@ -5,17 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 )
 
 // Includes reads the files d's include blocks name. It returns one result
 // per block, like Run, with only the include blocks filled in: Stdout
 // holds the selected lines. A relative path is relative to opts.Dir, or
 // opts.File's directory; res://name is name in the document's assets
-// folder, <doc>.assets.
+// folder, <doc>.assets. The file must be a regular file of at most
+// docroot.MaxRead bytes inside the document's root, unless
+// opts.AllowOutside.
 func Includes(d *doc.Document, opts Options) []*Result {
 	if opts.Dir == "" && opts.File != "" {
 		opts.Dir = filepath.Dir(opts.File)
@@ -50,7 +52,7 @@ func includeBlock(b *doc.Block, r *Result, opts Options) {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(opts.Dir, filepath.FromSlash(path))
 	}
-	data, err := os.ReadFile(path)
+	data, err := docroot.ReadFile(docRoot(opts), path, 0)
 	if pe := (*fs.PathError)(nil); errors.As(err, &pe) {
 		err = pe.Err
 	}

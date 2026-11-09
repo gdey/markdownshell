@@ -16,6 +16,7 @@ import (
 
 	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/termrec"
 )
@@ -132,7 +133,9 @@ func (s *Session) prepare(cfg *env.Config) error {
 	}
 	scripts := make([]string, 0, len(paths)+1)
 	for _, p := range paths {
-		src, err := os.ReadFile(p)
+		// The paths were shown and approved, so they may be anywhere,
+		// such as ~/.aliases; they must still be plain files.
+		src, err := docroot.ReadFile("", p, 0)
 		if err != nil {
 			return &sourceError{fmt.Errorf("env.source: %w", err)}
 		}
