@@ -472,10 +472,18 @@ mdsh walks back down from the top of the chain, asking
 it would run, so each answer is followed by the run it allowed, and every
 block a block needs has run (or been skipped) before it is asked about:
 
-- `r` runs it now. Its `skip`, `run=` and `confirm` don't apply, since
-  you just said to run it.
+- `r` runs it now. Its `confirm` doesn't apply, since you just said to
+  run it.
 - `k` goes on without it; the blocks below it are still asked about.
 - `s`, or just enter, runs neither it nor anything below it, nor `deploy`.
+
+A dependency marked `skip`, or whose `run=` is false (or `run=once` that
+has run), is asked about differently: `Run build anyway? [r]un / s[k]ip,
+going on as if it ran / [s]top`. It is asked whenever there is a
+terminal, even with `--yes`, since `skip` reads as "this won't run". `k`
+treats it as done without running it, so `deploy` still runs. With no
+terminal it is skipped, with a warning on stderr. mdsh-gui and `mdsh -i`
+ask the same, and `mdsh -i --yes` asks too.
 
 If `deploy` is itself marked `confirm`, it is confirmed last, after the
 blocks it depends on have run.

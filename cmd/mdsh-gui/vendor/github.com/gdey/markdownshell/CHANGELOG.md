@@ -120,6 +120,16 @@ follow [Semantic Versioning](https://semver.org/).
   or with more than 100,000 writes is refused, and turning one into a GIF
   keeps memory bounded, so a crafted cast linked as an image can't make
   `--html`, `--pdf` or mdsh-gui's Copy as GIF run out of memory.
+- A block marked `skip`, or whose `run=` is false, no longer runs just
+  because another block's `depends=` names it, which `mdsh --yes` did
+  without asking. mdsh now asks `Run wipe anyway?` whenever there is a
+  terminal, with `--yes` too, and in `mdsh -i` and mdsh-gui; skip treats
+  it as done without running it, so the block that needs it still runs.
+  With no terminal, as in CI, it is skipped with a warning.
+
+  ![mdsh asking whether to run wipe, marked skip, which publish depends on](docs/changelog/dep-skip-cli.png)
+
+  ![mdsh -i asking the same in the card of the skip block](docs/changelog/dep-skip-tui.png)
 
 - mdsh-gui writes its settings, `gui.json`, so only you can read them
   (0600, in a 0700 folder when it makes one). They name your recent

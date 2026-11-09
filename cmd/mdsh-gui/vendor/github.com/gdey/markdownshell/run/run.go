@@ -97,6 +97,15 @@ type Options struct {
 	// A dep with nothing to run, only blank lines and # comments, and
 	// no confirm attribute, runs without asking.
 	Depend func(dep, b *doc.Block) Answer
+	// DependOff is asked instead of Depend about a dependency that is
+	// switched off where it stands: marked skip, or with a run=
+	// condition that is false (why is "skip", "run=" or "run=once").
+	// Go runs it anyway; Skip treats it as done without running it, so
+	// b still runs; Stop is as for Depend. It is asked even when Depend
+	// always answers Go, as mdsh --yes does, since skip reads as "this
+	// won't run". If DependOff is nil, such a dependency is skipped,
+	// and the audit log says why.
+	DependOff func(dep, b *doc.Block, why string) Answer
 	// TTY is the terminal that blocks marked tty run on. If it is nil,
 	// such blocks fail with ErrNoTTY.
 	TTY *os.File
