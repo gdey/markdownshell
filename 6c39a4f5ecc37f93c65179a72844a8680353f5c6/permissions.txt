@@ -1,0 +1,11 @@
+accessibility (AXIsProcessTrusted): false
+screen recording (CGPreflightScreenCaptureAccess): false
+36:47: execution error: System Events got an error: osascript is not allowed to send keystrokes. (1002)
+System Events key code: refused
+user: claude, session: Aqua
+process chain:
+  82729 80365 /bin/bash -e /Users/claude/actions-runner/_work/_temp/f8a21497-6932-4f1b-b0d4-a1aba1dcc96d.sh
+  80365 39816 /Users/claude/actions-runner/bin/Runner.Worker spawnclient 157 160
+  39816 39803 /Users/claude/actions-runner/bin/Runner.Listener run --startuptype service
+  39803 39797 ./externals/node24/bin/node ./bin/RunnerService.js
+  39797     1 /bin/bash /Users/claude/actions-runner/runsvc.sh
