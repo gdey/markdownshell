@@ -50,6 +50,9 @@ type Session struct {
 	ended, restarts map[string]bool
 	// killed is set by Kill, so the shell's end is logged as killed.
 	killed atomic.Bool
+	// badFrontMatter is set when the front matter didn't parse as the
+	// session started, so its shells have the default settings.
+	badFrontMatter bool
 }
 
 // NewSession reads d's include blocks and readies its envs. No shell is
@@ -82,7 +85,8 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			TTY:       hasTTY(d) || opts.PTY,
 			KillAfter: opts.KillAfter,
 		}),
-		tty: hasTTY(d) || opts.PTY,
+		tty:            hasTTY(d) || opts.PTY,
+		badFrontMatter: d.FrontMatterErr != nil,
 	}
 	s.stack.Strict = opts.Remote
 	s.stack.Prepare = s.prepare
@@ -254,13 +258,38 @@ func (s *Session) SetResult(i int, r *Result) {
 // own.
 var ErrRestart = errors.New("the first tty block needs mdsh to start again")
 
+// ErrFrontMatterFixed is Sync's answer when the document's front matter
+// didn't parse when the session started and now does: the shells were
+// readied with the defaults, so they must start again with what it
+// says. It is an ErrRestart.
+var ErrFrontMatterFixed = fmt.Errorf("the front matter is fixed, so the shells start again with its settings: %w", ErrRestart)
+
+// FrontMatterError is what running a block returns while the document's
+// front matter doesn't parse: mdsh runs nothing with settings it can't
+// read.
+type FrontMatterError struct{ Err error }
+
+func (e *FrontMatterError) Error() string {
+	return e.Err.Error() + "; fix it to run blocks"
+}
+func (e *FrontMatterError) Unwrap() error { return e.Err }
+
+// checkFrontMatter is a FrontMatterError if the document's front matter
+// doesn't parse, else nil.
+func (s *Session) checkFrontMatter() error {
+	if s.d.FrontMatterErr != nil {
+		return &FrontMatterError{s.d.FrontMatterErr}
+	}
+	return nil
+}
+
 // Sync catches the session up with changes to the document since it
 // started: blocks appended, as by doc.AppendBlock, blocks edited in
 // place, as by doc.Document.SetBlock, and a new source, as by
 // doc.Document.SetSource. A block that kept its identity keeps its
 // result, wherever it moved; a new block starts with none, except that
-// a new include block is read. Call it
-// while nothing runs.
+// a new include block is read. Front matter fixed since the session
+// started returns ErrFrontMatterFixed. Call it while nothing runs.
 func (s *Session) Sync() error {
 	byBlock := make(map[*doc.Block]*Result, len(s.results))
 	for _, r := range s.results {
@@ -282,6 +311,9 @@ func (s *Session) Sync() error {
 	}
 	s.results = results
 	s.refs()
+	if s.badFrontMatter && s.d.FrontMatterErr == nil {
+		return ErrFrontMatterFixed
+	}
 	if hasTTY(s.d) && !s.tty {
 		return ErrRestart
 	}
@@ -321,6 +353,9 @@ func (s *Session) Ask(ctx context.Context, script string) (string, error) {
 // AskSized is Ask with the shell's terminal, if it has one, sized cols
 // by rows first. Zero leaves it as it is.
 func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (string, error) {
+	if err := s.checkFrontMatter(); err != nil {
+		return "", err
+	}
 	e, err := s.stack.Get(ctx, "", s.d.Options.Env.Share)
 	if err != nil {
 		return "", err
@@ -398,6 +433,9 @@ func (s *Session) RunFrom(ctx context.Context, from int) error {
 // a block's dependencies run first even when they are outside the
 // range. mdsh-gui uses it to run a section.
 func (s *Session) RunRange(ctx context.Context, from, to int) error {
+	if err := s.checkFrontMatter(); err != nil {
+		return err
+	}
 	d, opts := s.d, s.opts
 	// ran holds the blocks already run as dependencies on the way, so
 	// they don't run twice.
@@ -529,6 +567,9 @@ func (s *Session) hasOutput(i int) bool {
 func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 	if i < 0 || i >= len(s.d.Blocks) {
 		return nil, fmt.Errorf("no block %d", i)
+	}
+	if err := s.checkFrontMatter(); err != nil {
+		return s.results[i], err
 	}
 	s.Reap()
 	b := s.d.Blocks[i]
@@ -757,6 +798,9 @@ func (s *Session) depend(dep, b *doc.Block) (Answer, error) {
 func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bool, err error) {
 	if i < 0 || i >= len(s.d.Blocks) {
 		return nil, false, fmt.Errorf("no block %d", i)
+	}
+	if err := s.checkFrontMatter(); err != nil {
+		return s.results[i], false, err
 	}
 	b := s.d.Blocks[i]
 	if !Runnable(b) {

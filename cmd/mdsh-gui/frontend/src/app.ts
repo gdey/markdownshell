@@ -32,9 +32,12 @@ import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 
 let me = ""; // this window's name; events from other windows are ignored
-let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "", lastView: "", lastHistory: false };
+let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "", frontMatterError: "", frontMatterFix: { label: "", detail: "" }, lastView: "", lastHistory: false };
 let cells: Cell[] = [];
 let running = false;
+// noRun is why no block can run, such as front matter that doesn't
+// parse, or "".
+let noRun = "";
 let ranHere = false; // the run going on was started from this page
 let selected = -1; // index into the block cards, for j/k
 // selectedSection is the selected heading's dataset.fold, or "". A
@@ -161,6 +164,7 @@ async function refresh() {
   syncHistory();
   $("fullenv-text").textContent = doc.envBanner;
   $("fullenv").hidden = !open || doc.envBanner === "";
+  showFrontMatterError(open);
   if (!open) {
     $("changed").hidden = true;
     return drawStart();
@@ -780,7 +784,7 @@ function drawProse(c: Cell): HTMLElement {
       s.dataset.sectionTo = String(c.sectionTo);
       const play = iconButton("play", "Run this section (s)", () => void runSection(s));
       play.classList.add("run-section");
-      play.disabled = running;
+      play.disabled = running || !!noRun;
       // Next to the heading's text, which names it in the outline and
       // its fold, and a button's svg adds none. The heading keeps its
       // text as its name, without the button's.
@@ -1158,6 +1162,13 @@ function blockClass(c: Cell): string {
   return "block" + (c.history ? " history" : "") + (c.secret && !revealed.has(c.block) ? " masked" : "") + (c.secretCode ? " secret-code" : "") + (c.hidden ? " hidden-block" : "") + (c.running ? " background" : c.failed ? " failed" : c.ran ? " ran" : "") + (c.stale ? " stale" : "");
 }
 
+// runs marks b as a button that starts a run, off while none can.
+function runs(b: HTMLButtonElement): HTMLButtonElement {
+  b.classList.add("runs");
+  b.disabled = !!noRun;
+  return b;
+}
+
 function drawBlock(c: Cell): HTMLElement {
   // The outline names a block by the .name's first child.
   const name = el("span", { className: "name" }, el("span", { className: "id" }, c.name ?? c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
@@ -1178,8 +1189,8 @@ function drawBlock(c: Cell): HTMLElement {
       c.secret ? revealButton(c) : "",
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "", !!c.secretCode)),
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
-      iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block)),
-      iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block)),
+      runs(iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block))),
+      runs(iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block))),
       ...(c.movable ? [trashButton(c)] : []),
     ),
     foldPart("code", el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))), () => foldBlock(block, "code")),
@@ -1842,8 +1853,33 @@ function runAllButton() {
   const b = $<HTMLButtonElement>("run-all");
   b.replaceChildren(svg(running ? icons.stop : icons.play), el("span", {}, running ? "Stop" : "Run all"));
   b.classList.toggle("stop", running);
-  b.disabled = !running && !cells.some((c) => c.block >= 0);
+  b.disabled = !running && (noRun !== "" || !cells.some((c) => c.block >= 0));
+  b.title = !running && noRun ? noRun : "";
   void clearOutputsButton();
+}
+
+// runButtons are the buttons that start a run: a block's, a section's
+// and the outline's.
+const runButtons = ".block .head button.runs, #outline .run, .heading-cell .run-section";
+
+// showFrontMatterError shows, while the file is open, why its front
+// matter doesn't parse, with the fix mdsh offers, if any, and turns
+// running off until it does.
+function showFrontMatterError(open: boolean) {
+  const err = open ? doc.frontMatterError : "";
+  noRun = err ? "Fix the front matter to run blocks" : "";
+  $("fmerror").hidden = !err;
+  document.body.classList.toggle("no-run", !!err);
+  $("fmerror-text").textContent = err.charAt(0).toUpperCase() + err.slice(1) + ".";
+  const fix = $<HTMLButtonElement>("fmerror-fix");
+  fix.hidden = !err || !doc.frontMatterFix.label;
+  fix.textContent = doc.frontMatterFix.label;
+  fix.title = doc.frontMatterFix.detail;
+  fix.onclick = () => void fixWarning(err, "Fixed the front matter. Blocks can run.");
+  // The front matter's first line, after any #! line.
+  $("fmerror-source").onclick = () => void goToLine(2);
+  for (const x of document.querySelectorAll<HTMLButtonElement>(runButtons)) x.disabled = running || !!noRun;
+  runAllButton();
 }
 
 // clearOutputsButton offers Clear All Outputs only when there is output
@@ -1879,6 +1915,7 @@ function busy(on: boolean) {
   historyBusy(on);
   busyFrontMatter(on);
   for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run, .heading-cell .run-section")) x.disabled = on;
+  if (!on && noRun) for (const x of document.querySelectorAll<HTMLButtonElement>(runButtons)) x.disabled = true;
 }
 
 function start(method: "RunBlock" | "RunFrom", block: number) {
@@ -1901,6 +1938,7 @@ function shellLost(text: string) {
 
 async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   if (running) return;
+  if (noRun) return status(noRun);
   const back = home ? homeOffset(home()) : null;
   scrolledByHand = false;
   // The History pane may have set the terminal's size to its own.
@@ -2874,7 +2912,7 @@ function drawOutline() {
       const block = Number(e.dataset.block);
       const play = iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", block));
       play.classList.add("run");
-      play.disabled = running;
+      play.disabled = running || !!noRun;
       const row = outlineRow(item, e, 0);
       // The block waiting for an answer is ringed, to be found at a glance.
       row.classList.toggle("asking", mark === "?");
@@ -2914,7 +2952,7 @@ function drawOutline() {
       if (e.dataset.sectionTo) {
         const play = iconButton("play", "Run this section (s)", () => void runSection(e));
         play.classList.add("run");
-        play.disabled = running;
+        play.disabled = running || !!noRun;
         row.append(play);
         row.dataset.section = e.dataset.fold ?? "";
       }
@@ -3507,8 +3545,8 @@ async function deleteBlock(i: number) {
 }
 
 // fixWarning asks whether to make the fix the console offers for
-// warning, saying what it does, and makes it.
-async function fixWarning(warning: string) {
+// warning, saying what it does, and makes it, saying done, if given.
+async function fixWarning(warning: string, done?: string) {
   if (running) return status("can't change the file while a block runs");
   await applySource();
   let f;
@@ -3532,13 +3570,13 @@ async function fixWarning(warning: string) {
     return fail(err);
   }
   await refresh();
-  $("moved-text").textContent = `Fixed: ${warning}.`;
+  $("moved-text").textContent = done ?? `Fixed: ${warning}.`;
   $("moved-undo").onclick = () => {
     $("moved").hidden = true;
     void undoEdit(false);
   };
   $("moved").hidden = false;
-  status("fixed: " + warning);
+  status(done ?? "fixed: " + warning);
 }
 
 // confirmDelete asks whether to delete the block named name.

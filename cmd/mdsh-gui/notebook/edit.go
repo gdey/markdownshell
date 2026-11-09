@@ -16,7 +16,8 @@ import (
 
 // sync catches the session up with an edited document. Blocks that
 // kept their identity keep their results. A document that gains its
-// first tty block needs new shells.
+// first tty block needs new shells, as does front matter that parses
+// now and didn't, since its shells were readied with the defaults.
 func (n *Notebook) sync() error {
 	n.logWarnings()
 	n.waitReap()
@@ -36,17 +37,21 @@ func (n *Notebook) sync() error {
 		if !errors.Is(err, run.ErrRestart) {
 			return err
 		}
+		why := whyTTY
+		if errors.Is(err, run.ErrFrontMatterFixed) {
+			why = whyFrontMatter
+		}
 		if n.ran() {
 			// Starting the shells again would lose what blocks set in
 			// them; that is the user's call, with Restart Shells. Until
 			// then the tty block can't run.
-			n.opts.Events.Event("restart.needed", audit.Fields{"reason": whyTTY})
+			n.opts.Events.Event("restart.needed", audit.Fields{"reason": why})
 		} else {
 			sess, err := n.newSession(n.opts.Run)
 			if err != nil {
 				return err
 			}
-			n.replaceSession(sess, whyTTY)
+			n.replaceSession(sess, why)
 		}
 	}
 	// The session reads include blocks that are new, so a typed

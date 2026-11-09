@@ -210,6 +210,12 @@ The base set is `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`,
 `abstract`) and `tags` are read by the start screens and the Front matter
 form, not by the run.
 
+Front matter that doesn't parse, such as `title: Setup: first steps`
+with its colon unquoted, doesn't stop the file opening: mdsh-gui and
+`mdsh -i` show the error over it, and no block runs until it is fixed.
+When a colon in a value is why, they offer to quote it. `mdsh FILE`
+runs nothing and says why.
+
 A `.mdsh.yaml` in a folder makes it a collection on mdsh-gui's start
 screen: `title`, `description`, `icon` (an image in the folder or an
 emoji), `color`, `background` and `tags`.
@@ -251,6 +257,7 @@ env starts in the document's folder.
 | ctrl+] | Stop a `tty` block running in its card |
 | `e` | Edit the block in `$VISUAL`, `$EDITOR` or `vi`; enter runs it |
 | `E` | Edit the whole file the same way, at the block |
+| `F` | Fix front matter that doesn't parse, when mdsh can: quote a value with a `: ` in it |
 | `y` | Copy the block's code to the clipboard (OSC 52, and the system clipboard locally) |
 | `V` | Select lines of History's output (shift+↑ in the pane too): ↑/↓ `j`/`k` extend, `g`/`G` ends, `o` other end, `y` or enter copies, esc cancels |
 | `J`/`K`, alt+↓/↑ | Move the block, with its output and tape, down or up |

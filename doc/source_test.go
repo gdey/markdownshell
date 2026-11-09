@@ -40,7 +40,7 @@ func TestSetSource(t *testing.T) {
 		t.Error("duplicates weren't matched in order")
 	}
 	src = string(d.Src)
-	if err := d.SetSource([]byte("---\nmdsh: [\n---\n")); err == nil || string(d.Src) != src {
+	if err := d.SetSource([]byte("```sh {#a}\nx\n```\n```sh {#a}\nx\n```\n")); err == nil || string(d.Src) != src {
 		t.Errorf("bad source: err %v, src %q", err, d.Src)
 	}
 }

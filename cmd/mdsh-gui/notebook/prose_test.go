@@ -111,8 +111,14 @@ func TestSetText(t *testing.T) {
 		t.Fatal(err)
 	}
 	text = n.Text()
-	if _, err := n.SetText(text, "---\nmdsh: [\n---\n"); err == nil || n.Text() != text {
+	if _, err := n.SetText(text, "```sh {#a}\n```\n```sh {#a}\n```\n"); err == nil || n.Text() != text {
 		t.Errorf("a bad text: err = %v, text %q", err, n.Text())
+	}
+	// Front matter that doesn't parse is taken, as typing it is
+	// halfway there; it shows its error, and nothing runs till it parses.
+	bad := "---\nmdsh: [\n---\n" + text
+	if ok, err := n.SetText(text, bad); !ok || err != nil || n.Text() != bad || n.FrontMatterError() == "" {
+		t.Errorf("bad front matter: %v, %v, error %q, text %q", ok, err, n.FrontMatterError(), n.Text())
 	}
 }
 

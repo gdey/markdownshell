@@ -72,7 +72,13 @@ type Document struct {
 	// FrontMatter covers the front matter, including both --- lines.
 	FrontMatter Span
 	Options     Options
-	Blocks      []*Block
+	// FrontMatterErr is why mdsh can't read the front matter, or nil.
+	// The rest of the document parses as usual, with Options at their
+	// defaults, so front ends can still show it; they show the error,
+	// and run (see run.Session) refuses to run any block until the
+	// front matter is fixed.
+	FrontMatterErr error
+	Blocks         []*Block
 	// Placeholders are the env placeholders in the prose, in order.
 	// Empty when the front matter turns them off.
 	Placeholders []*Placeholder
@@ -133,11 +139,8 @@ func Parse(src []byte) (*Document, error) {
 		d.Shebang = string(bytes.TrimRight(src[:end], "\r\n"))
 		pos = end
 	}
-	fm, opts, err := parseFrontMatter(src, pos)
-	if err != nil {
-		return nil, err
-	}
-	d.FrontMatter, d.Options = fm, opts
+	d.FrontMatter, d.Options, d.FrontMatterErr = parseFrontMatter(src, pos)
+	fm := d.FrontMatter
 	if fm.End > pos {
 		pos = fm.End
 	}

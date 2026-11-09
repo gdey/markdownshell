@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -233,5 +234,48 @@ func TestTabReopenWhileAsking(t *testing.T) {
 	}
 	if err := a.Answer(ctx, "run"); err == nil {
 		t.Error("an answer after reopening was taken by the old run")
+	}
+}
+
+// A file whose front matter doesn't parse opens in a tab, as File >
+// Open, Open With and the command line open it: the page is told why,
+// with the fix, nothing runs, and the fix lets blocks run.
+func TestTabOpensBadFrontMatter(t *testing.T) {
+	dir := t.TempDir()
+	st, err := settings.Open(filepath.Join(dir, "gui.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "bad.md")
+	if err := os.WriteFile(file, []byte("---\ntitle: Setup: first steps\n---\n\n```sh {#one}\necho hi\n```\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{settings: st, tabs: map[int]*docTab{}, tabWindow: map[*docTab]*docWindow{}}
+	tab := &docTab{app: a, id: 1, answers: make(chan run.Answer), done: make(chan struct{})}
+	a.tabs[1] = tab
+	t.Cleanup(tab.shutdown)
+	ctx := context.WithValue(context.Background(), tabKey{}, 1)
+	if err := tab.open(file, notebook.RunOptions{}); err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	d, err := a.Doc(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(d.FrontMatterError, "mapping values are not allowed") || d.FrontMatterFix.Label == "" {
+		t.Errorf("Doc = %q, %+v", d.FrontMatterError, d.FrontMatterFix)
+	}
+	n, _ := tab.notebook()
+	if err := n.RunBlock(0); err == nil {
+		t.Error("a block ran")
+	}
+	if err := a.FixWarning(ctx, d.FrontMatterError); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := a.Doc(ctx); d.FrontMatterError != "" || d.FrontMatterFix.Label != "" {
+		t.Errorf("after the fix: %q, %+v", d.FrontMatterError, d.FrontMatterFix)
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Errorf("after the fix: %v", err)
 	}
 }

@@ -273,6 +273,7 @@ its output.
 | `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
 | `y` | copy the block's code, without its fences, to the clipboard. It is sent to the terminal as OSC 52, which works over ssh in terminals that allow it, and run locally it also goes to the system clipboard (`pbcopy`, `wl-copy`, `xclip` or `xsel`), for terminals that don't, such as macOS's Terminal or tmux by default |
 | `E` | edit the whole file in `$VISUAL`, `$EDITOR` or `vi`, at the block under the cursor, with output not saved yet in it. Blocks whose code didn't change keep their output, as in `mdsh-gui`'s source view; save with `w` |
+| `F` | fix front matter that doesn't parse, when mdsh can tell how: a value with a `: ` in it gets quotes. Until the front matter parses, a banner says why and no block runs |
 | alt+↑/↓, or `K`/`J` | move the block, with its output and tape, up or down past the paragraph, heading or block next to it, as alt+↑/↓ does in `mdsh-gui`. Prose stays put. What the move breaks that depends on block order, such as a `run=` that now reads a block below it, shows in the footer. Not while a block runs |
 | `u` | undo the last move |
 | `v` | show the block's image or recording full screen; enter goes back |

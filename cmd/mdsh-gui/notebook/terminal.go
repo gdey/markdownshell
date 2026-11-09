@@ -109,6 +109,32 @@ func (n *Notebook) TerminalSize() (cols, rows int) {
 	return t.Cols, t.Rows
 }
 
+// FrontMatterError is why the front matter doesn't parse, or "" when it
+// does. Until it does, the page says so and no block runs.
+func (n *Notebook) FrontMatterError() string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.d.FrontMatterErr == nil {
+		return ""
+	}
+	return n.d.FrontMatterErr.Error()
+}
+
+// FrontMatterFix says what FixWarning does with FrontMatterError as the
+// warning, or is the zero Fix when mdsh has no fix for the front matter.
+func (n *Notebook) FrontMatterFix() Fix {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.d.FrontMatterErr == nil {
+		return Fix{}
+	}
+	f, err := n.fixFor(n.d.FrontMatterErr.Error())
+	if err != nil {
+		return Fix{}
+	}
+	return Fix{Label: f.Label, Detail: f.Detail}
+}
+
 // EnvBanner is the front matter's note that the file brings in more
 // than the base set from the environment, or "" (see
 // doc.Options.ShareBanner).

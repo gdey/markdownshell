@@ -120,6 +120,15 @@ follow [Semantic Versioning](https://semver.org/).
   or with more than 100,000 writes is refused, and turning one into a GIF
   keeps memory bounded, so a crafted cast linked as an image can't make
   `--html`, `--pdf` or mdsh-gui's Copy as GIF run out of memory.
+- mdsh-gui no longer opens a linked file with the system's app for it
+  on a click, which let a document link to a script or an app and run it.
+  A link to a file now shows it in Finder (or the file manager), a linked
+  image opens in the image viewer, and markdown files still open in a
+  tab. Settings › Files › **Links open these file types** names the
+  types, such as `pdf, txt`, that open in their app; a file marked
+  executable is only ever shown.
+
+  ![Settings, Files tab, with Links open these file types set to pdf, txt](docs/changelog/open-types.png)
 - A block marked `skip`, or whose `run=` is false, no longer runs just
   because another block's `depends=` names it, which `mdsh --yes` did
   without asking. mdsh now asks `Run wipe anyway?` whenever there is a
@@ -136,14 +145,25 @@ follow [Semantic Versioning](https://semver.org/).
   files, the shell and the Neovim to run, and were readable by every
   user on the machine; a file left that way is fixed on the next save
   (finding 12 of the v1.4.0 security review).
-
 - Reports print a block marked `secret` as `(secret)`, its code and its
   output, whether it ran or the output was saved: `--pdf`, `--html` and
   the reports mdsh-gui and `mdsh -i` make. `secret` kept the output out
   of the `.md` only, so a PDF of the run carried the secret to whoever
   you sent it to (finding 9 of the v1.4.0 security review). Pass
   `--show-secrets` to put them in.
+- A secret no longer shows in mdsh-gui's source pane or in `mdsh -i`.
+  The source pane, and the Neovim one, mask the lines of a `secret`
+  block's code, and the output of a block whose code names a variable
+  set with `mdsh ctl set --secret`, as the block's card does, until its
+  eye button shows them. `mdsh -i` had no notion of `secret`: it now
+  shows such code and output as `•••••••• secret` until you press `x`
+  on the block, and masks them again when you move off it. Copying a
+  secret on Linux and Windows says a clipboard manager may keep a
+  copy, since only macOS can mark it concealed (finding 9 of the
+  v1.4.0 security review).
 
+  ![mdsh-gui's source pane blurring a secret block's code next to its blurred card](docs/changelog/secret-source.png)
+  ![mdsh -i showing a secret block's code and output as dots, with x shows it](docs/changelog/secret-tui.png)
 - `mdsh` printing to a terminal and `mdsh -i` show escape sequences in
   a document's prose and saved output as text, `^[]52;c;...^G`, and keep
   only their colors. They went to the terminal as they were, so opening
@@ -154,6 +174,33 @@ follow [Semantic Versioning](https://semver.org/).
   History pane's output and prompt, keep their colors and drop the
   rest. Printed to a file or a pipe, `mdsh` leaves the markdown as it
   is.
+- mdsh-gui no longer takes over the `mdsh` command when any copy of it
+  is launched. At launch it pointed `/usr/local/bin/mdsh` at itself
+  whenever the link went into another `mdsh.app`, so opening an older
+  release from a mounted `.dmg`, or a fork's build, quietly made it the
+  `mdsh` every terminal ran; and an older AppImage replaced a newer copy
+  in `~/.local/bin` (finding 7 of the v1.4.0 security review). Now the
+  link is repaired only when its target is gone or is a place this app
+  has stood, the AppImage copy is only ever brought forward, and the
+  Console says when either happens. Settings › Shell says "runs another
+  mdsh.app" for a link it left, and Install points it here. Installing
+  the command no longer clears the quarantine flag on the app, which is
+  notarized.
+- mdsh-gui's window loads only images, audio, video and terminal
+  recordings from beside an open document. It served any file in the
+  document's folder tree, so with a file open in `~/notes` a bug in the
+  page could have read a `.env` or a key there; the page's Content
+  Security Policy kept it from sending one anywhere, and `mdsh --serve`
+  would have put the same route on the network (finding 12 of the
+  v1.4.0 security review). The type is the file's own, so a link named
+  `.png` that points at something else isn't served.
+- The release workflows no longer paste the release tag into their
+  shell scripts, where a tag name holding `$(...)` or backticks would
+  have run as a command. The tag and version reach the scripts through
+  the environment, and a tag that isn't `vX.Y.Z` (with an optional
+  pre-release) stops the release. goreleaser runs `go mod verify`
+  instead of `go mod tidy`, so a release can't build a `go.mod` that
+  differs from the tag's (finding 11 of the v1.4.0 security review).
 - `mdsh -i` and mdsh-gui show the environment banner over a file whose
   `env.share` names variables beyond the base set, and list them: "This
   file brings in GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY from your
@@ -172,6 +219,23 @@ follow [Semantic Versioning](https://semver.org/).
   first?" (finding 10 of the v1.4.0 security review).
 
 ### Fixed
+
+- A file whose front matter doesn't parse, such as `title: Setup: the
+  first steps` with its colon not in quotes, now opens. mdsh-gui and
+  `mdsh -i` used to refuse it with only the YAML error. Now the file
+  shows as usual under a banner that gives the error, with lines
+  counted from the top of the file, and says blocks can't run until it
+  is fixed; the run buttons are off, and a run, a typed command or Run
+  all is refused. When a colon in a value is why, the banner offers
+  **Add quotes** (`F` in `mdsh -i`), which quotes the value and is
+  undone like any edit. Once the front matter parses, the shells start
+  again with what it says and blocks run. `mdsh FILE` still runs
+  nothing and says why, and `mdsh --no-run` prints the file with a
+  warning. This applies however the file is opened: File › Open, Open
+  With or a double click in Finder, the start screen or the command
+  line.
+
+  ![A runbook whose title has an unquoted colon, open in mdsh-gui under a red banner: the front matter error, "Blocks can't run until it is fixed", and Add quotes and Edit in source buttons; the run buttons are greyed](docs/changelog/bad-front-matter.png)
 
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
   app only the lines it changed. Each pause in the typing sent the whole

@@ -36,10 +36,15 @@ var helpItems = []helpItem{
 	{group: "Move", keys: "space/pgup", key: tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")}, what: says("page down (pgup, ctrl+b: up)")},
 	{group: "Move", keys: "ctrl+d/ctrl+u", key: tea.KeyMsg{Type: tea.KeyCtrlD}, what: says("half a page down (ctrl+u: up)")},
 
-	{group: "Run", keys: "enter r", key: tea.KeyMsg{Type: tea.KeyEnter}, what: says("run the block"), off: needIdleBlock},
-	{group: "Run", keys: "a", key: runeKey("a"), what: says("run from this block to the end"), off: needIdleBlock},
+	{group: "Run", keys: "enter r", key: tea.KeyMsg{Type: tea.KeyEnter}, what: says("run the block"), off: noRun},
+	{group: "Run", keys: "a", key: runeKey("a"), what: says("run from this block to the end"), off: noRun},
 	{group: "Run", keys: "s", key: runeKey("s"), what: says("run the section the block is in"), off: noSection},
-	{group: "Run", keys: "i :", key: runeKey("i"), what: says("type a new sh block and run it"), off: busy},
+	{group: "Run", keys: "i :", key: runeKey("i"), what: says("type a new sh block and run it"), off: func(m *Model) string {
+		if s := badFrontMatter(m); s != "" {
+			return s
+		}
+		return busy(m)
+	}},
 	{group: "Run", keys: "h", key: runeKey("h"), what: says("History: a shell whose commands are added to the file"), off: func(m *Model) string {
 		if m.running && !m.hist.open {
 			return "a block is running"
@@ -70,6 +75,20 @@ var helpItems = []helpItem{
 		return ""
 	}},
 	{group: "Edit", keys: "E", key: runeKey("E"), what: says("edit the whole file in $EDITOR"), off: busy},
+	{group: "Edit", keys: "F", key: runeKey("F"), what: func(m *Model) string {
+		if f, ok := m.frontMatterFix(); ok {
+			return "fix the front matter: " + f.Label
+		}
+		return "fix the front matter"
+	}, off: func(m *Model) string {
+		if s := busy(m); s != "" {
+			return s
+		}
+		if _, ok := m.frontMatterFix(); !ok {
+			return "only when mdsh can fix the front matter"
+		}
+		return ""
+	}},
 	{group: "Edit", keys: "J/K alt+↓/↑", key: runeKey("J"), what: says("move the block down (K: up)"), off: noMove},
 	{group: "Edit", keys: "u", key: runeKey("u"), what: says("undo the last move"), off: noUndo},
 
@@ -136,8 +155,25 @@ func needIdleBlock(m *Model) string {
 	return noBlocks(m)
 }
 
+// badFrontMatter says why nothing runs while the front matter doesn't
+// parse, or "".
+func badFrontMatter(m *Model) string {
+	if m.d != nil && m.d.FrontMatterErr != nil {
+		return "the front matter doesn't parse"
+	}
+	return ""
+}
+
+// noRun says why the block can't run now, or "".
+func noRun(m *Model) string {
+	if s := badFrontMatter(m); s != "" {
+		return s
+	}
+	return needIdleBlock(m)
+}
+
 func noSection(m *Model) string {
-	if s := needIdleBlock(m); s != "" {
+	if s := noRun(m); s != "" {
 		return s
 	}
 	if _, ok := doc.SectionAt(m.d.Headings(), m.d.Blocks[m.cur()].Span.Start); !ok {

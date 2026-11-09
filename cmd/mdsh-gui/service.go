@@ -56,6 +56,12 @@ type Doc struct {
 	// the base set from the environment the app started in (env.share
 	// with ..., or naming variables).
 	EnvBanner string `json:"envBanner"`
+	// FrontMatterError, if set, is why the front matter doesn't parse:
+	// the page shows it and runs nothing until it does. FrontMatterFix
+	// is the fix FixWarning makes for it, with that as the warning, if
+	// there is one; its Label is "" if not.
+	FrontMatterError string       `json:"frontMatterError"`
+	FrontMatterFix   notebook.Fix `json:"frontMatterFix"`
 	// LastView is how the file was last shown, "rendered", "source" or
 	// "both", or "" if that isn't remembered. LastHistory is whether
 	// its History pane was open then.
@@ -80,7 +86,7 @@ func (a *App) Doc(ctx context.Context) (Doc, error) {
 	ro := n.RunOptions()
 	cols, rows := n.TerminalSize()
 	last, _ := a.settings.Get().FileView(n.File())
-	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows, EnvBanner: n.EnvBanner(), LastView: last.View, LastHistory: last.History}, nil
+	return Doc{File: n.File(), Dirty: n.Dirty(), Changed: n.Changed(), Running: running, Fresh: fresh, OpenHistory: history, Run: ro, Args: run.JoinArgs(ro.Args), History: n.History(), TermCols: cols, TermRows: rows, EnvBanner: n.EnvBanner(), FrontMatterError: n.FrontMatterError(), FrontMatterFix: n.FrontMatterFix(), LastView: last.View, LastHistory: last.History}, nil
 }
 
 // Live is what the run going on in the tab has sent so far, for a page
