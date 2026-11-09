@@ -654,6 +654,29 @@ func TestDependOff(t *testing.T) {
 	}
 }
 
+// TestDependOwnConfirm checks that a dependency with its own confirm
+// question is asked with that question: Go answers it too, so a milder
+// "Run it first?" would let it through unread.
+func TestDependOwnConfirm(t *testing.T) {
+	file := write(t, "```sh {#wipe confirm=\"This deletes the database. Sure?\"}\necho wiped\n```\n\n```sh {#deploy depends=wipe}\necho deploy\n```\n")
+	var asked string
+	n, err := Open(file, Options{
+		Confirm: func(int, string) run.Answer { return run.Stop },
+		Depend: func(_, _ int, q string) run.Answer {
+			asked = q
+			return run.Stop
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	n.RunBlock(1)
+	if want := "deploy depends on this block, which hasn't run yet. It asks: This deletes the database. Sure? Run it first?"; asked != want {
+		t.Errorf("asked %q, want %q", asked, want)
+	}
+}
+
 // An include's cell holds the file's lines as they are, number_on or
 // not, and FirstLine starts the view's line numbers at from=, so the
 // code shows one column of numbers, the file's.

@@ -20,6 +20,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -792,6 +793,38 @@ func (p *prompter) warnControl(b *doc.Block) {
 // from.
 var openTTY = func() (*os.File, error) { return os.OpenFile("/dev/tty", os.O_RDWR, 0) }
 
+// commonShells are the shells a question doesn't name: what a reader
+// expects a sh or zsh block to run in.
+var commonShells = []string{"", "sh", "bash", "zsh", "/bin/sh", "/bin/bash", "/bin/zsh", "/usr/bin/bash", "/usr/bin/zsh"}
+
+// context prints what else decides what b does when it runs, besides
+// its code: the shell the front matter names, when it isn't a common
+// one, and the attributes that pick its env, the variables it gets,
+// where its output is written and how it runs. A question that showed
+// only the code would let `out=screenshot:../../.zshrc` or `shell:
+// ./evil` pass as harmless (finding 10 of the v1.4.0 security review).
+func (p *prompter) context(b *doc.Block) {
+	if p.d != nil {
+		if sh := run.Shell(p.d); !slices.Contains(commonShells, sh) {
+			fmt.Fprintf(p.out, "runs in: %s (the front matter's shell)\n", termsafe.Visible(sh))
+		}
+	}
+	var with []string
+	for _, k := range []string{"env", "share", "out", "background", "tty"} {
+		if !b.Attrs.Has(k) {
+			continue
+		}
+		if v := b.Attrs[k]; v != "" {
+			with = append(with, k+"="+termsafe.Visible(v))
+		} else {
+			with = append(with, k)
+		}
+	}
+	if len(with) > 0 {
+		fmt.Fprintf(p.out, "with: %s\n", strings.Join(with, " "))
+	}
+}
+
 func newPrompter(in io.Reader, out io.Writer) *prompter {
 	return &prompter{in: bufio.NewReader(in), out: out}
 }
@@ -832,8 +865,14 @@ func (p *prompter) depend(dep, b *doc.Block) run.Answer {
 		fmt.Fprintf(p.out, "%s---\n", termsafe.Visible(dep.Body))
 	}
 	p.warnControl(dep)
+	p.context(dep)
+	// Run answers dep's own confirm too, so its question is asked here.
+	q := "Run " + p.label(dep) + " first?"
+	if c := dep.Attrs["confirm"]; c != "" {
+		q = fmt.Sprintf("%s asks: %s Run it first?", p.label(dep), termsafe.Visible(c))
+	}
 	for {
-		fmt.Fprintf(p.out, "Run %s first? [r]un / s[k]ip / [s]top: ", p.label(dep))
+		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [s]top: ", q)
 		line, err := p.in.ReadString('\n')
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":
@@ -894,6 +933,7 @@ func (p *prompter) confirm(b *doc.Block) run.Answer {
 		fmt.Fprintf(p.out, "\n--- block %s%s ---\n%s---\n", p.label(b), saved, termsafe.Visible(b.Body))
 	}
 	p.warnControl(b)
+	p.context(b)
 	for {
 		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", termsafe.Visible(q))
 		line, err := p.in.ReadString('\n')

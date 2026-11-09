@@ -1437,3 +1437,19 @@ func TestEscapesShown(t *testing.T) {
 		}
 	}
 }
+
+// TestDependOwnConfirm checks that a dependency's own confirm question
+// is the one asked for it, since Run answers it too.
+func TestDependOwnConfirm(t *testing.T) {
+	src := "```sh {#wipe confirm=\"This deletes the database. Sure?\"}\necho wiped\n```\n\n```sh {#deploy depends=wipe}\necho deploy\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "down", "enter")
+	pump(t, m)
+	if m.prompt == nil || m.prompt.block.ID != "wipe" {
+		t.Fatal("not asked about wipe")
+	}
+	if v := strings.Join(strings.Fields(ansi.Strip(m.View())), " "); !strings.Contains(v, "It asks: This deletes the database. Sure? Run it first?") {
+		t.Errorf("wipe's own question not asked:\n%s", v)
+	}
+	press(m, "s")
+}

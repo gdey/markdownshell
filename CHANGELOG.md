@@ -208,6 +208,15 @@ follow [Semantic Versioning](https://semver.org/).
   for exactly the secrets it wanted with no sign of it (finding 2 of the
   v1.4.0 security review). Naming only base variables (`PATH`, `HOME`,
   `LC_*`, ...) or removing them with `-NAME` still shows nothing.
+- The questions say more about what a block will do than its code.
+  `mdsh` asking on the terminal adds the front matter's shell when it
+  isn't sh, bash or zsh, and the block's `env=`, `share=`, `out=`,
+  `background` and `tty`, so `out=screenshot:../../.zshrc` is in front
+  of you when you answer. The question whether to run a dependency first
+  asks that block's own `confirm` question when it has one, in `mdsh`,
+  `mdsh -i` and mdsh-gui: Run answers it too, so a block that asks
+  "This deletes the database. Sure?" is no longer run on "Run it
+  first?" (finding 10 of the v1.4.0 security review).
 
 ### Fixed
 
