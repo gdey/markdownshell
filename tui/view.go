@@ -36,6 +36,7 @@ var (
 	stderrStyle = lipgloss.NewStyle().Foreground(failCol)
 	savedStyle  = lipgloss.NewStyle().Foreground(dimCol)
 	tagStyle    = lipgloss.NewStyle().Foreground(dimCol)
+	secretStyle = lipgloss.NewStyle().Foreground(runningCol)
 	// envBannerStyle marks a file that brings in the whole environment:
 	// worth knowing, not an error.
 	envBannerStyle = lipgloss.NewStyle().Foreground(runningCol).Reverse(true).Padding(0, 1)
@@ -49,6 +50,7 @@ func (m *Model) refresh() {
 		return
 	}
 	m.vp.Height = m.vpHeight()
+	m.secretVars = m.sess.SecretVars()
 	var buf strings.Builder
 	m.tops, m.bots = map[int]int{}, map[int]int{}
 	line, blank := 0, true
@@ -156,16 +158,23 @@ func (m *Model) block(i int) string {
 	}
 	w := max(m.docWidth()-4, 10)
 	out := head
-	// Code hidden with the Code switch still shows while its block asks
-	// to run, so the question is never asked about unseen code.
-	if !m.shown.HideCode || (m.prompt != nil && m.prompt.block == b) {
+	// Code hidden with the Code switch, or masked as a secret, still
+	// shows while its block asks to run, so the question is never asked
+	// about unseen code.
+	asking := m.prompt != nil && m.prompt.block == b
+	maskCode, maskOutput := m.masked(i)
+	if !m.shown.HideCode || asking {
+		code := clean(termsafe.Visible(body))
+		if maskCode && !asking {
+			code = m.secretMask(i)
+		}
 		out += "\n" + lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(border).
 			Padding(0, 1).
 			MarginLeft(2).
 			Width(w-2).
-			Render(clean(termsafe.Visible(body)))
+			Render(code)
 	}
 	// A confirm question is asked in the block's card, under its code, as
 	// in mdsh-gui.
@@ -194,9 +203,42 @@ func (m *Model) block(i int) string {
 		return out
 	}
 	if o := m.output(i, r, w); o != "" {
+		if maskOutput {
+			o = m.secretMask(i)
+		}
 		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Render(o)
 	}
 	return out
+}
+
+// secret says whether block i's code, and its output, may hold a
+// secret: both for a block marked secret, the output for one whose code
+// names a variable mdsh ctl set --secret made, as mdsh-gui masks them.
+func (m *Model) secret(i int) (code, output bool) {
+	b := m.d.Blocks[i]
+	if b.Attrs.Has("secret") {
+		return true, true
+	}
+	return false, run.NamesAny(b.Body, m.secretVars)
+}
+
+// masked is secret, but nothing is masked in the selected block once x
+// has shown it. Moving off it masks it again.
+func (m *Model) masked(i int) (code, output bool) {
+	if m.secretShown == i+1 && m.cur() == i {
+		return false, false
+	}
+	return m.secret(i)
+}
+
+// secretMask stands for block i's masked code or output (finding 9 of
+// the v1.4.0 security review).
+func (m *Model) secretMask(i int) string {
+	how := "select the block and press x to show it"
+	if m.cur() == i {
+		how = "x shows it"
+	}
+	return secretStyle.Render("•••••••• secret") + helpStyle.Render(" · "+how)
 }
 
 // tagsOf lists the attributes worth seeing at a glance.
@@ -207,7 +249,7 @@ func tagsOf(b *doc.Block) string {
 			tags = append(tags, a+"="+v)
 		}
 	}
-	for _, a := range []string{"background", "tty", "confirm", "skip", "always"} {
+	for _, a := range []string{"background", "tty", "confirm", "skip", "always", "secret"} {
 		if b.Attrs.Has(a) {
 			tags = append(tags, a)
 		}

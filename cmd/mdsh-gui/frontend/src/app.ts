@@ -23,6 +23,7 @@ import { NvimPane, nvimColors } from "./nvim.js";
 import { offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
+import { secretMask, setSecretLines } from "./secretmask.js";
 import { textboxGrip } from "./textbox.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
@@ -874,8 +875,10 @@ function outputText(out: HTMLElement): string {
   return out.innerText;
 }
 
-// secretNote ends the status line after copying a secret.
-const secretNote = () => "; it comes off the clipboard in " + aWhile(revealFor());
+// secretNote ends the status line after copying a secret. Only macOS
+// can mark it concealed, so elsewhere a clipboard manager may keep it
+// after it comes off (finding 9 of the v1.4.0 security review).
+const secretNote = () => "; it comes off the clipboard in " + aWhile(revealFor()) + (isMac ? "" : ", but a clipboard manager may keep a copy");
 
 // aWhile says how long ms is, in whole seconds or minutes.
 function aWhile(ms: number): string {
@@ -919,6 +922,7 @@ function showSecret(i: number, on: boolean) {
     block.classList.toggle("masked", !on);
     block.querySelector(".head .reveal")?.replaceWith(revealButton(c));
   }
+  maskSource();
   clearTimeout(revealTimer);
   if (revealed.size) revealTimer = window.setTimeout(maskAll, revealFor());
 }
@@ -2065,7 +2069,7 @@ function openSource() {
     lineNumbers: true,
     // The last lines can scroll up from the window's bottom edge, and
     // the cursor keeps clear of it.
-    extensions: [runGutter((line) => void runLine(line)), sourceFolding(), scrollPastEnd(), EditorView.scrollMargins.of(() => ({ bottom: 48 }))],
+    extensions: [runGutter((line) => void runLine(line)), secretMask(), sourceFolding(), scrollPastEnd(), EditorView.scrollMargins.of(() => ({ bottom: 48 }))],
     onChange() {
       typedAt = Date.now();
       clearTimeout(sourceTimer);
@@ -2626,6 +2630,18 @@ function markRunLines() {
   const sections = cells.filter((c) => c.heading && c.sectionTo).map((c) => c.line);
   source?.view.dispatch({ effects: setRunLines.of({ blocks: lines, sections }) });
   if (nvimDoc) void nvimCall("set_runs", lines, sections).catch(() => {});
+  maskSource();
+}
+
+// maskSource masks in the source pane what the rendered view masks: a
+// secret block's code, and the output of a block whose output may hold
+// a secret, unless its eye button shows it.
+function maskSource() {
+  const hidden = cells.filter((c) => c.block >= 0 && c.secret && !revealed.has(c.block));
+  const code = hidden.filter((c) => c.secretCode).map((c) => c.line);
+  const output = hidden.filter((c) => c.outputLine).map((c) => c.outputLine!);
+  source?.view.dispatch({ effects: setSecretLines.of({ code, output }) });
+  if (nvimDoc) void nvimCall("set_secrets", code, output).catch(() => {});
 }
 
 // runLine runs the block whose fence opens on line of the source pane,

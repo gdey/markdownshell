@@ -171,3 +171,20 @@ func TestSecretVars(t *testing.T) {
 		t.Errorf("SecretVars = %q", got)
 	}
 }
+
+func TestNamesAny(t *testing.T) {
+	names := []string{"MDSH_VAR_token"}
+	for code, want := range map[string]bool{
+		"curl -H \"$MDSH_VAR_token\"":            true,
+		"echo ${MDSH_VAR_token}":                 true,
+		"echo {{$MDSH_VAR_token}}":               true,
+		"echo $MDSH_VAR_token_hint":              false,
+		"echo $XMDSH_VAR_token":                  false,
+		"echo $MDSH_VAR_tok":                     false,
+		"echo $MDSH_VAR_token_x $MDSH_VAR_token": true,
+	} {
+		if got := run.NamesAny(code, names); got != want {
+			t.Errorf("NamesAny(%q) = %v, want %v", code, got, want)
+		}
+	}
+}

@@ -82,7 +82,7 @@ attributes are kept as written.
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
 | `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
 | `nosave` | Saving keeps what the file holds: the output, a textbox's text or a choice's picks live in the session only. On an `output` fence, just that fence |
-| `secret` | The code and output hold a secret: mdsh-gui blurs them until shown, and as with `nosave` the output isn't saved |
+| `secret` | The code and output hold a secret: mdsh-gui and `mdsh -i` mask them until shown, and as with `nosave` the output isn't saved |
 | `links` | Make `http:`, `https:` and `mailto:` addresses in the output clickable in mdsh-gui and `mdsh -i` |
 | `env=NAME` | Run in a named sub-env, a shell of its own; `a/b` stacks `b` on `a` |
 | `share=A,B` | Exported variables a new sub-env gets from its parent, besides the base set. `...` or `*` all, `-NAME` drops one, empty just the base set. Default: front matter `env.share`, else all |
@@ -261,6 +261,7 @@ env starts in the document's folder.
 | `p` | Create a report: PDF, HTML or markdown |
 | `v` | Show the block's image or recording full screen; enter goes back |
 | `o` | Show or hide the outline |
+| `x` | Show or hide the selected block's secret |
 | `C` / `O` | Show or hide code / output |
 | `]` / `[` | Next / previous tab |
 | ctrl+t | New tab, on the list of files |

@@ -698,20 +698,3 @@ func TestSecretCells(t *testing.T) {
 		t.Errorf("secret, secretCode by block = %v", got)
 	}
 }
-
-func TestNamesAny(t *testing.T) {
-	names := []string{"MDSH_VAR_token"}
-	for code, want := range map[string]bool{
-		"curl -H \"$MDSH_VAR_token\"":            true,
-		"echo ${MDSH_VAR_token}":                 true,
-		"echo {{$MDSH_VAR_token}}":               true,
-		"echo $MDSH_VAR_token_hint":              false,
-		"echo $XMDSH_VAR_token":                  false,
-		"echo $MDSH_VAR_tok":                     false,
-		"echo $MDSH_VAR_token_x $MDSH_VAR_token": true,
-	} {
-		if got := namesAny(code, names); got != want {
-			t.Errorf("namesAny(%q) = %v, want %v", code, got, want)
-		}
-	}
-}

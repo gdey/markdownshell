@@ -60,7 +60,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "collapse-output", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the output folded to one line, or only if the condition holds"},
 	{Name: "nosave", Kind: AttrFlag, Default: "off", Help: "Saving keeps what the file holds: the block's output, or a textbox's text or a choice's picks, lives in the session only"},
 	{Name: "links", Kind: AttrFlag, Default: "off", Help: "Make web addresses in the output clickable, in mdsh-gui and mdsh -i; History adds it to the commands typed there"},
-	{Name: "secret", Kind: AttrFlag, Default: "off", Help: "The block's code and output hold a secret: mdsh-gui masks them until you show them, copying still works, reports print them as (secret) unless --show-secrets, and as with nosave its output isn't saved to the file"},
+	{Name: "secret", Kind: AttrFlag, Default: "off", Help: "The block's code and output hold a secret: mdsh-gui and mdsh -i mask them until you show them, copying still works, reports print them as (secret) unless --show-secrets, and as with nosave its output isn't saved to the file"},
 	{Name: "env", Kind: AttrText, Default: "top-level env", Help: "Run in a named sub-env; a/b stacks b on a"},
 	{Name: "share", Kind: AttrList, Default: "front matter env.share, else all", Help: "Exported variables a new sub-env gets from its parent, besides PATH, HOME, USER and the rest of the base set; empty for just the base set"},
 	{Name: "on_error", Kind: AttrChoice, Values: []string{"stop", "continue"}, Default: "front matter on_error", Help: "Stop the run if this block fails, or go on"},

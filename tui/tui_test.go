@@ -1358,3 +1358,32 @@ func TestStopKeepsShell(t *testing.T) {
 		t.Errorf("after the kill, show printed %q, want a new shell", got)
 	}
 }
+
+// TestSecretMasked checks that a block marked secret has its code and
+// output masked until x shows them, and masked again once the cursor
+// moves off it (finding 9 of the v1.4.0 security review).
+func TestSecretMasked(t *testing.T) {
+	src := "```sh {#tok secret}\necho s3cr3t-code; echo s3cr3t-out | tr a-z A-Z\n```\n\n```sh {#open}\necho plain\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	v := m.View()
+	if strings.Contains(v, "s3cr3t") || strings.Contains(v, "S3CR3T") || !strings.Contains(v, "x shows it") {
+		t.Fatalf("secret block not masked:\n%s", v)
+	}
+	if !strings.Contains(v, "secret") || !strings.Contains(v, "echo plain") {
+		t.Errorf("the open block or the secret tag is missing:\n%s", v)
+	}
+	press(m, "x")
+	if v := m.View(); !strings.Contains(v, "s3cr3t-code") || !strings.Contains(v, "S3CR3T-OUT") {
+		t.Errorf("x doesn't show the secret:\n%s", v)
+	}
+	press(m, "j", "k")
+	if v := m.View(); strings.Contains(v, "s3cr3t") {
+		t.Errorf("moving off and back doesn't mask it again:\n%s", v)
+	}
+	press(m, "j", "x")
+	if !strings.Contains(m.status, "isn't secret") {
+		t.Errorf("x on an open block: status %q", m.status)
+	}
+}

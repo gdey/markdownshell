@@ -113,9 +113,9 @@ This page is the reference.
   press `c`), its output has one in its top right corner, and other
   fenced code shows one on hover. Output is copied as text, without
   its colors. Drag over the History pane's output to copy lines of it.
-- **Secrets.** A `secret` block's code and output are blurred until you
-  press the eye on its card, and masked again after a minute or when
-  the window loses focus. A `nosave` card carries a *session only*
+- **Secrets.** A `secret` block's code and output are blurred, on its
+  card and in the source pane, until you press the eye on its card, and
+  masked again after a minute or when the window loses focus. A `nosave` card carries a *session only*
   badge: it runs, but its output isn't saved to the file.
 - **Front matter.** The Front matter tab at the top of the page (Edit ›
   Front Matter, cmd/ctrl+shift+M) opens a form for the title,
