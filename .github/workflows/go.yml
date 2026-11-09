@@ -75,7 +75,8 @@ jobs:
       - name: Install the oldest Neovim the source pane supports
         if: runner.os == 'Linux'
         run: |
-          curl -sSL https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-linux64.tar.gz | tar xz -C "$RUNNER_TEMP"
+          curl -fsSL --retry 8 --retry-all-errors -o "$RUNNER_TEMP/nvim.tar.gz" https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-linux64.tar.gz
+          tar xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP"
           echo "MDSH_TEST_NVIM=$RUNNER_TEMP/nvim-linux64/bin/nvim" >> "$GITHUB_ENV"
       - run: go vet ./...
       - run: go test -race ./...
