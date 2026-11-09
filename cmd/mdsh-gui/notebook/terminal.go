@@ -109,12 +109,13 @@ func (n *Notebook) TerminalSize() (cols, rows int) {
 	return t.Cols, t.Rows
 }
 
-// EnvBanner is the front matter's note that the file brings in the whole
-// environment, or "" (see doc.Options.FullEnvBanner).
+// EnvBanner is the front matter's note that the file brings in more
+// than the base set from the environment, or "" (see
+// doc.Options.ShareBanner).
 func (n *Notebook) EnvBanner() string {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	return n.d.Options.FullEnvBanner()
+	return n.d.Options.ShareBanner()
 }
 
 // SetTerminalSize sets the terminal pane's size in cells. The next tty

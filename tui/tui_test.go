@@ -1317,9 +1317,13 @@ func TestFullEnvBanner(t *testing.T) {
 	if got := strings.Count(view, "\n") + 1; got != m.height {
 		t.Errorf("view is %d lines, want %d", got, m.height)
 	}
+	m, _ = newModel(t, "---\nmdsh:\n  env:\n    share: [GITHUB_TOKEN, PATH]\n---\n"+twoBlocks, Options{})
+	if view := m.View(); !strings.Contains(view, "This file brings in GITHUB_TOKEN from your environment") {
+		t.Errorf("no banner for a named secret:\n%s", view)
+	}
 	m, _ = newModel(t, twoBlocks, Options{})
-	if strings.Contains(m.View(), "environment variables") {
-		t.Errorf("banner on a file without share: [...]")
+	if strings.Contains(m.View(), "This file brings in") {
+		t.Errorf("banner on a file without share")
 	}
 }
 

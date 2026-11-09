@@ -26,7 +26,9 @@ lede: "mdsh runs the code in a markdown file; that is what it is for. Running a 
 - **It can't widen what a block sees.** Sub-envs get only the variables
   `share=` names, and the front matter's `env.share` can narrow a whole
   file. A file gets your whole environment only when its front matter
-  says `share: [...]`, and `mdsh -i` and mdsh-gui show a banner over it.
+  says `share: [...]`, and a variable beyond the base set only when it
+  names it; either way `mdsh -i` and mdsh-gui show a banner over it
+  that says what comes in.
   Both always pass a small base set (`PATH`, `HOME`, `USER`,
   `LANG`, `TMPDIR` and the like) that says who you are and where your
   files are but grants nothing: no tokens, no agent sockets. A document

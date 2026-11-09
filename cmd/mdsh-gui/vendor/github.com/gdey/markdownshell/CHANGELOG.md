@@ -154,6 +154,13 @@ follow [Semantic Versioning](https://semver.org/).
   History pane's output and prompt, keep their colors and drop the
   rest. Printed to a file or a pipe, `mdsh` leaves the markdown as it
   is.
+- `mdsh -i` and mdsh-gui show the environment banner over a file whose
+  `env.share` names variables beyond the base set, and list them: "This
+  file brings in GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY from your
+  environment". The banner was shown only for `...`, so a file could ask
+  for exactly the secrets it wanted with no sign of it (finding 2 of the
+  v1.4.0 security review). Naming only base variables (`PATH`, `HOME`,
+  `LC_*`, ...) or removing them with `-NAME` still shows nothing.
 
 ### Fixed
 

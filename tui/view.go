@@ -37,7 +37,7 @@ var (
 	savedStyle  = lipgloss.NewStyle().Foreground(dimCol)
 	tagStyle    = lipgloss.NewStyle().Foreground(dimCol)
 	secretStyle = lipgloss.NewStyle().Foreground(runningCol)
-	// envBannerStyle marks a file that brings in the whole environment:
+	// envBannerStyle marks a file that brings in more than the base set:
 	// worth knowing, not an error.
 	envBannerStyle = lipgloss.NewStyle().Foreground(runningCol).Reverse(true).Padding(0, 1)
 	bannerStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(runningCol).Padding(0, 1)
