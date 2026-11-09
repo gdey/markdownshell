@@ -96,17 +96,19 @@ func (m *Model) prose(pieces [][]byte, top bool, p part) string {
 	return m.markdown(src)
 }
 
-// markdown draws md with glamour, once per text and width.
+// markdown draws md with glamour, once per text and width. Control
+// characters in md other than color escapes are shown as text first:
+// glamour passes them through to the terminal (see termsafe.Styled).
 func (m *Model) markdown(md string) string {
 	md = strings.TrimSpace(md)
 	if s, ok := m.md[md]; ok {
 		return s
 	}
-	out := md
+	out := termsafe.Styled(md)
 	if md != "" {
 		r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(m.opts.Style), glamour.WithWordWrap(max(m.docWidth()-4, 20)))
 		if err == nil {
-			if s, err := r.Render(md); err == nil {
+			if s, err := r.Render(out); err == nil {
 				out = strings.Trim(s, "\n")
 			}
 		}
@@ -340,7 +342,7 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		if run.OutKind(b) == "markdown" {
 			return savedStyle.Render("saved output:") + "\n" + m.markdown(out)
 		}
-		return wrap.Render(savedStyle.Render("saved output:\n" + links(b, clean(out))))
+		return wrap.Render(savedStyle.Render("saved output:\n" + links(b, clean(termsafe.Styled(out)))))
 	}
 	return ""
 }
@@ -423,11 +425,14 @@ func saved(src []byte) string {
 	return strings.Trim(strings.Join(lines, "\n"), "\n")
 }
 
-// clean turns tabs into spaces and drops carriage returns and control
-// characters that would upset the layout, keeping newlines and color
-// escapes.
+// clean turns tabs into spaces and drops carriage returns, control
+// characters and escape sequences, keeping newlines and color escapes
+// (SGR), so output can't upset the layout, write the clipboard, set the
+// title, make a link or move the cursor (see termsafe.SGROnly). Output
+// saved in the file goes through termsafe.Styled first, which shows
+// those sequences as text instead.
 func clean(s string) string {
-	return strings.Map(func(r rune) rune {
+	return termsafe.SGROnly(strings.Map(func(r rune) rune {
 		switch {
 		case r == '\n', r == 0x1b:
 			return r
@@ -435,7 +440,7 @@ func clean(s string) string {
 			return -1
 		}
 		return r
-	}, strings.ReplaceAll(s, "\t", "    "))
+	}, strings.ReplaceAll(s, "\t", "    ")))
 }
 
 // elapsed is how long running block i has run, to the second, and its

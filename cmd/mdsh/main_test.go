@@ -720,3 +720,33 @@ func TestReportSecrets(t *testing.T) {
 		t.Errorf("--show-secrets hides the secret:\n%s", stdout.String())
 	}
 }
+
+// TestPrintEscapes checks that printing to a terminal shows escape
+// sequences in prose and saved output as text, keeping colors, and that
+// printing to a file leaves the markdown as it is (finding 5 of the
+// v1.4.0 security review).
+func TestPrintEscapes(t *testing.T) {
+	md := []byte("# Notes\n\nhi \x1b]0;pwned\x07 there\n\n```output\n\x1b]52;c;ZXZpbAo=\x07hello \x1b[31mred\x1b[0m\n```\n")
+	var out bytes.Buffer
+	if err := print(&out, md, true); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	for _, bad := range []string{"\x1b]52", "\x1b]0;", "\a"} {
+		if strings.Contains(s, bad) {
+			t.Errorf("styled print keeps %q:\n%q", bad, s)
+		}
+	}
+	for _, want := range []string{"^[]52;c;ZXZpbAo=^G", "^[]0;pwned^G", "\x1b[31m"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("styled print lacks %q:\n%q", want, s)
+		}
+	}
+	out.Reset()
+	if err := print(&out, md, false); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out.Bytes(), md) {
+		t.Errorf("print to a file changed the markdown:\n%q", out.String())
+	}
+}

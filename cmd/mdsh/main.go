@@ -872,12 +872,23 @@ func print(w io.Writer, md []byte, styled bool) error { return newPrinter(w, sty
 
 // newPrinter returns a func that prints markdown to w, styled if asked.
 // It sets the style up once, so it can print a document in pieces.
+//
+// When the markdown goes to a terminal (styled, or w is one), control
+// characters in it other than color escapes are shown as text, ^[]52;...,
+// first: prose and saved output come from the file, and a sequence in
+// them would otherwise write the clipboard (OSC 52), set the title, make
+// a link or move the cursor with no block run (see termsafe.Styled).
+// Printed to a file or a pipe, the markdown is left as it is.
 func newPrinter(w io.Writer, styled bool) func(md []byte) error {
 	var r *glamour.TermRenderer
 	if styled {
 		r, _ = glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(termWidth(w)))
 	}
+	safe := styled || isTerminal(w)
 	return func(md []byte) error {
+		if safe {
+			md = []byte(termsafe.Styled(string(md)))
+		}
 		if r != nil {
 			if out, err := r.RenderBytes(md); err == nil {
 				md = out

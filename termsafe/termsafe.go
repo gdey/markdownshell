@@ -82,3 +82,135 @@ func isControl(r rune) bool {
 	}
 	return false
 }
+
+// Styled is s for printing to a terminal as document text or output:
+// SGR sequences (ESC [ params m, which only set colours and the like)
+// are kept, so coloured output stays coloured, and every other control
+// character is shown as Visible shows it, so a saved output or a line
+// of prose can't write the clipboard (OSC 52), set the window title,
+// make a link whose target isn't its text (OSC 8), or move the cursor
+// to hide text. A newline, a tab and a carriage return just before a
+// newline (CRLF line ends) pass as they are. Unlike Visible it leaves
+// zero-width and bidi characters alone: they don't drive the terminal,
+// and prose and output use them (emoji joiners, right-to-left text).
+func Styled(s string) string {
+	if !hasC0C1(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + 8)
+	for len(s) > 0 {
+		if n := sgrLen(s); n > 0 {
+			b.WriteString(s[:n])
+			s = s[n:]
+			continue
+		}
+		r, n := utf8.DecodeRuneInString(s)
+		switch {
+		case r == utf8.RuneError && n == 1:
+			fmt.Fprintf(&b, "<0x%02X>", s[0])
+		case r == '\r' && strings.HasPrefix(s[1:], "\n"), !isC0C1(r):
+			b.WriteString(s[:n])
+		default:
+			b.WriteString(Visible(s[:n]))
+		}
+		s = s[n:]
+	}
+	return b.String()
+}
+
+// sgrLen is the length of the SGR sequence s starts with, or 0.
+func sgrLen(s string) int {
+	if !strings.HasPrefix(s, "\x1b[") {
+		return 0
+	}
+	for i := 2; i < len(s); i++ {
+		switch c := s[i]; {
+		case c >= '0' && c <= '9', c == ';', c == ':':
+		case c == 'm':
+			return i + 1
+		default:
+			return 0
+		}
+	}
+	return 0
+}
+
+// hasC0C1 reports whether s holds a character Styled changes.
+func hasC0C1(s string) bool {
+	if !utf8.ValidString(s) {
+		return true
+	}
+	for _, r := range s {
+		if isC0C1(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// isC0C1 reports whether r is a control character that drives a
+// terminal: C0 but newline and tab, DEL, and C1.
+func isC0C1(r rune) bool {
+	return r != '\n' && r != '\t' && (r < 0x20 || r == 0x7f || r >= 0x80 && r <= 0x9f)
+}
+
+// SGROnly is s with every control character and escape sequence taken
+// out but SGR sequences (colours), newlines and tabs: for text a
+// terminal should draw rather than obey, where showing the sequences
+// would only be noise, such as a shell prompt, which commonly carries
+// shell-integration marks (OSC 133) and title sets. A CSI sequence goes
+// up to its final byte and an OSC, DCS, APC, PM or SOS string up to BEL
+// or ST; an unterminated one runs to the end of s.
+func SGROnly(s string) string {
+	if !hasC0C1(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for len(s) > 0 {
+		if n := sgrLen(s); n > 0 {
+			b.WriteString(s[:n])
+			s = s[n:]
+			continue
+		}
+		if s[0] == 0x1b {
+			s = s[seqLen(s):]
+			continue
+		}
+		r, n := utf8.DecodeRuneInString(s)
+		if !(r == utf8.RuneError && n == 1) && !isC0C1(r) {
+			b.WriteString(s[:n])
+		}
+		s = s[n:]
+	}
+	return b.String()
+}
+
+// seqLen is the length of the escape sequence s starts with (s[0] is
+// ESC): at least 1.
+func seqLen(s string) int {
+	if len(s) < 2 {
+		return len(s)
+	}
+	switch s[1] {
+	case '[':
+		for i := 2; i < len(s); i++ {
+			if s[i] >= 0x40 && s[i] <= 0x7e {
+				return i + 1
+			}
+		}
+		return len(s)
+	case ']', 'P', '_', '^', 'X':
+		for i := 2; i < len(s); i++ {
+			if s[i] == 0x07 {
+				return i + 1
+			}
+			if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '\\' {
+				return i + 2
+			}
+		}
+		return len(s)
+	}
+	return 2
+}

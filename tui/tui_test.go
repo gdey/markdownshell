@@ -1387,3 +1387,22 @@ func TestSecretMasked(t *testing.T) {
 		t.Errorf("x on an open block: status %q", m.status)
 	}
 }
+
+// TestEscapesShown checks that escape sequences in prose and saved
+// output reach the screen as text, not as commands to the terminal,
+// while their colors stay (finding 5 of the v1.4.0 security review).
+func TestEscapesShown(t *testing.T) {
+	src := "# Notes\n\nhi \x1b]0;pwned\x07 there\n\n```sh {#a}\necho hi\n```\n\n```output\n\x1b]52;c;ZXZpbAo=\x07hello \x1b[31mred\x1b[0m\n```\n"
+	m, _ := newModel(t, src, Options{})
+	view := m.View()
+	for _, bad := range []string{"\x1b]52", "\x1b]0;"} {
+		if strings.Contains(view, bad) {
+			t.Errorf("view keeps %q:\n%q", bad, view)
+		}
+	}
+	for _, want := range []string{"^[]52;c;ZXZpbAo=", "^[]0;pwned", "\x1b[31m"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view lacks %q:\n%q", want, view)
+		}
+	}
+}

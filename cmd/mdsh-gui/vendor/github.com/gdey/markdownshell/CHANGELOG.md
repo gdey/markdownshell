@@ -134,6 +134,17 @@ follow [Semantic Versioning](https://semver.org/).
   you sent it to (finding 9 of the v1.4.0 security review). Pass
   `--show-secrets` to put them in.
 
+- `mdsh` printing to a terminal and `mdsh -i` show escape sequences in
+  a document's prose and saved output as text, `^[]52;c;...^G`, and keep
+  only their colors. They went to the terminal as they were, so opening
+  a file with `mdsh -n` or `mdsh -i` could write your clipboard (OSC
+  52), set the window title, make a link whose target isn't its text, or
+  move the cursor to hide a line, with no block run (finding 5 of the
+  v1.4.0 security review). A block's output in `mdsh -i`, and the
+  History pane's output and prompt, keep their colors and drop the
+  rest. Printed to a file or a pipe, `mdsh` leaves the markdown as it
+  is.
+
 ### Fixed
 
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
