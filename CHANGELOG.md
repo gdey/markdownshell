@@ -194,6 +194,13 @@ follow [Semantic Versioning](https://semver.org/).
   would have put the same route on the network (finding 12 of the
   v1.4.0 security review). The type is the file's own, so a link named
   `.png` that points at something else isn't served.
+- The release workflows no longer paste the release tag into their
+  shell scripts, where a tag name holding `$(...)` or backticks would
+  have run as a command. The tag and version reach the scripts through
+  the environment, and a tag that isn't `vX.Y.Z` (with an optional
+  pre-release) stops the release. goreleaser runs `go mod verify`
+  instead of `go mod tidy`, so a release can't build a `go.mod` that
+  differs from the tag's (finding 11 of the v1.4.0 security review).
 
 ### Fixed
 
