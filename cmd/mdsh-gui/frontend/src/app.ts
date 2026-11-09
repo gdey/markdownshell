@@ -1,10 +1,10 @@
 import "./tab.js";
 import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
-import { type StateCommand, Text } from "@codemirror/state";
+import { ChangeSet, type EditorState, type StateCommand, type Text } from "@codemirror/state";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Clipboard, Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type SourceBlock, type Start, message } from "./api.js";
 import { enableCasts } from "./cast.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBehavior, setOutput, svg } from "./dom.js";
@@ -13,17 +13,19 @@ import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } f
 import { Ansi, codeLines, colorOutput, highlightProse } from "./highlight.js";
 import { busyFrontMatter, frontMatterOpen, initFrontMatter, loadFrontMatter, showFrontMatter } from "./frontmatter.js";
 import { linkify } from "./links.js";
+import { forceLinting } from "@codemirror/lint";
+import { type GoBlocks } from "./editor.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { confirmShells, dismissShells, lostWarning } from "./confirm.js";
 import { addEvent, consoleFile, initConsole, loadEvents, showConsole } from "./console.js";
 import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, selectAllHistory, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
-import { lineEdits, offsetOf, posOf, stateOf } from "./nvimtext.js";
+import { offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { textboxGrip } from "./textbox.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
-import { Synced, diff } from "./sync.js";
+import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
@@ -2059,6 +2061,7 @@ function openSource() {
     spellCheck: !settings.noSpellCheck,
     attrs,
     names: () => known,
+    blocks: sourceBlocks,
     lineNumbers: true,
     // The last lines can scroll up from the window's bottom edge, and
     // the cursor keeps clear of it.
@@ -2126,6 +2129,10 @@ function applySource(typing = false): Promise<void> {
         return;
       }
       $("dirty").hidden = false;
+      if (lintAgain && source === ed) {
+        lintAgain = false;
+        forceLinting(ed.view);
+      }
     }
     const fresh = (await App.Cells()) ?? [];
     const settles = typedAt + settle - Date.now();
@@ -2146,16 +2153,86 @@ function applySource(typing = false): Promise<void> {
   });
 }
 
-// sendSource hands Go ed's text, reading Go's changes into it first
-// whenever Go has some the pane hasn't seen.
+// sendSource hands Go what was typed in ed as line edits, folding Go's
+// changes into it first whenever Go has some the pane hasn't seen.
 async function sendSource(ed: MarkdownEditor) {
-  for (let tries = 0; ed.pending; tries++) {
-    const text = ed.view.state.doc.toString();
-    if (await App.SetText(ed.base, text)) return ed.sent(text);
+  await sendSync(ed.sync, (changes) => ed.remote(changes));
+}
+
+// LinesSince is how Go's text changed since a version, as Go's Edit and
+// LinesSince say.
+type LinesSince = { version: Version; events: LineEdit[] | null; reset: boolean };
+
+// sendSync hands Go what was typed, as sync has it, as line edits made
+// against the version Go last had. When Go has moved on since, sync takes
+// in Go's changes, apply makes them in the pane, and it tries again.
+async function sendSync(sync: Synced, apply: (changes: ChangeSet) => void | Promise<void>) {
+  for (let tries = 0; sync.pending; tries++) {
+    const edits = sync.take();
+    let r: LinesSince & { applied: boolean };
+    try {
+      r = await App.Edit(sync.version, edits);
+    } catch (err) {
+      sync.refused();
+      throw err;
+    }
+    if (r.applied) return sync.sent(r.version);
+    sync.refused();
     if (tries === 5) throw new Error("the file keeps changing; try again");
-    ed.load(await App.Text());
+    await apply(await syncFrom(sync, r));
   }
 }
+
+// syncFrom takes Go's changes, as l says them, into sync, and returns
+// the changes that bring the pane's text up to Go's around what was
+// typed. Only when Go no longer has the changes since sync's version, or
+// the file is another, is the whole text read.
+async function syncFrom(sync: Synced, l: LinesSince): Promise<ChangeSet> {
+  if (!l.reset) return sync.incoming(l.events ?? [], l.version);
+  const t = await App.TextAt();
+  return sync.reset(t.text, t.version);
+}
+
+// sourceBlocks asks Go about the blocks in the source pane's text, for
+// depends= (GoBlocks in editor.ts): about Go's text, with the lines moved
+// past what was typed since, so the pane's text needn't cross the
+// bridge. Checking asks only for what is wrong.
+const sourceBlocks: GoBlocks = {
+  blocks: async (state) => {
+    const r = await App.SourceBlocksAt();
+    return fromGo(state, r.version, r.blocks ?? []);
+  },
+  depends: async (state) => {
+    const r = await App.DependsAt();
+    return fromGo(state, r.version, r.problems ?? []);
+  },
+};
+
+// fromGo moves things on lines of Go's text at version to the lines of
+// the source pane's text in state, or is null if the pane's idea of
+// Go's text isn't version. Typing Go hasn't had may make or unmake
+// blocks, so what is checked against it is checked again once Go has it.
+function fromGo<T extends { line: number }>(state: EditorState, version: Version, got: T[]): T[] | null {
+  const ed = source;
+  if (!ed) return null;
+  const s = ed.sync;
+  const typed = s.sending ? s.sending.compose(s.local) : s.local;
+  if (!typed.empty) lintAgain = true;
+  if (version.doc !== s.version.doc || version.tick !== s.version.tick || typed.newLength !== state.doc.length) {
+    lintAgain = true;
+    return null;
+  }
+  const out: T[] = [];
+  for (const x of got) {
+    if (x.line > s.base.lines) continue;
+    out.push({ ...x, line: state.doc.lineAt(typed.mapPos(s.base.line(x.line).from)).number });
+  }
+  return out;
+}
+
+// lintAgain is set when the source pane's depends= were checked against
+// blocks Go didn't have all of, so they are checked again once it does.
+let lintAgain = false;
 
 // sourceFoldsFor is the file whose folds the source pane opened with.
 let sourceFoldsFor = "";
@@ -2173,7 +2250,8 @@ async function loadSourceNow() {
       return;
     }
     try {
-      await mergeNvim(nvimDoc, await App.Text());
+      const d = nvimDoc;
+      await mergeNvim(d, await App.LinesSince(d.sync.version));
     } catch (err) {
       fail(err);
     }
@@ -2184,9 +2262,11 @@ async function loadSourceNow() {
   const ed = source;
   const marks = foldMarks(ed.view);
   try {
-    const text = await App.Text();
+    const l = await App.LinesSince(ed.sync.version);
     if (source !== ed) return;
-    ed.load(text);
+    const changes = await syncFrom(ed.sync, l);
+    if (source !== ed) return;
+    ed.remote(changes);
   } catch (err) {
     fail(err);
   }
@@ -2208,11 +2288,18 @@ async function loadSourceNow() {
 let nvim: NvimPane | null = null;
 let nvimFailed = false;
 
-// NvimDoc is the text a Neovim edits: sync keeps it in step with Go's,
-// as the CodeMirror pane does, and text is Neovim's text as it last sent
-// it or was sent it.
-type NvimDoc = { sync: Synced; text: string };
+// NvimDoc is the text a Neovim edits. sync keeps it in step with Go's,
+// as the CodeMirror pane's does. text is Neovim's text as the page has
+// heard it, at seq, Neovim's count of the lines it sent and the edits it
+// took; owed is Go's changes, on text, that Neovim hasn't taken yet, so
+// that sync's text is owed made on text. queue holds lines Neovim sent
+// while an edit was going to it, and waiters wait for seq to move.
+type NvimDoc = { sync: Synced; text: Text; seq: number; owed: ChangeSet | null; applying: boolean; queue: NvimLines[]; waiters: (() => void)[] };
 let nvimDoc: NvimDoc | null = null;
+
+// NvimLines is lines typed in Neovim: lines [first, last) of its text
+// became text, Neovim's seq-th change.
+type NvimLines = LineEdit & { seq: number };
 
 function useNvim() {
   return settings.vim && settings.neovim && !nvimFailed;
@@ -2224,9 +2311,12 @@ async function startNvim() {
   nvim = pane;
   $("source-editor").classList.add("nvim");
   try {
-    const text = await pane.start();
+    const { text, version, buffer, seq } = await pane.start();
     if (nvim !== pane) return;
-    nvimDoc = { sync: new Synced(text), text };
+    const sync = new Synced(text, version);
+    // A Neovim already running may have typing the file doesn't.
+    if (buffer !== text) sync.typed(diff(text, buffer));
+    nvimDoc = { sync, text: textOf(buffer), seq, owed: null, applying: false, queue: [], waiters: [] };
     await nvimReady();
   } catch (err) {
     stopNvim();
@@ -2278,38 +2368,101 @@ async function applyNvim(d: NvimDoc) {
   markRunLines();
 }
 
-// sendNvim hands Go Neovim's text, merging Go's changes into it first
-// whenever Go has some Neovim hasn't seen.
+// sendNvim hands Go what was typed in Neovim, merging Go's changes into
+// it first whenever Go has some Neovim hasn't seen.
 async function sendNvim(d: NvimDoc) {
-  for (let tries = 0; d.sync.pending; tries++) {
-    const text = d.text;
-    if (await App.SetText(d.sync.base, text)) return d.sync.sent(text, d.text);
-    if (tries === 5) throw new Error("the file keeps changing; try again");
-    await mergeNvim(d, await App.Text());
+  await sendSync(d.sync, (changes) => oweNvim(d, changes));
+}
+
+// mergeNvim brings d up to Go's text, as l says it changed, keeping what
+// was typed, and gives Neovim Go's changes as edits to the lines they
+// change, so keys typed elsewhere meanwhile stay.
+async function mergeNvim(d: NvimDoc, l: LinesSince) {
+  await oweNvim(d, await syncFrom(d.sync, l));
+}
+
+// oweNvim notes changes, on sync's text, that Neovim is to make, and
+// gives them to it.
+async function oweNvim(d: NvimDoc, changes: ChangeSet) {
+  if (!changes.empty) d.owed = d.owed ? d.owed.compose(changes) : changes;
+  if (nvimDoc === d) await giveNvim(d);
+}
+
+// giveNvim gives Neovim what it owes, as line edits. When Neovim has
+// typing the page hasn't heard yet, it sends that instead of taking the
+// edits, and once the page has it, giveNvim tries again.
+async function giveNvim(d: NvimDoc) {
+  for (let tries = 0; d.owed && !d.owed.empty; tries++) {
+    if (tries === 5) throw new Error("Neovim keeps changing; try again");
+    const owed = d.owed;
+    const ok = await toNvim(d, owed);
+    if (ok) d.owed = null;
+    else await waitNvim(d, d.seq + 1);
   }
 }
 
-// mergeNvim brings d up to theirs, Go's text, keeping what was typed,
-// and gives Neovim the result as edits to the lines Go changed, so keys
-// typed elsewhere in the moment since Neovim last sent its text stay.
-async function mergeNvim(d: NvimDoc, theirs: string) {
-  const changes = d.sync.incoming(theirs);
-  if (changes.empty) return;
-  const before = d.text;
-  d.text = changes.apply(Text.of(before.split("\n"))).toString();
-  if (nvimDoc !== d) return;
-  const edits = lineEdits(before, d.text);
-  await (edits ? App.NvimApply(d.text, edits) : App.NvimSetText(d.text));
+// toNvim makes changes, on d.text, in Neovim, and reports whether it
+// took them.
+async function toNvim(d: NvimDoc, changes: ChangeSet): Promise<boolean> {
+  const seq = d.seq;
+  d.applying = true;
+  let ok = false;
+  try {
+    ok = await App.NvimApply(seq, lineEditsOf(d.text, changes));
+  } finally {
+    d.applying = false;
+  }
+  if (ok) {
+    d.text = changes.apply(d.text);
+    d.seq = seq + 1;
+  }
+  drainNvim(d);
+  return ok;
 }
 
-// typedNvim notes text Neovim sent.
-function typedNvim(text: string): boolean {
+// typedNvim notes lines typed in Neovim. Lines that come while an edit
+// is going to Neovim, or ahead of their turn, wait.
+function typedNvim(l: NvimLines) {
   const d = nvimDoc;
-  if (!d) return false;
-  if (text === d.text) return true;
-  d.sync.typed(diff(d.text, text));
-  d.text = text;
-  return true;
+  if (!d) return;
+  d.queue.push(l);
+  if (!d.applying) drainNvim(d);
+}
+
+// drainNvim takes in the lines Neovim sent, in turn: they go to sync as
+// typed, past what Neovim owes, and what it owes moves past them.
+function drainNvim(d: NvimDoc) {
+  d.queue.sort((a, b) => a.seq - b.seq);
+  let typed = false;
+  while (d.queue.length && d.queue[0].seq <= d.seq + 1) {
+    const l = d.queue.shift()!;
+    if (l.seq <= d.seq) continue;
+    const t = eventChanges(d.text, l);
+    d.sync.typed(d.owed ? t.map(d.owed, true) : t);
+    if (d.owed) d.owed = d.owed.map(t);
+    d.text = t.apply(d.text);
+    d.seq = l.seq;
+    typed = true;
+  }
+  if (!typed) return;
+  for (const w of d.waiters.splice(0)) w();
+  void applySource();
+}
+
+// waitNvim waits until the page has heard Neovim's seq-th change, or
+// gives up after a moment.
+function waitNvim(d: NvimDoc, seq: number): Promise<void> {
+  if (d.seq >= seq) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, 2000);
+    const check = () => {
+      if (d.seq >= seq || nvimDoc !== d) {
+        clearTimeout(timer);
+        resolve();
+      } else d.waiters.push(check);
+    };
+    d.waiters.push(check);
+  });
 }
 
 // nvimCall calls fn in Neovim's mdsh.lua.
@@ -2318,16 +2471,16 @@ async function nvimCall<T = unknown>(fn: string, ...args: unknown[]): Promise<T 
   return JSON.parse(await App.NvimCall(fn, JSON.stringify(args))) as T;
 }
 
-// NvimState is Neovim's text now, its mode and where the cursor is: the
-// line from 1 and the column in bytes, and in visual mode the selection's
-// other end.
-type NvimState = { text: string; mode: string; line?: number; col?: number; vline?: number; vcol?: number };
+// NvimState is Neovim's mode and where the cursor is: the line from 1
+// and the column in bytes, and in visual mode the selection's other end.
+// seq is Neovim's count of its changes once what was typed is sent.
+type NvimState = { seq: number; mode: string; line?: number; col?: number; vline?: number; vcol?: number };
 
-// nvimState is Neovim's state, its text noted as typed.
+// nvimState is Neovim's state, once the page has what was typed.
 async function nvimState(): Promise<NvimState | null> {
   try {
     const st = await nvimCall<NvimState>("state");
-    if (st) typedNvim(st.text);
+    if (st && nvimDoc) await waitNvim(nvimDoc, st.seq);
     return st;
   } catch (err) {
     fail(err);
@@ -2369,34 +2522,47 @@ window.addEventListener("mdsh-look", () => void nvimSettings());
 // and the selection the command made.
 async function insertNvim(cmd: StateCommand) {
   const st = await nvimState();
-  if (!st || !nvimDoc || st.line === undefined) return;
-  const doc0 = Text.of(st.text.split("\n"));
-  const head = offsetOf(doc0, st.line, st.col ?? 0);
-  let anchor = st.vline !== undefined ? offsetOf(doc0, st.vline, st.vcol ?? 0) : head;
-  let to = head;
-  // Visual mode takes in the character under the cursor.
-  if (anchor !== head) {
-    const [lo, hi] = anchor < head ? [anchor, head] : [head, anchor];
-    anchor = lo;
-    to = Math.min(hi + 1, doc0.length);
-  }
-  let state = stateOf(st.text, anchor, to);
-  cmd({ state, dispatch: (tr) => (state = tr.state) });
-  const after = state.doc.toString();
-  if (after === st.text) return;
   const d = nvimDoc;
-  const before = d.text;
-  typedNvim(after);
-  const edits = lineEdits(before, after);
-  try {
-    await (edits ? App.NvimApply(after, edits) : App.NvimSetText(after));
-    const sel = state.selection.main;
-    const a = posOf(state.doc, sel.from);
-    const b = posOf(state.doc, sel.to);
-    await nvimCall("select", a.line, a.col, b.line, b.col);
-  } catch (err) {
-    fail(err);
-  }
+  if (!st || !d || st.line === undefined) return;
+  const line = st.line;
+  await inTurn(async () => {
+    try {
+      // What Go changed goes first, so the command acts on what Neovim
+      // shows.
+      await giveNvim(d);
+      if (nvimDoc !== d) return;
+      const doc0 = d.text;
+      const head = offsetOf(doc0, line, st.col ?? 0);
+      let anchor = st.vline !== undefined ? offsetOf(doc0, st.vline, st.vcol ?? 0) : head;
+      let to = head;
+      // Visual mode takes in the character under the cursor.
+      if (anchor !== head) {
+        const [lo, hi] = anchor < head ? [anchor, head] : [head, anchor];
+        anchor = lo;
+        to = Math.min(hi + 1, doc0.length);
+      }
+      let state = stateOf(doc0.toString(), anchor, to);
+      let changes = ChangeSet.empty(doc0.length);
+      cmd({
+        state,
+        dispatch: (tr) => {
+          changes = changes.compose(tr.changes);
+          state = tr.state;
+        },
+      });
+      if (changes.empty) return;
+      if (!(await toNvim(d, changes))) return status("Neovim changed meanwhile; try again");
+      // To Go, the command is typing.
+      d.sync.typed(d.owed ? changes.map(d.owed, true) : changes);
+      if (d.owed) d.owed = d.owed.map(changes);
+      const sel = state.selection.main;
+      const a = posOf(state.doc, sel.from);
+      const b = posOf(state.doc, sel.to);
+      await nvimCall("select", a.line, a.col, b.line, b.col);
+    } catch (err) {
+      fail(err);
+    }
+  });
   nvim?.focus();
   void applySource();
 }
@@ -2426,12 +2592,7 @@ async function nvimEvent(name: string, data: any) {
 }
 
 Events.On("nvim-redraw", mine<unknown[][]>((ev) => nvim?.redraw(ev)));
-Events.On(
-  "nvim-text",
-  mine<string>((text) => {
-    if (typedNvim(text)) void applySource();
-  }),
-);
+Events.On("nvim-lines", mine<NvimLines>(typedNvim));
 Events.On(
   "nvim-event",
   mine<{ name: string; data: string }>((ev) => {
@@ -2441,8 +2602,10 @@ Events.On(
 // :w in Neovim.
 Events.On(
   "nvim-write",
-  mine<string>(async (text) => {
-    if (!typedNvim(text)) return;
+  mine<number>(async (seq) => {
+    const d = nvimDoc;
+    if (!d) return;
+    await waitNvim(d, seq);
     await actions.save();
   }),
 );
@@ -2498,7 +2661,7 @@ async function runCurrent() {
   if (running || !doc.file) return;
   if (nvimDoc) {
     const line = await nvimLine();
-    const c = nvimDoc && line ? blockAtLine(nvimDoc.text, line) : undefined;
+    const c = nvimDoc && line ? blockAtLine(nvimDoc.sync.base.toString(), line) : undefined;
     if (c) await start("RunBlock", c.block);
     else status("the cursor isn't in a block that runs");
     return;
@@ -3199,7 +3362,7 @@ async function moveInSource(dir: number, byBlock: boolean) {
   }
   if (source !== ed) return;
   // Giving blocks ids first is Go's change, not one to undo.
-  if (view.state.doc.toString() !== m.base) ed.load(m.base);
+  if (view.state.doc.toString() !== m.base) await loadSource();
   if (view.state.doc.toString() !== m.base) return status("the file changed; try again");
   const line = Math.min(cursor.number + m.line - m.fromLine, 1 + m.text.split("\n").length - 1);
   view.dispatch({ changes: diff(m.base, m.text), userEvent: "move.line", scrollIntoView: true });
@@ -3584,7 +3747,7 @@ async function openDepends() {
   const at = document.activeElement as HTMLElement | null;
   if (nvimDoc && at?.closest(".nvim-input")) {
     const line = await nvimLine();
-    i = line ? (blockAtLine(nvimDoc.text, line)?.block ?? -1) : -1;
+    i = line ? (blockAtLine(nvimDoc.sync.base.toString(), line)?.block ?? -1) : -1;
   } else if (source && at?.closest(".cm-editor")) {
     await applySource();
     if (!source) return;

@@ -162,10 +162,11 @@ type Options struct {
 	// them: each is the event's name and then one argument list for
 	// each time it happened.
 	Redraw func(events [][]any)
-	// Changed gets the buffer's text a moment after it is edited.
-	Changed func(text string)
-	// Write gets the buffer's text for :w.
-	Write func(text string)
+	// Lines gets what was typed in the buffer, a moment after: the lines
+	// that changed.
+	Lines func(Lines)
+	// Write is called for :w, with the Seq of the last Lines it follows.
+	Write func(seq int)
 	// Event gets what the buffer's mdsh side reports, such as the
 	// cursor moving or :RunBlock: the event's name and its data as JSON.
 	Event func(name, data string)
@@ -179,7 +180,24 @@ type Editor struct {
 
 	mu      sync.Mutex
 	pending [][]any // redraw events since the last flush
-	text    string  // the text last sent either way
+}
+
+// Lines says lines [First, Last) of the buffer's text, counted from 0,
+// became Text, whole lines each ending with a newline. Seq counts what
+// changed the text, as the buffer sends it: what was typed, and each
+// ApplyLines.
+type Lines struct {
+	Seq   int    `json:"seq"`
+	First int    `json:"first"`
+	Last  int    `json:"last"`
+	Text  string `json:"text"`
+}
+
+// LineEdit replaces lines [First, Last) with Text, whole lines.
+type LineEdit struct {
+	First int    `json:"first"`
+	Last  int    `json:"last"`
+	Text  string `json:"text"`
 }
 
 // Start starts Neovim and attaches to it as its UI.
@@ -202,7 +220,7 @@ func Start(o Options) (*Editor, error) {
 	if err != nil {
 		return nil, err
 	}
-	e := &Editor{v: v, text: o.Text}
+	e := &Editor{v: v}
 	v.RegisterHandler("redraw", func(updates ...[]any) {
 		e.mu.Lock()
 		var flushes [][][]any
@@ -221,20 +239,14 @@ func Start(o Options) (*Editor, error) {
 			}
 		}
 	})
-	v.RegisterHandler("mdsh_text", func(text string) {
-		e.mu.Lock()
-		e.text = text
-		e.mu.Unlock()
-		if o.Changed != nil {
-			o.Changed(text)
+	v.RegisterHandler("mdsh_lines", func(seq, first, last int, l []string) {
+		if o.Lines != nil {
+			o.Lines(Lines{Seq: seq, First: first, Last: last, Text: joinLines(l)})
 		}
 	})
-	v.RegisterHandler("mdsh_write", func(text string) {
-		e.mu.Lock()
-		e.text = text
-		e.mu.Unlock()
+	v.RegisterHandler("mdsh_write", func(seq int) {
 		if o.Write != nil {
-			o.Write(text)
+			o.Write(seq)
 		}
 	})
 	v.RegisterHandler("mdsh_event", func(name, data string) {
@@ -311,49 +323,55 @@ func (e *Editor) Resize(cols, rows int) error {
 	return e.v.TryResizeUI(max(cols, 1), max(rows, 1))
 }
 
-// SetText replaces the buffer's text, as after a run writes its output.
-// Text the buffer already has changes nothing.
-func (e *Editor) SetText(text string) error {
-	e.mu.Lock()
-	same := text == e.text
-	e.text = text
-	e.mu.Unlock()
-	if same {
-		return nil
+// ApplyLines makes edits on the buffer, in order and not overlapping,
+// made against its text as of seq. If the buffer has typing since that
+// wasn't sent, or seq isn't the buffer's, it changes nothing and reports
+// false; the typing is then sent, as Lines, to fold in before trying
+// again. Done, it moves the buffer's seq on one.
+func (e *Editor) ApplyLines(seq int, edits []LineEdit) (bool, error) {
+	type luaEdit struct {
+		First int      `msgpack:"first"`
+		Last  int      `msgpack:"last"`
+		Lines []string `msgpack:"lines"`
 	}
-	return e.v.ExecLua("mdsh.set_text(...)", nil, lines(text))
-}
-
-// ApplyEdits applies edits to the buffer: each replaces lines
-// [Start, End), counted from 0, which must still hold Old, with New.
-// Edits are in order and don't overlap. If any edit's lines changed, the
-// whole text is replaced with text instead. Either way the buffer then
-// has text, as far as mdsh-gui knows; typing since may follow.
-func (e *Editor) ApplyEdits(text string, edits []Edit) error {
-	e.mu.Lock()
-	same := text == e.text
-	e.text = text
-	e.mu.Unlock()
-	if same {
-		return nil
+	in := make([]luaEdit, len(edits))
+	for i, ed := range edits {
+		in[i] = luaEdit{ed.First, ed.Last, splitLines(ed.Text)}
 	}
 	var ok bool
-	if err := e.v.ExecLua("return mdsh.apply(...)", &ok, edits); err != nil {
-		return err
-	}
-	if ok {
-		return nil
-	}
-	return e.v.ExecLua("mdsh.set_text(...)", nil, lines(text))
+	err := e.v.ExecLua("return mdsh.apply_lines(...)", &ok, seq, in)
+	return ok, err
 }
 
-// Edit replaces lines [Start, End) of a buffer, counted from 0, which
-// hold Old, with New.
-type Edit struct {
-	Start int      `msgpack:"start" json:"start"`
-	End   int      `msgpack:"end" json:"end"`
-	Old   []string `msgpack:"old" json:"old"`
-	New   []string `msgpack:"new" json:"new"`
+// Snapshot is the buffer's text, each line ending with a newline, and
+// its seq, for a page catching up with a Neovim already running. What
+// was typed and not yet sent is sent first, as Lines, and is in both.
+func (e *Editor) Snapshot() (string, int, error) {
+	var out struct {
+		Lines []string `msgpack:"lines"`
+		Seq   int      `msgpack:"seq"`
+	}
+	if err := e.v.ExecLua("return mdsh.snapshot()", &out); err != nil {
+		return "", 0, err
+	}
+	return joinLines(out.Lines), out.Seq, nil
+}
+
+// joinLines is a buffer's lines as text, each ending with a newline.
+func joinLines(l []string) string {
+	if len(l) == 0 {
+		return ""
+	}
+	return strings.Join(l, "\n") + "\n"
+}
+
+// splitLines is text, whole lines, as a buffer's lines: never nil, so
+// it goes to Lua as a list.
+func splitLines(text string) []string {
+	if text == "" {
+		return []string{}
+	}
+	return strings.Split(strings.TrimSuffix(text, "\n"), "\n")
 }
 
 // Call calls the function called fn in the buffer's mdsh side with

@@ -1,7 +1,7 @@
 // Markdown editors, for the split view's source pane and the inline prose
 // editor, and the markdown bar over them.
 
-import { Compartment, EditorSelection, EditorState, type Extension, Prec, type StateCommand, Transaction } from "@codemirror/state";
+import { type ChangeSet, Compartment, EditorSelection, EditorState, type Extension, Prec, type StateCommand, Transaction } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, MatchDecorator, ViewPlugin, type ViewUpdate, drawSelection, highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownKeymap } from "@codemirror/lang-markdown";
@@ -9,7 +9,7 @@ import { vim } from "@replit/codemirror-vim";
 
 import type { AttrSpec, Names } from "./api.js";
 import { el, iconButton, type icons } from "./dom.js";
-import { type ExTarget, attrHelp, clickFocus, exTarget, forgetEx } from "./editor.js";
+import { type ExTarget, type GoBlocks, attrHelp, clickFocus, exTarget, forgetEx } from "./editor.js";
 import { codeLanguages } from "./highlight.js";
 import { hinted } from "./keys.js";
 import { Synced } from "./sync.js";
@@ -23,6 +23,9 @@ export interface MarkdownEditorOptions {
   spellCheck?: boolean;
   attrs: AttrSpec[];
   names: () => Names;
+  // blocks asks Go about the blocks in the editor's text, for depends=
+  // (GoBlocks in editor.ts).
+  blocks?: GoBlocks;
   // lineNumbers is on for the source pane.
   lineNumbers?: boolean;
   // extensions are added to the editor's own, such as the source pane's
@@ -46,17 +49,14 @@ export interface MarkdownEditor {
   view: EditorView;
   setVim(on: boolean): void;
   setSpellCheck(on: boolean): void;
-  // pending is whether something was typed since the text last came
-  // from Go or went to it.
+  // pending is whether something was typed that Go doesn't have yet.
   readonly pending: boolean;
-  // base is the text Go last had, as far as the editor knows: what to
-  // hand Go with the text, so Go can tell whether it changed since.
-  readonly base: string;
-  // load brings in text, Go's text now, keeping what was typed since
-  // base, without calling onChange.
-  load(text: string): void;
-  // sent notes that Go took text, the editor's text when it was sent.
-  sent(text: string): void;
+  // sync keeps the editor's text in step with Go's: what Go has, at
+  // which version, and what was typed since.
+  readonly sync: Synced;
+  // remote makes changes Go made, as sync worked them out, without
+  // calling onChange.
+  remote(changes: ChangeSet): void;
   destroy(): void;
 }
 
@@ -104,7 +104,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
   const escapeKey = (on: boolean): Extension =>
     on ? Prec.lowest(keymap.of([{ key: "Escape", run: () => true }])) : keymap.of([{ key: "Escape", run: () => (opts.close(), true) }]);
   let quiet = false; // load is changing the text
-  const sync = new Synced(opts.text);
+  const sync = new Synced(opts.text, { doc: 0, tick: 0 });
   const target: ExTarget = { view: null as unknown as EditorView, write: opts.write, close: opts.close, run: opts.run };
   const view = new EditorView({
     parent,
@@ -124,7 +124,7 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
         Prec.high(keymap.of([{ key: "Mod-Enter", run: modEnter(opts) }, ...barKeys, { key: "Tab", run: tableTab(1) }, { key: "Shift-Tab", run: tableTab(-1) }])),
         escape.of(escapeKey(opts.vim)),
         keymap.of([...markdownKeymap, ...defaultKeymap, ...historyKeymap]),
-        attrHelp(opts.attrs, opts.names),
+        attrHelp(opts.attrs, opts.names, opts.blocks),
         exTarget(() => target),
         clickFocus(),
         EditorView.lineWrapping,
@@ -157,15 +157,12 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
     get pending() {
       return sync.pending;
     },
-    get base() {
-      return sync.base;
-    },
-    load(text) {
+    sync,
+    remote(changes) {
       // Only the parts Go changed change, moved past what was typed, so
       // the typing stays and the cursor and the scroll position move
       // with the text around them, as when a run writes output in above
       // them. Go's changes aren't the user's to undo.
-      const changes = sync.incoming(text);
       if (changes.empty) return;
       quiet = true;
       try {
@@ -173,9 +170,6 @@ export function markdownEditor(parent: HTMLElement, opts: MarkdownEditorOptions)
       } finally {
         quiet = false;
       }
-    },
-    sent(text) {
-      sync.sent(text, view.state.doc.toString());
     },
     destroy() {
       forgetEx(view);

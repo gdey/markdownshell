@@ -135,6 +135,14 @@ export interface ConsoleEntry {
 }
 
 /**
+ * Depends are DependsAt's problems at a version of the file.
+ */
+export interface Depends {
+    "problems": notebook$0.DependsProblem[] | null;
+    "version": notebook$0.Version;
+}
+
+/**
  * Doc is what the frontend shows about the open file.
  */
 export interface Doc {
@@ -232,6 +240,20 @@ export interface NeovimInfo {
 }
 
 /**
+ * NvimText is what NvimStart answers: the file's text and its version,
+ * for Edit, and Neovim's text and seq, the count of its changes it sent
+ * and edits it took. A Neovim that just started has the file's text, at
+ * seq 0; one already running has its own, typing the file doesn't have
+ * yet included.
+ */
+export interface NvimText {
+    "text": string;
+    "version": notebook$0.Version;
+    "buffer": string;
+    "seq": number;
+}
+
+/**
  * ReportStart is what the Report dialog starts with.
  */
 export interface ReportStart {
@@ -255,6 +277,23 @@ export interface ReportStart {
      * for showing paths as ~/…
      */
     "home": string;
+}
+
+/**
+ * SourceBlocks are blocks at a version of the file.
+ */
+export interface SourceBlocks {
+    "blocks": notebook$0.SourceBlock[] | null;
+    "version": notebook$0.Version;
+}
+
+/**
+ * SourceText is the whole file and the version it is at, for a source
+ * pane opening on it: later changes come as line events since.
+ */
+export interface SourceText {
+    "text": string;
+    "version": notebook$0.Version;
 }
 
 /**
