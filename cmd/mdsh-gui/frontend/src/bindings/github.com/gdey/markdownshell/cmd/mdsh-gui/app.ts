@@ -545,9 +545,14 @@ export function Open(): $CancellablePromise<void> {
 /**
  * OpenLink follows href, a link in the tab's document: a web address
  * opens in the browser, a markdown file in a new tab beside this one,
- * and any other file as the system would open it.
+ * and an image beside the document is shown full size in the window:
+ * OpenLink returns the address the window loads it from. Any other file
+ * is shown in the file manager, unless Settings › Files lists its type
+ * to open with the system's app. Opening it would run a .command, .app
+ * or script beside the document on one click, past every question a
+ * block asks (finding 6 of the v1.4.0 security review).
  */
-export function OpenLink(href: string): $CancellablePromise<void> {
+export function OpenLink(href: string): $CancellablePromise<string> {
     return $Call.ByName("main.App.OpenLink", href);
 }
 

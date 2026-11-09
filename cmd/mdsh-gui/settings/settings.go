@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -115,6 +116,11 @@ type Settings struct {
 	// SessionTemplate is a markdown file a new session starts as a copy
 	// of. Empty starts it with a heading for the date.
 	SessionTemplate string `json:"sessionTemplate"`
+	// OpenTypes are the file extensions, such as "pdf", that a link in
+	// a document opens with the system's app for them. A link to any
+	// other file the app doesn't show itself is shown in the file
+	// manager instead, so one click on a link can't run something.
+	OpenTypes []string `json:"openTypes,omitempty"`
 	// LastFolder is the folder of the file opened last.
 	LastFolder string `json:"lastFolder"`
 	// Recent are the files opened last, newest first.
@@ -180,6 +186,7 @@ func (s Settings) clone() Settings {
 	s.Pinned = slices.Clone(s.Pinned)
 	s.Places = slices.Clone(s.Places)
 	s.FileViews = slices.Clone(s.FileViews)
+	s.OpenTypes = slices.Clone(s.OpenTypes)
 	return s
 }
 
@@ -231,6 +238,26 @@ func write(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(f.Name(), path)
+}
+
+// OpenType reports whether a link to path opens with the system's app,
+// as OpenTypes says for its extension.
+func (s *Settings) OpenType(path string) bool {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+	return ext != "" && slices.Contains(s.OpenTypes, ext)
+}
+
+// CleanTypes is list as OpenTypes keeps it: lower case, without dots or
+// spaces, each once, and none empty.
+func CleanTypes(list []string) []string {
+	var out []string
+	for _, t := range list {
+		t = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(t), "."))
+		if t != "" && !strings.ContainsAny(t, "/\\ ") && !slices.Contains(out, t) {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // Opened notes that file was opened: it goes to the top of Recent and

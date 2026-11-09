@@ -120,6 +120,15 @@ follow [Semantic Versioning](https://semver.org/).
   or with more than 100,000 writes is refused, and turning one into a GIF
   keeps memory bounded, so a crafted cast linked as an image can't make
   `--html`, `--pdf` or mdsh-gui's Copy as GIF run out of memory.
+- mdsh-gui no longer opens a linked file with the system's app for it
+  on a click, which let a document link to a script or an app and run it.
+  A link to a file now shows it in Finder (or the file manager), a linked
+  image opens in the image viewer, and markdown files still open in a
+  tab. Settings › Files › **Links open these file types** names the
+  types, such as `pdf, txt`, that open in their app; a file marked
+  executable is only ever shown.
+
+  ![Settings, Files tab, with Links open these file types set to pdf, txt](docs/changelog/open-types.png)
 
 - mdsh-gui writes its settings, `gui.json`, so only you can read them
   (0600, in a 0700 folder when it makes one). They name your recent

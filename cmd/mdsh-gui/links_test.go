@@ -1,8 +1,11 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 )
 
 func TestLinkTarget(t *testing.T) {
@@ -23,7 +26,10 @@ func TestLinkTarget(t *testing.T) {
 		{file, "../up/Read%20Me.MARKDOWN", linkDoc, filepath.FromSlash("/notes/up/Read Me.MARKDOWN"), false},
 		{file, "/abs/x.md", linkDoc, filepath.FromSlash("/abs/x.md"), false},
 		{file, "file:///abs/x.md", linkDoc, filepath.FromSlash("/abs/x.md"), false},
-		{file, "img/plot.png", linkFile, filepath.Join(dir, "img", "plot.png"), false},
+		{file, "img/plot.png", linkImage, filepath.Join(dir, "img", "plot.png"), false},
+		{file, "img/Plot.SVG", linkImage, filepath.Join(dir, "img", "Plot.SVG"), false},
+		{file, "setup.command", linkFile, filepath.Join(dir, "setup.command"), false},
+		{file, "file:///Applications/Utilities/Terminal.app", linkFile, filepath.FromSlash("/Applications/Utilities/Terminal.app"), false},
 		{file, "#heading", 0, "", true},
 		{file, "javascript:alert(1)", 0, "", true},
 		{"", "other.md", 0, "", true},
@@ -34,4 +40,53 @@ func TestLinkTarget(t *testing.T) {
 			t.Errorf("linkTarget(%q, %q) = %v, %q, %v; want %v, %q, error %v", tc.file, tc.href, kind, got, err, tc.kind, tc.want, tc.err)
 		}
 	}
+}
+
+// TestOpenable checks what a link may open with the system's app, when
+// its type is listed: a plain file, not a script, folder or bundle
+// (finding 6 of the v1.4.0 security review).
+func TestOpenable(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, mode os.FileMode) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("x"), mode); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	app := filepath.Join(dir, "Evil.app")
+	os.MkdirAll(app, 0o755)
+	for path, want := range map[string]bool{
+		write("notes.pdf", 0o644):      true,
+		write("run.pdf", 0o755):        false,
+		write("setup.command", 0o755):  false,
+		app:                            false,
+		filepath.Join(dir, "gone.pdf"): false,
+	} {
+		if got := openable(path); got != want {
+			t.Errorf("openable(%s) = %v, want %v", filepath.Base(path), got, want)
+		}
+	}
+}
+
+func TestOpenTypes(t *testing.T) {
+	if got := settings.CleanTypes([]string{" .PDF", "txt", "pdf", "", "a b", "../x", "Png"}); !slicesEqual(got, []string{"pdf", "txt", "png"}) {
+		t.Errorf("CleanTypes = %q", got)
+	}
+	s := settings.Settings{OpenTypes: []string{"pdf"}}
+	if !s.OpenType("/a/Report.PDF") || s.OpenType("/a/setup.command") || s.OpenType("/a/pdf") {
+		t.Error("OpenType")
+	}
+}
+
+func slicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

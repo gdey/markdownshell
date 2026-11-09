@@ -120,7 +120,7 @@ type tabEvent struct {
 // emit sends an event to this tab's page, in whichever window holds it.
 func (t *docTab) emit(name string, data any) {
 	t.mu.Lock()
-	if t.running && name != "menu" && name != "audit" {
+	if t.running && name != "menu" && name != "audit" && name != "view-image" {
 		t.live = append(t.live, liveEvent{name, data})
 	}
 	t.mu.Unlock()

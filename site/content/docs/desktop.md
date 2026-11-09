@@ -189,7 +189,7 @@ six tabs:
 | Look | {{< looks >}}; light, dark or the system's; text size, fonts (any installed), line spacing, accent, the History pane's colors, and each look's own textures, such as the Teletype paper's sprockets, rules and shadows |
 | Editing | autosave after each run, Vim keys, spell checking, how long a secret stays shown, the Neovim pane (experimental) |
 | Shell | a shell for every file, the file the History shell reads, a switch that gives blocks your shell's aliases and functions and turns on tab completion, and Install for the command line tool |
-| Files | the templates folder for New File…, the sessions folder and template |
+| Files | the templates folder for New File…, the sessions folder and template, and the file types a link opens in their app (any other linked file is shown in the file manager) |
 | About | the build, the paths it uses and the tools on your `PATH`, with Copy for a bug report, and a link to the changelog |
 
 {{< shot src="settings-look-paper.png" title="Settings" >}}Settings › Look, in the Teletype look.{{< /shot >}}
