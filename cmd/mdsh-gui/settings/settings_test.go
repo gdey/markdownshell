@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -27,6 +28,88 @@ func TestStore(t *testing.T) {
 	s := st2.Get()
 	if !s.Autosave || !slices.Equal(s.Recent, []string{"/a/one.md"}) || s.LastFolder != "/a" {
 		t.Errorf("read back %+v", s)
+	}
+}
+
+// The settings name recent files, the shell and the Neovim to run, so
+// only the user may read them, including a file an older version left
+// 0644 (finding 12 of the v1.4.0 security review).
+func TestStoreMode(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "mdsh")
+	path := filepath.Join(dir, "gui.json")
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Update(func(s *Settings) { s.Opened("/a/one.md") }); err != nil {
+		t.Fatal(err)
+	}
+	mode := func(p string) os.FileMode {
+		t.Helper()
+		fi, err := os.Stat(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return fi.Mode().Perm()
+	}
+	if m := mode(dir); m != 0o700 {
+		t.Errorf("folder mode = %o, want 700", m)
+	}
+	if m := mode(path); m != 0o600 {
+		t.Errorf("file mode = %o, want 600", m)
+	}
+
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Update(func(s *Settings) { s.Autosave = true }); err != nil {
+		t.Fatal(err)
+	}
+	if m := mode(path); m != 0o600 {
+		t.Errorf("old 0644 file mode after a save = %o, want 600", m)
+	}
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ents) != 1 {
+		t.Errorf("folder holds %d files, want only gui.json", len(ents))
+	}
+}
+
+// A gui.json kept elsewhere and linked in stays a link.
+func TestStoreSymlink(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "dotfiles", "gui.json")
+	if err := os.MkdirAll(filepath.Dir(real), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(real, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(tmp, "mdsh", "gui.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, path); err != nil {
+		t.Fatal(err)
+	}
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Update(func(s *Settings) { s.Autosave = true }); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Lstat(path); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("gui.json is no longer a link: %v %v", fi, err)
+	}
+	st2, err := Open(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st2.Get().Autosave {
+		t.Error("the save didn't reach the linked file")
 	}
 }
 

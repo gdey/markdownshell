@@ -193,14 +193,44 @@ func (st *Store) Update(f func(*Settings)) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(st.path), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(st.path, append(out, '\n'), 0o644); err != nil {
+	if err := write(st.path, append(out, '\n')); err != nil {
 		return err
 	}
 	st.s = s
 	return nil
+}
+
+// write puts data in path, readable by the user only: the settings
+// name recent files, the shell and the Neovim to run. It writes a
+// temporary file and renames it over path, so a file left 0644 by an
+// older version comes out 0600 and a crash never leaves half a file.
+// A path that is a symlink (dotfiles kept elsewhere) is written through,
+// so the link stays.
+func write(path string, data []byte) error {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name()) // fails once renamed
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), path)
 }
 
 // Opened notes that file was opened: it goes to the top of Recent and
