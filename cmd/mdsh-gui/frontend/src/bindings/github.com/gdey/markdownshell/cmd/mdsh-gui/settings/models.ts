@@ -178,7 +178,7 @@ export interface Settings {
      * other file the app doesn't show itself is shown in the file
      * manager instead, so one click on a link can't run something.
      */
-    "openTypes"?: string[];
+    "openTypes"?: string[] | null;
 
     /**
      * LastFolder is the folder of the file opened last.
