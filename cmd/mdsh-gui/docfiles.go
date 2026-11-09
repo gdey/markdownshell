@@ -36,12 +36,30 @@ func (a *App) assets(pages http.Handler) http.Handler {
 	})
 }
 
-// serveDocFile serves the file at path if it is in the folder of an open
-// document, or under it, or is an image the start screen shows, and
-// nothing else.
+// docTypes are the kinds of file the window loads from beside a
+// document: images, audio and video, and terminal recordings, which the
+// cast player reads. Nothing else beside a document is served, so the
+// route can't hand a page a .env, a key or a database that happens to sit
+// in the same folder tree (finding 12 of the v1.4.0 security review).
+var docTypes = map[string]bool{
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true,
+	".svg": true, ".avif": true, ".apng": true, ".bmp": true, ".ico": true,
+	".mp4": true, ".webm": true, ".mov": true, ".m4v": true,
+	".mp3": true, ".wav": true, ".ogg": true, ".m4a": true, ".flac": true,
+	".cast": true,
+}
+
+// docType reports whether path's extension is one of docTypes.
+func docType(path string) bool { return docTypes[strings.ToLower(filepath.Ext(path))] }
+
+// serveDocFile serves the file at path if it is an image, media or
+// recording (docTypes) in the folder of an open document, or under it,
+// or is an image the start screen shows, and nothing else. The type is
+// checked on the path the link resolves to, so a link named .png that
+// points at a .env isn't served.
 func (a *App) serveDocFile(w http.ResponseWriter, r *http.Request, path string) {
 	real, err := filepath.EvalSymlinks(filepath.Clean(path))
-	if err != nil || !a.underDoc(real) && !a.startImage(real) {
+	if err != nil || !(a.underDoc(real) && docType(real)) && !a.startImage(real) {
 		http.NotFound(w, r)
 		return
 	}
