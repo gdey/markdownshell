@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -38,13 +40,16 @@ func TestKeepInterrupts(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer sh.Close()
-				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+				// The interrupt comes 300ms after the script starts, not
+				// after Run is called: see cancelOn.
+				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				var out, errb bytes.Buffer
+				w := &cancelOn{text: "ready", after: 300 * time.Millisecond, cancel: cancel, w: &out}
 				start := time.Now()
-				rc, exited, err := sh.Run(ctx, "X=kept\n"+body+"\n", &out, &errb)
-				if !errors.Is(err, context.DeadlineExceeded) || exited || rc != 130 {
-					t.Fatalf("Run = %d, %v, %v; want 130, not exited, the deadline", rc, exited, err)
+				rc, exited, err := sh.Run(ctx, "X=kept\necho ready\n"+body+"\n", w, &errb)
+				if !errors.Is(err, context.Canceled) || exited || rc != 130 {
+					t.Fatalf("Run = %d, %v, %v; want 130, not exited, the interrupt", rc, exited, err)
 				}
 				if d := time.Since(start); d > 5*time.Second {
 					t.Errorf("stopping took %v", d)
@@ -84,8 +89,9 @@ func TestKeepStatusAndKill(t *testing.T) {
 			if rc, _, err := sh.Run(context.Background(), "false", &out, &out); err != nil || rc != 1 {
 				t.Errorf("false = %d, %v; want 1", rc, err)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			ready := &cancelOn{text: "ready", cancel: cancel}
 			go func() {
 				time.Sleep(interruptFor + time.Second)
 				if !sh.Busy() {
@@ -93,9 +99,9 @@ func TestKeepStatusAndKill(t *testing.T) {
 				}
 				sh.Kill()
 			}()
-			_, exited, err := sh.Run(ctx, "trap '' INT\nwhile :; do :; done\n", &out, &out)
-			if !exited || !errors.Is(err, context.DeadlineExceeded) {
-				t.Errorf("Run after Kill = exited %v, %v; want exited and the deadline", exited, err)
+			_, exited, err := sh.Run(ctx, "trap '' INT\necho ready\nwhile :; do :; done\n", ready, ready)
+			if !exited || !errors.Is(err, context.Canceled) {
+				t.Errorf("Run after Kill = exited %v, %v; want exited and the interrupt", exited, err)
 			}
 		})
 	}
@@ -150,18 +156,19 @@ func TestKillAfter(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer sh.Close()
-			var out bytes.Buffer
+			// run interrupts script once it prints "ready"; see cancelOn.
 			run := func(script string) (bool, error) {
-				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				_, exited, err := sh.Run(ctx, script, &out, &out)
+				w := &cancelOn{text: "ready", cancel: cancel}
+				_, exited, err := sh.Run(ctx, script, w, w)
 				return exited, err
 			}
-			if exited, err := run("X=kept\nsleep 30"); exited || !errors.Is(err, context.DeadlineExceeded) {
+			if exited, err := run("X=kept\necho ready\nsleep 30"); exited || !errors.Is(err, context.Canceled) {
 				t.Fatalf("a script that stops = exited %v, %v; want the shell kept", exited, err)
 			}
 			start := time.Now()
-			if exited, _ := run("trap '' INT\nwhile :; do :; done"); !exited {
+			if exited, _ := run("trap '' INT\necho ready\nwhile :; do :; done"); !exited {
 				t.Fatal("a script that won't stop left its shell running")
 			}
 			if d := time.Since(start); d > 5*time.Second {
@@ -169,4 +176,34 @@ func TestKillAfter(t *testing.T) {
 			}
 		})
 	}
+}
+
+// cancelOn is an io.Writer that calls cancel, after a while if after is
+// set, once what is written to it holds text, and passes it on to w if
+// set. The tests interrupt a script this way, once it says it is
+// running, rather than with a deadline from when Run was called: Run
+// checks the script's syntax in another shell first, under the same
+// ctx, and on a busy machine starting that shell can outlast a short
+// deadline, so the script never runs.
+type cancelOn struct {
+	mu     sync.Mutex
+	buf    bytes.Buffer
+	text   string
+	after  time.Duration
+	cancel func()
+	w      io.Writer
+	once   sync.Once
+}
+
+func (c *cancelOn) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buf.Write(p)
+	if bytes.Contains(c.buf.Bytes(), []byte(c.text)) {
+		c.once.Do(func() { time.AfterFunc(c.after, c.cancel) })
+	}
+	if c.w != nil {
+		return c.w.Write(p)
+	}
+	return len(p), nil
 }
