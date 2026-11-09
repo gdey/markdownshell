@@ -1669,7 +1669,9 @@ function followLinks() {
       e.stopPropagation();
       const href = a.getAttribute("href")!;
       if (href.startsWith("#")) return void scrollToHeading(href.slice(1));
-      App.OpenLink(href).catch(fail);
+      App.OpenLink(href)
+        .then((src) => src && viewSrc(src, a.textContent ?? ""))
+        .catch(fail);
     },
     true,
   );
@@ -1726,11 +1728,17 @@ function backgroundStatus() {
 // viewImage shows an output image full size over the window, until a
 // click or esc.
 function viewImage(img: HTMLImageElement) {
+  viewSrc(img.src, img.alt);
+}
+
+// viewSrc shows the image at src full size over the window, as
+// viewImage does: a link to an image beside the document opens here.
+function viewSrc(src: string, alt: string) {
   const viewer = $<HTMLDialogElement>("viewer");
   const big = viewer.querySelector("img")!;
-  big.src = img.src;
-  big.alt = img.alt;
-  big.classList.toggle("vector", /\.svg$/i.test(new URL(img.src).pathname));
+  big.src = src;
+  big.alt = alt;
+  big.classList.toggle("vector", /\.svg$/i.test(new URL(src, location.href).pathname));
   viewer.onclick = () => viewer.close();
   viewer.showModal();
 }
@@ -4415,6 +4423,7 @@ Events.On(
 
 Events.On("opened", mine(() => ((selected = -1), void refresh())));
 Events.On("audit", mine(addEvent));
+Events.On("view-image", mine((src: string) => viewSrc(src, "")));
 Events.On(
   "saved",
   mine<string>((file) => {

@@ -85,6 +85,7 @@ function draw() {
   input("session-folder").value = s.sessionFolder;
   $("reset-sessions").hidden = !s.sessionFolder;
   input("session-template").value = s.sessionTemplate;
+  input("open-types").value = (s.openTypes ?? []).join(", ");
   $("clear-session-template").hidden = !s.sessionTemplate;
   $("fixed").hidden = !s.startFolder && select("start-mode").value !== "fixed";
   input("zsh-wrapper").checked = !!zsh?.on;
@@ -297,6 +298,11 @@ input("shadows").onchange = () => lookChange(() => (s.noShadows = !input("shadow
 select("view").onchange = () => ((s.view = select("view").value), save());
 input("shell").onchange = () => ((s.shell = input("shell").value.trim()), save());
 input("history-rc").onchange = () => ((s.historyRC = input("history-rc").value.trim()), save());
+input("open-types").onchange = async () => {
+  s.openTypes = input("open-types").value.split(/[\s,]+/).filter((t) => t !== "");
+  await save();
+  draw();
+};
 select("start-mode").onchange = async () => {
   if (select("start-mode").value === "last") {
     s.startFolder = "";

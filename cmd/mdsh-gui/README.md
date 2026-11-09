@@ -267,8 +267,11 @@ Each file opens in a tab of its own, with its own shells.
   rendered view's earlier edits can't be undone.
 - **Links** in the rendered view open when clicked: web links in the
   browser, a markdown file in a new tab (or the tab it's already open
-  in), any other file as the system would open it, and `#heading`
-  links scroll to the heading. Right-click a link to open or copy it.
+  in), an image in the image viewer, and `#heading` links scroll to the
+  heading. Any other file is shown in Finder (or the file manager), not
+  opened, so a link can't run a script or an app; Settings › Files lists
+  the file types, such as `pdf`, that open in the system's app for them
+  instead. Right-click a link to open or copy it.
 - **Source view** (the `<>` button or cmd/ctrl+\\): the whole file in a
   markdown editor beside the rendered view. Typing re-renders after a
   pause, and the two scroll together; clicking a block lines the source
@@ -364,7 +367,7 @@ Each file opens in a tab of its own, with its own shells.
   each run, Vim mode and spell checking of the prose in the
   source view (on by default; not code, links or HTML); Shell for a shell for every file and the file
   the History pane's shell reads; and Files for the templates folder
-  for New File…. They are kept in
+  for New File… and the file types links open in their app. They are kept in
   `mdsh/gui.json` in the user's config folder. Shell has one more,
   **Give blocks your shell's aliases and functions**, which adds an
   `mdsh` function to `~/.zshrc` (or `$ZDOTDIR/.zshrc`), and to

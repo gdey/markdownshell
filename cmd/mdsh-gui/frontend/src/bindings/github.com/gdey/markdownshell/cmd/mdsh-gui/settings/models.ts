@@ -173,6 +173,14 @@ export interface Settings {
     "sessionTemplate": string;
 
     /**
+     * OpenTypes are the file extensions, such as "pdf", that a link in
+     * a document opens with the system's app for them. A link to any
+     * other file the app doesn't show itself is shown in the file
+     * manager instead, so one click on a link can't run something.
+     */
+    "openTypes"?: string[] | null;
+
+    /**
      * LastFolder is the folder of the file opened last.
      */
     "lastFolder": string;

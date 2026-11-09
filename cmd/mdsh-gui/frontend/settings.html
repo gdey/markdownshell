@@ -294,6 +294,15 @@
         <button id="choose-session-template">Choose…</button>
         <button id="clear-session-template">Clear</button>
       </div>
+      <div class="setting">
+        <div class="text">
+          <label for="open-types">Links open these file types</label>
+          <p class="muted">A link in a document to a file of one of these types, such as <code>pdf, txt</code>, opens it with your system's app for it. A link to any other file shows it in the file manager instead, so one click can't run a script or an app. Markdown files and images always open here, and a file marked executable is only ever shown.</p>
+        </div>
+      </div>
+      <div class="setting path">
+        <input id="open-types" type="text" spellcheck="false" autocomplete="off" placeholder="None: links show files in the file manager">
+      </div>
     </section>
 
     <section id="about" role="tabpanel" hidden>
