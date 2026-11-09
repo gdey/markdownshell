@@ -14,6 +14,7 @@ import (
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/history"
 	"github.com/gdey/markdownshell/run"
+	"github.com/gdey/markdownshell/termsafe"
 )
 
 // The History pane, as in mdsh-gui, is a terminal along the bottom of the
@@ -166,18 +167,20 @@ func (m *Model) askPrompt() {
 }
 
 // ps1 and ps2 are the shell's prompts, or $ and > for a shell with none.
+// A block can export PS1, so only its color escapes reach the terminal;
+// the rest, such as shell-integration marks, are dropped.
 func (m *Model) ps1() string {
 	if m.hist.prompt.PS1 == "" {
 		return "$ "
 	}
-	return m.hist.prompt.PS1
+	return termsafe.SGROnly(m.hist.prompt.PS1)
 }
 
 func (m *Model) ps2() string {
 	if m.hist.prompt.PS2 == "" {
 		return "> "
 	}
-	return m.hist.prompt.PS2
+	return termsafe.SGROnly(m.hist.prompt.PS2)
 }
 
 // setPrompt puts the prompt before what is typed: PS1, or PS2 on a line
@@ -435,7 +438,7 @@ func (m *Model) typedDone(d *histDone) {
 		}
 		m.histLog(helpStyle.Render("(full screen: kept as a recording)"))
 	} else if r != nil {
-		if out := strings.TrimRight(string(r.Stdout), "\n"); out != "" {
+		if out := strings.TrimRight(clean(string(r.Stdout)), "\n"); out != "" {
 			m.histLog(links(b, out))
 		}
 	}

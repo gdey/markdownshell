@@ -27,3 +27,43 @@ func TestVisible(t *testing.T) {
 		}
 	}
 }
+
+func TestStyled(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"plain\n", "plain\n"},
+		{"a\tb\r\nc\n", "a\tb\r\nc\n"},
+		{"\x1b[1;31mred\x1b[0m \x1b[38:2:1:2:3mtc\x1b[m", "\x1b[1;31mred\x1b[0m \x1b[38:2:1:2:3mtc\x1b[m"},
+		{"\x1b]52;c;ZXZpbAo=\x07hello", "^[]52;c;ZXZpbAo=^Ghello"},
+		{"\x1b]0;title\x1b\\", "^[]0;title^[\\"},
+		{"\x1b]8;;https://evil\x1b\\ok\x1b]8;;\x1b\\", "^[]8;;https://evil^[\\ok^[]8;;^[\\"},
+		{"secret\r\x1b[2Kshown", "secret^M^[[2Kshown"},
+		{"\x1b[1A\x1b[31", "^[[1A^[[31"},
+		{"\x1b[?1049h", "^[[?1049h"},
+		{"csi\u009b2K", "csi<U+009B>2K"},
+		{"bad\x9b2K", "bad<0x9B>2K"},
+		{"👨‍👩 ‮rtl", "👨‍👩 ‮rtl"},
+		{"bell\a", "bell^G"},
+	} {
+		if got := Styled(tc.in); got != tc.want {
+			t.Errorf("Styled(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestSGROnly(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"$ ", "$ "},
+		{"\x1b[32muser\x1b[0m $ ", "\x1b[32muser\x1b[0m $ "},
+		{"\x1b]133;A\x07\x1b[1m%\x1b[m ", "\x1b[1m%\x1b[m "},
+		{"\x1b]0;title\x1b\\$ ", "$ "},
+		{"\x1b]52;c;ZXZpbAo=\x07$ ", "$ "},
+		{"\x1b[2J\x1b[H$ ", "$ "},
+		{"a\x1b=b\x07c\r", "abc"},
+		{"\x1b]8;;https://x", ""},
+		{"x\x1b", "x"},
+	} {
+		if got := SGROnly(tc.in); got != tc.want {
+			t.Errorf("SGROnly(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
