@@ -94,8 +94,9 @@ jobs:
         run: |
           printf '%s\n' "$APP_STORE_CONNECT_KEY" > "$RUNNER_TEMP/AuthKey.p8"
           chmod 600 "$RUNNER_TEMP/AuthKey.p8"
-      - run: build/darwin/app.sh "${{ inputs.version || format('0.0.0-dev.{0}', github.run_number) }}" dist
+      - run: build/darwin/app.sh "$VERSION" dist
         env:
+          VERSION: ${{ inputs.version || format('0.0.0-dev.{0}', github.run_number) }}
           MDSH_SIGN_IDENTITY: ${{ steps.cert.outputs.identity }}
           MDSH_NOTARY_KEY: ${{ env.NOTARIZE == 'true' && format('{0}/AuthKey.p8', runner.temp) || '' }}
           MDSH_NOTARY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -133,8 +134,9 @@ jobs:
           cache-dependency-path: cmd/mdsh-gui/go.sum
       - name: Install GTK, WebKitGTK and what AppImages need
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libfuse2t64 file
-      - run: build/linux/appimage.sh "${{ inputs.version || format('0.0.0-dev.{0}', github.run_number) }}" dist
+      - run: build/linux/appimage.sh "$VERSION" dist
         env:
+          VERSION: ${{ inputs.version || format('0.0.0-dev.{0}', github.run_number) }}
           # linuxdeploy is an AppImage itself; this runs it without FUSE.
           APPIMAGE_EXTRACT_AND_RUN: 1
       - uses: actions/upload-artifact@v4

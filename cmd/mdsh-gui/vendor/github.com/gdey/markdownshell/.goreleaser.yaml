@@ -7,7 +7,9 @@ project_name: mdsh
 
 before:
   hooks:
-    - go mod tidy
+    # verify, not tidy: the module is vendored, and a tidy that changed
+    # go.mod would build code that isn't the tag's.
+    - go mod verify
     - go test ./...
 
 builds:

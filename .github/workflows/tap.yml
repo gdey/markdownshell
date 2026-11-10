@@ -33,16 +33,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The tag comes in through env, never spliced into the script: a
+      # tag name may hold $(...) or backticks. Anything that isn't a
+      # plain vX.Y.Z[-pre] stops here, so later steps can trust it.
       - name: Version
         id: v
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          tag="$TAG"
+          if ! printf '%s\n' "$tag" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?'; then
+            echo "not a release tag: $tag" >&2
+            exit 1
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - name: Download checksums.txt
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download "${{ steps.v.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern checksums.txt --dir "$RUNNER_TEMP"
+          TAG: ${{ steps.v.outputs.tag }}
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern checksums.txt --dir "$RUNNER_TEMP"
       # Not actions/checkout: it can't check out a tap with no commits yet
       # ("couldn't find remote ref refs/heads/main"), which is what the
       # tap is until this workflow first pushes to it.
@@ -54,18 +64,21 @@ jobs:
           git clone https://github.com/gdey/homebrew-tap.git tap
           git -C tap rev-parse -q --verify HEAD >/dev/null || git -C tap checkout -b main
       - name: Write the formula and cask
-        run: .github/scripts/tap.sh "${{ steps.v.outputs.version }}" "$RUNNER_TEMP/checksums.txt" tap
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: .github/scripts/tap.sh "$VERSION" "$RUNNER_TEMP/checksums.txt" tap
       - name: Push
         working-directory: tap
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/mdsh.rb Casks/mdsh.rb
           if git diff --cached --quiet; then
-            echo "tap already at ${{ steps.v.outputs.tag }}"
+            echo "tap already at $TAG"
             exit 0
           fi
-          git commit -m "mdsh ${{ steps.v.outputs.tag }}"
+          git commit -m "mdsh $TAG"
           git push origin HEAD
