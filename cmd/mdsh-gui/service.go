@@ -52,8 +52,9 @@ type Doc struct {
 	// for, 0 where it doesn't.
 	TermCols int `json:"termCols"`
 	TermRows int `json:"termRows"`
-	// EnvBanner, if set, says that the front matter brings in the whole
-	// environment the app started in (env.share with ...).
+	// EnvBanner, if set, says that the front matter brings in more than
+	// the base set from the environment the app started in (env.share
+	// with ..., or naming variables).
 	EnvBanner string `json:"envBanner"`
 	// LastView is how the file was last shown, "rendered", "source" or
 	// "both", or "" if that isn't remembered. LastHistory is whether

@@ -1501,13 +1501,13 @@ func (m *Model) quitWord(key string) string {
 }
 
 // envBanner is the line shown over the document when its front matter
-// brings in the whole environment mdsh started in (env.share with ...),
-// or "" when it doesn't.
+// brings in more than the base set from the environment mdsh started in
+// (env.share with ..., or naming variables), or "" when it doesn't.
 func (m *Model) envBanner() string {
 	if m.d == nil {
 		return ""
 	}
-	return m.d.Options.FullEnvBanner()
+	return m.d.Options.ShareBanner()
 }
 
 // toggleSecret shows the selected block's masked code and output, or

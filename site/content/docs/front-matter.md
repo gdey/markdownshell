@@ -115,7 +115,10 @@ own passes just the base set, so add `...` when you mean "all but".
 
 `[...]` is how a file asks for your whole environment. `mdsh -i` and
 mdsh-gui show a banner over such a file, "This file brings in all your
-environment variables", naming anything it leaves out with `-NAME`.
+environment variables", naming anything it leaves out with `-NAME`. A
+file that names variables beyond the base set gets a banner too, listing
+them: "This file brings in GITHUB_TOKEN, AWS_PROFILE from your
+environment".
 
 A document loaded from a URL gets no base set: its shells see only the
 variables it names, not even `PATH`.

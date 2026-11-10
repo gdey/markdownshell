@@ -3,9 +3,12 @@ package doc
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/gdey/markdownshell/env"
 )
 
 // Options are the document-wide settings under the mdsh: key of the
@@ -65,19 +68,40 @@ func (o Options) FullEnv() (full bool, except []string) {
 	return true, except
 }
 
-// FullEnvBanner is the line front ends show over a file whose
-// env.share brings in the whole environment, naming what it leaves out,
-// or "" when it doesn't.
-func (o Options) FullEnvBanner() string {
-	full, except := o.FullEnv()
-	if !full {
+// Shared lists the names env.share brings in from the environment mdsh
+// was started in besides the base set (env.IsBase), in the list's
+// order: the names a file asks for by name, such as GITHUB_TOKEN. "...",
+// -NAME and base names aren't in it.
+func (o Options) Shared() []string {
+	var out []string
+	for _, k := range o.Env.Share {
+		if k == "..." || k == "*" || strings.HasPrefix(k, "-") || k == "" || env.IsBase(k) || slices.Contains(out, k) {
+			continue
+		}
+		out = append(out, k)
+	}
+	return out
+}
+
+// ShareBanner is the line front ends show over a file whose env.share
+// brings in more than the base set: the whole environment, naming what
+// it leaves out, or the names it asks for. It is "" when the file gets
+// only the base set. A file that names GITHUB_TOKEN gets a banner just
+// as one with "..." does, so a secret never comes in unannounced
+// (finding 2 of the v1.4.0 security review).
+func (o Options) ShareBanner() string {
+	if full, except := o.FullEnv(); full {
+		text := "This file brings in all your environment variables"
+		if len(except) > 0 {
+			text += ", except " + strings.Join(except, ", ")
+		}
+		return text
+	}
+	names := o.Shared()
+	if len(names) == 0 {
 		return ""
 	}
-	text := "This file brings in all your environment variables"
-	if len(except) > 0 {
-		text += ", except " + strings.Join(except, ", ")
-	}
-	return text
+	return "This file brings in " + strings.Join(names, ", ") + " from your environment"
 }
 
 // Interpolating reports whether placeholders are filled in.

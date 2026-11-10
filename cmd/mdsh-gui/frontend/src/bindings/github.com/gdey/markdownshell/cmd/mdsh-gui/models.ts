@@ -194,8 +194,9 @@ export interface Doc {
     "termRows": number;
 
     /**
-     * EnvBanner, if set, says that the front matter brings in the whole
-     * environment the app started in (env.share with ...).
+     * EnvBanner, if set, says that the front matter brings in more than
+     * the base set from the environment the app started in (env.share
+     * with ..., or naming variables).
      */
     "envBanner": string;
 

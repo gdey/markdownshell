@@ -702,7 +702,9 @@ mdsh:
 ```
 
 `mdsh -i` and mdsh-gui show a banner over a file that brings in
-everything, so you know before you run it.
+everything, or that names variables beyond the base set ("This file
+brings in GITHUB_TOKEN from your environment"), so you know before you
+run it.
 
 A block's stderr is captured separately. It is shown only when the block
 fails, unless `show-stderr` (or `show_stderr: true` under `mdsh:` in the
