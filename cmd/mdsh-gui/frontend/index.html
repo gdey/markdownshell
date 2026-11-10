@@ -54,6 +54,12 @@
     <span id="fullenv-text"></span>
   </div>
 
+  <div id="outside" class="banner" role="status" hidden>
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1zm0 2.9L3.4 12.6h9.2zM7.3 6.5h1.4v3.4H7.3zm0 4.2h1.4V12H7.3z"/></svg>
+    <span id="outside-text"></span>
+    <button id="outside-change">Stop allowing</button>
+  </div>
+
   <div id="fmerror" class="banner" role="alert" hidden>
     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM7.25 4h1.5v5h-1.5zm0 6h1.5v1.5h-1.5z"/></svg>
     <span><span id="fmerror-text"></span> <strong>Blocks can't run until it is fixed.</strong></span>
@@ -321,6 +327,18 @@
         <button id="sources-cancel" value="stop" formnovalidate>Cancel</button>
         <button value="skip">Run without them</button>
         <button value="run" class="primary">Allow</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="outside-dialog" aria-labelledby="outside-title" aria-describedby="outside-detail">
+    <form method="dialog">
+      <h2 id="outside-title">Let this document reach outside its repository?</h2>
+      <p id="outside-detail" class="muted">Its includes and <code>out=</code> files name these, outside <code id="outside-root"></code>. A document is kept inside its repository (or its folder) so it can't read a key into its output or write over a file of yours. Allow only a document you trust. Your answer is remembered for this document, until the list changes.</p>
+      <ul id="outside-list"></ul>
+      <div class="buttons">
+        <button id="outside-later" value="" formnovalidate>Ask me later</button>
+        <button value="deny">Keep it inside</button>
+        <button value="allow" class="primary">Allow for this document</button>
       </div>
     </form>
   </dialog>

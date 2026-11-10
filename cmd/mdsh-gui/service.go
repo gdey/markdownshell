@@ -20,6 +20,7 @@ import (
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/settings"
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/shellrc"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
@@ -454,6 +455,72 @@ func (a *App) Reload(ctx context.Context) error {
 	return nil
 }
 
+// OutsideFiles are the files a document's includes and out= name
+// outside its folder or repository, and what the user last said about
+// them.
+type OutsideFiles struct {
+	// Paths are the files, as the document writes them.
+	Paths []string `json:"paths"`
+	// Root is the folder they are outside: the document's repository,
+	// or its folder, with the home folder as ~.
+	Root string `json:"root"`
+	// Answer is "allow" or "deny", or "" when this list hasn't been
+	// answered: the page asks.
+	Answer string `json:"answer"`
+}
+
+// Outside lists what the file reaches outside its root, for the page
+// to ask about once per file, and again when the list changes, as
+// mdsh --allow-outside allows it on the command line.
+func (a *App) Outside(ctx context.Context) (OutsideFiles, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return OutsideFiles{}, err
+	}
+	o := OutsideFiles{Paths: n.Outside(), Root: docroot.Root(filepath.Dir(n.File()))}
+	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(o.Root, home+string(filepath.Separator)) {
+		o.Root = "~" + o.Root[len(home):]
+	}
+	if len(o.Paths) == 0 {
+		return o, nil
+	}
+	if allow, ok := a.outside.Lookup(n.File(), o.Paths); ok {
+		o.Answer = "deny"
+		if allow {
+			o.Answer = "allow"
+		}
+	}
+	return o, nil
+}
+
+// AnswerOutside remembers whether the file may reach the files Outside
+// lists now, and starts its shells again so the answer holds for its
+// runs. "allow" and "deny" are remembered; "" forgets the answer, so the
+// page asks the next time the file opens.
+func (a *App) AnswerOutside(ctx context.Context, answer string) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	switch answer {
+	case "allow", "deny":
+		err = a.outside.Remember(n.File(), n.Outside(), answer == "allow")
+	case "":
+		err = a.outside.Forget(n.File())
+	default:
+		return fmt.Errorf("answer outside: unknown answer %q", answer)
+	}
+	if err != nil {
+		return err
+	}
+	// The includes are read again, now in or out, as Restart Shells
+	// does; what blocks set in the shells goes.
+	err = n.Restart()
+	t.changed()
+	t.emit("opened", n.File())
+	return err
+}
+
 // Events is the event log of the file this window shows: its shells
 // starting and ending, and why, blocks running, the file changing on
 // disk and mdsh ctl calls, oldest first. New events come as "audit"
@@ -559,6 +626,9 @@ type Start struct {
 	// Writable are the listed folders, by rel, whose .mdsh.yaml the
 	// folder settings can save.
 	Writable []string `json:"writable"`
+	// Outside are the files, by absolute path, allowed to reach outside
+	// their folder or repository, which the list tags.
+	Outside []string `json:"outside"`
 }
 
 // StartScreen lists the markdown files under the start folder, and the
@@ -591,7 +661,7 @@ func (a *App) StartScreen() (Start, error) {
 	s := a.settings.Get()
 	home, _ := os.UserHomeDir()
 	last, _ := session.Last(a.sessionDir())
-	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: existing(s.Recent), Pinned: existing(s.Pinned), LastSession: last, Writable: writable}, nil
+	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: existing(s.Recent), Pinned: existing(s.Pinned), LastSession: last, Writable: writable, Outside: a.outside.Allowed()}, nil
 }
 
 // existing are the files that still exist. The others stay in the

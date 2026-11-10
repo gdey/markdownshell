@@ -2,7 +2,9 @@
 // read the files the front matter's env.source names into its shells,
 // so that mdsh, mdsh -i and mdsh-gui ask once per file, and again only
 // when the list of files changes. The answers live in one JSON file,
-// shared by every front end.
+// shared by every front end. A second store, at OutsidePath, keeps in
+// the same way whether a document's includes and out= files may reach
+// outside its folder or repository (see run.Outside).
 package trust
 
 import (
@@ -54,6 +56,26 @@ func DefaultPath() (string, error) {
 	return filepath.Join(dir, "mdsh", "sources.json"), nil
 }
 
+// OutsidePath is mdsh/outside.json in the user's config folder, where
+// the answers to whether a document may reach outside its root live.
+func OutsidePath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "mdsh", "outside.json"), nil
+}
+
+// OpenOutside opens the store at OutsidePath, or returns nil, which
+// remembers nothing, if there is no config folder.
+func OpenOutside() *Store {
+	p, err := OutsidePath()
+	if err != nil {
+		return nil
+	}
+	return Open(p)
+}
+
 // Open returns the store kept in path. The file is made on the first
 // answer.
 func Open(path string) *Store { return &Store{path: path} }
@@ -100,10 +122,52 @@ func (st *Store) Lookup(file string, sources []string) (allow, ok bool) {
 	return false, false
 }
 
+// Allowed lists the documents whose last answer allowed them, whatever
+// their lists were then.
+func (st *Store) Allowed() []string {
+	if st == nil {
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	s, err := st.read()
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, c := range s.Files {
+		if c.Allow {
+			files = append(files, c.File)
+		}
+	}
+	return files
+}
+
+// Forget drops the answer for file, so it is asked again.
+func (st *Store) Forget(file string) error {
+	return st.update(func(s *state) {
+		s.Files = slices.DeleteFunc(s.Files, func(c Choice) bool { return c.File == file })
+	})
+}
+
 // Remember keeps allow as the answer for file naming sources, in place
 // of any earlier answer for file.
 func (st *Store) Remember(file string, sources []string, allow bool) error {
-	if st == nil || file == "" {
+	if file == "" {
+		return nil
+	}
+	return st.update(func(s *state) {
+		s.Files = slices.DeleteFunc(s.Files, func(c Choice) bool { return c.File == file })
+		s.Files = slices.Insert(s.Files, 0, Choice{File: file, Sources: slices.Clone(sources), Allow: allow, At: time.Now().UTC()})
+		if len(s.Files) > Max {
+			s.Files = s.Files[:Max]
+		}
+	})
+}
+
+// update reads the store, changes it with f and writes it back.
+func (st *Store) update(f func(*state)) error {
+	if st == nil {
 		return nil
 	}
 	st.mu.Lock()
@@ -114,11 +178,7 @@ func (st *Store) Remember(file string, sources []string, allow bool) error {
 		// leaving every document unable to remember.
 		s = state{}
 	}
-	s.Files = slices.DeleteFunc(s.Files, func(c Choice) bool { return c.File == file })
-	s.Files = slices.Insert(s.Files, 0, Choice{File: file, Sources: slices.Clone(sources), Allow: allow, At: time.Now().UTC()})
-	if len(s.Files) > Max {
-		s.Files = s.Files[:Max]
-	}
+	f(&s)
 	out, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err

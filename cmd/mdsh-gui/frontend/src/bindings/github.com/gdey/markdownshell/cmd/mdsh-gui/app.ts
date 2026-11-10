@@ -56,6 +56,16 @@ export function Answer(reply: string): $CancellablePromise<void> {
 }
 
 /**
+ * AnswerOutside remembers whether the file may reach the files Outside
+ * lists now, and starts its shells again so the answer holds for its
+ * runs. "allow" and "deny" are remembered; "" forgets the answer, so the
+ * page asks the next time the file opens.
+ */
+export function AnswerOutside(answer: string): $CancellablePromise<void> {
+    return $Call.ByName("main.App.AnswerOutside", answer);
+}
+
+/**
  * BlockAt is the top-level block on line of the file, or -1.
  */
 export function BlockAt(line: number): $CancellablePromise<number> {
@@ -568,6 +578,15 @@ export function OpenPath(file: string): $CancellablePromise<void> {
  */
 export function OpenURL(u: string): $CancellablePromise<void> {
     return $Call.ByName("main.App.OpenURL", u);
+}
+
+/**
+ * Outside lists what the file reaches outside its root, for the page
+ * to ask about once per file, and again when the list changes, as
+ * mdsh --allow-outside allows it on the command line.
+ */
+export function Outside(): $CancellablePromise<$models.OutsideFiles> {
+    return $Call.ByName("main.App.Outside");
 }
 
 /**

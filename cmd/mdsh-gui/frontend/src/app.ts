@@ -4,7 +4,7 @@ import { ChangeSet, type EditorState, type StateCommand, type Text } from "@code
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Clipboard, Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type Settings, type SourceBlock, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type OutsideFiles, type Settings, type SourceBlock, type Start, message } from "./api.js";
 import { enableCasts } from "./cast.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBehavior, setOutput, svg } from "./dom.js";
@@ -157,6 +157,12 @@ async function refresh() {
     eventsFile = doc.file;
     void loadEvents();
   }
+  // Whether it may reach outside its repository is asked when a file
+  // opens or is read again, not on every redraw.
+  if (open && doc.file !== outsideFile) {
+    outsideFile = doc.file;
+    void checkOutside();
+  }
   consoleFile(doc.file);
   $("toolbar").hidden = !open;
   $("workspace").hidden = !open;
@@ -164,6 +170,7 @@ async function refresh() {
   syncHistory();
   $("fullenv-text").textContent = doc.envBanner;
   $("fullenv").hidden = !open || doc.envBanner === "";
+  if (!open) $("outside").hidden = true;
   showFrontMatterError(open);
   if (!open) {
     $("changed").hidden = true;
@@ -3899,14 +3906,14 @@ $("options").onclick = openRunOptions;
 
 // Start screen
 
-let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], pinned: [], lastSession: "", writable: [] };
+let startScreen: Start = { dir: "", home: "", files: [], collections: [], full: false, recent: [], pinned: [], lastSession: "", writable: [], outside: [] };
 
 async function drawStart() {
   try {
     startScreen = await App.StartScreen();
     $("start-dir").textContent = tilde(startScreen.dir) + (startScreen.full ? " (showing the first " + (startScreen.files ?? []).length + " files)" : "");
   } catch (err) {
-    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], pinned: [], lastSession: "", writable: [] };
+    startScreen = { dir: "", home: "", files: [], collections: [], full: false, recent: [], pinned: [], lastSession: "", writable: [], outside: [] };
     $("start-dir").textContent = message(err);
   }
   const last = $<HTMLButtonElement>("last-session");
@@ -3922,6 +3929,7 @@ type Collection = NonNullable<Start["collections"]>[number];
 function fileRow(path: string, label: string, detail: string, desc = "", tags: string[] = []): HTMLElement {
   const name = el("span", { className: "fname" }, label);
   if (tags.length) name.append(el("span", { className: "ftag" }, tags.map((t) => "#" + t).join(" ")));
+  if ((startScreen.outside ?? []).includes(path)) name.append(el("span", { className: "fbadge", title: "Allowed to reach files outside its repository" }, "outside"));
   const left = desc ? el("span", { className: "fleft" }, name, el("span", { className: "fdesc muted", title: desc }, desc)) : name;
   const b = el("button", { className: "file", title: path }, left, el("span", { className: "muted" }, detail));
   b.onclick = () => openPath(path);
@@ -4444,6 +4452,53 @@ function onSources({ files }: SourcesQuestion) {
   status("waiting for you");
 }
 
+// checkOutside asks, once a file opens, whether it may reach the files
+// its includes and out= name outside its repository (or its folder),
+// as mdsh --allow-outside allows them on the command line. The answer is
+// remembered for the file, until the list changes; Ask me later and Esc
+// leave it unanswered. Once answered, a banner says which way, with a
+// button to change it.
+let outsideFile = "";
+
+async function checkOutside() {
+  let o: OutsideFiles;
+  try {
+    o = await App.Outside();
+  } catch {
+    $("outside").hidden = true;
+    return;
+  }
+  const paths = o.paths ?? [];
+  const shown = paths.map(tilde).join(", ");
+  $("outside").hidden = paths.length === 0 || o.answer === "";
+  $("outside-text").textContent = o.answer === "allow" ? "This document may reach outside its repository: " + shown : "Kept inside its repository, so these fail: " + shown;
+  const change = $<HTMLButtonElement>("outside-change");
+  change.textContent = o.answer === "allow" ? "Stop allowing" : "Allow…";
+  change.onclick = () => (o.answer === "allow" ? void answerOutside("deny") : askOutside(o));
+  if (paths.length > 0 && o.answer === "") askOutside(o);
+}
+
+function askOutside(o: OutsideFiles) {
+  const dialog = $<HTMLDialogElement>("outside-dialog");
+  $("outside-root").textContent = o.root;
+  $("outside-list").replaceChildren(...(o.paths ?? []).map((p) => el("li", {}, el("code", {}, p))));
+  dialog.returnValue = "";
+  dialog.onclose = () => {
+    if (dialog.returnValue !== "") void answerOutside(dialog.returnValue);
+  };
+  if (!dialog.open) dialog.showModal();
+  $("outside-later").focus();
+}
+
+async function answerOutside(answer: string) {
+  try {
+    await App.AnswerOutside(answer);
+    announce(answer === "allow" ? "Allowed outside its repository" : "Kept inside its repository");
+  } catch (err) {
+    status(message(err));
+  }
+}
+
 Events.On("block", mine(onBlock));
 Events.On("sources", mine(onSources));
 Events.On("confirm", mine(onConfirm));
@@ -4459,7 +4514,7 @@ Events.On(
   }),
 );
 
-Events.On("opened", mine(() => ((selected = -1), void refresh())));
+Events.On("opened", mine(() => ((selected = -1), (outsideFile = ""), void refresh())));
 Events.On("audit", mine(addEvent));
 Events.On("view-image", mine((src: string) => viewSrc(src, "")));
 Events.On(

@@ -2,6 +2,7 @@ package trust_test
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/gdey/markdownshell/run"
@@ -52,5 +53,32 @@ func TestNilStore(t *testing.T) {
 	var st *trust.Store
 	if a := st.Ask("/d/doc.md", func([]string) run.Answer { return run.Go })([]string{"x"}); a != run.Go {
 		t.Errorf("nil store: %v", a)
+	}
+}
+
+// Allowed lists the documents last allowed, and Forget drops an
+// answer so the document is asked again.
+func TestAllowedForget(t *testing.T) {
+	st := trust.Open(filepath.Join(t.TempDir(), "outside.json"))
+	if err := st.Remember("/a.md", []string{"../x"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Remember("/b.md", []string{"../y"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Allowed(); !slices.Equal(got, []string{"/a.md"}) {
+		t.Errorf("Allowed = %q, want /a.md", got)
+	}
+	if err := st.Forget("/a.md"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := st.Lookup("/a.md", []string{"../x"}); ok {
+		t.Error("/a.md still answered after Forget")
+	}
+	if allow, ok := st.Lookup("/b.md", []string{"../y"}); !ok || allow {
+		t.Errorf("/b.md = %v, %v; want refused", allow, ok)
+	}
+	if got := (*trust.Store)(nil).Allowed(); got != nil {
+		t.Errorf("nil store: Allowed = %q", got)
 	}
 }

@@ -68,7 +68,7 @@ func (n *Notebook) MakeReport(r Report) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return report.Render(d, run.Includes(d, run.Options{File: n.File()}), opts)
+		return report.Render(d, run.Includes(d, run.Options{File: n.File(), AllowedOutside: n.allowedOutside(d)}), opts)
 	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
