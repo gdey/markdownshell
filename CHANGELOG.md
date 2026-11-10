@@ -186,6 +186,14 @@ follow [Semantic Versioning](https://semver.org/).
   mdsh.app" for a link it left, and Install points it here. Installing
   the command no longer clears the quarantine flag on the app, which is
   notarized.
+- mdsh-gui's window loads only images, audio, video and terminal
+  recordings from beside an open document. It served any file in the
+  document's folder tree, so with a file open in `~/notes` a bug in the
+  page could have read a `.env` or a key there; the page's Content
+  Security Policy kept it from sending one anywhere, and `mdsh --serve`
+  would have put the same route on the network (finding 12 of the
+  v1.4.0 security review). The type is the file's own, so a link named
+  `.png` that points at something else isn't served.
 
 ### Fixed
 

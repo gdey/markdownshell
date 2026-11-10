@@ -19,6 +19,11 @@ func TestDocFiles(t *testing.T) {
 		"docs/img/a.svg":    "<svg/>",
 		"secret.txt":        "no",
 		"docs/img/link.svg": "",
+		"docs/.env":         "TOKEN=x",
+		"docs/notes.txt":    "private",
+		"docs/run.cast":     "{}",
+		"docs/img/B.PNG":    "png",
+		"docs/key.png.pem":  "key",
 	} {
 		p := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -31,6 +36,12 @@ func TestDocFiles(t *testing.T) {
 	// A link out of the folder isn't followed.
 	link := filepath.Join(dir, "img", "out.txt")
 	if err := os.Symlink(filepath.Join(root, "secret.txt"), link); err != nil {
+		t.Fatal(err)
+	}
+	// A link named like an image that points at a file that isn't one
+	// isn't served either: the type is the target's.
+	fake := filepath.Join(dir, "img", "env.png")
+	if err := os.Symlink(filepath.Join(dir, ".env"), fake); err != nil {
 		t.Fatal(err)
 	}
 	n, err := notebook.Open(filepath.Join(dir, "doc.md"), notebook.Options{})
@@ -52,7 +63,15 @@ func TestDocFiles(t *testing.T) {
 		notebook.DocURL(link):                              http.StatusNotFound,
 		notebook.DocURL(filepath.Join(dir, "img")):         http.StatusNotFound,
 		notebook.DocURL(filepath.Join(dir, "missing.png")): http.StatusNotFound,
-		"/index.html": http.StatusTeapot,
+		// Only images, media and recordings beside the document.
+		notebook.DocURL(filepath.Join(dir, "run.cast")):     http.StatusOK,
+		notebook.DocURL(filepath.Join(dir, "img", "B.PNG")): http.StatusOK,
+		notebook.DocURL(filepath.Join(dir, ".env")):         http.StatusNotFound,
+		notebook.DocURL(filepath.Join(dir, "notes.txt")):    http.StatusNotFound,
+		notebook.DocURL(filepath.Join(dir, "doc.md")):       http.StatusNotFound,
+		notebook.DocURL(filepath.Join(dir, "key.png.pem")):  http.StatusNotFound,
+		notebook.DocURL(fake):                               http.StatusNotFound,
+		"/index.html":                                       http.StatusTeapot,
 	} {
 		if got := get(path); got != want {
 			t.Errorf("GET %s = %d, want %d", path, got, want)
