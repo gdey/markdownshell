@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -35,6 +36,9 @@ type CLI struct {
 	// Broken is where Link points when it's a symlink into an mdsh.app
 	// that isn't this one, such as after the app moved.
 	Broken string `json:"broken"`
+	// OtherApp is whether Broken is still there: another mdsh.app, such
+	// as an older release's, rather than where this one used to be.
+	OtherApp bool `json:"otherApp"`
 	// Linked is another mdsh on PATH that is this app's, such as the
 	// Homebrew cask's link, which comes first on PATH.
 	Linked string `json:"linked"`
@@ -59,9 +63,12 @@ type cliHost struct {
 	// admin runs a shell command as root, after asking for a password,
 	// for a link folder the user can't write. Nil when there's no way.
 	admin func(cmd string) error
-	// unquarantine clears the quarantine flag on the app, so a
-	// download's helper can run from a terminal. Nil when not needed.
-	unquarantine func() error
+	// known are the bundled paths the link has pointed at before, from
+	// the settings: where this app has stood (see repair).
+	known []string
+	// saw, if set, is told the bundled path whenever the link is seen
+	// pointing at it, to add to known.
+	saw func(path string)
 }
 
 // marker is the file beside a copied mdsh that says this app put it
@@ -97,6 +104,8 @@ func (h *cliHost) state() CLI {
 			c.Installed = true
 		case isAppHelper(target):
 			c.Broken = target
+			_, err := os.Stat(target)
+			c.OtherApp = err == nil
 		default:
 			c.Other = h.link
 		}
@@ -149,9 +158,6 @@ func (h *cliHost) install() error {
 	if h.copy {
 		return h.copyIn()
 	}
-	if h.unquarantine != nil {
-		_ = h.unquarantine() // best effort: a terminal shows macOS's own message if it's still set
-	}
 	err := os.MkdirAll(filepath.Dir(h.link), 0o755)
 	if err == nil {
 		err = os.Remove(h.link)
@@ -163,8 +169,11 @@ func (h *cliHost) install() error {
 		err = os.Symlink(h.bundled, h.link)
 	}
 	if errors.Is(err, fs.ErrPermission) && h.admin != nil {
-		return h.admin(fmt.Sprintf("mkdir -p %s && ln -sfn %s %s",
+		err = h.admin(fmt.Sprintf("mkdir -p %s && ln -sfn %s %s",
 			shellQuote(filepath.Dir(h.link)), shellQuote(h.bundled), shellQuote(h.link)))
+	}
+	if err == nil && h.saw != nil {
+		h.saw(h.bundled)
 	}
 	return err
 }
@@ -223,25 +232,100 @@ func (h *cliHost) uninstall() error {
 	return err
 }
 
-// repair is the launch-time check, which asks nothing: on macOS it
-// points a broken link back at this app when it can write the folder;
-// from an AppImage it copies again when the copy is another version's.
-func (h *cliHost) repair() error {
+// repair is the launch-time check, which asks nothing, and says what it
+// changed, for the Console. On macOS it points a link into an mdsh.app
+// back at this app when the app moved: when the link's target is gone,
+// or is a place this app has stood (known). A link into another
+// mdsh.app that is still there, such as an older release's on a mounted
+// .dmg or a fork's build, is left alone: launching that copy once must
+// not make it the mdsh every terminal runs; Settings › Shell shows it,
+// and Install takes it over when asked. From an AppImage it copies
+// again only when the copy is an older version's, never a newer one's.
+// (Finding 7 of the v1.4.0 security review.)
+func (h *cliHost) repair() (changed string, err error) {
 	c := h.state()
 	switch {
+	case !h.copy && c.Installed:
+		if h.saw != nil {
+			h.saw(h.bundled)
+		}
 	case h.copy && c.Installed:
 		v, _ := os.ReadFile(h.marker())
-		if strings.TrimSpace(string(v)) == h.version {
-			return nil
+		old := strings.TrimSpace(string(v))
+		if !olderVersion(old, h.version) {
+			return "", nil
 		}
-		return h.copyIn()
+		if err := h.copyIn(); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("updated %s from %s to %s", h.link, old, h.version), nil
 	case !h.copy && c.Broken != "":
-		if err := os.Remove(h.link); err != nil {
-			return err
+		_, statErr := os.Stat(c.Broken)
+		if statErr == nil && !slices.Contains(h.known, c.Broken) {
+			return "", nil
 		}
-		return os.Symlink(h.bundled, h.link)
+		if err := os.Remove(h.link); err != nil {
+			return "", err
+		}
+		if err := os.Symlink(h.bundled, h.link); err != nil {
+			return "", err
+		}
+		if h.saw != nil {
+			h.saw(h.bundled)
+		}
+		return fmt.Sprintf("pointed %s at this app; it pointed at %s", h.link, c.Broken), nil
 	}
-	return nil
+	return "", nil
+}
+
+// olderVersion reports whether version a is older than b, both as
+// X.Y.Z with an optional -pre part, which is older than X.Y.Z itself.
+// A version that doesn't parse is older than one that does, and two
+// that don't aren't ordered.
+func olderVersion(a, b string) bool {
+	pa, oka := parseVersion(a)
+	pb, okb := parseVersion(b)
+	switch {
+	case !oka || !okb:
+		return !oka && okb
+	}
+	for i := range 3 {
+		if pa.n[i] != pb.n[i] {
+			return pa.n[i] < pb.n[i]
+		}
+	}
+	switch {
+	case pa.pre == pb.pre:
+		return false
+	case pa.pre == "":
+		return false
+	case pb.pre == "":
+		return true
+	}
+	return pa.pre < pb.pre
+}
+
+type semver struct {
+	n   [3]int
+	pre string
+}
+
+func parseVersion(s string) (semver, bool) {
+	var v semver
+	core, pre, _ := strings.Cut(strings.TrimPrefix(s, "v"), "-")
+	parts := strings.Split(core, ".")
+	if len(parts) != 3 {
+		return v, false
+	}
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 {
+			return v, false
+		}
+		v.n[i] = n
+	}
+	v.pre = pre
+	return v, true
 }
 
 // shellQuote quotes s for sh as one word.

@@ -105,9 +105,11 @@ notarized app this is a non-issue. With today's ad hoc signature:
   helper too.
 - What does work: `brew install --cask --no-quarantine mdsh`, and
   `xattr -dr com.apple.quarantine /Applications/mdsh.app`, which the
-  desktop page already documents. The app's install step (below) runs
-  the latter on its own bundle when it sees the flag, since the user has
-  by then opened the app and chosen to install its CLI.
+  desktop page already documents. The app's install step used to run
+  the latter on its own bundle; since 1.4 the app is notarized, so the
+  helper runs with the flag on, and the step is gone: it would clear the
+  flag on a tampered bundle too (finding 7 of the v1.4.0 security
+  review).
 
 ## Putting it on PATH
 
@@ -140,28 +142,38 @@ method:
    say where it is (`/opt/homebrew/bin/mdsh`, from the formula, is the
    likely case) and stop. Two copies with different versions would be
    worse than one.
-2. Clear the quarantine flag on the bundle if it's set (see above).
-3. `os.Symlink(target, "/usr/local/bin/mdsh")`, after `os.MkdirAll` of
+2. `os.Symlink(target, "/usr/local/bin/mdsh")`, after `os.MkdirAll` of
    the folder. On an Intel Mac with Homebrew, `/usr/local/bin` is
    usually writable by the user and this succeeds.
-4. On `EACCES`, ask for an administrator password through the standard
+3. On `EACCES`, ask for an administrator password through the standard
    macOS prompt: `osascript -e 'do shell script "…" with administrator
    privileges'`, the same route VS Code and Zed take. The shell command
    is `mkdir -p /usr/local/bin && ln -sfn TARGET /usr/local/bin/mdsh`
    with `TARGET` single-quoted for the shell and then escaped for the
    AppleScript string literal; the app's path can hold spaces and
    quotes, and this string runs as root. A test covers a path with both.
-5. Tell the user, and say that open terminals see it after `rehash` or
+   The link's target is a file the user can write, so `sudo mdsh` runs
+   code the user controls; VS Code's and Zed's links are the same.
+4. Tell the user, and say that open terminals see it after `rehash` or
    a new window.
 
 Uninstall removes `/usr/local/bin/mdsh` only when it's a symlink into
 this app, by the same two routes.
 
 **Moved app.** The symlink dangles if the app moves. On launch, if
-`/usr/local/bin/mdsh` is a symlink into an `mdsh.app` that isn't this
-one or doesn't exist, the app repairs it quietly when it can write the
-folder, and otherwise the Settings › Shell row says `broken, points at …`
-with Install to redo it. VS Code does the same check on start.
+`/usr/local/bin/mdsh` is a symlink into an `mdsh.app` that no longer
+exists, or that is a place this app has stood (the settings keep the
+last few helper paths the link pointed at, `cliPaths`), the app points
+it back at itself when it can write the folder, and the Console says so.
+A link into another `mdsh.app` that is still there, such as an older
+release on a mounted `.dmg` or a fork's build, is left alone: launching
+that copy once mustn't make it the `mdsh` every terminal runs (finding
+7 of the v1.4.0 security review). The Settings › Shell row says
+`runs another mdsh.app, at …` for that, or `broken, points at …` when
+the folder can't be written, with Install to point it here.
+
+From an AppImage, the copy in `~/.local/bin` is refreshed at launch only
+when it is an older version's, never replaced by an older AppImage's.
 
 **Not a `.pkg`.** A package installer could write the symlink with its
 own privilege prompt, but the app is a drag install and the cask expects
@@ -269,8 +281,8 @@ reaches a release.
 
 - **Open Anyway and the helper.** Answered Nov 4: approving the app
   with Open Anyway also lets its helper run from a terminal (see
-  Signing). The install still clears the quarantine flag, for someone
-  who installs the CLI from the menu before Gatekeeper has asked.
+  Signing). The install no longer clears the quarantine flag: the app is
+  notarized, so the helper runs with it on.
 - **Linux.** Decided Nov 4: the AppImage carries it; see [Linux](#linux).
 - **`mdsh-gui --lsp`.** Decided Nov 4: the Neovim pane keeps running
   `mdsh-gui --lsp`, not the helper's `mdsh lsp`. The GUI's language

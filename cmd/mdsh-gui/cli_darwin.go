@@ -33,16 +33,9 @@ func newCLIHost() *cliHost {
 		return h
 	}
 	h.bundled = p
-	app := strings.TrimSuffix(p, "/Contents/MacOS/mdsh")
+	// The app is notarized, so its helper runs from a terminal with the
+	// download's quarantine flag still on; nothing clears it.
 	h.admin = osascriptAdmin
-	h.unquarantine = func() error {
-		// A .dmg's download flag is on everything copied out of it, and
-		// a quarantined helper is blocked when run from a terminal.
-		if exec.Command("xattr", "-p", "com.apple.quarantine", app).Run() != nil {
-			return nil
-		}
-		return exec.Command("xattr", "-dr", "com.apple.quarantine", app).Run()
-	}
 	return h
 }
 
