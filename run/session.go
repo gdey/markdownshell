@@ -600,7 +600,20 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 		}
 		for _, st := range steps {
 			a := Go
-			if !emptyDep(st.dep) {
+			if why := s.depOff(st.dep); why != "" && !emptyDep(st.dep) {
+				a = Skip
+				if s.opts.DependOff != nil {
+					a = s.opts.DependOff(st.dep, st.of, why)
+				}
+				if a == Skip {
+					// The reasons RunRange logs for the block in place.
+					reason := strings.TrimPrefix(why, "run=")
+					if why == "run=" {
+						reason = why
+					}
+					s.logSkip(st.dep, reason, audit.Fields{"depended_on_by": st.of.ID})
+				}
+			} else if !emptyDep(st.dep) {
 				if a, err = s.depend(st.dep, st.of); err != nil {
 					return err
 				}
@@ -668,6 +681,43 @@ func (s *Session) depChain(b *doc.Block, done map[*doc.Block]bool) ([]depStep, e
 		return nil
 	}
 	return steps, walk(b)
+}
+
+// depOff says why dep is switched off where it stands, as RunRange
+// would pass it over: "skip" if it is marked skip, "run=" if its run=
+// condition is false, "run=once" if it has run=once and saved output,
+// and "" if it isn't.
+func (s *Session) depOff(dep *doc.Block) string {
+	if dep.Attrs.Has("skip") {
+		return "skip"
+	}
+	c, ok := dep.Cond("run")
+	if !ok {
+		return ""
+	}
+	i := slices.Index(s.d.Blocks, dep)
+	if c.Once && s.hasOutput(i) {
+		return "run=once"
+	}
+	if !c.Eval(LookupAt(s.lookup, s.d, s.results, dep.Span.Start)) {
+		return "run="
+	}
+	return ""
+}
+
+// OffReason says why a dependency is switched off, for a question
+// about it: why is as DependOff gets it. It reads after the block's
+// name, as in "setup is marked skip".
+func OffReason(dep *doc.Block, why string) string {
+	switch why {
+	case "skip":
+		return "is marked skip"
+	case "run=once":
+		return "is marked run=once and has run already"
+	case "run=":
+		return fmt.Sprintf("has run=%s, which is false", dep.Attrs["run"])
+	}
+	return "is switched off"
 }
 
 // emptyDep reports whether dep can run as a dependency without asking:

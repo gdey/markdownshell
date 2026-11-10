@@ -206,7 +206,10 @@ type confirmMsg struct {
 	block *doc.Block
 	// of, for a dependency's question, is the block that depends on
 	// block.
-	of    *doc.Block
+	of *doc.Block
+	// why, for a dependency that is switched off where it stands, says
+	// why: see run.Options.DependOff.
+	why   string
 	reply chan run.Answer
 }
 
@@ -315,6 +318,7 @@ func (m *Model) newSession(ro run.Options) (*run.Session, error) {
 	ro.OnEvent = func(e run.Event) { m.send(eventMsg(e)) }
 	ro.Confirm = m.confirm
 	ro.Depend = m.depend
+	ro.DependOff = m.dependOff
 	ro.ApproveSources = m.approveSources
 	// tty blocks run in a terminal drawn in their card.
 	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
@@ -388,6 +392,15 @@ func (m *Model) depend(dep, b *doc.Block) run.Answer {
 	}
 	reply := make(chan run.Answer)
 	m.events <- confirmMsg{block: dep, of: b, reply: reply}
+	return <-reply
+}
+
+// dependOff asks about dep, a block b depends on that is marked skip
+// or whose run= is false. It asks even with --yes, as skip reads as
+// "this won't run"; skip goes on as if it had run.
+func (m *Model) dependOff(dep, b *doc.Block, why string) run.Answer {
+	reply := make(chan run.Answer)
+	m.events <- confirmMsg{block: dep, of: b, why: why, reply: reply}
 	return <-reply
 }
 
@@ -1457,6 +1470,8 @@ func (m *Model) footer() string {
 		help = helpStyle.Render(formHelp + "apply · esc cancel")
 	case m.srcAsk != nil:
 		help = promptStyle.Render("Read them in? Remembered for this file.") + helpStyle.Render(" y yes · n run without them · s stop")
+	case m.prompt != nil && m.prompt.of != nil && m.prompt.why != "":
+		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which %s. Run it anyway?  [r]un  s[k]ip  [s]top", termsafe.Visible(m.d.Label(m.prompt.of)), termsafe.Visible(m.d.Label(m.prompt.block)), termsafe.Visible(run.OffReason(m.prompt.block, m.prompt.why))))
 	case m.prompt != nil && m.prompt.of != nil:
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", termsafe.Visible(m.d.Label(m.prompt.of)), termsafe.Visible(m.d.Label(m.prompt.block))))
 	case m.prompt != nil:

@@ -191,6 +191,9 @@ func (m *Model) block(i int) string {
 			q = fmt.Sprintf("%s depends on this block, which hasn't run. Run it first?", m.d.Label(m.prompt.of))
 			keys = "[r]un  s[k]ip  [s]top"
 		}
+		if m.prompt.of != nil && m.prompt.why != "" {
+			q = fmt.Sprintf("%s depends on this block, which %s. Run it anyway? Skip goes on as if it had run.", m.d.Label(m.prompt.of), run.OffReason(b, m.prompt.why))
+		}
 		if termsafe.HasControl(b.Body) {
 			q = "This block's code has control characters, shown as ^X or <U+XXXX>. " + q
 		}

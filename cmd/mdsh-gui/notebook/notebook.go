@@ -330,6 +330,7 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		OnEvent:     n.event,
 		Confirm:     n.confirm,
 		Depend:      n.depend,
+		DependOff:   n.dependOff,
 		Terminal:    n.term.env(n.emit),
 		TakeTTY:     n.takeTTY,
 		Mode:        run.ModeInteractive,
@@ -853,6 +854,20 @@ func (n *Notebook) depend(dep, b *doc.Block) run.Answer {
 	i, of := n.index[dep], n.index[b]
 	n.mu.Unlock()
 	q := fmt.Sprintf("%s depends on this block, which hasn't run yet. Run it first?", n.d.Label(b))
+	return n.opts.Depend(i, of, q)
+}
+
+// dependOff asks about dep, a block b depends on that is marked skip
+// or whose run= is false, with Depend and a question that says so.
+// Skip goes on as if it had run.
+func (n *Notebook) dependOff(dep, b *doc.Block, why string) run.Answer {
+	if n.opts.Depend == nil {
+		return run.Skip
+	}
+	n.mu.Lock()
+	i, of := n.index[dep], n.index[b]
+	n.mu.Unlock()
+	q := fmt.Sprintf("%s depends on this block, which %s. Run it anyway? Skip goes on as if it had run.", n.d.Label(b), run.OffReason(dep, why))
 	return n.opts.Depend(i, of, q)
 }
 

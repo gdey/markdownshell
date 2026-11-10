@@ -16,6 +16,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
@@ -456,6 +457,32 @@ func TestDependsAsksInTUI(t *testing.T) {
 		press(m, "o") // not an answer here
 		if m.prompt == nil {
 			t.Fatalf("%s: o answered a dependency's question", tc.key)
+		}
+		press(m, tc.key)
+		pump(t, m)
+		got := read(t, file)
+		if dep, block := strings.Contains(got, "for=build"), strings.Contains(got, "for=deploy"); dep != tc.dep || block != tc.block {
+			t.Errorf("%s: build ran %v, deploy ran %v; want %v, %v", tc.key, dep, block, tc.dep, tc.block)
+		}
+	}
+}
+
+// A dependency marked skip is asked about even with --yes, and says
+// why; skip runs the block without it (security review v1.4.0, finding 8).
+func TestDependOffInTUI(t *testing.T) {
+	src := "```sh {#deploy depends=build}\necho deploy\n```\n\n```sh {#build skip}\necho built\n```\n"
+	for _, tc := range []struct {
+		key        string
+		dep, block bool
+	}{{"r", true, true}, {"k", false, true}, {"s", false, false}} {
+		m, file := newModel(t, src, Options{AutoSave: true, Yes: true})
+		press(m, "enter")
+		pump(t, m)
+		if m.prompt == nil || m.prompt.block.ID != "build" {
+			t.Fatalf("%s: not asked about build", tc.key)
+		}
+		if v := strings.Join(strings.Fields(ansi.Strip(m.View())), " "); !strings.Contains(v, "deploy depends on this block, which is marked skip. Run it anyway?") {
+			t.Errorf("%s: question not in build's card:\n%s", tc.key, v)
 		}
 		press(m, tc.key)
 		pump(t, m)

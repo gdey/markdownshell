@@ -58,6 +58,42 @@ func TestDependsYes(t *testing.T) {
 	}
 }
 
+// With --yes and no terminal, a dependency marked skip isn't run: the
+// block that needs it runs without it, with a warning (security review
+// v1.4.0, finding 8).
+func TestDependsYesSkip(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	os.WriteFile(f, []byte("```sh {#setup skip}\necho set up\n```\n\n```sh {#main depends=setup}\necho main\n```\n"), 0o644)
+	var out, errb bytes.Buffer
+	rc := mdsh([]string{"--yes", "--no-color", f}, nil, &out, &errb)
+	if rc != 0 || strings.Contains(out.String(), "for=setup") || !strings.Contains(out.String(), "```output {for=main exit=0}\nmain\n") {
+		t.Errorf("rc = %d, stdout %s", rc, out.String())
+	}
+	if want := "main depends on setup, which is marked skip; going on without running it"; !strings.Contains(errb.String(), want) {
+		t.Errorf("stderr = %q, want %q", errb.String(), want)
+	}
+}
+
+// The question about a switched-off dependency says why it is off, and
+// skip goes on.
+func TestDependOffPrompt(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#setup run=false}\necho set up\n```\n\n```sh {#main depends=setup}\necho main\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	p := newPrompter(strings.NewReader("k\n"), &out)
+	p.d = d
+	if a := p.dependOff(d.Blocks[0], d.Blocks[1], "run="); a != run.Skip {
+		t.Errorf("answer = %v, want Skip", a)
+	}
+	for _, want := range []string{"main depends on setup, which has run=false, which is false", "echo set up", "Run setup anyway?"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("prompt %q lacks %q", out.String(), want)
+		}
+	}
+}
+
 func TestConfirmSkipSaved(t *testing.T) {
 	d, err := doc.Parse([]byte("```sh {#a}\necho a\n```\n\n```output {for=a exit=0}\na\n```\n\n```sh {#b}\necho b\n```\n\n```sh {#c}\necho c\n```\n\n```output {for=c exit=0}\nc\n```\n"))
 	if err != nil {
