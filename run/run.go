@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +47,11 @@ type Options struct {
 	// document's root (see package docroot), as mdsh --allow-outside
 	// does. Leave it off unless the document is trusted.
 	AllowOutside bool
+	// AllowedOutside are files, as the document writes them in an
+	// include's file= or an out=, that may reach outside the document's
+	// root though AllowOutside is off: the list run.Outside gave when
+	// the user allowed it, so a file added since stays inside.
+	AllowedOutside []string
 	// Remote marks a document loaded from a URL (http, https, ftp,
 	// sftp). Its shells get only the caller's variables its env.share
 	// and share= name, without env.Base (PATH, HOME, USER, ...), and
@@ -717,7 +723,7 @@ func saveRecording(b *doc.Block, rec termrec.Recording, opts Options) (string, e
 	if !b.Attrs.Has("embed") || b.Attrs["embed"] != "inline" {
 		castRel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".cast"
 	}
-	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes(), opts); err != nil {
+	if err := writeAsset(assetPath(b, castRel, ".cast", opts), cast.Bytes(), docRootFor(rel, opts)); err != nil {
 		return "", err
 	}
 	return saveAsset(b, rel, data, "image/gif", ".gif", opts)
@@ -771,7 +777,7 @@ func saveAsset(b *doc.Block, rel string, data []byte, mime, ext string, opts Opt
 		rel = defaultAsset(b, ext, opts)
 	}
 	path := assetPath(b, rel, ext, opts)
-	if err := writeAsset(path, data, opts); err != nil {
+	if err := writeAsset(path, data, docRootFor(rel, opts)); err != nil {
 		return "", err
 	}
 	if opts.LinkDir != "" {
@@ -831,21 +837,22 @@ func assetPath(b *doc.Block, rel, ext string, opts Options) string {
 	return filepath.Join(opts.Dir, filepath.FromSlash(rel))
 }
 
-// writeAsset writes a block's file, which must be inside the
-// document's root unless opts.AllowOutside. A symlink at path is
-// replaced, not followed.
-func writeAsset(path string, data []byte, opts Options) error {
-	err := docroot.WriteFile(docRoot(opts), path, data)
+// writeAsset writes a block's file, which must be inside root unless
+// root is "": see docRootFor. A symlink at path is replaced, not
+// followed.
+func writeAsset(path string, data []byte, root string) error {
+	err := docroot.WriteFile(root, path, data)
 	if pe := (*fs.PathError)(nil); errors.As(err, &pe) {
 		return fmt.Errorf("can't write %s: %w", path, pe.Err)
 	}
 	return err
 }
 
-// docRoot is the folder opts' reads and writes must stay in, or "" with
-// opts.AllowOutside: see docroot.Root.
-func docRoot(opts Options) string {
-	if opts.AllowOutside {
+// docRootFor is the folder a read or write of rel, as the document
+// writes it, must stay in, or "" with opts.AllowOutside or when rel is
+// in opts.AllowedOutside: see docroot.Root.
+func docRootFor(rel string, opts Options) string {
+	if opts.AllowOutside || (rel != "" && slices.Contains(opts.AllowedOutside, rel)) {
 		return ""
 	}
 	dir := opts.Dir

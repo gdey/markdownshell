@@ -198,6 +198,12 @@ type Options struct {
 	// env.source names (see run.Options.ApproveSources). If it is nil,
 	// no shell starts for a document that names any.
 	Sources func(paths []string) run.Answer
+	// Outside says whether the document may reach the files run.Outside
+	// lists, outside its folder or repository, as the user last
+	// answered. It is asked as each session starts, and only the files
+	// listed then are let out, so one an edit adds stays in until it is
+	// asked about. If it is nil, nothing reaches outside.
+	Outside func(paths []string) bool
 	// Resolved, if set, is told of each warning logged for the console
 	// that the document no longer has, as logged, after an edit fixes
 	// it.
@@ -338,7 +344,29 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		Audit:       n.opts.Events.Audit(),
 		// Nil stays nil: run treats that as nobody to ask.
 		ApproveSources: n.opts.Sources,
+		AllowedOutside: n.allowedOutside(n.d),
 	})
+}
+
+// Outside lists the files the document's includes and out= name
+// outside its folder or repository: see run.Outside.
+func (n *Notebook) Outside() []string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return run.Outside(n.d, run.Options{File: n.file})
+}
+
+// allowedOutside is the files outside the root d, this document or its
+// saved copy, may reach, as Options.Outside answers for its list now.
+func (n *Notebook) allowedOutside(d *doc.Document) []string {
+	if n.opts.Outside == nil {
+		return nil
+	}
+	paths := run.Outside(d, run.Options{File: n.file})
+	if len(paths) == 0 || !n.opts.Outside(paths) {
+		return nil
+	}
+	return paths
 }
 
 // ErrRestartNeeded is the answer when doing what was asked needs the
@@ -647,7 +675,9 @@ func (n *Notebook) Restart() error {
 	}
 	n.replaceSession(sess, whyRestart)
 	n.results = append([]*run.Result(nil), sess.Results()...)
-	return nil
+	// The new session read the includes again, which may now reach
+	// outside the root, or no longer: their fences show what it read.
+	return n.fold()
 }
 
 // Save writes the output of every block that ran into the file.

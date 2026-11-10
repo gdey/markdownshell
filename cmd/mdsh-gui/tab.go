@@ -189,6 +189,12 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 		Sources: t.app.trust.Ask(abs, func(paths []string) run.Answer {
 			return t.ask(done, "sources", map[string]any{"files": paths})
 		}),
+		// The files outside the document's root it may reach, as
+		// last answered for this list (see App.AnswerOutside).
+		Outside: func(paths []string) bool {
+			allow, ok := t.app.outside.Lookup(abs, paths)
+			return ok && allow
+		},
 		// A warning an edit fixed goes stale in the console.
 		Resolved: func(file, warning string) { t.app.console.resolve(file, warning) },
 	})

@@ -1,0 +1,80 @@
+package run_test
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
+	"testing"
+
+	"github.com/gdey/markdownshell/docroot"
+	"github.com/gdey/markdownshell/run"
+)
+
+// Outside lists the includes and out= files that leave the document's
+// root, as the document writes them, and nothing that stays inside.
+func TestOutsideList(t *testing.T) {
+	top := t.TempDir()
+	repo := filepath.Join(top, "repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(repo, "docs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A link inside the repository that points out of it counts as out.
+	if err := os.Symlink(top, filepath.Join(dir, "up")); err != nil {
+		t.Fatal(err)
+	}
+	src := "```sh {<include file=../README.md}\n```\n\n" +
+		"```sh {<include file=../../shared/x.sh}\n```\n\n" +
+		"```sh {<include file=../../shared/x.sh skip}\n```\n\n" +
+		"```sh {<include file=up/y.sh}\n```\n\n" +
+		"```sh {<include file=res://a.sh}\n```\n\n" +
+		"```sh {out=screenshot:shot.png}\necho\n```\n\n" +
+		"```sh {out=screenshot:../../.zshrc}\necho\n```\n\n" +
+		"```sh {out=image:/tmp/x.png}\necho\n```\n\n" +
+		"```sh\necho plain\n```\n"
+	d := parse(t, src)
+	got := run.Outside(d, run.Options{File: filepath.Join(dir, "doc.md")})
+	want := []string{"../../shared/x.sh", "up/y.sh", "../../.zshrc", "/tmp/x.png"}
+	if !slices.Equal(got, want) {
+		t.Errorf("Outside = %q, want %q", got, want)
+	}
+	if got := run.Outside(parse(t, "```sh {<include file=../README.md}\n```\n"), run.Options{File: filepath.Join(dir, "doc.md")}); got != nil {
+		t.Errorf("inside only: Outside = %q, want none", got)
+	}
+}
+
+// AllowedOutside lets the files it names reach outside the root, and
+// only those: a file the document names after it was allowed stays in.
+func TestAllowedOutside(t *testing.T) {
+	top := t.TempDir()
+	dir := filepath.Join(top, "sub")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"shared", "secret"} {
+		if err := os.WriteFile(filepath.Join(top, f), []byte(f+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := "```txt {<include file=../shared}\n```\n\n" +
+		"```txt {<include file=../secret}\n```\n\n" +
+		"```sh {#img out=image:../out.svg on_error=continue}\nprintf '<svg/>'\n```\n"
+	opts := run.Options{Dir: dir, File: filepath.Join(dir, "d.md"), AllowedOutside: []string{"../shared", "../out.svg"}}
+	_, results := runDoc(t, src, opts)
+	if r := results[0]; r.Err != nil || string(r.Stdout) != "shared\n" {
+		t.Errorf("allowed include = %q, %v", r.Stdout, r.Err)
+	}
+	if r := results[1]; !errors.Is(r.Err, docroot.ErrOutside) {
+		t.Errorf("include not allowed: err = %v, want ErrOutside", r.Err)
+	}
+	if r := results[2]; r.Err != nil {
+		t.Errorf("allowed out=: err = %v", r.Err)
+	}
+	if _, err := os.Stat(filepath.Join(top, "out.svg")); err != nil {
+		t.Errorf("allowed out= file: %v", err)
+	}
+}

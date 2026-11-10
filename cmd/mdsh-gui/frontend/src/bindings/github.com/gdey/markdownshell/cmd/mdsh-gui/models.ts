@@ -270,6 +270,30 @@ export interface NvimText {
 }
 
 /**
+ * OutsideFiles are the files a document's includes and out= name
+ * outside its folder or repository, and what the user last said about
+ * them.
+ */
+export interface OutsideFiles {
+    /**
+     * Paths are the files, as the document writes them.
+     */
+    "paths": string[] | null;
+
+    /**
+     * Root is the folder they are outside: the document's repository,
+     * or its folder, with the home folder as ~.
+     */
+    "root": string;
+
+    /**
+     * Answer is "allow" or "deny", or "" when this list hasn't been
+     * answered: the page asks.
+     */
+    "answer": string;
+}
+
+/**
  * ReportStart is what the Report dialog starts with.
  */
 export interface ReportStart {
@@ -347,6 +371,12 @@ export interface Start {
      * folder settings can save.
      */
     "writable": string[] | null;
+
+    /**
+     * Outside are the files, by absolute path, allowed to reach outside
+     * their folder or repository, which the list tags.
+     */
+    "outside": string[] | null;
 }
 
 /**

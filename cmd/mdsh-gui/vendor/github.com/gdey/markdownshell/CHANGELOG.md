@@ -8,6 +8,20 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh-gui asks whether a document may reach outside its repository,
+  as `mdsh --allow-outside` lets it on the command line. A document
+  whose includes or `out=` files name files outside its git repository
+  (or its folder) asks as it opens, listing them: Allow for this
+  document, Keep it inside, or Ask me later. The answer is remembered
+  for the document until the list changes, and only the files listed
+  are let out, so an include added later stays inside until it is asked
+  about. A banner says which way it was answered, with a button to
+  change it, and the start screen tags an allowed file *outside*.
+
+  ![deploy.md asking whether it may include ../shared/setup.sh, outside its repository, with Ask me later, Keep it inside and Allow for this document](docs/changelog/outside-dialog.png)
+
+  ![The start screen with deploy.md tagged outside in Recent and in the folder's list](docs/changelog/outside-finder.png)
+
 - `mdsh-gui`: a Witchcraft look in Settings › Look, in purple. The
   document is written on a scroll hung against a sky of stars and
   crescent moons: speckled kraft paper in aubergine ink, ruled round
