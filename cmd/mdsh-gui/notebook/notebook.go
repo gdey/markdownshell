@@ -854,6 +854,11 @@ func (n *Notebook) depend(dep, b *doc.Block) run.Answer {
 	i, of := n.index[dep], n.index[b]
 	n.mu.Unlock()
 	q := fmt.Sprintf("%s depends on this block, which hasn't run yet. Run it first?", n.d.Label(b))
+	if c := dep.Attrs["confirm"]; c != "" {
+		// Run answers dep's own confirm too, so its question is asked
+		// here, not a milder one.
+		q = fmt.Sprintf("%s depends on this block, which hasn't run yet. It asks: %s Run it first?", n.d.Label(b), c)
+	}
 	return n.opts.Depend(i, of, q)
 }
 

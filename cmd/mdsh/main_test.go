@@ -786,3 +786,45 @@ func TestPrintEscapes(t *testing.T) {
 		t.Errorf("print to a file changed the markdown:\n%q", out.String())
 	}
 }
+
+// TestQuestionContext checks that the questions show what else decides
+// what a block does: an unusual shell, its env, share, out and how it
+// runs, and a dependency's own confirm question, which Run answers too
+// (finding 10 of the v1.4.0 security review).
+func TestQuestionContext(t *testing.T) {
+	d, err := doc.Parse([]byte("---\nmdsh:\n  shell: ./tools/sh\n---\n```sh {#wipe confirm=\"This deletes the database. Sure?\" env=prod}\ndrop\n```\n\n```sh {#shot out=screenshot:../../.zshrc share=GITHUB_TOKEN background}\ndate\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wipe, shot := d.Blocks[0], d.Blocks[1]
+
+	var out bytes.Buffer
+	p := newPrompter(strings.NewReader("s\n"), &out)
+	p.d = d
+	p.confirm(shot)
+	for _, want := range []string{"runs in: ./tools/sh", "with: share=GITHUB_TOKEN out=screenshot:../../.zshrc background"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("confirm lacks %q:\n%s", want, out.String())
+		}
+	}
+
+	out.Reset()
+	p = newPrompter(strings.NewReader("s\n"), &out)
+	p.d = d
+	p.depend(wipe, shot)
+	for _, want := range []string{"with: env=prod", "wipe asks: This deletes the database. Sure? Run it first?"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("depend lacks %q:\n%s", want, out.String())
+		}
+	}
+
+	// A common shell and a plain block add nothing.
+	d, _ = doc.Parse([]byte("```sh {#a}\necho hi\n```\n"))
+	out.Reset()
+	p = newPrompter(strings.NewReader("s\n"), &out)
+	p.d = d
+	p.confirm(d.Blocks[0])
+	if s := out.String(); strings.Contains(s, "runs in:") || strings.Contains(s, "with:") {
+		t.Errorf("plain block's question has context:\n%s", s)
+	}
+}

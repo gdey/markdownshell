@@ -189,6 +189,11 @@ func (m *Model) block(i int) string {
 		keys := "[r]un  s[k]ip  [o]nly blocks without saved output  [s]top"
 		if m.prompt.of != nil {
 			q = fmt.Sprintf("%s depends on this block, which hasn't run. Run it first?", m.d.Label(m.prompt.of))
+			if c := b.Attrs["confirm"]; c != "" {
+				// Run answers the block's own confirm too, so its
+				// question is asked here, not a milder one.
+				q = fmt.Sprintf("%s depends on this block, which hasn't run. It asks: %s Run it first?", m.d.Label(m.prompt.of), c)
+			}
 			keys = "[r]un  s[k]ip  [s]top"
 		}
 		if m.prompt.of != nil && m.prompt.why != "" {
