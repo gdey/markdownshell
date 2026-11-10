@@ -126,7 +126,7 @@ func (m *Model) block(i int) string {
 
 	border := dimCol
 	switch {
-	case m.prompt != nil && m.prompt.block == b, running, m.bg[i]:
+	case m.prompt != nil && m.prompt.block == b, running, m.bg[i], m.asking() != nil && m.asking().q.Block == b:
 		border = runningCol
 	case selected:
 		border = accent
@@ -204,6 +204,10 @@ func (m *Model) block(i int) string {
 		}
 		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Width(w-2).Render(
 			promptStyle.Render(termsafe.Visible(q))+"\n"+helpStyle.Render(keys))
+	}
+	// So is a question the block asked with mdsh ctl.
+	if a := m.askView(i, w); a != "" {
+		out += "\n" + a
 	}
 	// A tty block runs in a terminal in its card, as in mdsh-gui.
 	if m.termBlock == i && !m.hist.running {

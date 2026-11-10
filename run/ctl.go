@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/gdey/markdownshell/audit"
@@ -63,8 +64,27 @@ func (s *Session) issue(b *doc.Block) (pre string, revoke func()) {
 	if s.ctl == nil || s.ctl.srv == nil {
 		return pre, func() {}
 	}
-	token := s.ctl.srv.Issue(b)
-	return s.ctlPrelude(token) + pre, func() { s.ctl.srv.Revoke(token) }
+	ctx, cancel := context.WithCancel(context.Background())
+	token := s.ctl.srv.Issue(&ctlCaller{b: b, ctx: ctx})
+	return s.ctlPrelude(token) + pre, func() {
+		s.ctl.srv.Revoke(token)
+		cancel()
+	}
+}
+
+// ctlCaller is who a token was issued to: one run of a block. ctx ends
+// when the run does, which withdraws a question the block asked.
+type ctlCaller struct {
+	b   *doc.Block
+	ctx context.Context
+}
+
+// callerBlock is the block caller stands for, or nil.
+func callerBlock(caller any) *doc.Block {
+	if c, ok := caller.(*ctlCaller); ok {
+		return c.b
+	}
+	return nil
 }
 
 // ctlPrelude exports $MDSH_SOCK, $MDSH_TOKEN and the variables ctl set
@@ -124,8 +144,14 @@ func (s *Session) inputFor(name string) *doc.Block { return s.d.InputFor(name) }
 
 // handleCtl answers a call from a block.
 func (s *Session) handleCtl(caller any, req ctl.Request) ctl.Response {
-	b, _ := caller.(*doc.Block)
+	b := callerBlock(caller)
 	switch req.Cmd {
+	case "ask", "confirm":
+		ctx := context.Background()
+		if c, ok := caller.(*ctlCaller); ok {
+			ctx = c.ctx
+		}
+		return s.ctlAsk(ctx, b, req.Cmd, req.Args)
 	case "set":
 		var a ctl.SetArgs
 		if err := json.Unmarshal(req.Args, &a); err != nil {
@@ -215,14 +241,18 @@ func (s *Session) handleLogged(caller any, req ctl.Request) ctl.Response {
 		return resp
 	}
 	f := audit.Fields{"cmd": req.Cmd, "ok": resp.OK, "code": resp.Code}
-	if b, ok := caller.(*doc.Block); ok {
+	if b := callerBlock(caller); b != nil {
 		f["block"], f["env"] = b.ID, blockEnv(b)
 	}
 	var args map[string]any
 	if json.Unmarshal(req.Args, &args) == nil {
 		if secret, _ := args["secret"].(bool); secret {
-			v, _ := args["value"].(string)
-			args["value"] = s.opts.Audit.Secret(v)
+			// set's value, or ask's default, which may be the answer.
+			for _, k := range []string{"value", "default"} {
+				if v, ok := args[k].(string); ok {
+					args[k] = s.opts.Audit.Secret(v)
+				}
+			}
 		}
 		f["args"] = args
 	}

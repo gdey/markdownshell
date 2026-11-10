@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gdey/markdownshell/ctl"
+	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -185,6 +186,67 @@ func TestNamesAny(t *testing.T) {
 	} {
 		if got := run.NamesAny(code, names); got != want {
 			t.Errorf("NamesAny(%q) = %v, want %v", code, got, want)
+		}
+	}
+}
+
+// TestCtlQuestions checks that ask and confirm from a block, and a
+// confirm block, are pending questions with ids while they are asked,
+// that the answers reach the block, and that a question is withdrawn
+// when its block times out.
+func TestCtlQuestions(t *testing.T) {
+	d := parse(t, "```sh {#a}\n"+
+		"echo \"$(mdsh_ctl ask --choice x,y 'Pick?')\"\n"+
+		"mdsh_ctl confirm 'Go?'; echo \"confirm=$?\"\n"+
+		"```\n\n"+
+		"```sh {#b confirm=\"Sure?\"}\necho b\n```\n\n"+
+		"```sh {#c timeout=300ms}\nmdsh_ctl ask 'Slow?'; echo \"slow=$?\"\n```\n")
+	var s *run.Session
+	var seen []string
+	opts := run.Options{Environ: []string{}, Ask: func(ctx context.Context, q run.Question) (string, run.Answered) {
+		p := s.Pending()
+		if len(p) != 1 || p[0].ID != q.ID {
+			t.Errorf("pending while asking %s: %+v", q.ID, p)
+		}
+		seen = append(seen, q.ID+":"+string(q.Kind)+":"+q.Text)
+		switch q.Text {
+		case "Pick?":
+			return "y", run.ByUser
+		case "Go?":
+			return ctl.NoValue, run.ByUser
+		}
+		<-ctx.Done()
+		return "", run.ByNone
+	}, Confirm: func(b *doc.Block) run.Answer {
+		p := s.Pending()
+		if len(p) != 1 || p[0].Kind != run.AskConfirm || p[0].Block != b || p[0].Text != "Sure?" {
+			t.Errorf("pending while confirming: %+v", p)
+		}
+		seen = append(seen, p[0].ID+":"+string(p[0].Kind))
+		return run.Go
+	}}
+	opts.Source = "mdsh_ctl() { " + ctlClient(t) + " \"$@\"; }"
+	var err error
+	if s, err = run.NewSession(d, opts); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	s.RunFrom(context.Background(), 0)
+	r := s.Results()
+	if got := string(r[0].Stdout); got != "y\nconfirm=1\n" {
+		t.Errorf("a: %q %q", got, r[0].Stderr)
+	}
+	if !r[2].TimedOut {
+		t.Errorf("c didn't time out: %+v", r[2])
+	}
+	want := "q1:ask:Pick? q2:ctl.confirm:Go? q3:confirm q4:ask:Slow?"
+	if got := strings.Join(seen, " "); got != want {
+		t.Errorf("asked %s, want %s", got, want)
+	}
+	// The withdrawn question comes off on the socket's goroutine.
+	for deadline := time.Now().Add(5 * time.Second); len(s.Pending()) != 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("left pending: %+v", s.Pending())
 		}
 	}
 }

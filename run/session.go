@@ -37,6 +37,7 @@ type Session struct {
 	// baseLookup is lookup without the variables mdsh ctl set made.
 	baseLookup doc.Lookup
 	ctl        *ctlState
+	qs         questions
 	wanted     map[string][]string
 	tty        bool // whether the shells have terminals of their own
 	jobs       []*bgJob
@@ -600,7 +601,7 @@ func (s *Session) RunBlock(ctx context.Context, i int) (*Result, error) {
 		}
 		return s.results[i], err
 	}
-	if confirm && s.opts.Confirm(b) != Go {
+	if confirm && s.askConfirm(b) != Go {
 		return s.results[i], nil
 	}
 	s.results[i] = r
@@ -650,7 +651,7 @@ func (s *Session) runDepends(ctx context.Context, b *doc.Block, ran map[*doc.Blo
 			if why := s.depOff(st.dep); why != "" && !emptyDep(st.dep) {
 				a = Skip
 				if s.opts.DependOff != nil {
-					a = s.opts.DependOff(st.dep, st.of, why)
+					a = s.askDependOff(st.dep, st.of, why)
 				}
 				if a == Skip {
 					// The reasons RunRange logs for the block in place.
@@ -789,7 +790,7 @@ func (s *Session) depend(dep, b *doc.Block) (Answer, error) {
 	if s.opts.Depend == nil {
 		return Stop, fmt.Errorf("%w: %s depends on %s, which hasn't run", ErrNoConfirm, s.d.Label(b), s.d.Label(dep))
 	}
-	return s.opts.Depend(dep, b), nil
+	return s.askDepend(dep, b), nil
 }
 
 // RunTyped runs block i on Terminal, as if it had been typed there: what
@@ -857,7 +858,7 @@ func (s *Session) confirm(b *doc.Block) (Answer, error) {
 	if s.opts.Confirm == nil {
 		return Stop, fmt.Errorf("%w: %s", ErrNoConfirm, s.d.Label(b))
 	}
-	return s.opts.Confirm(b), nil
+	return s.askConfirm(b), nil
 }
 
 func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
