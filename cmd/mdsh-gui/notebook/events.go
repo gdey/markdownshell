@@ -113,26 +113,28 @@ func (w eventWriter) Write(p []byte) (int, error) {
 // Why a notebook's shells start or end, for session.start and
 // session.end.
 const (
-	whyOpen       = "open"
-	whyReload     = "reload"
-	whyRestart    = "restart"
-	whyRunOptions = "run options"
-	whyHistory    = "history pane"
-	whySaveAs     = "save as"
-	whyTTY        = "tty block"
-	whyClose      = "close"
+	whyOpen        = "open"
+	whyReload      = "reload"
+	whyRestart     = "restart"
+	whyRunOptions  = "run options"
+	whyHistory     = "history pane"
+	whySaveAs      = "save as"
+	whyTTY         = "tty block"
+	whyFrontMatter = "front matter"
+	whyClose       = "close"
 )
 
 // reasons says each reason in words.
 var reasons = map[string]string{
-	whyOpen:       "the file was opened",
-	whyReload:     "the file was reloaded from disk",
-	whyRestart:    "Restart Shells",
-	whyRunOptions: "the shell or the files the shells source changed",
-	whyHistory:    "the History pane needs shells on a terminal",
-	whySaveAs:     "Save As moved the file to another folder",
-	whyTTY:        "the first tty block needs shells on a terminal",
-	whyClose:      "the file was closed",
+	whyOpen:        "the file was opened",
+	whyReload:      "the file was reloaded from disk",
+	whyRestart:     "Restart Shells",
+	whyRunOptions:  "the shell or the files the shells source changed",
+	whyHistory:     "the History pane needs shells on a terminal",
+	whySaveAs:      "Save As moved the file to another folder",
+	whyTTY:         "the first tty block needs shells on a terminal",
+	whyFrontMatter: "the front matter was fixed",
+	whyClose:       "the file was closed",
 }
 
 // Reason says why, a session.start or session.end reason, in words.

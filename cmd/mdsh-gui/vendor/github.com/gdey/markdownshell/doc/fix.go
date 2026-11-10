@@ -23,9 +23,14 @@ type Fix struct {
 
 // Fixes lists the fixes for d's warnings that have one: an output copy
 // for a block that isn't there goes, and a depends= loses an id that
-// names no block that runs. A warning has at most one fix.
+// names no block that runs, and a value in front matter that doesn't
+// parse is quoted when a colon in it is why. A warning has at most one
+// fix; the front matter's is for FrontMatterErr's text.
 func (d *Document) Fixes() []Fix {
 	var out []Fix
+	if f, ok := d.frontMatterFix(); ok {
+		out = append(out, f)
+	}
 	seen := map[string]bool{}
 	for _, c := range d.Copies {
 		if b := d.Block(c.For); b != nil && !b.IsInclude() && !b.IsTape() || seen[c.For] {

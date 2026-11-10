@@ -220,6 +220,23 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A file whose front matter doesn't parse, such as `title: Setup: the
+  first steps` with its colon not in quotes, now opens. mdsh-gui and
+  `mdsh -i` used to refuse it with only the YAML error. Now the file
+  shows as usual under a banner that gives the error, with lines
+  counted from the top of the file, and says blocks can't run until it
+  is fixed; the run buttons are off, and a run, a typed command or Run
+  all is refused. When a colon in a value is why, the banner offers
+  **Add quotes** (`F` in `mdsh -i`), which quotes the value and is
+  undone like any edit. Once the front matter parses, the shells start
+  again with what it says and blocks run. `mdsh FILE` still runs
+  nothing and says why, and `mdsh --no-run` prints the file with a
+  warning. This applies however the file is opened: File › Open, Open
+  With or a double click in Finder, the start screen or the command
+  line.
+
+  ![A runbook whose title has an unquoted colon, open in mdsh-gui under a red banner: the front matter error, "Blocks can't run until it is fixed", and Add quotes and Edit in source buttons; the run buttons are greyed](docs/changelog/bad-front-matter.png)
+
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
   app only the lines it changed. Each pause in the typing sent the whole
   file twice, and checking the fences' `depends=` sent it again, so a

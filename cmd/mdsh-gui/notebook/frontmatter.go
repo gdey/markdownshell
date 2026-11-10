@@ -10,6 +10,8 @@ import (
 	"unicode"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/gdey/markdownshell/doc"
 )
 
 // FrontMatter is the document's front matter as the rendered view's form
@@ -64,6 +66,11 @@ func (n *Notebook) frontMatterNode() (*yaml.Node, error) {
 	body := frontMatterBody(n.d.Src[n.d.FrontMatter.Start:n.d.FrontMatter.End])
 	var d yaml.Node
 	if err := yaml.Unmarshal(body, &d); err != nil {
+		// The document's error says it better: lines from the top of
+		// the file.
+		if n.d.FrontMatterErr != nil {
+			return nil, n.d.FrontMatterErr
+		}
 		return nil, fmt.Errorf("front matter: %w", err)
 	}
 	if d.Kind == 0 {
@@ -267,6 +274,13 @@ func (n *Notebook) SetFrontMatter(f FrontMatter) error {
 	src, err := n.withFrontMatter(root)
 	if err != nil {
 		return err
+	}
+	// Front matter that parses isn't broken by the form. Front matter
+	// that doesn't may be fixed by it a field at a time.
+	if n.d.FrontMatterErr == nil {
+		if d, err := doc.Parse(src); err == nil && d.FrontMatterErr != nil {
+			return d.FrontMatterErr
+		}
 	}
 	what := "edit front matter"
 	if len(changed) == 1 {

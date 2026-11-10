@@ -201,6 +201,15 @@ export interface Doc {
     "envBanner": string;
 
     /**
+     * FrontMatterError, if set, is why the front matter doesn't parse:
+     * the page shows it and runs nothing until it does. FrontMatterFix
+     * is the fix FixWarning makes for it, with that as the warning, if
+     * there is one; its Label is "" if not.
+     */
+    "frontMatterError": string;
+    "frontMatterFix": notebook$0.Fix;
+
+    /**
      * LastView is how the file was last shown, "rendered", "source" or
      * "both", or "" if that isn't remembered. LastHistory is whether
      * its History pane was open then.

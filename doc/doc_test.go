@@ -2,6 +2,7 @@ package doc
 
 import (
 	_ "embed"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -114,8 +115,55 @@ func TestParseNoFrontMatter(t *testing.T) {
 }
 
 func TestParseBadOnError(t *testing.T) {
-	if _, err := Parse([]byte("---\nmdsh:\n  on_error: maybe\n---\n")); err == nil {
-		t.Fatal("want error")
+	d, err := Parse([]byte("---\nmdsh:\n  on_error: maybe\n---\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.FrontMatterErr == nil {
+		t.Fatal("want FrontMatterErr")
+	}
+}
+
+func TestFrontMatterErrorText(t *testing.T) {
+	for _, tt := range []struct{ fm, want string }{
+		{"title: a: b\n", "front matter: mapping values are not allowed in this context"},
+		{"a: 1\n b: 2\n", "front matter: line 3: mapping values are not allowed in this context"},
+		{"title: x\ntitle: y\n", `front matter: line 3: mapping key "title" already defined at line 2`},
+	} {
+		d, err := Parse([]byte("---\n" + tt.fm + "---\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := fmt.Sprint(d.FrontMatterErr); got != tt.want {
+			t.Errorf("%q: %s, want %s", tt.fm, got, tt.want)
+		}
+	}
+	// Lines count from the top of the file, #! line and all.
+	d, _ := Parse([]byte("#!/usr/bin/env mdsh\n---\na: 1\n b: 2\n---\n"))
+	if got, want := fmt.Sprint(d.FrontMatterErr), "front matter: line 4: mapping values are not allowed in this context"; got != want {
+		t.Errorf("after #!: %s, want %s", got, want)
+	}
+}
+
+// Front matter that doesn't parse doesn't stop the document parsing:
+// it keeps its lines, with the error and the default options.
+func TestParseBadFrontMatter(t *testing.T) {
+	src := "---\ntitle: Setup: first steps\nmdsh:\n  on_error: stop\n---\n\n# Hi\n\n```sh\necho hi\n```\n"
+	d, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.FrontMatterErr == nil || !strings.Contains(d.FrontMatterErr.Error(), "front matter: ") {
+		t.Fatalf("FrontMatterErr = %v", d.FrontMatterErr)
+	}
+	if want := strings.Index(src, "\n\n# Hi") + 1; d.FrontMatter != (Span{0, want}) {
+		t.Errorf("FrontMatter = %+v, want {0 %d}", d.FrontMatter, want)
+	}
+	if d.Options.OnError != "" {
+		t.Errorf("Options = %+v, want the defaults", d.Options)
+	}
+	if len(d.Blocks) != 1 || d.Blocks[0].Body != "echo hi\n" {
+		t.Errorf("Blocks = %+v", d.Blocks)
 	}
 }
 
@@ -127,8 +175,8 @@ func TestParseTerminal(t *testing.T) {
 	if got := d.Options.Terminal; got.Cols != 120 || got.Rows != 40 {
 		t.Errorf("Terminal = %+v", got)
 	}
-	if _, err := Parse([]byte("---\nmdsh:\n  terminal:\n    rows: -1\n---\n")); err == nil {
-		t.Error("rows -1: want error")
+	if d, _ := Parse([]byte("---\nmdsh:\n  terminal:\n    rows: -1\n---\n")); d.FrontMatterErr == nil {
+		t.Error("rows -1: want FrontMatterErr")
 	}
 }
 

@@ -121,3 +121,69 @@ func TestSetFrontMatterNew(t *testing.T) {
 		t.Error("interpolate: false wasn't read")
 	}
 }
+
+// A file whose front matter doesn't parse opens and draws, says why,
+// runs nothing, typed or not, and its fix fixes it, after which
+// the shells start with what it says.
+func TestBadFrontMatterOpens(t *testing.T) {
+	file := write(t, "---\ntitle: Setup: first steps\nmdsh:\n  shell: /bin/sh\n---\n# Setup\n\n```sh {#one}\necho $0\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if e := n.FrontMatterError(); !strings.Contains(e, "mapping values are not allowed") {
+		t.Errorf("FrontMatterError = %q", e)
+	}
+	if len(n.Cells()) == 0 {
+		t.Error("no cells drawn")
+	}
+	if err := n.RunBlock(0); err == nil || !strings.Contains(err.Error(), "fix it to run blocks") {
+		t.Errorf("RunBlock: %v", err)
+	}
+	if err := n.RunFrom(0); err == nil {
+		t.Error("RunFrom ran")
+	}
+	if _, err := n.SetHistory(true, false); err != nil {
+		t.Fatal(err)
+	}
+	before := n.Text()
+	if err := n.Enter("echo typed"); err == nil {
+		t.Error("Enter ran")
+	}
+	if n.Text() != before {
+		t.Errorf("Enter added a block:\n%s", n.Text())
+	}
+	if _, err := n.SetHistory(false, false); err != nil {
+		t.Fatal(err)
+	}
+	if n.Cells()[len(n.Cells())-1].Ran {
+		t.Error("a block ran")
+	}
+	f := n.FrontMatterFix()
+	if f.Label == "" || !strings.Contains(f.Detail, "title") {
+		t.Errorf("FrontMatterFix = %+v", f)
+	}
+	sess := n.sess
+	if err := n.FixWarning(n.FrontMatterError()); err != nil {
+		t.Fatal(err)
+	}
+	if n.FrontMatterError() != "" || !strings.Contains(n.Text(), `title: "Setup: first steps"`) {
+		t.Fatalf("not fixed: %q\n%s", n.FrontMatterError(), n.Text())
+	}
+	if n.sess == sess {
+		t.Error("the shells readied with the defaults weren't replaced")
+	}
+	if what, _ := n.Undo(); what != "fix warning" || n.FrontMatterError() == "" {
+		t.Errorf("undo = %q, error %q", what, n.FrontMatterError())
+	}
+	if _, err := n.Redo(); err != nil || n.FrontMatterError() != "" {
+		t.Fatalf("redo: %v, error %q", err, n.FrontMatterError())
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if c := n.Cells(); !strings.Contains(c[len(c)-1].Output, "sh") {
+		t.Errorf("output = %q", c[len(c)-1].Output)
+	}
+}

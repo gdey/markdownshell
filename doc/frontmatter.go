@@ -3,7 +3,9 @@ package doc
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -108,6 +110,8 @@ func (o Options) ShareBanner() string {
 func (o Options) Interpolating() bool { return o.Interpolate == nil || *o.Interpolate }
 
 // parseFrontMatter reads YAML front matter starting at pos, if any.
+// Front matter mdsh can't read still covers its lines, with the error,
+// and Options at their defaults.
 func parseFrontMatter(src []byte, pos int) (Span, Options, error) {
 	var opts Options
 	end := lineEnd(src, pos)
@@ -123,15 +127,15 @@ func parseFrontMatter(src []byte, pos int) (Span, Options, error) {
 				Mdsh Options `yaml:"mdsh"`
 			}
 			if err := yaml.Unmarshal(src[body:p], &fm); err != nil {
-				return Span{}, opts, fmt.Errorf("front matter: %w", err)
+				return Span{pos, e}, opts, yamlError(err, lineNo(src, body)-1)
 			}
 			switch fm.Mdsh.OnError {
 			case "", "continue", "stop":
 			default:
-				return Span{}, opts, fmt.Errorf("front matter: on_error must be continue or stop, got %q", fm.Mdsh.OnError)
+				return Span{pos, e}, opts, fmt.Errorf("front matter: on_error must be continue or stop, got %q", fm.Mdsh.OnError)
 			}
 			if t := fm.Mdsh.Terminal; t.Cols < 0 || t.Rows < 0 || t.Cols > 1000 || t.Rows > 500 {
-				return Span{}, opts, fmt.Errorf("front matter: terminal cols must be 0 to 1000 and rows 0 to 500, got %d by %d", t.Cols, t.Rows)
+				return Span{pos, e}, opts, fmt.Errorf("front matter: terminal cols must be 0 to 1000 and rows 0 to 500, got %d by %d", t.Cols, t.Rows)
 			}
 			return Span{pos, e}, fm.Mdsh, nil
 		}
@@ -139,4 +143,27 @@ func parseFrontMatter(src []byte, pos int) (Span, Options, error) {
 	}
 	// No closing line: not front matter, just a thematic break.
 	return Span{pos, pos}, opts, nil
+}
+
+// yamlLine is a line number in a YAML error.
+var yamlLine = regexp.MustCompile(`\bline (\d+)\b`)
+
+// yamlError is err, from reading the front matter's YAML, said as
+// mdsh says errors, on one line: without YAML's "yaml: " and
+// "unmarshal errors:", and with the lines it names counted from the top
+// of the file, which is offset lines above the YAML's first line.
+func yamlError(err error, offset int) error {
+	msg := strings.TrimPrefix(err.Error(), "yaml: ")
+	msg = strings.TrimPrefix(msg, "unmarshal errors:\n")
+	var parts []string
+	for _, l := range strings.Split(msg, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			parts = append(parts, l)
+		}
+	}
+	msg = yamlLine.ReplaceAllStringFunc(strings.Join(parts, "; "), func(m string) string {
+		n, _ := strconv.Atoi(m[len("line "):])
+		return "line " + strconv.Itoa(n+offset)
+	})
+	return fmt.Errorf("front matter: %s", msg)
 }

@@ -551,6 +551,12 @@ func (n *Notebook) start(f func(context.Context) error) error {
 		n.mu.Unlock()
 		return ErrBusy
 	}
+	// Nothing runs, not even a typed command, with settings mdsh can't
+	// read.
+	if err := n.d.FrontMatterErr; err != nil {
+		n.mu.Unlock()
+		return &run.FrontMatterError{Err: err}
+	}
 	n.waitReap()
 	ctx, cancel := context.WithCancel(context.Background())
 	n.running, n.cancel = true, cancel

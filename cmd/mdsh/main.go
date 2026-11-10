@@ -338,6 +338,9 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	// still filled in, since reading a file runs nothing. -o saves what
 	// would be printed, unstyled.
 	if noRun || (*hideCode && *hideOutput && !*write) {
+		if d.FrontMatterErr != nil {
+			fmt.Fprintf(stderr, "mdsh: %s: warning: %s\n", displayName(file), d.FrontMatterErr)
+		}
 		results := run.Includes(d, run.Options{File: file, AllowOutside: *allowOutside})
 		if *outFile != "" {
 			out, _ := report.Render(d, results, reportOpts)
@@ -355,6 +358,12 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 			}
 		}
 		return nil
+	}
+
+	// Settings mdsh can't read could be anything, such as on_error:
+	// stop or the shell: run nothing. --no-run still prints the file.
+	if d.FrontMatterErr != nil {
+		return fmt.Errorf("%s: %w; mdsh runs no block until it is fixed (--no-run prints the file without running)", displayName(file), d.FrontMatterErr)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)

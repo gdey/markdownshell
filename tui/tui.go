@@ -746,6 +746,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd := m.editAll(); cmd != nil {
 			return m, cmd
 		}
+	case "F":
+		m.fixFrontMatter()
 	case "y":
 		if cmd := m.copyBlock(); cmd != nil {
 			return m, cmd
@@ -952,11 +954,19 @@ func (m *Model) editedAll(text string, was string) {
 	if i := m.cur(); i >= 0 {
 		b = m.d.Blocks[i]
 	}
+	// The front matter's banner may come or go, which moves the view.
+	if banner := m.fmBanner() != nil; m.ready {
+		defer func() {
+			if (m.fmBanner() != nil) != banner {
+				m.resize(m.width, m.height)
+			}
+		}()
+	}
 	if err := m.d.SetSource([]byte(text)); err != nil {
 		m.status = "edit: " + err.Error()
 		return
 	}
-	if err := m.sess.Sync(); err != nil {
+	if err := m.syncSession(); err != nil {
 		m.status = "edited; " + err.Error()
 	} else {
 		m.status = "edited"
@@ -981,6 +991,69 @@ func (m *Model) editedAll(text string, was string) {
 	if m.opts.AutoSave {
 		m.save(false)
 	}
+}
+
+// syncSession catches the session up with an edited document. Front
+// matter that parses now, and didn't, means new shells with what it
+// says: nothing ran in the old ones, since nothing can run until then.
+func (m *Model) syncSession() error {
+	err := m.sess.Sync()
+	if !errors.Is(err, run.ErrFrontMatterFixed) {
+		return err
+	}
+	sess, err := m.newSession(m.opts.Run)
+	if err != nil {
+		return err
+	}
+	m.sess.Close()
+	m.sess = sess
+	return nil
+}
+
+// frontMatterFix is the fix mdsh offers for front matter that doesn't
+// parse, if it has one.
+func (m *Model) frontMatterFix() (doc.Fix, bool) {
+	if m.d == nil || m.d.FrontMatterErr == nil {
+		return doc.Fix{}, false
+	}
+	for _, f := range m.d.Fixes() {
+		if f.Warning == m.d.FrontMatterErr.Error() {
+			return f, true
+		}
+	}
+	return doc.Fix{}, false
+}
+
+// fixFrontMatter makes the front matter's fix, as an edit of the file.
+func (m *Model) fixFrontMatter() {
+	if m.running {
+		m.status = "a block is running; ctrl+c stops it"
+		return
+	}
+	f, ok := m.frontMatterFix()
+	if !ok {
+		if m.d.FrontMatterErr != nil {
+			m.status = "mdsh can't fix this front matter; E edits the file"
+		}
+		return
+	}
+	m.editedAll(string(f.Src), string(m.d.Src))
+	if m.d.FrontMatterErr == nil {
+		m.status = "front matter fixed: " + strings.ToLower(f.Label[:1]) + f.Label[1:] + "; w saves"
+	}
+}
+
+// fmBanner is the lines over the document while its front matter
+// doesn't parse: the error, then what to do. It is nil when it parses.
+func (m *Model) fmBanner() []string {
+	if m.d == nil || m.d.FrontMatterErr == nil {
+		return nil
+	}
+	todo := "Blocks can't run until it is fixed · "
+	if f, ok := m.frontMatterFix(); ok {
+		todo += "F " + strings.ToLower(f.Label) + " · "
+	}
+	return []string{termsafe.Visible(m.d.FrontMatterErr.Error()), todo + "E edit the file"}
 }
 
 // edited puts the edited block, or file, into the document.
@@ -1304,8 +1377,16 @@ func (m *Model) readOnly() bool {
 
 // askBeforeRun opens save as before a run when autosave would save to a
 // read-only file, and reports whether it did; run starts once saved.
+// While the front matter doesn't parse it says so and runs nothing.
 // Cancelling it means the next run goes ahead without saving.
 func (m *Model) askBeforeRun(run func()) bool {
+	if m.d.FrontMatterErr != nil {
+		m.status = "not run: fix the front matter first"
+		if _, ok := m.frontMatterFix(); ok {
+			m.status += " (F fixes it)"
+		}
+		return true
+	}
 	if !m.opts.AutoSave || m.opts.Save == nil || m.roRun == m.opts.Run.File || !m.readOnly() {
 		return false
 	}
@@ -1386,6 +1467,7 @@ func (m *Model) vpHeight() int {
 	if m.envBanner() != "" {
 		h--
 	}
+	h -= len(m.fmBanner())
 	h -= len(m.srcBanner())
 	return max(h, 1)
 }
@@ -1413,6 +1495,12 @@ func (m *Model) View() string {
 		// One line, cut short to fit: the names it leaves out are in the
 		// front matter.
 		view = envBannerStyle.Width(m.width).Render(ansi.Truncate(b, m.width-2, "…")) + "\n" + view
+	}
+	if lines := m.fmBanner(); lines != nil {
+		for i := range lines {
+			lines[i] = bannerStyle.Width(m.width).Render(ansi.Truncate(lines[i], m.width-2, "…"))
+		}
+		view = strings.Join(lines, "\n") + "\n" + view
 	}
 	if lines := m.srcBanner(); lines != nil {
 		for i := range lines {
