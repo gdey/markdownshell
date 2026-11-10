@@ -17,7 +17,7 @@ import (
 // opts.File's directory; res://name is name in the document's assets
 // folder, <doc>.assets. The file must be a regular file of at most
 // docroot.MaxRead bytes inside the document's root, unless
-// opts.AllowOutside.
+// opts.AllowOutside or opts.AllowedOutside names it.
 func Includes(d *doc.Document, opts Options) []*Result {
 	if opts.Dir == "" && opts.File != "" {
 		opts.Dir = filepath.Dir(opts.File)
@@ -52,7 +52,7 @@ func includeBlock(b *doc.Block, r *Result, opts Options) {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(opts.Dir, filepath.FromSlash(path))
 	}
-	data, err := docroot.ReadFile(docRoot(opts), path, 0)
+	data, err := docroot.ReadFile(docRootFor(inc.File, opts), path, 0)
 	if pe := (*fs.PathError)(nil); errors.As(err, &pe) {
 		err = pe.Err
 	}

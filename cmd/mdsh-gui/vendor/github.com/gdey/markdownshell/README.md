@@ -410,7 +410,8 @@ reads `notes.md` from the document's assets folder, `<doc>.assets/`.
 must be inside the document's git repository, or its folder when it isn't
 in one, and at most 16 MB; `out=` paths and the images `--html` and
 `--pdf` read are held to the same folder. `--allow-outside` lifts that for
-a document you trust. `from=` and `to=` are line
+a document you trust; mdsh-gui asks, once per document, and lets out
+only the files it listed. `from=` and `to=` are line
 numbers counted from 1 and inclusive; `from` defaults to the start of the
 file and `to` to the end. The fence's language is the language, and
 `number_on` shows line numbers when the document is printed, in the
