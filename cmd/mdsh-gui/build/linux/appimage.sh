@@ -6,7 +6,8 @@
 #
 # Run it from cmd/mdsh-gui on Linux, with GTK 4 and WebKitGTK 6.0
 # installed (libgtk-4-dev, libwebkitgtk-6.0-dev). wails3 generate
-# appimage bundles WebKit's helper processes and downloads linuxdeploy.
+# appimage bundles WebKit's helper processes and packs the image with
+# linuxdeploy.
 set -eu
 version=$1
 out=$(realpath -m "$2")
@@ -17,6 +18,25 @@ trap 'rm -rf "$work"' EXIT
 go build -tags production -trimpath -ldflags "-s -w -X main.version=$version" -o "$work/mdsh-gui" .
 cp build/appicon.png "$work/mdsh-gui.png"
 mkdir -p "$work/dist"
+
+# linuxdeploy, at a release pinned by checksum. wails3 downloads the
+# latest continuous build when the build folder doesn't already hold
+# one, so a changed upload would land in the image unchecked (finding 11
+# of the v1.4.0 security review). wails3 itself comes through the Go
+# module proxy, checked against the checksum database like any module.
+case $(uname -m) in
+x86_64) ld=linuxdeploy-x86_64.AppImage ld_sum=c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d ;;
+aarch64) ld=linuxdeploy-aarch64.AppImage ld_sum=620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff ;;
+*)
+	echo "no pinned linuxdeploy for $(uname -m)" >&2
+	exit 1
+	;;
+esac
+mkdir -p "$work/appdir"
+curl -fsSL --retry 8 --retry-all-errors -o "$work/appdir/$ld" \
+	"https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/$ld"
+echo "$ld_sum  $work/appdir/$ld" | sha256sum -c - >/dev/null
+
 go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0 generate appimage \
 	-binary "$work/mdsh-gui" \
 	-icon "$work/mdsh-gui.png" \

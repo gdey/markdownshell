@@ -36,8 +36,8 @@ jobs:
     # Pull requests from forks always use GitHub's runners.
     runs-on: ${{ matrix.os == 'macos-latest' && vars.MACOS_RUNNER && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.MACOS_RUNNER) || matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
           # A self-hosted runner keeps Go's caches on its own disk; saving
@@ -61,8 +61,8 @@ jobs:
       run:
         working-directory: cmd/mdsh-gui
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: cmd/mdsh-gui/go.mod
           cache-dependency-path: cmd/mdsh-gui/go.sum
@@ -76,6 +76,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           curl -fsSL --retry 8 --retry-all-errors -o "$RUNNER_TEMP/nvim.tar.gz" https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-linux64.tar.gz
+          echo "be1f0988d0de71c375982b87b86cd28d2bab35ece8285abe3b0aac57604dfc5a  $RUNNER_TEMP/nvim.tar.gz" | sha256sum -c -
           tar xzf "$RUNNER_TEMP/nvim.tar.gz" -C "$RUNNER_TEMP"
           echo "MDSH_TEST_NVIM=$RUNNER_TEMP/nvim-linux64/bin/nvim" >> "$GITHUB_ENV"
       - run: go vet ./...
