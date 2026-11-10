@@ -201,6 +201,14 @@ follow [Semantic Versioning](https://semver.org/).
   pre-release) stops the release. goreleaser runs `go mod verify`
   instead of `go mod tidy`, so a release can't build a `go.mod` that
   differs from the tag's (finding 11 of the v1.4.0 security review).
+- The build pins what it downloads. The workflows name each action by
+  commit, not by a tag that can be moved. The macOS build installs
+  dmgbuild and what it needs from a requirements file with
+  `pip --require-hashes`. The AppImage build fetches linuxdeploy at a
+  tagged release and checks its checksum, instead of whatever
+  continuous build wails3 would download. CI checks the Neovim tarball's
+  checksum too. A changed upload now fails the build instead of landing
+  in the signed app (finding 11 of the v1.4.0 security review).
 - `mdsh -i` and mdsh-gui show the environment banner over a file whose
   `env.share` names variables beyond the base set, and list them: "This
   file brings in GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY from your

@@ -32,7 +32,7 @@ jobs:
   tap:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # The tag comes in through env, never spliced into the script: a
       # tag name may hold $(...) or backticks. Anything that isn't a
       # plain vX.Y.Z[-pre] stops here, so later steps can trust it.

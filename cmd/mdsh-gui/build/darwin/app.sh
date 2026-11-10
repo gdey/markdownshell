@@ -126,7 +126,7 @@ ditto -c -k --keepParent "$app" "$out/$name.zip"
 # The .dmg opens on a window that shows dragging mdsh to Applications;
 # build/darwin/dmg/settings.py lays it out.
 python3 -m venv "$work/venv"
-"$work/venv/bin/pip" install --quiet dmgbuild==1.6.7
+"$work/venv/bin/pip" install --quiet --require-hashes -r build/darwin/dmg/requirements.txt
 "$work/venv/bin/dmgbuild" -s build/darwin/dmg/settings.py -D app="$app" mdsh "$out/$name.dmg" >/dev/null
 
 if [ -n "$identity" ]; then
