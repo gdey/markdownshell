@@ -72,6 +72,15 @@ follow [Semantic Versioning](https://semver.org/).
   fails the build instead of being installed (finding 7 of the v1.5.0
   security review).
 
+- mdsh-gui's cast player now refuses a recording wider than 1000
+  columns, taller than 500 rows, or with more than 100,000 writes or
+  16 MB of output, the limits mdsh already put on casts for reports and
+  GIFs. A `.cast` beside a document, made with a huge size in its
+  header, used to make the player ask xterm.js for billions of cells
+  and hang or kill the window as the card was drawn. The card now says
+  the recording is too large instead (finding 6 of the v1.5.0 security
+  review).
+
 ## [1.5.0] - 2026-11-10
 
 mdsh-gui settles in. Settings and the cheat sheet open in tabs beside
