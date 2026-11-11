@@ -29,8 +29,6 @@ func TestCLILink(t *testing.T) {
 	if c := h.state(); c.Installed || c.Other != "" || c.Broken != "" || !c.InPath {
 		t.Fatalf("before install: %+v", c)
 	}
-	var saw []string
-	h.saw = func(p string) { saw = append(saw, p) }
 	if err := h.install(); err != nil {
 		t.Fatal(err)
 	}
@@ -39,9 +37,6 @@ func TestCLILink(t *testing.T) {
 	}
 	if !h.state().Installed {
 		t.Error("not installed after install")
-	}
-	if len(saw) != 1 || saw[0] != h.bundled {
-		t.Errorf("install noted %q, want this app's helper", saw)
 	}
 	if err := h.uninstall(); err != nil {
 		t.Fatal(err)
@@ -76,35 +71,51 @@ func TestCLIMovedApp(t *testing.T) {
 }
 
 // TestCLIOtherApp checks that launching an mdsh.app doesn't take over a
-// link into another mdsh.app that is still there, such as an older
-// release on a mounted .dmg, unless this app stood there before
-// (finding 7 of the v1.4.0 security review).
+// link into another mdsh.app that is still there, such as the installed
+// app's while this copy runs from a mounted .dmg, even after the
+// installed app has launched and repaired its own link (finding 7 of
+// the v1.4.0 security review, and finding 1 of the v1.5.0 one, where
+// every copy shared one record of "where this app has stood").
 func TestCLIOtherApp(t *testing.T) {
 	tmp := t.TempDir()
 	bin := filepath.Join(tmp, "bin")
 	os.MkdirAll(bin, 0o755)
-	installed := fakeApp(t, filepath.Join(tmp, "Applications"))
-	h := &cliHost{bundled: fakeApp(t, filepath.Join(tmp, "Volumes", "mdsh-1.3")), link: filepath.Join(bin, "mdsh"), pathDirs: []string{bin}}
-	if err := os.Symlink(installed, h.link); err != nil {
+	link := filepath.Join(bin, "mdsh")
+	installed := &cliHost{bundled: fakeApp(t, filepath.Join(tmp, "Applications")), link: link, pathDirs: []string{bin}}
+	if err := installed.install(); err != nil {
 		t.Fatal(err)
 	}
-	if c := h.state(); c.Broken != installed || !c.OtherApp {
+	// The installed app launches: its own link is left as it is.
+	if changed, err := installed.repair(); err != nil || changed != "" {
+		t.Fatalf("installed app's repair = %q, %v", changed, err)
+	}
+	// Then a copy launches from a mounted .dmg.
+	dmg := &cliHost{bundled: fakeApp(t, filepath.Join(tmp, "Volumes", "mdsh-dmg")), link: link, pathDirs: []string{bin}}
+	if c := dmg.state(); c.Broken != installed.bundled || !c.OtherApp {
 		t.Errorf("state = %+v, want another app", c)
 	}
-	changed, err := h.repair()
-	if err != nil || changed != "" {
-		t.Fatalf("repair = %q, %v", changed, err)
+	for range 2 {
+		changed, err := dmg.repair()
+		if err != nil || changed != "" {
+			t.Fatalf("dmg copy's repair = %q, %v", changed, err)
+		}
+		if target, _ := os.Readlink(link); target != installed.bundled {
+			t.Fatalf("the dmg copy's launch moved the link to %q", target)
+		}
 	}
-	if target, _ := os.Readlink(h.link); target != installed {
-		t.Errorf("another app's launch moved the link to %q", target)
-	}
-	// Where this app has stood before is its own.
-	h.known = []string{installed}
-	if _, err := h.repair(); err != nil {
+	// Install, asked for, is what moves it.
+	if err := dmg.install(); err != nil {
 		t.Fatal(err)
 	}
-	if !h.state().Installed {
-		t.Error("repair left a link to a place this app stood")
+	if !dmg.state().Installed {
+		t.Error("Install didn't point the link at the copy")
+	}
+	// And the installed app, launched again, doesn't take it back.
+	if changed, err := installed.repair(); err != nil || changed != "" {
+		t.Fatalf("installed app's repair after the copy's Install = %q, %v", changed, err)
+	}
+	if target, _ := os.Readlink(link); target != dmg.bundled {
+		t.Errorf("the installed app's launch moved the link back to %q", target)
 	}
 }
 

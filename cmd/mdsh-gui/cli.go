@@ -63,12 +63,6 @@ type cliHost struct {
 	// admin runs a shell command as root, after asking for a password,
 	// for a link folder the user can't write. Nil when there's no way.
 	admin func(cmd string) error
-	// known are the bundled paths the link has pointed at before, from
-	// the settings: where this app has stood (see repair).
-	known []string
-	// saw, if set, is told the bundled path whenever the link is seen
-	// pointing at it, to add to known.
-	saw func(path string)
 }
 
 // marker is the file beside a copied mdsh that says this app put it
@@ -172,9 +166,6 @@ func (h *cliHost) install() error {
 		err = h.admin(fmt.Sprintf("mkdir -p %s && ln -sfn %s %s",
 			shellQuote(filepath.Dir(h.link)), shellQuote(h.bundled), shellQuote(h.link)))
 	}
-	if err == nil && h.saw != nil {
-		h.saw(h.bundled)
-	}
 	return err
 }
 
@@ -234,21 +225,19 @@ func (h *cliHost) uninstall() error {
 
 // repair is the launch-time check, which asks nothing, and says what it
 // changed, for the Console. On macOS it points a link into an mdsh.app
-// back at this app when the app moved: when the link's target is gone,
-// or is a place this app has stood (known). A link into another
-// mdsh.app that is still there, such as an older release's on a mounted
-// .dmg or a fork's build, is left alone: launching that copy once must
-// not make it the mdsh every terminal runs; Settings › Shell shows it,
-// and Install takes it over when asked. From an AppImage it copies
-// again only when the copy is an older version's, never a newer one's.
-// (Finding 7 of the v1.4.0 security review.)
+// back at this app when the app moved, which is when the link's target
+// is gone. A link into another mdsh.app that is still there, such as the
+// installed app's while this copy runs from a mounted .dmg, an older
+// release's, or a fork's build, is left alone: launching that copy once
+// must not make it the mdsh every terminal runs; Settings › Shell shows
+// it, and Install takes it over when asked. Nothing remembered decides
+// this, since the settings are the user's and every copy of the app
+// shares them. From an AppImage it copies again only when the copy is an
+// older version's, never a newer one's. (Finding 7 of the v1.4.0
+// security review, and finding 1 of the v1.5.0 one.)
 func (h *cliHost) repair() (changed string, err error) {
 	c := h.state()
 	switch {
-	case !h.copy && c.Installed:
-		if h.saw != nil {
-			h.saw(h.bundled)
-		}
 	case h.copy && c.Installed:
 		v, _ := os.ReadFile(h.marker())
 		old := strings.TrimSpace(string(v))
@@ -260,8 +249,7 @@ func (h *cliHost) repair() (changed string, err error) {
 		}
 		return fmt.Sprintf("updated %s from %s to %s", h.link, old, h.version), nil
 	case !h.copy && c.Broken != "":
-		_, statErr := os.Stat(c.Broken)
-		if statErr == nil && !slices.Contains(h.known, c.Broken) {
+		if c.OtherApp {
 			return "", nil
 		}
 		if err := os.Remove(h.link); err != nil {
@@ -269,9 +257,6 @@ func (h *cliHost) repair() (changed string, err error) {
 		}
 		if err := os.Symlink(h.bundled, h.link); err != nil {
 			return "", err
-		}
-		if h.saw != nil {
-			h.saw(h.bundled)
 		}
 		return fmt.Sprintf("pointed %s at this app; it pointed at %s", h.link, c.Broken), nil
 	}

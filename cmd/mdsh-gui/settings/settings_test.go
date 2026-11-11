@@ -278,14 +278,3 @@ func TestSecretShow(t *testing.T) {
 		}
 	}
 }
-
-func TestSawCLI(t *testing.T) {
-	var s Settings
-	for i := range MaxCLIPaths + 2 {
-		s.SawCLI(fmt.Sprintf("/a%d/mdsh.app/Contents/MacOS/mdsh", i))
-	}
-	s.SawCLI("/a3/mdsh.app/Contents/MacOS/mdsh")
-	if len(s.CLIPaths) != MaxCLIPaths || s.CLIPaths[0] != "/a3/mdsh.app/Contents/MacOS/mdsh" || s.CLIPaths[1] != fmt.Sprintf("/a%d/mdsh.app/Contents/MacOS/mdsh", MaxCLIPaths+1) {
-		t.Errorf("CLIPaths = %q", s.CLIPaths)
-	}
-}
