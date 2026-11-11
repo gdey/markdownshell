@@ -139,6 +139,7 @@ header, .banner {
   border-bottom: 1px solid var(--border);
 }
 .banner { background: var(--warn-bg); border-bottom-color: var(--warn-border); }
+#outside-vcs { background: var(--warn-bg); border-left: 3px solid var(--warn-border); border-radius: 4px; padding: 6px 10px; }
 .banner span { flex: 1; }
 .banner > svg { flex: none; width: 16px; height: 16px; fill: currentColor; }
 #fmerror { background: color-mix(in srgb, var(--bad) 12%, var(--bg)); border-bottom-color: var(--bad); }

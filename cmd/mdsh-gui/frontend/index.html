@@ -335,6 +335,7 @@
       <h2 id="outside-title">Let this document reach outside its repository?</h2>
       <p id="outside-detail" class="muted">Its includes and <code>out=</code> files name these, outside <code id="outside-root"></code>. A document is kept inside its repository (or its folder) so it can't read a key into its output or write over a file of yours. Allow only a document you trust. Your answer is remembered for this document, until the list changes.</p>
       <ul id="outside-list"></ul>
+      <p id="outside-vcs" class="warn" hidden>Some of these are in the repository's own <code>.git</code> folder, which holds its settings and hooks. A remote's address there can hold a password or token.</p>
       <div class="buttons">
         <button id="outside-later" value="" formnovalidate>Ask me later</button>
         <button value="deny">Keep it inside</button>

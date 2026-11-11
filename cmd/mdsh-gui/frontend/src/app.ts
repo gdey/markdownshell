@@ -4484,12 +4484,19 @@ function askOutside(o: OutsideFiles) {
   const dialog = $<HTMLDialogElement>("outside-dialog");
   $("outside-root").textContent = o.root;
   $("outside-list").replaceChildren(...(o.paths ?? []).map((p) => el("li", {}, el("code", {}, p))));
+  $("outside-vcs").hidden = !(o.paths ?? []).some(inRepoFolder);
   dialog.returnValue = "";
   dialog.onclose = () => {
     if (dialog.returnValue !== "") void answerOutside(dialog.returnValue);
   };
   if (!dialog.open) dialog.showModal();
   $("outside-later").focus();
+}
+
+// inRepoFolder says whether a path, as the document writes it, names a
+// repository's own folder or something in it, as docroot.InMetadata does.
+function inRepoFolder(path: string): boolean {
+  return path.split(/[\\/]/).some((part) => [".git", ".hg", ".jj", ".svn"].includes(part.toLowerCase()));
 }
 
 async function answerOutside(answer: string) {
