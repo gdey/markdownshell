@@ -24,6 +24,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 
+	"github.com/gdey/markdownshell/ctl"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
@@ -104,6 +105,12 @@ type Model struct {
 	started  map[int]time.Time
 	clocking bool
 	prompt   *confirmMsg
+	// asks are the questions blocks put with mdsh ctl ask and confirm,
+	// asked one at a time, the first in its block's card with askIn or
+	// askPick.
+	asks    []*askMsg
+	askIn   textinput.Model
+	askPick int
 	// srcAsk is the env.source question while it is up, and src the
 	// answer given, which the run's goroutine reads.
 	srcAsk *srcPrompt
@@ -319,6 +326,7 @@ func (m *Model) newSession(ro run.Options) (*run.Session, error) {
 	ro.Confirm = m.confirm
 	ro.Depend = m.depend
 	ro.DependOff = m.dependOff
+	ro.Ask = m.ask
 	ro.ApproveSources = m.approveSources
 	// tty blocks run in a terminal drawn in their card.
 	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
@@ -493,6 +501,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sess.Reap()
 		}
 		return m, m.tick()
+	case askMsg:
+		cmd := m.askAdd(msg)
+		m.refresh()
+		return m, tea.Batch(m.wait, cmd)
+	case askGoneMsg:
+		cmd := m.askGone(msg.id)
+		m.refresh()
+		return m, tea.Batch(m.wait, cmd)
 	case confirmMsg:
 		i := m.index[msg.block]
 		if m.skipSaved && m.hasOutput(i) && msg.of == nil {
@@ -588,6 +604,8 @@ func (m *Model) event(e run.Event) {
 		m.moveTo(i)
 	case run.Stdout, run.Stderr:
 		m.live[i] = append(m.live[i], chunk{stderr: e.Kind == run.Stderr, data: string(e.Data)})
+	case run.Unanswered:
+		m.status = termsafe.Visible(m.d.Label(e.Block) + ": " + ctl.NoAnswerError(e.Question.Text))
 	case run.Done:
 		delete(m.started, i)
 		delete(m.live, i)
@@ -670,6 +688,11 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.answer(k.String())
 		m.refresh()
 		return m, nil
+	}
+	if m.asking() != nil {
+		cmd := m.askKey(k)
+		m.refresh()
+		return m, cmd
 	}
 	if m.hist.sel != nil {
 		cmd := m.selKey(k)
@@ -1564,6 +1587,8 @@ func (m *Model) footer() string {
 		help = promptStyle.Render(fmt.Sprintf("%s depends on %s, which hasn't run. Run it first?  [r]un  s[k]ip  [s]top", termsafe.Visible(m.d.Label(m.prompt.of)), termsafe.Visible(m.d.Label(m.prompt.block))))
 	case m.prompt != nil:
 		help = promptStyle.Render(m.name(m.prompt.block)+" is waiting for an answer:") + helpStyle.Render(" r run · k skip · o only blocks without saved output · s stop")
+	case m.asking() != nil:
+		help = m.askHelp()
 	case m.hist.sel != nil:
 		help = helpStyle.Render("↑/↓ j/k move the end · g/G first/last · o other end · y enter copy · esc cancel")
 	case m.hist.focus:

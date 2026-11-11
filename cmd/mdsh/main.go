@@ -19,8 +19,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -29,6 +31,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/gdey/markdownshell/audit"
+	"github.com/gdey/markdownshell/ctl"
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/lsp"
 	"github.com/gdey/markdownshell/render"
@@ -448,6 +451,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	if tty != nil {
 		p = newPrompter(tty, tty)
 		p.d = d
+		p.tty = tty
 		// The streamed document already shows the code, unless it is
 		// hidden.
 		p.quiet = live != nil && !*hideCode
@@ -455,6 +459,20 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 			p.shown = live.codeShown
 		}
 		opts.DependOff = p.dependOff
+	}
+	// mdsh ctl ask and confirm are asked on the terminal. --yes
+	// answers a confirm that has no --default; with nobody to ask,
+	// the default answers, or the call exits 4.
+	opts.Ask = func(ctx context.Context, q run.Question) (string, run.Answered) {
+		switch {
+		case *yes && q.Kind == run.AskCtlConfirm && q.HasDefault:
+			return q.Default, run.ByDefault
+		case *yes && q.Kind == run.AskCtlConfirm:
+			return ctl.Yes, run.ByYes
+		case p == nil:
+			return "", run.ByNone
+		}
+		return p.ask(ctx, q)
 	}
 	if *yes {
 		opts.Confirm = func(*doc.Block) run.Answer { return run.Go }
@@ -486,14 +504,21 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 	}
 
-	// mdsh ctl status shows on stderr. It comes from the control
-	// socket while its block runs.
+	// mdsh ctl status shows on stderr, as does an ask or confirm that
+	// nobody answered. They come from the control socket while their
+	// block runs.
 	next := opts.OnEvent
 	var statusMu sync.Mutex
 	opts.OnEvent = func(e run.Event) {
-		if e.Kind == run.Status {
+		switch e.Kind {
+		case run.Status:
 			statusMu.Lock()
 			fmt.Fprintln(stderr, progressLine(d.Label(e.Block), e.Progress))
+			statusMu.Unlock()
+			return
+		case run.Unanswered:
+			statusMu.Lock()
+			fmt.Fprintf(stderr, "mdsh: block %s: %s\n", termsafe.Visible(d.Label(e.Block)), termsafe.Visible(ctl.NoAnswerError(e.Question.Text)))
 			statusMu.Unlock()
 			return
 		}
@@ -602,12 +627,17 @@ func asks(d *doc.Document, opts run.Options) bool {
 		return true
 	}
 	for _, b := range d.Blocks {
-		if b.Attrs.Has("confirm") {
+		if b.Attrs.Has("confirm") || ctlAsks.MatchString(b.Body) {
 			return true
 		}
 	}
 	return false
 }
+
+// ctlAsks finds a block that may ask with mdsh ctl ask or confirm. A
+// script it calls may ask too, unseen; then the question comes before
+// the block's prose, which is only harder to read.
+var ctlAsks = regexp.MustCompile(`\bctl\s+(ask|confirm)\b`)
 
 // streamer prints the rendered document as a run reaches each block:
 // the prose and code before the block starts, its output once it is
@@ -767,6 +797,119 @@ type prompter struct {
 	// shown, if set, reports whether a block's code was printed, for
 	// quiet.
 	shown func(*doc.Block) bool
+	// tty, if set, is the terminal in, so a secret answer isn't shown
+	// as it is typed.
+	tty *os.File
+
+	// mu keeps one question on the terminal at a time: a block's
+	// mdsh ctl ask comes from the control socket while the run may be
+	// asking about the next block.
+	mu sync.Mutex
+	// line, if not nil, is a read of in that a withdrawn question
+	// left waiting; the next question gets its line.
+	line chan readResult
+}
+
+type readResult struct {
+	line string
+	err  error
+}
+
+// readLine reads a line from in, or gives up when ctx ends. A read it
+// gives up on goes on, and the next readLine gets its line.
+func (p *prompter) readLine(ctx context.Context) (string, error) {
+	if p.line == nil {
+		ch := make(chan readResult, 1)
+		go func() {
+			line, err := p.in.ReadString('\n')
+			ch <- readResult{line, err}
+		}()
+		p.line = ch
+	}
+	select {
+	case r := <-p.line:
+		p.line = nil
+		return r.line, r.err
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+// ask asks q, a question a block put with mdsh ctl ask or confirm, on
+// the terminal. Pressing enter takes the default, if there is one. It
+// gives up, with run.ByNone, when ctx ends because the block did.
+func (p *prompter) ask(ctx context.Context, q run.Question) (string, run.Answered) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	fmt.Fprintf(p.out, "\n--- block %s asks ---\n", p.label(q.Block))
+	text := termsafe.Visible(q.Text)
+	for {
+		switch {
+		case q.Kind == run.AskCtlConfirm:
+			yn := "y/n"
+			if q.HasDefault && q.Default == ctl.Yes {
+				yn = "Y/n"
+			} else if q.HasDefault {
+				yn = "y/N"
+			}
+			fmt.Fprintf(p.out, "%s [%s]: ", text, yn)
+		case len(q.Choices) > 0:
+			var cs []string
+			for i, c := range q.Choices {
+				c = fmt.Sprintf("%d) %s", i+1, termsafe.Visible(c))
+				if q.HasDefault && q.Choices[i] == q.Default {
+					c += " (default)"
+				}
+				cs = append(cs, c)
+			}
+			fmt.Fprintf(p.out, "%s  %s: ", text, strings.Join(cs, "  "))
+		case q.HasDefault && !q.Secret:
+			fmt.Fprintf(p.out, "%s [%s]: ", text, termsafe.Visible(q.Default))
+		default:
+			fmt.Fprintf(p.out, "%s: ", text)
+		}
+		restore := func() {}
+		if q.Secret {
+			restore = noEcho(p.tty)
+		}
+		line, err := p.readLine(ctx)
+		restore()
+		if q.Secret {
+			fmt.Fprintln(p.out)
+		}
+		if ctx.Err() != nil {
+			fmt.Fprintf(p.out, "\n--- block %s ended; its question is withdrawn ---\n", p.label(q.Block))
+			return "", run.ByNone
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if err != nil && line == "" {
+			return "", run.ByNone
+		}
+		if line == "" && q.HasDefault {
+			return q.Default, run.ByUser
+		}
+		switch {
+		case q.Kind == run.AskCtlConfirm:
+			switch strings.ToLower(strings.TrimSpace(line)) {
+			case "y", "yes":
+				return ctl.Yes, run.ByUser
+			case "n", "no":
+				return ctl.NoValue, run.ByUser
+			}
+		case len(q.Choices) > 0:
+			if slices.Contains(q.Choices, line) {
+				return line, run.ByUser
+			}
+			if n, err := strconv.Atoi(strings.TrimSpace(line)); err == nil && n >= 1 && n <= len(q.Choices) {
+				return q.Choices[n-1], run.ByUser
+			}
+		default:
+			return line, run.ByUser
+		}
+		if err != nil {
+			return "", run.ByNone
+		}
+	}
 }
 
 // label names b in a message.
@@ -842,6 +985,8 @@ func newPrompter(in io.Reader, out io.Writer) *prompter {
 // the shells. Pressing enter stops, so it is the safe choice. The answer
 // is remembered for the file (see package trust), so say so.
 func (p *prompter) sources(paths []string) run.Answer {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	fmt.Fprintf(p.out, "\n--- this document reads these files into its shell before any block runs ---\n")
 	for _, path := range paths {
 		fmt.Fprintf(p.out, "  %s\n", termsafe.Visible(path))
@@ -849,7 +994,7 @@ func (p *prompter) sources(paths []string) run.Answer {
 	fmt.Fprintf(p.out, "---\nmdsh remembers the answer for this document, until the list changes.\n")
 	for {
 		fmt.Fprintf(p.out, "Read them in? [y]es / [n]o, run without them / [s]top: ")
-		line, err := p.in.ReadString('\n')
+		line, err := p.readLine(context.Background())
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "y", "yes":
 			return run.Go
@@ -868,6 +1013,8 @@ func (p *prompter) sources(paths []string) run.Answer {
 // Pressing enter stops, so it is the safe choice.
 // depend asks whether to run dep, which b depends on, first.
 func (p *prompter) depend(dep, b *doc.Block) run.Answer {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	fmt.Fprintf(p.out, "\n--- block %s depends on %s, which hasn't run ---\n", p.label(b), p.label(dep))
 	if !p.quiet || dep.Span.Start > b.Span.Start || !p.printed(dep) {
 		// A later block hasn't been printed yet.
@@ -882,7 +1029,7 @@ func (p *prompter) depend(dep, b *doc.Block) run.Answer {
 	}
 	for {
 		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [s]top: ", q)
-		line, err := p.in.ReadString('\n')
+		line, err := p.readLine(context.Background())
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":
 			return run.Go
@@ -901,6 +1048,8 @@ func (p *prompter) depend(dep, b *doc.Block) run.Answer {
 // where it stands (see run.Options.DependOff). Skip goes on as if it
 // had run.
 func (p *prompter) dependOff(dep, b *doc.Block, why string) run.Answer {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	fmt.Fprintf(p.out, "\n--- block %s depends on %s, which %s ---\n", p.label(b), p.label(dep), run.OffReason(dep, why))
 	if !p.quiet || dep.Span.Start > b.Span.Start || !p.printed(dep) {
 		fmt.Fprintf(p.out, "%s---\n", termsafe.Visible(dep.Body))
@@ -908,7 +1057,7 @@ func (p *prompter) dependOff(dep, b *doc.Block, why string) run.Answer {
 	p.warnControl(dep)
 	for {
 		fmt.Fprintf(p.out, "Run %s anyway? [r]un / s[k]ip, going on as if it ran / [s]top: ", p.label(dep))
-		line, err := p.in.ReadString('\n')
+		line, err := p.readLine(context.Background())
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":
 			return run.Go
@@ -924,6 +1073,8 @@ func (p *prompter) dependOff(dep, b *doc.Block, why string) run.Answer {
 }
 
 func (p *prompter) confirm(b *doc.Block) run.Answer {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.skipSaved && b.HasOutput() {
 		fmt.Fprintf(p.out, "--- block %s: skipped, keeping its saved output ---\n", p.label(b))
 		return run.Skip
@@ -945,7 +1096,7 @@ func (p *prompter) confirm(b *doc.Block) run.Answer {
 	p.context(b)
 	for {
 		fmt.Fprintf(p.out, "%s [r]un / s[k]ip / [o]nly run blocks without saved output / [s]top: ", termsafe.Visible(q))
-		line, err := p.in.ReadString('\n')
+		line, err := p.readLine(context.Background())
 		switch strings.ToLower(strings.TrimSpace(line)) {
 		case "r", "run", "y", "yes":
 			return run.Go

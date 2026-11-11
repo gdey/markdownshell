@@ -22,6 +22,23 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The whole of greet.sh over the window, with lines 2–9 marked as the included ones](docs/changelog/include-whole-file.png)
 
+- `mdsh ctl ask` and `mdsh ctl confirm`: a block can ask you a question
+  while it runs. `ask` prints the answer, with `--choice a,b,c` to
+  limit it, `--default V` for when nobody can answer, and `--secret` to
+  hide the typing; `confirm` answers with its exit code, 0 for yes and
+  1 for no. `mdsh` asks on the terminal and `mdsh -i` in the block's
+  card. With nobody to answer, as in a report or a run with no terminal,
+  the default answers, or the call exits 4 and mdsh says "no answer".
+  `--yes` answers yes to a `confirm` with no default. A question is
+  withdrawn when its block ends, and the audit log's new `ask` event
+  records the answer and who gave it. Every question a run waits on,
+  these and `confirm` and `depends=` ones alike, now has an id. mdsh-gui
+  doesn't ask these yet; there the default answers.
+
+  ![mdsh -i asking Deploy where? in the running block's card, with staging picked and prod beside it](docs/changelog/ctl-ask-tui.png)
+
+  ![mdsh on the command line asking Deploy where? with numbered choices, then Deploy to prod now? [y/N]](docs/changelog/ctl-ask-cli.png)
+
 ### Fixed
 
 - Pressing enter in mdsh-gui's History pane no longer sends the keys you

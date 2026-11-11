@@ -17,9 +17,14 @@ commands, for blocks that mdsh runs:
   set [--secret] NAME VALUE   set $MDSH_VAR_NAME for later blocks (- reads VALUE from stdin)
   unset NAME                  remove a variable that set made
   get NAME                    print $MDSH_VAR_NAME as it is now
+  ask [--choice a,b,c] [--default V] [--secret] QUESTION
+                              ask the user for text and print the answer
+  confirm [--default yes|no] QUESTION
+                              ask the user yes or no; the exit code is the answer
   status [--step N --of M] TEXT
                               show progress for this block
-exit codes: 0 done, 2 refused, 3 not running under mdsh`
+exit codes: 0 done or yes, 1 no, 2 refused, 3 not running under mdsh,
+4 no answer (nobody to ask and no --default)`
 
 // ctlCmd is mdsh ctl: a block talking back to the run that started it,
 // over the socket in $MDSH_SOCK. It returns the exit code.
@@ -44,12 +49,23 @@ func ctlCall(args []string, sock, token string, stdin io.Reader, stdout, stderr 
 	fs.SetOutput(io.Discard)
 	var call any
 	var nargs int
+	var def *string
 	switch cmd {
 	case "set":
 		fs.Bool("secret", false, "")
 		call, nargs = &ctl.SetArgs{}, 2
 	case "unset", "get":
 		call, nargs = &ctl.NameArgs{}, 1
+	case "ask", "confirm":
+		if cmd == "ask" {
+			fs.String("choice", "", "")
+			fs.Bool("secret", false, "")
+		}
+		fs.Func("default", "", func(v string) error {
+			def = &v
+			return nil
+		})
+		call, nargs = &ctl.AskArgs{}, -1
 	case "status":
 		a := &ctl.StatusArgs{}
 		fs.IntVar(&a.Step, "step", 0, "")
@@ -78,6 +94,23 @@ func ctlCall(args []string, sock, token string, stdin io.Reader, stdout, stderr 
 		a.Secret = fs.Lookup("secret").Value.String() == "true"
 	case *ctl.NameArgs:
 		a.Name = rest[0]
+	case *ctl.AskArgs:
+		a.Question = strings.Join(rest, " ")
+		a.Default = def
+		if f := fs.Lookup("choice"); f != nil && f.Value.String() != "" {
+			a.Choices = strings.Split(f.Value.String(), ",")
+		}
+		a.Secret = fs.Lookup("secret") != nil && fs.Lookup("secret").Value.String() == "true"
+		if cmd == "confirm" && def != nil {
+			switch strings.ToLower(*def) {
+			case "y", "yes":
+				*def = ctl.Yes
+			case "n", "no":
+				*def = ctl.NoValue
+			default:
+				return fail(ctl.Refused, "confirm: --default is yes or no, not %q", *def)
+			}
+		}
 	case *ctl.StatusArgs:
 		a.Text = strings.Join(rest, " ")
 		if (a.Step == 0) != (a.Of == 0) {
@@ -93,10 +126,12 @@ func ctlCall(args []string, sock, token string, stdin io.Reader, stdout, stderr 
 		return fail(ctl.NotRunning, "not running under mdsh ($%s is unset or nothing is listening on it)", ctl.SockVar)
 	case err != nil:
 		return fail(ctl.Refused, "%s: %v", cmd, err)
+	case cmd == "confirm" && resp.Code == ctl.No:
+		return ctl.No
 	case !resp.OK:
 		return fail(resp.Code, "%s", resp.Error)
 	}
-	if cmd == "get" {
+	if cmd == "get" || cmd == "ask" {
 		fmt.Fprintln(stdout, resp.Value)
 	}
 	return ctl.OK

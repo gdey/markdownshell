@@ -49,8 +49,10 @@ or file.
 | `mdsh ctl set [--secret] NAME VALUE` | Set `$MDSH_VAR_NAME` for the blocks after this one; `-` reads the value from stdin; `--secret` has mdsh-gui blur output that names it |
 | `mdsh ctl unset NAME` | Remove a variable `set` made |
 | `mdsh ctl get NAME` | Print `$MDSH_VAR_NAME` as it is now |
+| `mdsh ctl ask [--choice a,b] [--default V] [--secret] QUESTION` | Ask for text and print the answer |
+| `mdsh ctl confirm [--default yes\|no] QUESTION` | Ask yes or no; the exit code is the answer |
 | `mdsh ctl status [--step N --of M] TEXT` | Show progress for this block |
-| `mdsh ctl help` | List these. Exit codes: 0 done, 2 refused, 3 not under mdsh |
+| `mdsh ctl help` | List these. Exit codes: 0 done or yes, 1 no, 2 refused, 3 not under mdsh, 4 no answer |
 
 `mdsh-gui [flags] [file.md [args…] | folder]` takes `--source FILE`,
 `--only ID`, `--step`, `--stop-on-error` and `--version`; on Linux the

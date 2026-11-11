@@ -5,8 +5,8 @@ weight: 45
 ---
 
 A block can talk back to the run that started it with `mdsh ctl`: set a
-variable for the blocks after it, read one back, or say how far along it
-is. And a run can write an audit log, so a run that a block changed can be
+variable for the blocks after it, read one back, ask you a question, or
+say how far along it is. And a run can write an audit log, so a run that a block changed can be
 reviewed afterwards.
 
 `mdsh ctl` can't add, edit or run blocks, and it can't change prose. You
@@ -34,6 +34,8 @@ mdsh ctl status "found $latest"
 | `mdsh ctl set --secret NAME VALUE` | The same, and keeps the value out of the file and the log |
 | `mdsh ctl unset NAME` | Removes a variable that `set` made |
 | `mdsh ctl get NAME` | Prints `$MDSH_VAR_NAME` as it is now, including values set after this block started |
+| `mdsh ctl ask QUESTION` | Asks you for text and prints the answer. `--choice a,b,c` limits the answers, `--default V` answers when nobody can, `--secret` hides the typing |
+| `mdsh ctl confirm QUESTION` | Asks you yes or no; the exit code is the answer. `--default yes` or `--default no` answers when nobody can |
 | `mdsh ctl status TEXT` | Shows progress for this block. `--step N --of M` adds a count |
 
 `NAME` is letters, digits and `_`, without the `MDSH_VAR_` in front.
@@ -55,13 +57,34 @@ mdsh ctl status "found $latest"
 The status line goes to stderr under `mdsh`; it is never written to the
 file.
 
+### Questions
+
+````markdown
+```sh {#deploy}
+env=$(mdsh ctl ask --choice staging,prod --default staging "Deploy where?")
+mdsh ctl confirm --default no "Deploy to $env now?" || exit 0
+./deploy "$env"
+```
+````
+
+`mdsh` asks on the terminal and `mdsh -i` in the block's card. Flags go
+before the question. Pressing enter takes the `--default`. When nobody
+can answer (a report, or a run with no terminal), the `--default`
+answers; with none, the call exits 4 and mdsh says "no answer" with the
+block. `--yes` answers yes to a `confirm` that has no default. A question
+is withdrawn if its block ends first, as when its `timeout=` does, and the
+time spent waiting counts toward that timeout. mdsh-gui can't ask these
+yet, so there the `--default` answers.
+
 ### Exit codes
 
 | Code | Means |
 | --- | --- |
-| 0 | Done |
+| 0 | Done, or `confirm` answered yes |
+| 1 | `confirm` answered no |
 | 2 | Refused: bad arguments, a name an input binds, or a token that has stopped working |
 | 3 | Not running under mdsh |
+| 4 | No answer: `ask` or `confirm` with nobody to answer and no `--default` |
 
 `status` is the exception to 3: outside mdsh it does nothing and exits
 0, so a script that reports progress still runs on its own.
@@ -99,6 +122,7 @@ run, to a file only you can read. Each has `seq`, a time `t` and an
 | `block.skip` | A block not run, and why: `skip`, the `run=` condition and the value it saw, `once`, `--only`, a failed `depends=` |
 | `ctl` | Every `mdsh ctl` call, refused ones too, with the block, arguments and result |
 | `var` | A variable changing, with the old and new values and what changed it |
+| `ask` | A question from `ask` or `confirm`, with its id, the answer, and who answered: `user`, `default`, `yes-flag`, or `none` |
 | `write` | mdsh saving the document |
 
 A secret value never appears in the log. Where it would go, the log has

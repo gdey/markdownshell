@@ -86,6 +86,8 @@ func pump(t *testing.T, m *Model) {
 				if m.prompt != nil {
 					return
 				}
+			case askMsg, askGoneMsg:
+				return
 			}
 		case <-time.After(10 * time.Second):
 			t.Fatal("timed out waiting for the run")
