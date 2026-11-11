@@ -166,6 +166,77 @@ func SetFlag(info, key string, on bool) string {
 	return info[:open] + "{" + inner + key + "}"
 }
 
+// SetAttr returns info, a fence info string, with key set to value,
+// replacing what key held, or with value empty, taken out:
+//
+//	SetAttr("go {<include file=a.go}", "to", "20")       // go {<include file=a.go to=20}
+//	SetAttr("go {<include file=a.go to=20}", "to", "30") // go {<include file=a.go to=30}
+//	SetAttr("go {<include file=a.go to=20}", "to", "")   // go {<include file=a.go}
+//
+// A value with a space or a quote in it is quoted. Like SetFlag, it
+// returns info unchanged when info has text after the language that
+// isn't attributes.
+func SetAttr(info, key, value string) string {
+	token := key + "=" + value
+	if strings.ContainsAny(value, " \t\"{}") {
+		token = key + `="` + strings.ReplaceAll(value, `"`, `\"`) + `"`
+	}
+	info = strings.TrimSpace(info)
+	open := 0 // where the { is
+	if !strings.HasPrefix(info, "{") {
+		i := strings.IndexFunc(info, func(r rune) bool { return unicode.IsSpace(r) || r == '{' })
+		if i < 0 {
+			if value != "" {
+				return strings.TrimSpace(info + " {" + token + "}")
+			}
+			return info
+		}
+		rest := strings.TrimLeftFunc(info[i:], unicode.IsSpace)
+		if !strings.HasPrefix(rest, "{") {
+			return info
+		}
+		open = len(info) - len(rest)
+	}
+	close := len(info)
+	if strings.HasSuffix(info, "}") {
+		close--
+	}
+	inner := info[open+1 : close]
+	for _, t := range attrTokens(inner) {
+		k, _, _ := strings.Cut(inner[t.Start:t.End], "=")
+		if k != key {
+			continue
+		}
+		if value != "" {
+			return info[:open] + "{" + inner[:t.Start] + token + inner[t.End:] + "}"
+		}
+		// Take out the token and the space before it, or after it when
+		// it comes first.
+		from, to := t.Start, t.End
+		for from > 0 && unicode.IsSpace(rune(inner[from-1])) {
+			from--
+		}
+		if from == 0 {
+			for to < len(inner) && unicode.IsSpace(rune(inner[to])) {
+				to++
+			}
+		}
+		inner = inner[:from] + inner[to:]
+		if strings.TrimSpace(inner) == "" {
+			return strings.TrimSpace(info[:open])
+		}
+		return info[:open] + "{" + inner + "}"
+	}
+	if value == "" {
+		return info
+	}
+	inner = strings.TrimRightFunc(inner, unicode.IsSpace)
+	if strings.TrimSpace(inner) != "" {
+		inner += " "
+	}
+	return info[:open] + "{" + inner + token + "}"
+}
+
 // attrTokens are where the tokens of s are, split as splitAttrs splits
 // them.
 func attrTokens(s string) []Span {

@@ -330,6 +330,12 @@ func (s *Session) ReadIncludes() {
 	}
 }
 
+// IncludeFile reads the whole of the file include block b names, as
+// IncludeFile does with the session's options.
+func (s *Session) IncludeFile(b *doc.Block) ([]byte, error) {
+	return IncludeFile(b, s.opts)
+}
+
 // readInclude reads include block b's file, or skips it with skip.
 func (s *Session) readInclude(b *doc.Block) *Result {
 	r := &Result{Block: b}

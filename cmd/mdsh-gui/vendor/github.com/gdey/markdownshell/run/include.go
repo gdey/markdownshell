@@ -44,10 +44,28 @@ func includeBlock(b *doc.Block, r *Result, opts Options) {
 		r.Err = err
 		return
 	}
+	data, err := IncludeFile(b, opts)
+	if err != nil {
+		r.Err = err
+		return
+	}
+	r.Stdout, r.Err = Lines(data, inc.From, inc.To)
+}
+
+// IncludeFile reads the whole of the file include block b names, under
+// the same rules as Includes. A relative path is relative to opts.Dir,
+// or opts.File's directory.
+func IncludeFile(b *doc.Block, opts Options) ([]byte, error) {
+	if opts.Dir == "" && opts.File != "" {
+		opts.Dir = filepath.Dir(opts.File)
+	}
+	inc, err := b.Include()
+	if err != nil {
+		return nil, err
+	}
 	path, err := resolveRes(inc.File, opts)
 	if err != nil {
-		r.Err = fmt.Errorf("include: %w", err)
-		return
+		return nil, fmt.Errorf("include: %w", err)
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(opts.Dir, filepath.FromSlash(path))
@@ -57,20 +75,26 @@ func includeBlock(b *doc.Block, r *Result, opts Options) {
 		err = pe.Err
 	}
 	if err != nil {
-		r.Err = fmt.Errorf("include %s: %w", inc.File, err)
-		return
+		return nil, fmt.Errorf("include %s: %w", inc.File, err)
 	}
-	r.Stdout, r.Err = Lines(data, inc.From, inc.To)
+	return data, nil
+}
+
+// LineCount is how many lines data has, counting a last line without a
+// newline.
+func LineCount(data []byte) int {
+	n := bytes.Count(data, []byte("\n"))
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		n++
+	}
+	return n
 }
 
 // Lines returns lines from through to of data, numbered from 1 and
 // inclusive. from 0 is the first line and to 0 the last.
 func Lines(data []byte, from, to int) ([]byte, error) {
 	from = max(from, 1)
-	n := bytes.Count(data, []byte("\n"))
-	if len(data) > 0 && data[len(data)-1] != '\n' {
-		n++
-	}
+	n := LineCount(data)
 	if from > n {
 		return nil, fmt.Errorf("include: from=%d is past the end of the file (%d lines)", from, n)
 	}
