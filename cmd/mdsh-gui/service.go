@@ -1009,6 +1009,28 @@ func (a *App) SetFolds(ctx context.Context, folds []notebook.Fold) error {
 	return err
 }
 
+// SetIncludeRange writes from= and to= on include block i, as its grips
+// were dragged to. Undo takes it back.
+func (a *App) SetIncludeRange(ctx context.Context, i, from, to int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.SetIncludeRange(i, from, to)
+	t.changed()
+	return err
+}
+
+// IncludeFile reads the whole of include block i's file, for showing it
+// and for dragging the include's range over it.
+func (a *App) IncludeFile(ctx context.Context, i int) (notebook.IncludeFile, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.IncludeFile{}, err
+	}
+	return n.IncludeFile(i)
+}
+
 // SetCastFrame writes frame=n, where a recording's player was left, on
 // tty block i, or with i < 0 on the cast fence holding body. Undo takes
 // it back.

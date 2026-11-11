@@ -8,6 +8,58 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An include block in mdsh-gui's rendered view has a grip above and
+  below its lines. Dragging the bottom one down shows the lines after
+  them, raising `to=`, and dragging the top one up shows the lines
+  before, lowering `from=`; the lines appear as the grip moves, and the
+  range is written to the file when it is let go, as one edit Undo takes
+  back. A grip dragged to the file's edge takes the attribute out, so
+  the include follows the file as it grows. With a grip focused, up and
+  down move it a line. The eye button by the file's name shows the whole
+  file over the window, with the included lines marked.
+
+  ![An include being dragged: the bar says lines 4–9 of 10, and the lines after the function are shown as the grip moves](docs/changelog/include-grips.png)
+
+  ![The whole of greet.sh over the window, with lines 2–9 marked as the included ones](docs/changelog/include-whole-file.png)
+
+### Fixed
+
+- Pressing enter in mdsh-gui's History pane no longer sends the keys you
+  type next to the rendered view. While a command typed there runs, the
+  input used to give its place to the run's clock, and hiding it dropped
+  the keyboard onto the page until the command ended. Now the clock comes
+  before the input, the input keeps the keyboard, and what you type
+  meanwhile waits in it for the next command, as a terminal's type-ahead
+  does. A command that takes the terminal gives the keyboard back to the
+  input when it ends, not to the page.
+
+  ![The History pane while "sleep 2; echo hi" runs: the dimmed prompt, "running 0.4s", and "abc" typed meanwhile in the focused input](docs/changelog/history-type-ahead.png)
+
+## [1.5.0] - 2026-11-10
+
+mdsh-gui settles in. Settings and the cheat sheet open in tabs beside
+your files, each file reopens in the view it was left in, and the
+outline keeps the selected block in sight. Typing in the source view
+hands the app only the lines it changed, so long documents stay quick to
+edit. 1.5's new look is Witchcraft, a purple scroll under the stars, and
+looks are now one folder each, made into everything else by
+`go generate`. A cast recording prints as a picture, a GIF or text outside
+the app, and in it can be replaced with its frame's text or a GIF. A
+file whose front matter doesn't parse now opens, under a banner that
+gives the error and offers to fix it, with running blocked until it's
+fixed. On macOS, Finder's Open With opens the file, and Escape in vim
+mode no longer leaves fullscreen. mdsh now asks before it reads a
+document's `env.source` files into its shells, so an unattended run of a
+document that names any stops until it's approved once or given `--yes`.
+A document's includes, `out=` files and report images must now stay
+inside its repository or folder unless you pass `--allow-outside`. Links
+to files no longer open scripts or apps, a skipped block another one
+depends on asks before it runs, secrets stay masked in the source pane
+and `mdsh -i`, and escape sequences in a document print as text rather
+than reaching the terminal.
+
+### Added
+
 - mdsh-gui asks whether a document may reach outside its repository,
   as `mdsh --allow-outside` lets it on the command line. A document
   whose includes or `out=` files name files outside its git repository
@@ -153,7 +205,6 @@ follow [Semantic Versioning](https://semver.org/).
   ![mdsh asking whether to run wipe, marked skip, which publish depends on](docs/changelog/dep-skip-cli.png)
 
   ![mdsh -i asking the same in the card of the skip block](docs/changelog/dep-skip-tui.png)
-
 - mdsh-gui writes its settings, `gui.json`, so only you can read them
   (0600, in a 0700 folder when it makes one). They name your recent
   files, the shell and the Neovim to run, and were readable by every
@@ -215,6 +266,14 @@ follow [Semantic Versioning](https://semver.org/).
   pre-release) stops the release. goreleaser runs `go mod verify`
   instead of `go mod tidy`, so a release can't build a `go.mod` that
   differs from the tag's (finding 11 of the v1.4.0 security review).
+- The build pins what it downloads. The workflows name each action by
+  commit, not by a tag that can be moved. The macOS build installs
+  dmgbuild and what it needs from a requirements file with
+  `pip --require-hashes`. The AppImage build fetches linuxdeploy at a
+  tagged release and checks its checksum, instead of whatever
+  continuous build wails3 would download. CI checks the Neovim tarball's
+  checksum too. A changed upload now fails the build instead of landing
+  in the signed app (finding 11 of the v1.4.0 security review).
 - `mdsh -i` and mdsh-gui show the environment banner over a file whose
   `env.share` names variables beyond the base set, and list them: "This
   file brings in GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY from your
@@ -234,6 +293,10 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `cast` block, a recording kept in the document, no longer prints as
+  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
+  frame) as a picture, HTML reports play it as a GIF, and the terminal,
+  as with `mdsh -n`, shows that frame's text.
 - A file whose front matter doesn't parse, such as `title: Setup: the
   first steps` with its colon not in quotes, now opens. mdsh-gui and
   `mdsh -i` used to refuse it with only the YAML error. Now the file
@@ -250,7 +313,6 @@ follow [Semantic Versioning](https://semver.org/).
   line.
 
   ![A runbook whose title has an unquoted colon, open in mdsh-gui under a red banner: the front matter error, "Blocks can't run until it is fixed", and Add quotes and Edit in source buttons; the run buttons are greyed](docs/changelog/bad-front-matter.png)
-
 - Typing in mdsh-gui's source view, CodeMirror or Neovim, now hands the
   app only the lines it changed. Each pause in the typing sent the whole
   file twice, and checking the fences' `depends=` sent it again, so a
@@ -393,10 +455,6 @@ and the docs gain a cheat sheet.
   its own shell, and the Events tab says so.
 
   ![Asked before killing a shell: The block hasn't stopped, with Cancel and Kill Shell](docs/changelog/kill-shell.png)
-- A `cast` block, a recording kept in the document, no longer prints as
-  its JSON outside mdsh-gui. PDF reports draw its `frame=` (or the last
-  frame) as a picture, HTML reports play it as a GIF, and the terminal,
-  as with `mdsh -n`, shows that frame's text.
 - `mdsh completion zsh` (and `run`, `lsp` and `ctl`) work again through
   the zsh wrapper from Settings › Shell and the README. The wrapper puts
   `--source …` first, so mdsh took the subcommand for a file and failed
@@ -1574,7 +1632,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/gdey/markdownshell/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/gdey/markdownshell/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gdey/markdownshell/compare/v1.2.1...v1.3.0

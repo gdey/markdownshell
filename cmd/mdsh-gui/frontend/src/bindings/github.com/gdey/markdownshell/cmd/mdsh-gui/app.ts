@@ -367,6 +367,14 @@ export function HistoryPrompt(cols: number, rows: number): $CancellablePromise<n
 }
 
 /**
+ * IncludeFile reads the whole of include block i's file, for showing it
+ * and for dragging the include's range over it.
+ */
+export function IncludeFile(i: number): $CancellablePromise<notebook$0.IncludeFile> {
+    return $Call.ByName("main.App.IncludeFile", i);
+}
+
+/**
  * InstallCLI puts the command line tool on PATH, and returns where it
  * stands after.
  */
@@ -770,6 +778,14 @@ export function SetFrontMatter(f: notebook$0.FrontMatter): $CancellablePromise<v
  */
 export function SetHistory(on: boolean, restart: boolean): $CancellablePromise<boolean> {
     return $Call.ByName("main.App.SetHistory", on, restart);
+}
+
+/**
+ * SetIncludeRange writes from= and to= on include block i, as its grips
+ * were dragged to. Undo takes it back.
+ */
+export function SetIncludeRange(i: number, $from: number, to: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.SetIncludeRange", i, $from, to);
 }
 
 /**

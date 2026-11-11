@@ -6,6 +6,22 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- An include block in mdsh-gui's rendered view has a grip above and
+  below its lines. Dragging the bottom one down shows the lines after
+  them, raising `to=`, and dragging the top one up shows the lines
+  before, lowering `from=`; the lines appear as the grip moves, and the
+  range is written to the file when it is let go, as one edit Undo takes
+  back. A grip dragged to the file's edge takes the attribute out, so
+  the include follows the file as it grows. With a grip focused, up and
+  down move it a line. The eye button by the file's name shows the whole
+  file over the window, with the included lines marked.
+
+  ![An include being dragged: the bar says lines 4–9 of 10, and the lines after the function are shown as the grip moves](docs/changelog/include-grips.png)
+
+  ![The whole of greet.sh over the window, with lines 2–9 marked as the included ones](docs/changelog/include-whole-file.png)
+
 ### Fixed
 
 - Pressing enter in mdsh-gui's History pane no longer sends the keys you

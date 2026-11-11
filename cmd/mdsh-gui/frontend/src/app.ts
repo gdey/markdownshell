@@ -25,6 +25,7 @@ import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { secretMask, setSecretLines } from "./secretmask.js";
 import { textboxGrip } from "./textbox.js";
+import { includeControls } from "./include.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
@@ -777,8 +778,9 @@ function drawProse(c: Cell): HTMLElement {
   enableDiagrams(s);
   enableCasts(s, { save: (n, body) => void saveFrame(-1, body, n) });
   enableCopy(s);
+  if (c.include) includeControls(s, c, { commit: (i, from, to) => edit(() => App.SetIncludeRange(i, from, to)), busy: () => running, say: status });
   s.onclick = (e) => {
-    if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input")) return;
+    if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input, .include-grip, .include-bar")) return;
     if (c.heading) selectSection(s);
     void showInSource(s, c.line, true);
   };

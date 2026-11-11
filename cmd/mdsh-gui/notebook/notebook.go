@@ -105,6 +105,9 @@ type Cell struct {
 	// OutputLine is the line a block's saved output starts on, counting
 	// from 1, or 0 when it has none, for folding it in the source.
 	OutputLine int `json:"outputLine,omitempty"`
+	// Include is set for an include block, whose lines come from a
+	// file: the view can drag its range, and show the whole file.
+	Include *IncludeCell `json:"include,omitempty"`
 	// FirstLine is set on the cell of an include with from= past 1: the
 	// line in its file the included lines start on, where the code's line
 	// numbers count from, so they are the file's.
