@@ -78,3 +78,30 @@ func TestAllowedOutside(t *testing.T) {
 		t.Errorf("allowed out= file: %v", err)
 	}
 }
+
+// An include of the repository's .git/config, which can carry a token in
+// a remote's URL, fails without --allow-outside and is listed by
+// Outside, so mdsh-gui asks about it.
+func TestIncludeGitMetadata(t *testing.T) {
+	repo := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	conf := "[remote \"origin\"]\n\turl = https://me:ghp_secret@github.com/a/b\n"
+	if err := os.WriteFile(filepath.Join(repo, ".git", "config"), []byte(conf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := "```ini {<include file=.git/config}\n```\n"
+	opts := run.Options{Dir: repo, File: filepath.Join(repo, "d.md")}
+	_, results := runDoc(t, src, opts)
+	if r := results[0]; !errors.Is(r.Err, docroot.ErrMetadata) || len(r.Stdout) != 0 {
+		t.Errorf("include .git/config = %q, %v, want ErrMetadata", r.Stdout, r.Err)
+	}
+	if got := run.Outside(parse(t, src), opts); !slices.Equal(got, []string{".git/config"}) {
+		t.Errorf("Outside = %q, want [.git/config]", got)
+	}
+	opts.AllowOutside = true
+	if _, results := runDoc(t, src, opts); results[0].Err != nil || string(results[0].Stdout) != conf {
+		t.Errorf("with AllowOutside = %q, %v", results[0].Stdout, results[0].Err)
+	}
+}

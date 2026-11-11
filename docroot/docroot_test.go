@@ -97,3 +97,46 @@ func TestWriteFile(t *testing.T) {
 		t.Error("esc.svg was written outside")
 	}
 }
+
+func TestMetadata(t *testing.T) {
+	root := tempDir(t)
+	os.MkdirAll(filepath.Join(root, ".git", "hooks"), 0o755)
+	os.WriteFile(filepath.Join(root, ".git", "config"), []byte("url = https://u:ghp_x@github.com/a/b"), 0o644)
+	os.MkdirAll(filepath.Join(root, "vendor", "lib", ".hg"), 0o755)
+	os.WriteFile(filepath.Join(root, "vendor", "lib", ".hg", "hgrc"), []byte("token"), 0o644)
+	os.WriteFile(filepath.Join(root, ".gitignore"), []byte("x"), 0o644)
+	os.Symlink(filepath.Join(root, ".git", "config"), filepath.Join(root, "config.txt"))
+
+	for _, p := range []string{
+		filepath.Join(root, ".git", "config"),
+		filepath.Join(root, ".GIT", "config"),
+		filepath.Join(root, "config.txt"), // a symlink into .git
+		filepath.Join(root, "vendor", "lib", ".hg", "hgrc"),
+		filepath.Join(root, ".git"),
+	} {
+		_, err := ReadFile(root, p, 0)
+		if !errors.Is(err, ErrMetadata) || !errors.Is(err, ErrOutside) {
+			t.Errorf("ReadFile(%s) = %v, want ErrMetadata and ErrOutside", p, err)
+		}
+	}
+	for _, p := range []string{
+		filepath.Join(root, ".git", "hooks", "pre-commit"),
+		filepath.Join(root, ".jj", "new"),
+		filepath.Join(root, "sub", ".svn", "auth"),
+	} {
+		if err := WriteFile(root, p, []byte("x")); !errors.Is(err, ErrMetadata) {
+			t.Errorf("WriteFile(%s) = %v, want ErrMetadata", p, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, ".git", "hooks", "pre-commit")); err == nil {
+		t.Error("a hook was written")
+	}
+	// A name that only starts like a marker is an ordinary file.
+	if data, err := ReadFile(root, filepath.Join(root, ".gitignore"), 0); err != nil || string(data) != "x" {
+		t.Errorf(".gitignore = %q, %v", data, err)
+	}
+	// With no root, as with --allow-outside, nothing is refused.
+	if _, err := ReadFile("", filepath.Join(root, ".git", "config"), 0); err != nil {
+		t.Errorf("ReadFile with no root = %v", err)
+	}
+}
