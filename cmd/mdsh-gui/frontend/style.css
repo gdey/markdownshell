@@ -461,6 +461,24 @@ figure.diagram img.dark { display: none; }
 .textbox-cell:hover .textbox-grip::after { background: var(--muted); }
 .textbox-grip:hover::after, .textbox-grip:focus-visible::after { background: var(--accent); }
 .textbox-grip:focus-visible { outline: none; }
+/* An include's grips drag its from= and to=; the bar above names its
+   file and lines, with the button that shows the whole file. */
+.include-cell { position: relative; }
+.include-cell:hover .textbox-grip::after { background: var(--muted); }
+.include-grip { margin: 0; z-index: 1; }
+.include-grip.top { margin-bottom: -6px; }
+.include-grip.bottom { margin-top: -6px; }
+.include-bar { display: flex; align-items: center; gap: 10px; font-size: calc(12px * var(--text-scale)); margin: 10px 0 2px; cursor: default; }
+.include-bar .include-file { font-family: var(--font-code); color: var(--muted); }
+.include-bar .include-whole { margin: -4px 0; }
+#include-dialog { width: min(960px, 94vw); max-height: 92vh; }
+#include-dialog[open] { display: flex; flex-direction: column; }
+#include-dialog form { display: flex; flex-direction: column; min-height: 0; }
+.include-dialog-head { display: flex; align-items: flex-start; gap: 12px; }
+.include-dialog-head > div { flex: 1; min-width: 0; }
+.include-dialog-head h2 { font-family: var(--font-code); overflow-wrap: anywhere; }
+#include-pre { overflow: auto; margin: 0; min-height: 0; }
+#include-pre .line.included { background: var(--selection); }
 .choice-cell { margin: 16px 0; }
 .input-cell.taken .name { color: var(--bad); }
 .input-cell.taken .textbox, .input-cell.taken .choice-select { border-color: var(--bad); }

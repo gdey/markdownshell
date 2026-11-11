@@ -199,6 +199,12 @@ export interface Cell {
     "outputLine"?: number;
 
     /**
+     * Include is set for an include block, whose lines come from a
+     * file: the view can drag its range, and show the whole file.
+     */
+    "include"?: IncludeCell | null;
+
+    /**
      * FirstLine is set on the cell of an include with from= past 1: the
      * line in its file the included lines start on, where the code's line
      * numbers count from, so they are the file's.
@@ -426,6 +432,46 @@ export interface FrontMatter {
      * Other is the other top-level keys, as YAML, in the file's order.
      */
     "other": string;
+}
+
+/**
+ * IncludeCell is an include block, as the frontend draws it: a grip
+ * above and below its lines drags From and To, and a button shows the
+ * whole file.
+ */
+export interface IncludeCell {
+    /**
+     * Block is the include's index in the document, for SetIncludeRange
+     * and IncludeFile.
+     */
+    "block": number;
+
+    /**
+     * File is its file= and Lang its language, for highlighting the
+     * whole file.
+     */
+    "file": string;
+    "lang": string;
+
+    /**
+     * From and To are its from= and to=, as the file holds them: 0 for
+     * one it doesn't have, which means the first and the last line.
+     */
+    "from": number;
+    "to": number;
+}
+
+/**
+ * IncludeFile is the whole of an include's file, for showing it and
+ * for dragging the include's range over it.
+ */
+export interface IncludeFile {
+    "text": string;
+
+    /**
+     * Lines is how many lines Text has.
+     */
+    "lines": number;
 }
 
 /**

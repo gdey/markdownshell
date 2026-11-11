@@ -228,6 +228,16 @@ Each file opens in a tab of its own, with its own shells.
   picks as `$MDSH_VAR_name`; a later input reusing a name is marked, with
   `!` in the outline, and ignored. All are edits like typing in the source
   view: Save writes them.
+- **Include ranges:** an include block (`<include file=… from=… to=…`)
+  shows its file's name and lines above its code, with an eye button
+  that shows the whole file over the window, the included lines marked.
+  A grip above and below the lines drags the range: the bottom one down
+  to show the lines after, raising `to=`, and the top one up to show
+  the lines before, lowering `from=`. The lines appear as the grip
+  moves, and the range is written when it is let go. At the file's
+  edge the attribute comes out, so the include follows the file as it
+  grows. With a grip focused, up and down move it a line. It is an edit
+  like the others: Undo takes it back and Save writes it.
 - **Dragging blocks and sections:** a block card's grip (⋮⋮, at the left
   of its head, shown on hover) drags the block, with its output, to a
   spot between top-level cells; a line shows where it will go, the view

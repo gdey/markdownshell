@@ -83,8 +83,11 @@ func (n *Notebook) cells() []Cell {
 		}
 		if !run.Runnable(b) {
 			c := Cell{Block: -1, HTML: n.html(append(append([]byte(nil), code...), out...)), From: span.Start, To: span.End}
-			if inc, err := b.Include(); err == nil && b.IsInclude() && inc.From > 1 {
-				c.FirstLine = inc.From
+			if inc, err := b.Include(); err == nil && b.IsInclude() {
+				if inc.From > 1 {
+					c.FirstLine = inc.From
+				}
+				c.Include = &IncludeCell{Block: i, File: inc.File, From: inc.From, To: inc.To, Lang: b.Lang}
 			}
 			l.cells = append(l.cells, c)
 			continue
