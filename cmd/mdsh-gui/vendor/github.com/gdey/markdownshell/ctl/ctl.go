@@ -37,6 +37,10 @@ const (
 	NoAnswer = 4
 )
 
+// NoAnswerError is the error for a NoAnswer response: what mdsh ctl
+// prints, and what the run shows under the block.
+func NoAnswerError(question string) string { return "no answer: " + question }
+
 // Request is one call.
 type Request struct {
 	V     int             `json:"v"`
@@ -82,3 +86,20 @@ type StatusArgs struct {
 	Step int    `json:"step,omitempty"`
 	Of   int    `json:"of,omitempty"`
 }
+
+// AskArgs are the arguments to ask and confirm. Default is nil when the
+// call gave no --default; for confirm it is "yes" or "no". Choices and
+// Secret are for ask only.
+type AskArgs struct {
+	Question string   `json:"question"`
+	Choices  []string `json:"choices,omitempty"`
+	Default  *string  `json:"default,omitempty"`
+	Secret   bool     `json:"secret,omitempty"`
+}
+
+// The values a confirm call answers with.
+const (
+	Yes = "yes"
+	// NoValue is confirm answered no; mdsh ctl exits with No.
+	NoValue = "no"
+)

@@ -22,6 +22,23 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The whole of greet.sh over the window, with lines 2–9 marked as the included ones](docs/changelog/include-whole-file.png)
 
+- `mdsh ctl ask` and `mdsh ctl confirm`: a block can ask you a question
+  while it runs. `ask` prints the answer, with `--choice a,b,c` to
+  limit it, `--default V` for when nobody can answer, and `--secret` to
+  hide the typing; `confirm` answers with its exit code, 0 for yes and
+  1 for no. `mdsh` asks on the terminal and `mdsh -i` in the block's
+  card. With nobody to answer, as in a report or a run with no terminal,
+  the default answers, or the call exits 4 and mdsh says "no answer".
+  `--yes` answers yes to a `confirm` with no default. A question is
+  withdrawn when its block ends, and the audit log's new `ask` event
+  records the answer and who gave it. Every question a run waits on,
+  these and `confirm` and `depends=` ones alike, now has an id. mdsh-gui
+  doesn't ask these yet; there the default answers.
+
+  ![mdsh -i asking Deploy where? in the running block's card, with staging picked and prod beside it](docs/changelog/ctl-ask-tui.png)
+
+  ![mdsh on the command line asking Deploy where? with numbered choices, then Deploy to prod now? [y/N]](docs/changelog/ctl-ask-cli.png)
+
 ### Fixed
 
 - Pressing enter in mdsh-gui's History pane no longer sends the keys you
@@ -34,6 +51,20 @@ follow [Semantic Versioning](https://semver.org/).
   input when it ends, not to the page.
 
   ![The History pane while "sleep 2; echo hi" runs: the dimmed prompt, "running 0.4s", and "abc" typed meanwhile in the focused input](docs/changelog/history-type-ahead.png)
+
+### Security
+
+- A repository's own `.git` folder (and `.hg`, `.jj`, `.svn`, in nested
+  repositories too) counts as outside the document's root, for includes,
+  `out=` files and report images alike. `{<include file=.git/config}`
+  read the repository's settings on open, and a remote's URL there can
+  hold a token, so `mdsh -w` or a report could carry it off without a
+  block running; an `out=` could write into `.git/hooks/` (finding 4 of
+  the v1.5.0 security review). Now those fail with an error that names
+  the folder, and mdsh-gui lists them in its question about files
+  outside the repository. `--allow-outside` still lifts it.
+
+  ![mdsh-gui's question about files outside the repository, listing .git/config, with a note that the .git folder holds the repository's settings and hooks and a remote's address there can hold a token](docs/changelog/outside-git.png)
 
 ## [1.5.0] - 2026-11-10
 

@@ -112,6 +112,18 @@ type Options struct {
 	// won't run". If DependOff is nil, such a dependency is skipped,
 	// and the audit log says why.
 	DependOff func(dep, b *doc.Block, why string) Answer
+	// Ask is asked the questions blocks put with mdsh ctl ask and mdsh
+	// ctl confirm, while the block that asked runs: q.Kind is AskCtl or
+	// AskCtlConfirm. It returns the answer and who gave it, or ByNone
+	// when nobody can answer, and then the call's --default answers, or
+	// the call exits ctl.NoAnswer. For AskCtlConfirm the answer is
+	// ctl.Yes or ctl.NoValue; for AskCtl with Choices it is one of them.
+	// ctx ends when the block does, as when its timeout= ends it; the
+	// question is then withdrawn, and Ask should stop asking and return
+	// ByNone. Ask is called from the control socket's goroutine, so it
+	// may be called while the run waits on Confirm or Depend. If Ask is
+	// nil, or Mode is ModeReport, nobody can answer.
+	Ask func(ctx context.Context, q Question) (answer string, by Answered)
 	// TTY is the terminal that blocks marked tty run on. If it is nil,
 	// such blocks fail with ErrNoTTY.
 	TTY *os.File
@@ -197,16 +209,23 @@ const (
 	// It comes from the control socket's goroutine, while the block
 	// runs, so OnEvent must be safe to call from more than one.
 	Status
+	// Unanswered is a block's mdsh ctl ask or confirm that nobody
+	// answered and that had no --default, so the call exited
+	// ctl.NoAnswer. Question is the question. It comes from the control
+	// socket's goroutine, as Status does. A front end shows it with the
+	// block as an mdsh error: "no answer: QUESTION".
+	Unanswered
 )
 
 // Event reports progress. Data is set for Stdout and Stderr, Result for
-// Done, and Progress for Status.
+// Done, Progress for Status, and Question for Unanswered.
 type Event struct {
 	Kind     EventKind
 	Block    *doc.Block
 	Data     []byte
 	Result   *Result
 	Progress *Progress
+	Question *Question
 }
 
 // Result is what one block did.
