@@ -711,11 +711,14 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-input { flex: 1; resize: none; border: 0; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
 #history-input::placeholder { color: var(--muted); }
 #history-input:disabled { opacity: 0.5; }
-/* While a command typed here runs, the prompt dims and the input gives
-   its place to a clock of how long it has run. */
+/* While a command typed here runs, the prompt dims and a clock of how
+   long it has run comes before the input. The input stays, and keeps the
+   keyboard: what is typed meanwhile waits there for the next command, as
+   a terminal's type-ahead does. */
 #history.running :is(.prompt, #history-prompt-head) { opacity: 0.4; }
-#history.running #history-input { display: none; }
-#history-timer { flex: 1; min-width: 0; line-height: 18px; color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
+#history.running #history-input { order: 1; }
+#history.running #history-input::placeholder { color: transparent; }
+#history-timer { flex: none; margin-right: 1ch; line-height: 18px; color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
 #history-timer[hidden], #history.closed #history-timer { display: none; }
 #history-timer .label { color: var(--muted); }
 /* Settings › Look › History prompt focus can show the prompt's focus as

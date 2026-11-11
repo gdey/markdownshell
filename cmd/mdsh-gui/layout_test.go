@@ -122,3 +122,30 @@ func TestOutputPartHidesByClassNotHasEmpty(t *testing.T) {
 		}
 	}
 }
+
+// The History input keeps the keyboard while a command typed there runs.
+// 1.5.0 hid it for the run's clock, and a hidden input loses its focus,
+// so the keys went to the rendered view until the run ended. Nothing in
+// a look may hide it while it runs, and historyBusy mustn't disable it
+// for a command the pane started, which would blur it the same way.
+func TestHistoryInputStaysWhileRunning(t *testing.T) {
+	for _, file := range stylesheets() {
+		for sel, props := range cssProps(t, file) {
+			if !strings.Contains(sel, ".running") || !strings.HasSuffix(sel, "#history-input") {
+				continue
+			}
+			for _, p := range []string{"display", "visibility", "content-visibility"} {
+				if props[p] {
+					t.Errorf("%s: %q sets %s, and a hidden input loses the keyboard to the page", file, sel, p)
+				}
+			}
+		}
+	}
+	src, err := os.ReadFile("frontend/src/history.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "input().disabled = on && block < 0 && !entering;") {
+		t.Error("history.ts: historyBusy disables the input for a command the pane started, which blurs it")
+	}
+}

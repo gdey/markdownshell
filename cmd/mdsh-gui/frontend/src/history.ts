@@ -25,6 +25,7 @@ const rowsKey = "mdsh.historyRows";
 let term: Terminal | null = null;
 let block = -1; // the command running in the pane, or -1
 let last = -1; // the last command that ran in the pane
+let entering = false; // a command entered here is running
 let typed: string[] = []; // what was entered, for up and down
 let ps1 = ""; // the shell's prompts, expanded, or "" for none
 let ps2 = "";
@@ -405,6 +406,7 @@ async function submit(entered: string) {
   fitHistory();
   last = -1;
   if (!isNote(text)) startClock();
+  entering = true;
   try {
     await hooks.enter(async () => {
       try {
@@ -414,6 +416,7 @@ async function submit(entered: string) {
       }
     });
   } finally {
+    entering = false;
     stopClock();
   }
   // A lone & at the end runs it as a background block, as Go decides.
@@ -647,7 +650,10 @@ export function historyEnd(i: number): boolean {
   block = -1;
   term.options.disableStdin = true;
   term.options.cursorBlink = false;
-  term.blur();
+  // The keys come back to the input, not to the page: blurring the
+  // transcript would leave them with the rendered view.
+  if (term.element?.contains(document.activeElement)) input().focus();
+  else term.blur();
   return true;
 }
 
@@ -661,9 +667,11 @@ export function historyStatus(text: string) {
 }
 
 // historyBusy disables the input while a run goes that the pane didn't
-// start.
+// start. A command entered here keeps it: disabling the focused input
+// would drop the keys onto the page, and the rendered view, until the
+// command ended.
 export function historyBusy(on: boolean) {
-  input().disabled = on && block < 0;
+  input().disabled = on && block < 0 && !entering;
   placeCursor();
   $<HTMLButtonElement>("history-stop").disabled = !on;
   $<HTMLButtonElement>("history-restart").disabled = on;
