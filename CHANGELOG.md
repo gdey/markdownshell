@@ -6,6 +6,19 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Pressing enter in mdsh-gui's History pane no longer sends the keys you
+  type next to the rendered view. While a command typed there runs, the
+  input used to give its place to the run's clock, and hiding it dropped
+  the keyboard onto the page until the command ended. Now the clock comes
+  before the input, the input keeps the keyboard, and what you type
+  meanwhile waits in it for the next command, as a terminal's type-ahead
+  does. A command that takes the terminal gives the keyboard back to the
+  input when it ends, not to the page.
+
+  ![The History pane while "sleep 2; echo hi" runs: the dimmed prompt, "running 0.4s", and "abc" typed meanwhile in the focused input](docs/changelog/history-type-ahead.png)
+
 ## [1.5.0] - 2026-11-10
 
 mdsh-gui settles in. Settings and the cheat sheet open in tabs beside
