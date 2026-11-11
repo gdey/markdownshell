@@ -66,6 +66,12 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh-gui's question about files outside the repository, listing .git/config, with a note that the .git folder holds the repository's settings and hooks and a remote's address there can hold a token](docs/changelog/outside-git.png)
 
+- The site build checks the Hugo package's SHA-256 before installing it,
+  and CI installs Playwright with `npm ci` from a lockfile, so each npm
+  package is checked against its integrity hash. A changed upload now
+  fails the build instead of being installed (finding 7 of the v1.5.0
+  security review).
+
 ## [1.5.0] - 2026-11-10
 
 mdsh-gui settles in. Settings and the cheat sheet open in tabs beside

@@ -98,6 +98,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           CGO_ENABLED=0 go build -tags server -o "$RUNNER_TEMP/mdsh-gui-server" .
-          npm install --prefix "$RUNNER_TEMP/pw" --no-save playwright@1.63.0
+          # npm ci installs exactly what internal/stress/package-lock.json
+          # names and checks each package against its integrity hash. The
+          # locked playwright-core fixes which Chromium build it fetches.
+          mkdir -p "$RUNNER_TEMP/pw"
+          cp internal/stress/package.json internal/stress/package-lock.json "$RUNNER_TEMP/pw/"
+          npm ci --prefix "$RUNNER_TEMP/pw" --ignore-scripts --no-audit --no-fund
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
           NODE_PATH="$RUNNER_TEMP/pw/node_modules" node internal/stress/gui.cjs --server "$RUNNER_TEMP/mdsh-gui-server" --check
