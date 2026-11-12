@@ -84,3 +84,6 @@ events as the CLI and TUI. Not designed yet.
   (design, Nov 2, 2026; after v1.3; not built).
 - HTTP request blocks with checks on the response: see
   [docs/http/design.md](http/design.md) (design, Nov 13, 2026; not built).
+- Sharing a running runbook with a teammate over a tailcat tunnel, with a
+  directory service for names, roles and relays: see
+  [docs/share/design.md](share/design.md) (design, Nov 12, 2026; not built).
