@@ -81,6 +81,17 @@ follow [Semantic Versioning](https://semver.org/).
   the recording is too large instead (finding 6 of the v1.5.0 security
   review).
 
+- Opening a copy of mdsh-gui 1.5.0, such as one on a mounted `.dmg`,
+  could still point `/usr/local/bin/mdsh` at itself, so the copy became
+  the `mdsh` every terminal ran, and `sudo mdsh` too. The fix for this
+  in 1.5.0 left a link into another `mdsh.app` alone unless the link
+  pointed at a place "this app has stood", but that list lived in the
+  user's settings, which every copy shares, so the installed app's own
+  path was on it (finding 1 of the v1.5.0 security review). Now the
+  link is repaired at launch only when its target is gone; a link into
+  another `mdsh.app` that is still there moves only when you press
+  Install in Settings › Shell.
+
 ## [1.5.0] - 2026-11-10
 
 mdsh-gui settles in. Settings and the cheat sheet open in tabs beside

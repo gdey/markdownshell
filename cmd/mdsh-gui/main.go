@@ -185,12 +185,6 @@ func mdshGUI(o options) error {
 	// A link left by a moved app is pointed back here, and an
 	// AppImage's copy brought up to this version, without asking; the
 	// Console says when it happens.
-	a.cli.known = store.Get().CLIPaths
-	a.cli.saw = func(path string) {
-		if err := store.Update(func(s *settings.Settings) { s.SawCLI(path) }); err != nil {
-			slog.Warn("saving where the mdsh command line tool points", "err", err)
-		}
-	}
 	go func() {
 		changed, err := a.cli.repair()
 		if err != nil {

@@ -134,27 +134,6 @@ type Settings struct {
 	// FileViews are how the files shown last were left, newest first:
 	// the view and whether the History pane was open.
 	FileViews []FileView `json:"fileViews,omitempty"`
-	// CLIPaths are the paths of the mdsh inside mdsh.app that the
-	// command line link has pointed at, newest first: where this app has
-	// stood. At launch the app points a link that has gone stale back at
-	// itself only when it pointed at one of these, or at nothing.
-	CLIPaths []string `json:"cliPaths,omitempty"`
-}
-
-// MaxCLIPaths is how many of the app's past places are kept.
-const MaxCLIPaths = 8
-
-// SawCLI notes that the command line link pointed at path, the mdsh
-// inside this app.
-func (s *Settings) SawCLI(path string) {
-	if len(s.CLIPaths) > 0 && s.CLIPaths[0] == path {
-		return
-	}
-	s.CLIPaths = slices.DeleteFunc(s.CLIPaths, func(p string) bool { return p == path })
-	s.CLIPaths = slices.Insert(s.CLIPaths, 0, path)
-	if len(s.CLIPaths) > MaxCLIPaths {
-		s.CLIPaths = s.CLIPaths[:MaxCLIPaths]
-	}
 }
 
 // Store reads and writes Settings.
@@ -208,7 +187,6 @@ func (s Settings) clone() Settings {
 	s.Places = slices.Clone(s.Places)
 	s.FileViews = slices.Clone(s.FileViews)
 	s.OpenTypes = slices.Clone(s.OpenTypes)
-	s.CLIPaths = slices.Clone(s.CLIPaths)
 	return s
 }
 

@@ -162,13 +162,16 @@ this app, by the same two routes.
 
 **Moved app.** The symlink dangles if the app moves. On launch, if
 `/usr/local/bin/mdsh` is a symlink into an `mdsh.app` that no longer
-exists, or that is a place this app has stood (the settings keep the
-last few helper paths the link pointed at, `cliPaths`), the app points
-it back at itself when it can write the folder, and the Console says so.
-A link into another `mdsh.app` that is still there, such as an older
-release on a mounted `.dmg` or a fork's build, is left alone: launching
+exists, the app points it back at itself when it can write the folder,
+and the Console says so. A link into another `mdsh.app` that is still
+there, such as the installed app's while a copy runs from a mounted
+`.dmg`, an older release, or a fork's build, is left alone: launching
 that copy once mustn't make it the `mdsh` every terminal runs (finding
-7 of the v1.4.0 security review). The Settings › Shell row says
+7 of the v1.4.0 security review). 1.5.0 also repaired a link into a
+place "this app has stood", from a list in the settings, but the
+settings are the user's and every copy shares them, so the copy on the
+`.dmg` found the installed app's path there and took the link (finding
+1 of the v1.5.0 review); the list is gone. The Settings › Shell row says
 `runs another mdsh.app, at …` for that, or `broken, points at …` when
 the folder can't be written, with Install to point it here.
 

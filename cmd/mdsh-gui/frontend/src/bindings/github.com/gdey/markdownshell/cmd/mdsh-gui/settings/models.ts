@@ -207,12 +207,4 @@ export interface Settings {
      * the view and whether the History pane was open.
      */
     "fileViews"?: FileView[] | null;
-
-    /**
-     * CLIPaths are the paths of the mdsh inside mdsh.app that the
-     * command line link has pointed at, newest first: where this app has
-     * stood. At launch the app points a link that has gone stale back at
-     * itself only when it pointed at one of these, or at nothing.
-     */
-    "cliPaths"?: string[] | null;
 }
