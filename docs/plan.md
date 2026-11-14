@@ -84,3 +84,5 @@ events as the CLI and TUI. Not designed yet.
   (design, Nov 2, 2026; after v1.3; not built).
 - HTTP request blocks with checks on the response: see
   [docs/http/design.md](http/design.md) (design, Nov 13, 2026; not built).
+- Running blocks on a remote host over SSH: see [docs/ssh/design.md](ssh/design.md)
+  (design, Nov 1, 2026; not built).
