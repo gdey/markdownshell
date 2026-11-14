@@ -169,7 +169,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	showVersion := fs.Bool("version", false, "print the version and exit")
-	allowOutside := fs.Bool("allow-outside", false, "let include blocks, out= files and report images reach outside the document's git repository (or its folder, outside a repository); only for documents you trust")
+	allowOutside := fs.Bool("allow-outside", false, "let include blocks, out= files and report images reach outside the document's folder, or hidden files (.env, .git) in it; only for documents you trust")
 	auditFile := fs.String("audit", "", "write an audit log of the run to this file, one JSON object per line")
 	// Files are read as the flag is parsed, so a pipe such as
 	// <(alias -L) is read once, however many shells start.

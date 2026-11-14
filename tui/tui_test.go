@@ -350,6 +350,39 @@ func TestImagePreview(t *testing.T) {
 	}
 }
 
+// An image preview stays in the document's folder and out of hidden
+// files, as includes and reports do; --allow-outside lifts that.
+func TestImagePreviewRoot(t *testing.T) {
+	top := t.TempDir()
+	dir := filepath.Join(top, "docs")
+	os.MkdirAll(filepath.Join(dir, ".hidden"), 0o755)
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	draw.Draw(img, img.Bounds(), image.NewUniform(color.RGBA{0, 255, 0, 255}), image.Point{}, draw.Src)
+	for _, p := range []string{filepath.Join(top, "up.png"), filepath.Join(dir, ".hidden", "h.png"), filepath.Join(dir, "in.png")} {
+		f, _ := os.Create(p)
+		png.Encode(f, img)
+		f.Close()
+	}
+	file := filepath.Join(dir, "doc.md")
+	m, err := New(&doc.Document{}, Options{Run: run.Options{File: file}, Images: true, Style: "notty"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.Close)
+	if m.preview("in.png", 20) == "" {
+		t.Error("in.png beside the document: no preview")
+	}
+	for _, link := range []string{"../up.png", ".hidden/h.png"} {
+		if s := m.preview(link, 20); s != "" {
+			t.Errorf("%s: previewed, want refused", link)
+		}
+	}
+	m.opts.Run.AllowOutside = true
+	if m.preview("../up.png", 20) == "" {
+		t.Error("../up.png with AllowOutside: no preview")
+	}
+}
+
 func TestEditBlock(t *testing.T) {
 	m, file := newModel(t, twoBlocks, Options{AutoSave: true})
 	if m.editor() != "vi" {

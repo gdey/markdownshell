@@ -54,6 +54,20 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- A document reaches only its own folder, and the folders under it, and
+  no hidden file or folder in them (a name starting with a dot, such as
+  `.env`, `.ssh` or `.git`), for includes, `out=` files, report images
+  and image previews alike. Before, a document with no repository got
+  its whole folder, so `~/notes.md` could include `~/.ssh/id_ed25519` on
+  open or write over `~/.zshrc` with an `out=`; and one in a repository
+  got all of it. Being in a repository no longer widens the root: an
+  include of `../scripts/setup.sh` from `docs/` is outside, and mdsh-gui
+  asks about it as it opens, as it asks about any file outside the
+  folder; `--allow-outside` still lifts it (finding 3 of the v1.5.0
+  security review). The `.git` rule below is now part of this one.
+
+  ![mdsh-gui asking whether to let a document reach outside its folder, listing ../scripts/setup.sh and .env, with a note that hidden files often hold passwords, tokens and keys](docs/changelog/outside-folder.png)
+
 - A repository's own `.git` folder (and `.hg`, `.jj`, `.svn`, in nested
   repositories too) counts as outside the document's root, for includes,
   `out=` files and report images alike. `{<include file=.git/config}`

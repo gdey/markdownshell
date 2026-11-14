@@ -19,25 +19,50 @@ func tempDir(t *testing.T) string {
 func TestRoot(t *testing.T) {
 	top := tempDir(t)
 	t.Setenv("HOME", filepath.Join(top, "home"))
+	// A repository doesn't widen the root: a document in docs/ops gets
+	// docs/ops, not the repository.
 	repo := filepath.Join(top, "repo")
 	sub := filepath.Join(repo, "docs", "ops")
 	os.MkdirAll(sub, 0o755)
 	os.Mkdir(filepath.Join(repo, ".git"), 0o755)
-	if got := Root(sub); got != repo {
-		t.Errorf("Root in a repo = %s, want %s", got, repo)
+	if got := Root(sub); got != sub {
+		t.Errorf("Root in a repo = %s, want %s", got, sub)
 	}
 	plain := filepath.Join(top, "plain", "a")
 	os.MkdirAll(plain, 0o755)
 	if got := Root(plain); got != plain {
 		t.Errorf("Root outside a repo = %s, want %s", got, plain)
 	}
-	// A dotfiles repository at home isn't the root.
-	home := filepath.Join(top, "home")
-	notes := filepath.Join(home, "notes")
-	os.MkdirAll(notes, 0o755)
-	os.Mkdir(filepath.Join(home, ".git"), 0o755)
-	if got := Root(notes); got != notes {
-		t.Errorf("Root under a home repo = %s, want %s", got, notes)
+	// A symlinked folder resolves.
+	os.Symlink(plain, filepath.Join(top, "alias"))
+	if got := Root(filepath.Join(top, "alias")); got != plain {
+		t.Errorf("Root through a symlink = %s, want %s", got, plain)
+	}
+}
+
+// TestFinding3 is finding 3 of the v1.5.0 security review: a document
+// in ~ reached ~/.ssh, and one in a repository reached all of it.
+func TestFinding3(t *testing.T) {
+	home := tempDir(t)
+	os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
+	os.WriteFile(filepath.Join(home, ".ssh", "id_ed25519"), []byte("KEY"), 0o600)
+	os.WriteFile(filepath.Join(home, ".zshrc"), []byte("rc"), 0o644)
+	os.MkdirAll(filepath.Join(home, "Downloads"), 0o755)
+	os.WriteFile(filepath.Join(home, "tax.txt"), []byte("TAX"), 0o644)
+
+	root := Root(home)
+	if _, err := ReadFile(root, filepath.Join(home, ".ssh", "id_ed25519"), 0); !errors.Is(err, ErrHidden) {
+		t.Errorf("~/.ssh/id_ed25519 from ~ = %v, want ErrHidden", err)
+	}
+	if err := WriteFile(root, filepath.Join(home, ".zshrc"), []byte("x")); !errors.Is(err, ErrHidden) {
+		t.Errorf("write ~/.zshrc from ~ = %v, want ErrHidden", err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(home, ".zshrc")); string(data) != "rc" {
+		t.Errorf(".zshrc changed to %q", data)
+	}
+	down := Root(filepath.Join(home, "Downloads"))
+	if _, err := ReadFile(down, filepath.Join(home, "tax.txt"), 0); !errors.Is(err, ErrOutside) {
+		t.Errorf("~/tax.txt from ~/Downloads = %v, want ErrOutside", err)
 	}
 }
 
@@ -98,42 +123,55 @@ func TestWriteFile(t *testing.T) {
 	}
 }
 
-func TestMetadata(t *testing.T) {
+func TestHidden(t *testing.T) {
 	root := tempDir(t)
 	os.MkdirAll(filepath.Join(root, ".git", "hooks"), 0o755)
 	os.WriteFile(filepath.Join(root, ".git", "config"), []byte("url = https://u:ghp_x@github.com/a/b"), 0o644)
 	os.MkdirAll(filepath.Join(root, "vendor", "lib", ".hg"), 0o755)
 	os.WriteFile(filepath.Join(root, "vendor", "lib", ".hg", "hgrc"), []byte("token"), 0o644)
+	os.WriteFile(filepath.Join(root, ".env"), []byte("TOKEN=x"), 0o644)
 	os.WriteFile(filepath.Join(root, ".gitignore"), []byte("x"), 0o644)
 	os.Symlink(filepath.Join(root, ".git", "config"), filepath.Join(root, "config.txt"))
+	os.Symlink(filepath.Join(root, ".env"), filepath.Join(root, "env.txt"))
+	os.WriteFile(filepath.Join(root, "a.b.txt"), []byte("ok"), 0o644)
 
 	for _, p := range []string{
 		filepath.Join(root, ".git", "config"),
-		filepath.Join(root, ".GIT", "config"),
+		filepath.Join(root, ".env"),
+		filepath.Join(root, ".gitignore"),
 		filepath.Join(root, "config.txt"), // a symlink into .git
+		filepath.Join(root, "env.txt"),    // a symlink to .env
 		filepath.Join(root, "vendor", "lib", ".hg", "hgrc"),
 		filepath.Join(root, ".git"),
 	} {
 		_, err := ReadFile(root, p, 0)
-		if !errors.Is(err, ErrMetadata) || !errors.Is(err, ErrOutside) {
-			t.Errorf("ReadFile(%s) = %v, want ErrMetadata and ErrOutside", p, err)
+		if !errors.Is(err, ErrHidden) || !errors.Is(err, ErrOutside) {
+			t.Errorf("ReadFile(%s) = %v, want ErrHidden and ErrOutside", p, err)
 		}
 	}
 	for _, p := range []string{
 		filepath.Join(root, ".git", "hooks", "pre-commit"),
 		filepath.Join(root, ".jj", "new"),
-		filepath.Join(root, "sub", ".svn", "auth"),
+		filepath.Join(root, "sub", ".config", "x"),
+		filepath.Join(root, ".bashrc"),
 	} {
-		if err := WriteFile(root, p, []byte("x")); !errors.Is(err, ErrMetadata) {
-			t.Errorf("WriteFile(%s) = %v, want ErrMetadata", p, err)
+		if err := WriteFile(root, p, []byte("x")); !errors.Is(err, ErrHidden) {
+			t.Errorf("WriteFile(%s) = %v, want ErrHidden", p, err)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(root, ".git", "hooks", "pre-commit")); err == nil {
 		t.Error("a hook was written")
 	}
-	// A name that only starts like a marker is an ordinary file.
-	if data, err := ReadFile(root, filepath.Join(root, ".gitignore"), 0); err != nil || string(data) != "x" {
-		t.Errorf(".gitignore = %q, %v", data, err)
+	// A dot inside a name isn't hidden.
+	if data, err := ReadFile(root, filepath.Join(root, "a.b.txt"), 0); err != nil || string(data) != "ok" {
+		t.Errorf("a.b.txt = %q, %v", data, err)
+	}
+	// A document kept in a hidden folder reaches its own folder.
+	inner := filepath.Join(root, ".notes")
+	os.Mkdir(inner, 0o755)
+	os.WriteFile(filepath.Join(inner, "in.txt"), []byte("in"), 0o644)
+	if data, err := ReadFile(Root(inner), filepath.Join(inner, "in.txt"), 0); err != nil || string(data) != "in" {
+		t.Errorf("in a hidden root = %q, %v", data, err)
 	}
 	// With no root, as with --allow-outside, nothing is refused.
 	if _, err := ReadFile("", filepath.Join(root, ".git", "config"), 0); err != nil {

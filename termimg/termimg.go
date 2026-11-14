@@ -25,8 +25,10 @@ import (
 // ErrSVG is returned by Decode for SVG images, which it can't draw.
 var ErrSVG = errors.New("can't show SVG images in the terminal")
 
-// Load reads the image at link: a file path or a data: URI.
-func Load(link string) (image.Image, error) {
+// Load reads the image at link: a file path or a data: URI. With root
+// set, a file must be inside it and not hidden (see package docroot);
+// with root empty, anywhere is allowed.
+func Load(root, link string) (image.Image, error) {
 	var data []byte
 	var err error
 	if rest, ok := strings.CutPrefix(link, "data:"); ok {
@@ -37,7 +39,7 @@ func Load(link string) (image.Image, error) {
 		data, err = base64.StdEncoding.DecodeString(enc)
 	} else {
 		// A plain file of at most 16 MB: not a device or a FIFO.
-		data, err = docroot.ReadFile("", link, 0)
+		data, err = docroot.ReadFile(root, link, 0)
 	}
 	if err != nil {
 		return nil, err

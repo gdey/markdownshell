@@ -368,10 +368,10 @@ func main() {
 | `number_on` | Show each line with its line number in the file |
 
 - The fence's language is the language the lines are shown in.
-- The file must be inside the document's git repository (or Mercurial,
-  Jujutsu or Subversion), or the document's folder when it isn't in one,
-  and a regular file of at most 16 MB. A repository at your home folder,
-  such as one for dotfiles, doesn't count. `out=` paths and the images
+- The file must be in the document's folder, or a folder under it, and
+  a regular file of at most 16 MB, whether or not the document is in a
+  repository. Hidden files and folders (names starting with a dot, such
+  as `.env`, `.ssh` or `.git`) count as outside. `out=` paths and the images
   `--html` and `--pdf` read are held to the same folder. For a document
   you trust, `mdsh --allow-outside` lifts this; mdsh-gui asks once per
   document, and lets out only the files it listed.

@@ -1,11 +1,12 @@
 // Package docroot keeps a document's reads and writes inside the folder
-// it belongs to: the root of the git (or Mercurial, Jujutsu or
-// Subversion) repository holding it, or the document's own folder when
-// it isn't in one, less the repository's own .git (or .hg, .jj, .svn)
-// folder. Includes, report images, casts and out= assets go
-// through it, so a document can't read ~/.ssh/id_ed25519 into its output
-// or write over ~/.zshrc. Callers that trust the document skip it, as
-// mdsh --allow-outside does.
+// it is in, and out of hidden files: the document's own folder and the
+// folders under it, less any file or folder whose name starts with a
+// dot (.env, .ssh, .git, .zshrc), at any depth. Includes, report images,
+// casts and out= assets go through it, so a document in ~ can't read
+// ~/.ssh/id_ed25519 into its output or write over ~/.zshrc, and one in
+// docs/ can't reach the rest of its repository. Being in a repository
+// changes nothing: a document reaches its own folder only. Callers
+// that trust the document skip it, as mdsh --allow-outside does.
 package docroot
 
 import (
@@ -21,23 +22,23 @@ import (
 // MaxRead is the most ReadFile reads by default: 16 MB.
 const MaxRead = 16 << 20
 
-// ErrOutside is returned for a path outside the document's root.
-var ErrOutside = errors.New("outside the document's folder or repository (mdsh --allow-outside allows it)")
+// ErrOutside is returned for a path outside the document's folder.
+var ErrOutside = errors.New("outside the document's folder (mdsh --allow-outside allows it)")
 
-// ErrMetadata is returned for a path inside the root that is in, or is,
-// a repository's own folder: .git, .hg, .jj or .svn, at any depth. Those
-// hold the repository's settings, which can carry a token in a remote's
-// URL, and hooks that run later, so they count as outside. It matches
-// ErrOutside with errors.Is.
-var ErrMetadata error = metadataError{}
+// ErrHidden is returned for a path inside the root that is, or is in, a
+// hidden file or folder: one whose name starts with a dot, at any depth
+// below the root. Those hold settings and secrets (.env, .ssh, .git's
+// config with a token in a remote's URL, .git/hooks that run later), so
+// they count as outside. It matches ErrOutside with errors.Is.
+var ErrHidden error = hiddenError{}
 
-type metadataError struct{}
+type hiddenError struct{}
 
-func (metadataError) Error() string {
-	return "in a repository's .git (or .hg, .jj, .svn) folder, which counts as outside (mdsh --allow-outside allows it)"
+func (hiddenError) Error() string {
+	return "a hidden file or folder (its name starts with a dot), which counts as outside (mdsh --allow-outside allows it)"
 }
 
-func (metadataError) Is(target error) bool { return target == ErrOutside }
+func (hiddenError) Is(target error) bool { return target == ErrOutside }
 
 // ErrNotRegular is returned for a folder, device, FIFO or other file
 // that isn't a regular file.
@@ -46,15 +47,9 @@ var ErrNotRegular = errors.New("not a regular file")
 // ErrTooBig is returned for a file larger than ReadFile's limit.
 var ErrTooBig = errors.New("file too large")
 
-// markers name the folders that mark a repository's root.
-var markers = []string{".git", ".hg", ".jj", ".svn"}
-
-// Root returns the folder files for a document in dir must stay in: the
-// root of the repository holding dir, else dir itself. A repository at
-// the home folder or the file system's root, such as a dotfiles
-// repository, is not used, as it would let a document reach everything
-// under it; dir is used instead. The result is absolute with symlinks
-// resolved.
+// Root returns the folder files for a document in dir must stay in: dir
+// itself, absolute with symlinks resolved. A repository holding dir
+// makes no difference.
 func Root(dir string) string {
 	if dir == "" {
 		dir = "."
@@ -66,32 +61,14 @@ func Root(dir string) string {
 	if real, err := filepath.EvalSymlinks(abs); err == nil {
 		abs = real
 	}
-	home, _ := os.UserHomeDir()
-	if home != "" {
-		if real, err := filepath.EvalSymlinks(home); err == nil {
-			home = real
-		}
-	}
-	for d := abs; ; {
-		if d == home || d == filepath.Dir(d) {
-			break
-		}
-		for _, m := range markers {
-			if _, err := os.Lstat(filepath.Join(d, m)); err == nil {
-				return d
-			}
-		}
-		d = filepath.Dir(d)
-	}
 	return abs
 }
 
 // Inside reports whether path, absolute and with symlinks resolved, is
-// root or under it, and not in a repository's own folder: see
-// ErrMetadata.
+// root or under it, and not hidden: see ErrHidden.
 func Inside(root, path string) bool {
 	rel, ok := relInside(root, path)
-	return ok && !InMetadata(rel)
+	return ok && !Hidden(rel)
 }
 
 // relInside returns path relative to root, and whether it is root or
@@ -102,24 +79,23 @@ func relInside(root, path string) (string, bool) {
 	return rel, ok
 }
 
-// InMetadata reports whether rel, a path relative to a root, names a
-// repository's own folder (.git, .hg, .jj or .svn) or something in one,
-// at any depth, so a nested repository's is caught too. The names are
-// matched ignoring case, as macOS and Windows file systems do.
-func InMetadata(rel string) bool {
+// Hidden reports whether rel, a clean path relative to a root, names a
+// hidden file or folder or something in one: any part of it starting
+// with a dot. The root itself (".") isn't hidden, so a document kept in
+// a hidden folder still reaches its own folder.
+func Hidden(rel string) bool {
 	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
-		for _, m := range markers {
-			if strings.EqualFold(part, m) {
-				return true
-			}
+		if part != "." && part != ".." && strings.HasPrefix(part, ".") {
+			return true
 		}
 	}
 	return false
 }
 
 // Resolve returns path with symlinks resolved, or ErrOutside if that is
-// outside root, or ErrMetadata if it is in a repository's own folder. A path that doesn't exist yet, such as a file about to
-// be written, is resolved through its nearest existing folder.
+// outside root, or ErrHidden if it is hidden. A path that doesn't exist
+// yet, such as a file about to be written, is resolved through its
+// nearest existing folder.
 func Resolve(root, path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -133,8 +109,8 @@ func Resolve(root, path string) (string, error) {
 	if !ok {
 		return "", &fs.PathError{Op: "open", Path: path, Err: ErrOutside}
 	}
-	if InMetadata(rel) {
-		return "", &fs.PathError{Op: "open", Path: path, Err: ErrMetadata}
+	if Hidden(rel) {
+		return "", &fs.PathError{Op: "open", Path: path, Err: ErrHidden}
 	}
 	return real, nil
 }

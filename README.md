@@ -407,9 +407,9 @@ Each run writes the file's lines into the block, so it reads well on
 GitHub too. `file=` is relative to the document, and `file=res://notes.md`
 reads `notes.md` from the document's assets folder, `<doc>.assets/`.
 `out=image:res://plot.png` saves an image there the same way. The file
-must be inside the document's git repository, or its folder when it isn't
-in one, but not in the repository's own `.git` folder (or `.hg`, `.jj`,
-`.svn`), and at most 16 MB; `out=` paths and the images `--html` and
+must be in the document's folder or a folder under it, repository or
+not, must not be hidden (a name starting with a dot, such as `.env` or
+`.git`), and at most 16 MB; `out=` paths and the images `--html` and
 `--pdf` read are held to the same folder. `--allow-outside` lifts that for
 a document you trust; mdsh-gui asks, once per document, and lets out
 only the files it listed. `from=` and `to=` are line

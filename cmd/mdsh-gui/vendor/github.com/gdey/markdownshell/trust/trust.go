@@ -4,7 +4,7 @@
 // when the list of files changes. The answers live in one JSON file,
 // shared by every front end. A second store, at OutsidePath, keeps in
 // the same way whether a document's includes and out= files may reach
-// outside its folder or repository (see run.Outside).
+// outside its folder, or hidden in it (see run.Outside).
 package trust
 
 import (

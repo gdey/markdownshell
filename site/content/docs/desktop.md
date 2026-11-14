@@ -117,8 +117,8 @@ This page is the reference.
   card and in the source pane, until you press the eye on its card, and
   masked again after a minute or when the window loses focus. A `nosave` card carries a *session only*
   badge: it runs, but its output isn't saved to the file.
-- **Files outside the repository.** A document whose includes or
-  `out=` files reach outside its git repository (or its folder) asks,
+- **Files outside the document's folder.** A document whose includes
+  or `out=` files reach outside its folder, or hidden files in it, asks,
   as it opens, whether to let them, listing the files: Allow for this
   document, Keep it inside, or Ask me later. The answer is remembered
   for that document, and asked again if the list changes; only the

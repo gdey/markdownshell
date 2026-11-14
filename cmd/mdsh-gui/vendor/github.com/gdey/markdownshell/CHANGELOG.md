@@ -54,6 +54,20 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- A document reaches only its own folder, and the folders under it, and
+  no hidden file or folder in them (a name starting with a dot, such as
+  `.env`, `.ssh` or `.git`), for includes, `out=` files, report images
+  and image previews alike. Before, a document with no repository got
+  its whole folder, so `~/notes.md` could include `~/.ssh/id_ed25519` on
+  open or write over `~/.zshrc` with an `out=`; and one in a repository
+  got all of it. Being in a repository no longer widens the root: an
+  include of `../scripts/setup.sh` from `docs/` is outside, and mdsh-gui
+  asks about it as it opens, as it asks about any file outside the
+  folder; `--allow-outside` still lifts it (finding 3 of the v1.5.0
+  security review). The `.git` rule below is now part of this one.
+
+  ![mdsh-gui asking whether to let a document reach outside its folder, listing ../scripts/setup.sh and .env, with a note that hidden files often hold passwords, tokens and keys](docs/changelog/outside-folder.png)
+
 - A repository's own `.git` folder (and `.hg`, `.jj`, `.svn`, in nested
   repositories too) counts as outside the document's root, for includes,
   `out=` files and report images alike. `{<include file=.git/config}`
@@ -65,6 +79,32 @@ follow [Semantic Versioning](https://semver.org/).
   outside the repository. `--allow-outside` still lifts it.
 
   ![mdsh-gui's question about files outside the repository, listing .git/config, with a note that the .git folder holds the repository's settings and hooks and a remote's address there can hold a token](docs/changelog/outside-git.png)
+
+- The site build checks the Hugo package's SHA-256 before installing it,
+  and CI installs Playwright with `npm ci` from a lockfile, so each npm
+  package is checked against its integrity hash. A changed upload now
+  fails the build instead of being installed (finding 7 of the v1.5.0
+  security review).
+
+- mdsh-gui's cast player now refuses a recording wider than 1000
+  columns, taller than 500 rows, or with more than 100,000 writes or
+  16 MB of output, the limits mdsh already put on casts for reports and
+  GIFs. A `.cast` beside a document, made with a huge size in its
+  header, used to make the player ask xterm.js for billions of cells
+  and hang or kill the window as the card was drawn. The card now says
+  the recording is too large instead (finding 6 of the v1.5.0 security
+  review).
+
+- Opening a copy of mdsh-gui 1.5.0, such as one on a mounted `.dmg`,
+  could still point `/usr/local/bin/mdsh` at itself, so the copy became
+  the `mdsh` every terminal ran, and `sudo mdsh` too. The fix for this
+  in 1.5.0 left a link into another `mdsh.app` alone unless the link
+  pointed at a place "this app has stood", but that list lived in the
+  user's settings, which every copy shares, so the installed app's own
+  path was on it (finding 1 of the v1.5.0 security review). Now the
+  link is repaired at launch only when its target is gone; a link into
+  another `mdsh.app` that is still there moves only when you press
+  Install in Settings › Shell.
 
 ## [1.5.0] - 2026-11-10
 

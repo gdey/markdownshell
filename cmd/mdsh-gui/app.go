@@ -35,8 +35,8 @@ type App struct {
 	// trust remembers which files' env.source files may be read into
 	// their shells. Nil remembers nothing, so each file asks every time.
 	trust *trust.Store
-	// outside remembers which files may reach outside their folder or
-	// repository, and for which files. Nil remembers nothing, so each
+	// outside remembers which files may reach outside their folder,
+	// or hidden in it, and for which files. Nil remembers nothing, so each
 	// file is asked every time it opens.
 	outside *trust.Store
 

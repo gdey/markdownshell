@@ -41,7 +41,8 @@ func TestOutside(t *testing.T) {
 	}
 }
 
-// A folder in a git repository may include from anywhere in it.
+// A document in a git repository is held to its own folder, not the
+// whole repository: ../Makefile is outside.
 func TestOutsideRepo(t *testing.T) {
 	top := t.TempDir()
 	os.Mkdir(filepath.Join(top, ".git"), 0o755)
@@ -49,7 +50,7 @@ func TestOutsideRepo(t *testing.T) {
 	os.Mkdir(dir, 0o755)
 	os.WriteFile(filepath.Join(top, "Makefile"), []byte("all:\n"), 0o644)
 	_, results := runDoc(t, "```make {<include file=../Makefile}\n```\n", run.Options{Dir: dir, File: filepath.Join(dir, "d.md")})
-	if r := results[0]; r.Err != nil || string(r.Stdout) != "all:\n" {
-		t.Errorf("include from the repo = %q, %v", r.Stdout, r.Err)
+	if r := results[0]; !errors.Is(r.Err, docroot.ErrOutside) || len(r.Stdout) != 0 {
+		t.Errorf("include from the repo = %q, %v, want ErrOutside", r.Stdout, r.Err)
 	}
 }

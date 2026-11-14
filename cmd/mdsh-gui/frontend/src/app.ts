@@ -158,7 +158,7 @@ async function refresh() {
     eventsFile = doc.file;
     void loadEvents();
   }
-  // Whether it may reach outside its repository is asked when a file
+  // Whether it may reach outside its folder is asked when a file
   // opens or is read again, not on every redraw.
   if (open && doc.file !== outsideFile) {
     outsideFile = doc.file;
@@ -3931,7 +3931,7 @@ type Collection = NonNullable<Start["collections"]>[number];
 function fileRow(path: string, label: string, detail: string, desc = "", tags: string[] = []): HTMLElement {
   const name = el("span", { className: "fname" }, label);
   if (tags.length) name.append(el("span", { className: "ftag" }, tags.map((t) => "#" + t).join(" ")));
-  if ((startScreen.outside ?? []).includes(path)) name.append(el("span", { className: "fbadge", title: "Allowed to reach files outside its repository" }, "outside"));
+  if ((startScreen.outside ?? []).includes(path)) name.append(el("span", { className: "fbadge", title: "Allowed to reach files outside its folder" }, "outside"));
   const left = desc ? el("span", { className: "fleft" }, name, el("span", { className: "fdesc muted", title: desc }, desc)) : name;
   const b = el("button", { className: "file", title: path }, left, el("span", { className: "muted" }, detail));
   b.onclick = () => openPath(path);
@@ -4455,7 +4455,7 @@ function onSources({ files }: SourcesQuestion) {
 }
 
 // checkOutside asks, once a file opens, whether it may reach the files
-// its includes and out= name outside its repository (or its folder),
+// its includes and out= name outside its folder, or hidden in it,
 // as mdsh --allow-outside allows them on the command line. The answer is
 // remembered for the file, until the list changes; Ask me later and Esc
 // leave it unanswered. Once answered, a banner says which way, with a
@@ -4473,7 +4473,7 @@ async function checkOutside() {
   const paths = o.paths ?? [];
   const shown = paths.map(tilde).join(", ");
   $("outside").hidden = paths.length === 0 || o.answer === "";
-  $("outside-text").textContent = o.answer === "allow" ? "This document may reach outside its repository: " + shown : "Kept inside its repository, so these fail: " + shown;
+  $("outside-text").textContent = o.answer === "allow" ? "This document may reach outside its folder: " + shown : "Kept inside its folder, so these fail: " + shown;
   const change = $<HTMLButtonElement>("outside-change");
   change.textContent = o.answer === "allow" ? "Stop allowing" : "Allow…";
   change.onclick = () => (o.answer === "allow" ? void answerOutside("deny") : askOutside(o));
@@ -4484,7 +4484,7 @@ function askOutside(o: OutsideFiles) {
   const dialog = $<HTMLDialogElement>("outside-dialog");
   $("outside-root").textContent = o.root;
   $("outside-list").replaceChildren(...(o.paths ?? []).map((p) => el("li", {}, el("code", {}, p))));
-  $("outside-vcs").hidden = !(o.paths ?? []).some(inRepoFolder);
+  $("outside-vcs").hidden = !(o.paths ?? []).some(isHidden);
   dialog.returnValue = "";
   dialog.onclose = () => {
     if (dialog.returnValue !== "") void answerOutside(dialog.returnValue);
@@ -4493,16 +4493,16 @@ function askOutside(o: OutsideFiles) {
   $("outside-later").focus();
 }
 
-// inRepoFolder says whether a path, as the document writes it, names a
-// repository's own folder or something in it, as docroot.InMetadata does.
-function inRepoFolder(path: string): boolean {
-  return path.split(/[\\/]/).some((part) => [".git", ".hg", ".jj", ".svn"].includes(part.toLowerCase()));
+// isHidden says whether a path, as the document writes it, names a
+// hidden file or folder or something in one, as docroot.Hidden does.
+function isHidden(path: string): boolean {
+  return path.split(/[\\/]/).some((part) => part.startsWith(".") && part !== "." && part !== "..");
 }
 
 async function answerOutside(answer: string) {
   try {
     await App.AnswerOutside(answer);
-    announce(answer === "allow" ? "Allowed outside its repository" : "Kept inside its repository");
+    announce(answer === "allow" ? "Allowed outside its folder" : "Kept inside its folder");
   } catch (err) {
     status(message(err));
   }

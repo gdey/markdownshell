@@ -202,7 +202,7 @@ type Options struct {
 	// no shell starts for a document that names any.
 	Sources func(paths []string) run.Answer
 	// Outside says whether the document may reach the files run.Outside
-	// lists, outside its folder or repository, as the user last
+	// lists, outside its folder, or hidden in it, as the user last
 	// answered. It is asked as each session starts, and only the files
 	// listed then are let out, so one an edit adds stays in until it is
 	// asked about. If it is nil, nothing reaches outside.
@@ -352,7 +352,7 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 }
 
 // Outside lists the files the document's includes and out= name
-// outside its folder or repository: see run.Outside.
+// outside its folder, or hidden in it: see run.Outside.
 func (n *Notebook) Outside() []string {
 	n.mu.Lock()
 	defer n.mu.Unlock()
