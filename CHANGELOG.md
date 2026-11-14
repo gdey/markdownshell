@@ -14,7 +14,10 @@ follow [Semantic Versioning](https://semver.org/).
   `jsonpath`, `body`, `regex` and `duration` with `==`, `contains`,
   `exists`, `matches` and the rest; `[Captures]` set the block's own
   variables, read as `{{#login/env(token)}}` by prose, conditions and
-  later requests. `[QueryStringParams]`, `[FormParams]`, `[Options]`
+  later requests, and `{{#login/status}}`, `{{#login/json($.expires)}}`
+  and `{{#login/header(Content-Type)}}` read the response itself, in
+  prose and in conditions such as `run={{#login/status}}==201`.
+  `[QueryStringParams]`, `[FormParams]`, `[Options]`
   (`insecure`, `follow`, `timeout`) and an `@file` body are there too.
   Placeholders are filled in as the request goes out and never saved.
   The response is the block's output, with `Set-Cookie`,

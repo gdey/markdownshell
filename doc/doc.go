@@ -355,6 +355,9 @@ func Parse(src []byte) (*Document, error) {
 			return nil, fmt.Errorf("%s refers to unknown block %q", r, r.BlockID)
 		}
 	}
+	if err := checkResponseRefs(d); err != nil {
+		return nil, err
+	}
 	return d, nil
 }
 

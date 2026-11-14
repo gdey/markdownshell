@@ -2,9 +2,8 @@
 
 Status: design, Nov 13, 2026; j settled questions 1 to 7 the same
 day. Building for 1.6: the fence, its checks and captures, masking and
-the audit log are built (see the spec's HTTP blocks); the response
-placeholders (`json()`, `header()`, `status`), the views' tabs and
-*Copy as curl* come next, and `background` on an http block is a parse
+the audit log and the response placeholders are built (see the
+spec's HTTP blocks); the views' tabs and *Copy as curl* come next, and `background` on an http block is a parse
 error for now. The open questions at the end keep their answers; the
 text above them reads as settled.
 

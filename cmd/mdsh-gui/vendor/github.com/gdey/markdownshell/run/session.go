@@ -202,7 +202,7 @@ func (s *Session) refs() {
 	}
 	s.wanted = map[string][]string{}
 	for _, ref := range refs {
-		if ref.BlockID != "" && !ref.Fact() {
+		if ref.BlockID != "" && !ref.Fact() && !ref.Response() {
 			s.wanted[ref.BlockID] = append(s.wanted[ref.BlockID], ref.Var)
 		}
 	}

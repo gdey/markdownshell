@@ -633,7 +633,9 @@ the body sends a file. `HTTP 201` checks the status, and each
 and the `is…` type checks, `not` in front to turn it around. A
 `[Captures]` line sets a variable of the block that prose, conditions
 and later `http` blocks read as `{{#login/env(token)}}`; `secret` keeps
-it out of the file.
+it out of the file. Prose and conditions can also read the response
+itself: `{{#login/status}}`, `{{#login/json($.expires)}}` and
+`{{#login/header(Content-Type)}}`, as in `run={{#login/status}}==201`.
 
 Placeholders are filled in as the request is made and never stored.
 The output is the response, saved under the block like any other, with

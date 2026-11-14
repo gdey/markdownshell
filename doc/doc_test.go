@@ -637,3 +637,37 @@ func TestHTTPBlockAttrs(t *testing.T) {
 		t.Errorf("a placeholder for an unknown block parsed")
 	}
 }
+
+func TestResponseRefs(t *testing.T) {
+	d, err := Parse([]byte("```http {#login}\nGET https://example.com\n```\n\nToken {{#login/json($.items[0]['id']):\"7\"}}, type {{#login/header(Content-Type)}}, status {{#login/status}}.\n\n```sh {#next run={{#login/status}}==200}\necho\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Ref{
+		{BlockID: "login", Fn: FnJSON, Var: "$.items[0]['id']"},
+		{BlockID: "login", Fn: FnHeader, Var: "Content-Type"},
+		{BlockID: "login", Fn: FnStatus},
+	}
+	for i, p := range d.Placeholders {
+		if p.Ref != want[i] {
+			t.Errorf("placeholder %d = %+v, want %+v", i, p.Ref, want[i])
+		}
+		if got := p.Ref.String(); !strings.Contains(string(d.Src), strings.TrimSuffix(got, "}}")) {
+			t.Errorf("String() = %s", got)
+		}
+	}
+	if d.Placeholders[0].Value != "7" {
+		t.Errorf("stored value = %q", d.Placeholders[0].Value)
+	}
+	if c, _ := d.Block("next").Cond("run"); c.Ref == nil || *c.Ref != want[2] {
+		t.Errorf("run= ref = %v", c.Ref)
+	}
+	for _, src := range []string{
+		"```sh {#a}\necho\n```\n{{#a/status}}\n",
+		"```http {#a}\nGET https://x\n```\n{{#a/json($.x[)}}\n",
+	} {
+		if _, err := Parse([]byte(src)); err == nil {
+			t.Errorf("Parse(%q) didn't fail", src)
+		}
+	}
+}

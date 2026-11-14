@@ -17,6 +17,48 @@ func (b *Block) Request() (*httpblock.Request, error) {
 	return httpblock.Parse(b.Body)
 }
 
+// SecretRef reports whether ref, read from http block b, holds a
+// secret: a capture marked secret, a json() path such a capture reads,
+// or a header() whose value the output masks (more is the front
+// matter's mdsh.http.secret_headers). Write-back stores it bare.
+func (b *Block) SecretRef(ref Ref, more []string) bool {
+	if !b.IsHTTP() || ref.Fact() {
+		return false
+	}
+	switch ref.Fn {
+	case "":
+		return b.SecretVar(ref.Var)
+	case FnHeader:
+		return httpblock.IsSecretHeader(ref.Var, more)
+	case FnJSON:
+		r, err := b.Request()
+		return err == nil && slices.ContainsFunc(r.Captures, func(c httpblock.Capture) bool {
+			return c.Secret && c.What == "jsonpath" && c.Arg == ref.Var
+		})
+	}
+	return false
+}
+
+// checkResponseRefs checks that the refs reading a response,
+// {{#id/json(PATH)}}, {{#id/header(NAME)}} and {{#id/status}}, name an
+// http block, and that each path reads.
+func checkResponseRefs(d *Document) error {
+	for _, r := range d.Refs() {
+		if !r.Response() {
+			continue
+		}
+		if b := d.Block(r.BlockID); b == nil || !b.IsHTTP() {
+			return fmt.Errorf("%s reads a response, but %s isn't an http block", r, r.BlockID)
+		}
+		if r.Fn == FnJSON {
+			if err := httpblock.CheckPath(r.Var); err != nil {
+				return fmt.Errorf("%s: %w", r, err)
+			}
+		}
+	}
+	return nil
+}
+
 // SecretVar reports whether name is one of http block b's captures
 // marked secret: write-back stores a placeholder for it bare.
 func (b *Block) SecretVar(name string) bool {

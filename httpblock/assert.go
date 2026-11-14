@@ -11,6 +11,31 @@ import (
 	"unicode/utf8"
 )
 
+// Lookup reads a response for a placeholder or a condition: fn is
+// "json" with a path, "header" with a name, or "status". ok is false
+// when there is nothing there. A value that isn't a string is JSON.
+func (resp *Response) Lookup(fn, arg string) (value string, ok bool) {
+	var q Query
+	switch fn {
+	case "json":
+		q = Query{What: "jsonpath", Arg: arg}
+	case "header":
+		q = Query{What: "header", Arg: arg}
+	case "status":
+		q = Query{What: "status"}
+	default:
+		return "", false
+	}
+	v, found, err := resp.query(q)
+	if err != nil || !found {
+		return "", false
+	}
+	if list, isList := v.([]any); isList && fn == "header" {
+		return text(list[0]), true
+	}
+	return text(v), true
+}
+
 // query reads q from the response. found is false when there is
 // nothing there: no such header, no match.
 func (resp *Response) query(q Query) (v any, found bool, err error) {

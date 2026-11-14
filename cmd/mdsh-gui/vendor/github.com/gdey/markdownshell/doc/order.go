@@ -69,6 +69,11 @@ func (d *Document) OrderProblems(runnable func(*Block) bool) []OrderProblem {
 				read(*c.Ref, b.Span.Start, fmt.Sprintf("%s=%s on %s", a, c.Text, d.name(b)), b.ID+"\x00"+a)
 			}
 		}
+		if b.IsHTTP() {
+			for _, r := range TextRefs(b.Body) {
+				read(r, b.Span.Start, "the request in "+d.name(b), b.ID+"\x00http")
+			}
+		}
 		if b.IsTape() && !b.IsInclude() {
 			if t := d.Block(b.Attrs["for"]); t != nil {
 				for _, r := range TextRefs(b.Body) {

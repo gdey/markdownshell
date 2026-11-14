@@ -360,6 +360,15 @@ func NewLookup(d *doc.Document, results []*Result, environ []string) doc.Lookup 
 		}
 		for _, r := range results {
 			if r != nil && r.Block.ID == ref.BlockID && (r.Ran || ref.Var == doc.Ran) {
+				if ref.Response() {
+					if r.HTTP == nil {
+						break
+					}
+					if v, ok := r.HTTP.Lookup(ref.Fn, ref.Var); ok {
+						return v, true
+					}
+					return "", true
+				}
 				if v, ok := r.fact(ref); ok {
 					return v, true
 				}

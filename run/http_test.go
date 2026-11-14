@@ -113,3 +113,25 @@ func TestHTTPBadRequest(t *testing.T) {
 		t.Errorf("warnings = %q", d.Warnings)
 	}
 }
+
+func TestHTTPResponsePlaceholders(t *testing.T) {
+	srv := apiServer(t)
+	src := "---\nmdsh:\n  env:\n    share: [API]\n---\n" +
+		"```http {#login}\nPOST {{$API}}/sessions\n\n{\"user\": \"j\"}\n\n[Captures]\ntoken: secret jsonpath $.token\n```\n\n" +
+		"```sh {#ok run={{#login/status}}==201}\necho created\n```\n\n" +
+		"```sh {#bad run={{#login/status}}!=201}\necho no\n```\n\n" +
+		"Id {{#login/json($.id)}}, type {{#login/header(Content-Type)}}, cookie {{#login/header(Set-Cookie)}}, token {{#login/json($.token)}}, status {{#login/status}}.\n"
+	d, results := runDoc(t, src, run.Options{Environ: []string{"PATH=" + os.Getenv("PATH"), "API=" + srv.URL, "MDSH_EXPOSE=API"}})
+	r := byID(results)
+	if !r["ok"].Ran || r["bad"].Ran {
+		t.Errorf("run= on status: ok ran %v, bad ran %v", r["ok"].Ran, r["bad"].Ran)
+	}
+	printed := string(render.Markdown(d, results, render.Options{}))
+	if !strings.Contains(printed, "Id 42, type application/json, cookie session=cookie123, token tok-j-789, status 201.") {
+		t.Errorf("printed:\n%s", printed)
+	}
+	saved := string(render.Markdown(d, results, render.Options{WriteBack: true}))
+	if want := `Id {{#login/json($.id):"42"}}, type {{#login/header(Content-Type):"application/json"}}, cookie {{#login/header(Set-Cookie)}}, token {{#login/json($.token)}}, status {{#login/status:"201"}}.`; !strings.Contains(saved, want) {
+		t.Errorf("saved lacks\n%s\nin\n%s", want, saved)
+	}
+}

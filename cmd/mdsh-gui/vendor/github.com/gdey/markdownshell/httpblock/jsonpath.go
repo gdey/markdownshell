@@ -29,6 +29,12 @@ const (
 	stepDescend
 )
 
+// CheckPath reports whether s is a JSONPath checks can read.
+func CheckPath(s string) error {
+	_, err := compilePath(s)
+	return err
+}
+
 // compilePath reads a JSONPath.
 func compilePath(s string) (*path, error) {
 	bad := func(why string) (*path, error) {
