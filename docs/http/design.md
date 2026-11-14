@@ -1,8 +1,12 @@
 # HTTP request blocks with checks
 
 Status: design, Nov 13, 2026; j settled questions 1 to 7 the same
-day. Nothing here is built. The open questions at the end keep their
-answers; the text above them reads as settled.
+day. Building for 1.6: the fence, its checks and captures, masking and
+the audit log are built (see the spec's HTTP blocks); the response
+placeholders (`json()`, `header()`, `status`), the views' tabs and
+*Copy as curl* come next, and `background` on an http block is a parse
+error for now. The open questions at the end keep their answers; the
+text above them reads as settled.
 
 The idea (j, Nov 13): a runbook often has to make an HTTP request, with
 a body and parameters, and then check that the response matches some

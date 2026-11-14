@@ -591,6 +591,59 @@ these, with the recordings they make.
 With no terminal (cron, CI) or with mdsh in the background, a `tty` block
 without a tape fails with an error instead of hanging.
 
+## HTTP requests
+
+An `http` block makes one HTTP request, written the way it goes over
+the wire, and checks what comes back in [Hurl](https://hurl.dev)'s
+words. mdsh makes the request itself, so it needs no `curl` or `jq`:
+
+````markdown
+```http {#login}
+POST {{$API}}/sessions
+Content-Type: application/json
+
+{"user": "j", "password": "{{$API_PASSWORD}}"}
+
+HTTP 201
+[Asserts]
+header Content-Type contains application/json
+jsonpath $.token exists
+[Captures]
+token: secret jsonpath $.token
+```
+
+```http {#whoami depends=login}
+GET {{$API}}/me
+Authorization: Bearer {{#login/env(token)}}
+
+HTTP 200
+[Asserts]
+jsonpath $.user == "j"
+jsonpath $.roles count == 2
+```
+````
+
+Headers follow the request line; the body comes after a blank line.
+`[QueryStringParams]` and `[FormParams]` take `name: value` lines,
+`[Options]` takes `insecure`, `follow` and `timeout`, and `@file` as
+the body sends a file. `HTTP 201` checks the status, and each
+`[Asserts]` line checks `status`, `header NAME`, `jsonpath PATH`,
+`body`, `regex PATTERN` or `duration` with `==`, `!=`, `<`, `>`,
+`contains`, `startsWith`, `endsWith`, `matches`, `exists`, `isEmpty`
+and the `is…` type checks, `not` in front to turn it around. A
+`[Captures]` line sets a variable of the block that prose, conditions
+and later `http` blocks read as `{{#login/env(token)}}`; `secret` keeps
+it out of the file.
+
+Placeholders are filled in as the request is made and never stored.
+The output is the response, saved under the block like any other, with
+`Set-Cookie`, `Authorization` and the other credential headers saved as
+`(secret)`; list more under `mdsh.http.secret_headers` in the front
+matter. A failed check fails the block with one line on stderr, such as
+`assert jsonpath $.user == "j": got "guest"`, so `on_error`,
+`depends=` and `{{#whoami/?}}` work as for any block. See the spec for
+everything an `http` block takes.
+
 ## Conditions
 
 A condition is a placeholder without the `:"..."` part, optionally

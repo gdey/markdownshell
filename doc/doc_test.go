@@ -615,3 +615,25 @@ func TestMirrorVar(t *testing.T) {
 		t.Errorf("SetText:\n%s", got)
 	}
 }
+
+func TestHTTPBlockAttrs(t *testing.T) {
+	for _, attr := range []string{"env=x", "share=A", "tty", "background", "out=markdown"} {
+		_, err := Parse([]byte("```http {#a " + attr + "}\nGET https://example.com\n```\n"))
+		if err == nil || !strings.Contains(err.Error(), "an http block takes no") {
+			t.Errorf("%s: err = %v", attr, err)
+		}
+	}
+	d, err := Parse([]byte("```http {#a}\nGET https://example.com/{{#b/env(X)}}\n[Captures]\nt: secret jsonpath $.t\nu: jsonpath $.u\n```\n```sh {#b}\nX=1\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refs := d.Refs(); len(refs) != 1 || refs[0] != (Ref{BlockID: "b", Var: "X"}) {
+		t.Errorf("refs = %v", refs)
+	}
+	if a := d.Block("a"); !a.SecretVar("t") || a.SecretVar("u") {
+		t.Errorf("SecretVar is wrong")
+	}
+	if _, err := Parse([]byte("```http {#a}\nGET https://example.com/{{#nope/env(X)}}\n```\n")); err == nil {
+		t.Errorf("a placeholder for an unknown block parsed")
+	}
+}

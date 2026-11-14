@@ -331,6 +331,9 @@ func Parse(src []byte) (*Document, error) {
 			return nil, fmt.Errorf("line %d: block %s: a background block can't be tty, since nobody is at its terminal", lineNo(src, b.Span.Start), b.ID)
 		}
 	}
+	if err := checkHTTP(d); err != nil {
+		return nil, err
+	}
 	if err := checkTapes(d); err != nil {
 		return nil, err
 	}

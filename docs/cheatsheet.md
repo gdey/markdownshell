@@ -142,6 +142,7 @@ on save.
 | ```` ```output {for=id exit=0} ```` | A block's output, right under it; elsewhere, a copy mdsh refills on every run. `stream=stderr` is its stderr; `nosave` keeps that fence out of the file |
 | `<!-- mdsh:output for="id" -->` … `<!-- /mdsh:output -->` | The same for `out=markdown` and image output |
 | ```` ```tape {for=id} ```` | Types the input for `tty` block `id`, in VHS commands: `Type "…"`, `Enter`, `Tab`, `Up`…, `Ctrl+X`, `Alt+X`, `Sleep 1s`, `Wait /regex/`, `Set TypingSpeed`, `WaitTimeout`, `WaitPattern`. Double-quoted `Type` takes placeholders. Can be an include |
+| ```` ```http ```` | One request: `METHOD URL`, headers, a blank line, the body; `HTTP 200`, then `[Asserts]` (`jsonpath $.id == 1`, `header X contains y`, `status`, `body`, `regex`, `duration`) and `[Captures]` (`token: secret jsonpath $.token`, read as `{{#id/env(token)}}`). `[QueryStringParams]`, `[FormParams]`, `[Options]` |
 | ```` ```cast ```` | An asciinema recording, played in mdsh-gui; `frame=N` opens it there |
 | ```` ```d2 ````, ```` ```svg ```` | A diagram, a picture, drawn in mdsh-gui |
 | `- [ ] task` | A task item mdsh-gui checks in the file when clicked; table cells starting with `[ ]` too |

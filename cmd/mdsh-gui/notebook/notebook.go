@@ -987,7 +987,7 @@ func (n *Notebook) Kill() bool {
 // so starting them again would lose what it set.
 func (n *Notebook) ran() bool {
 	for _, r := range n.results {
-		if r != nil && r.Ran && run.Runnable(r.Block) {
+		if r != nil && r.Ran && run.UsesShell(r.Block) {
 			return true
 		}
 	}

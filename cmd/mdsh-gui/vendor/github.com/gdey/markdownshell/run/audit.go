@@ -30,6 +30,21 @@ func (s *Session) logEnd(b *doc.Block, r *Result, start time.Time) {
 	if r.Err != nil {
 		f["error"] = r.Err.Error()
 	}
+	if r.Request != nil {
+		// The request as written: its placeholders' values, headers and
+		// bodies stay out of the log.
+		f["method"], f["url"] = r.Request.Method, r.Request.URL
+	}
+	if r.HTTP != nil {
+		f["status"] = r.HTTP.Code
+		var checks []any
+		for _, c := range r.HTTP.Checks {
+			checks = append(checks, audit.Fields{"check": c.Text, "ok": c.OK})
+		}
+		if checks != nil {
+			f["checks"] = checks
+		}
+	}
 	s.opts.Audit.Event("block.end", f)
 	if r.Exited {
 		s.logShellEnd(b, r)

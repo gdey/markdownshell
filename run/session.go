@@ -813,6 +813,11 @@ func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bo
 	if !Runnable(b) {
 		return s.results[i], false, fmt.Errorf("mdsh can't run %s blocks", b.Lang)
 	}
+	if b.IsHTTP() {
+		// A request has nothing to type at: it runs as it would anywhere.
+		r, err := s.RunBlock(ctx, i)
+		return r, false, err
+	}
 	if s.opts.Terminal == nil {
 		return s.results[i], false, ErrNoTTY
 	}
@@ -866,6 +871,13 @@ func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	r.Seq, r.Deps = s.seq, depSeqs(s.d, s.results, b)
 	s.emit(Event{Kind: Started, Block: b})
 	s.logStart(b)
+	if b.IsHTTP() {
+		start := time.Now()
+		runHTTP(ctx, s.d, b, r, s.opts, s.emit, LookupAt(s.lookup, s.d, s.results, b.Span.Start))
+		s.logEnd(b, r, start)
+		s.emit(Event{Kind: Done, Block: b, Result: r})
+		return
+	}
 	if b.Attrs.Has("background") {
 		s.background(ctx, b, r)
 		return

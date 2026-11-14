@@ -231,10 +231,11 @@ func (d *Document) Refs() []Ref {
 			refs = append(refs, *f.Cond.Ref)
 		}
 	}
-	// An included tape's lines are read when the document runs; see
-	// run.Run.
+	// A tape's input and an http block's request fill in placeholders
+	// as they run. An included tape's lines are read when the document
+	// runs; see run.Run.
 	for _, b := range d.Blocks {
-		if b.IsTape() && !b.IsInclude() {
+		if b.IsTape() && !b.IsInclude() || b.IsHTTP() {
 			refs = append(refs, TextRefs(b.Body)...)
 		}
 	}
