@@ -52,7 +52,7 @@ func TestNameBlocks(t *testing.T) {
 	if results[1].Image != "d.md.assets/"+two+".svg" {
 		t.Errorf("image = %q", results[1].Image)
 	}
-	out := string(render.Markdown(d, results, render.Options{WriteBack: true}))
+	out := noAt(string(render.Markdown(d, results, render.Options{WriteBack: true})))
 	for _, want := range []string{
 		"```sh {#" + one + " out=screenshot}",
 		"<!-- mdsh:output for=\"" + one + "\" -->\n![",

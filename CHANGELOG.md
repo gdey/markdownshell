@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Saved output says when it was made: each output fence and region a
+  run writes carries `at=`, the time the block started, in UTC to the
+  second (`at=2026-11-13T19:08:00Z`). It changes only when the block
+  runs again, so the first save after upgrading stamps each block's
+  output as it reruns. Output without `at=`, from an older mdsh, reads
+  as before. This is the first step of output history; the design is
+  in [docs/output-history/design.md](docs/output-history/design.md).
+
 - An include block in mdsh-gui's rendered view has a grip above and
   below its lines. Dragging the bottom one down shows the lines after
   them, raising `to=`, and dragging the top one up shows the lines

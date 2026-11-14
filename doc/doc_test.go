@@ -615,3 +615,41 @@ func TestMirrorVar(t *testing.T) {
 		t.Errorf("SetText:\n%s", got)
 	}
 }
+
+// TestRegionAttrs checks that an output region's opening line may carry
+// more attributes after for=, as at=, and still belongs to its block,
+// while a malformed one is not a region.
+func TestRegionAttrs(t *testing.T) {
+	for _, line := range []string{
+		`<!-- mdsh:output for="a" -->`,
+		`<!-- mdsh:output for="a" at="2026-11-13T19:08:00Z" -->`,
+		`<!-- mdsh:output for="a"  at="2026-11-13T19:08:00Z"  history="1" -->`,
+	} {
+		if id, ok := regionStart([]byte(line)); !ok || id != "a" {
+			t.Errorf("%s: id %q, ok %v", line, id, ok)
+		}
+	}
+	for _, line := range []string{
+		`<!-- mdsh:output for="a"at="x" -->`,
+		`<!-- mdsh:output for="a" at=x -->`,
+		`<!-- mdsh:output for="a" at -->`,
+		`<!-- mdsh:output for=a -->`,
+	} {
+		if _, ok := regionStart([]byte(line)); ok {
+			t.Errorf("%s: read as a region", line)
+		}
+	}
+	if got, want := RegionStartAt("a b", "2026-11-13T19:08:00Z"), `<!-- mdsh:output for="a b" at="2026-11-13T19:08:00Z" -->`; got != want {
+		t.Errorf("RegionStartAt = %s, want %s", got, want)
+	}
+	if got := RegionStartAt("a", ""); got != RegionStart("a") {
+		t.Errorf("RegionStartAt without a time = %s", got)
+	}
+	d, err := Parse([]byte("```sh {#a out=markdown}\necho hi\n```\n\n<!-- mdsh:output for=\"a\" at=\"2026-11-13T19:08:00Z\" -->\nhi\n<!-- /mdsh:output -->\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Blocks[0].HasOutput() || len(d.Copies) != 0 {
+		t.Errorf("stamped region isn't a's output: output %v, copies %d", d.Blocks[0].Output, len(d.Copies))
+	}
+}

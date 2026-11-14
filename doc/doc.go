@@ -649,20 +649,63 @@ const (
 // RegionStart returns the line that opens an output region for id.
 func RegionStart(id string) string { return regionOpen + strconv.Quote(id) + " -->" }
 
+// RegionStartAt returns the line that opens an output region for id
+// stamped with at=, the time its block's run started.
+func RegionStartAt(id, at string) string {
+	if at == "" {
+		return RegionStart(id)
+	}
+	return regionOpen + strconv.Quote(id) + " at=" + strconv.Quote(at) + " -->"
+}
+
 // RegionEnd is the line that closes an output region.
 const RegionEnd = regionClose
 
+// regionStart returns the id an output region's opening line names. The
+// id may be followed by more name="value" attributes, such as at=.
 func regionStart(line []byte) (string, bool) {
 	line = bytes.TrimSpace(line)
 	if !bytes.HasPrefix(line, []byte(regionOpen)) || !bytes.HasSuffix(line, []byte("-->")) {
 		return "", false
 	}
-	q := bytes.TrimSpace(line[len(regionOpen) : len(line)-3])
-	id, err := strconv.Unquote(string(q))
+	rest := string(bytes.TrimSpace(line[len(regionOpen) : len(line)-3]))
+	q, err := strconv.QuotedPrefix(rest)
 	if err != nil {
 		return "", false
 	}
+	id, _ := strconv.Unquote(q)
+	if more := rest[len(q):]; more != "" && more[0] != ' ' && more[0] != '\t' {
+		return "", false
+	}
+	if _, ok := regionAttrs(rest[len(q):]); !ok {
+		return "", false
+	}
 	return id, true
+}
+
+// regionAttrs parses the name="value" pairs after a region's for= id.
+func regionAttrs(s string) (map[string]string, bool) {
+	attrs := map[string]string{}
+	for {
+		s = strings.TrimLeft(s, " \t")
+		if s == "" {
+			return attrs, true
+		}
+		eq := strings.IndexByte(s, '=')
+		if eq <= 0 || strings.ContainsAny(s[:eq], " \t\"") {
+			return nil, false
+		}
+		name := s[:eq]
+		q, err := strconv.QuotedPrefix(s[eq+1:])
+		if err != nil {
+			return nil, false
+		}
+		attrs[name], _ = strconv.Unquote(q)
+		s = s[eq+1+len(q):]
+		if s != "" && s[0] != ' ' && s[0] != '\t' {
+			return nil, false
+		}
+	}
 }
 
 // regionEnd returns the offset just past the closing line of a region whose
