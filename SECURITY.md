@@ -7,8 +7,8 @@ Older releases don't get fixes; upgrade to the latest one.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.4.x   | Yes       |
-| < 1.4   | No        |
+| 1.5.x   | Yes       |
+| < 1.5   | No        |
 
 ## What counts as a security bug
 
@@ -37,7 +37,8 @@ heading, crediting you if you'd like.
 
 ## Past reviews
 
-The reviews are in [docs/security](docs/security): for v1.4.0,
+The reviews are in [docs/security](docs/security): for v1.5.0,
+[what changed since v1.4.0](docs/security/v1.5.0.md); for v1.4.0,
 [the whole surface](docs/security/v1.4.0.md); for v1.2.1,
 [the CLI and shared packages](docs/security/cli-v1.2.1.md) and
 [mdsh-gui](docs/security/gui-v1.2.1.md). The CHANGELOG notes each
