@@ -31,7 +31,7 @@ func TestLoadAndHalfBlocks(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "red.png")
 	os.WriteFile(file, buf.Bytes(), 0o644)
 	for _, link := range []string{file, "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())} {
-		img, err := Load(link)
+		img, err := Load("", link)
 		if err != nil {
 			t.Fatalf("%.30s: %v", link, err)
 		}

@@ -456,13 +456,13 @@ func (a *App) Reload(ctx context.Context) error {
 }
 
 // OutsideFiles are the files a document's includes and out= name
-// outside its folder or repository, and what the user last said about
+// outside its folder, or hidden in it, and what the user last said about
 // them.
 type OutsideFiles struct {
 	// Paths are the files, as the document writes them.
 	Paths []string `json:"paths"`
-	// Root is the folder they are outside: the document's repository,
-	// or its folder, with the home folder as ~.
+	// Root is the folder they are outside: the document's folder,
+	// with the home folder as ~.
 	Root string `json:"root"`
 	// Answer is "allow" or "deny", or "" when this list hasn't been
 	// answered: the page asks.

@@ -54,8 +54,8 @@ type Options struct {
 	// Title is the PDF's title metadata.
 	Title string
 	// AllowOutside reads images from anywhere. Otherwise a local image
-	// must be inside Dir's root (see package docroot): its repository,
-	// or Dir itself.
+	// must be inside Dir's root (see package docroot): Dir itself,
+	// and not hidden.
 	AllowOutside bool
 }
 

@@ -1125,7 +1125,7 @@ func (m *Model) view() tea.Cmd {
 		m.status = "this block has no image"
 		return nil
 	}
-	img, err := termimg.Load(m.imagePath(link))
+	img, err := termimg.Load(m.imageRoot(), m.imagePath(link))
 	if err != nil {
 		m.status = "can't show " + link + ": " + err.Error()
 		return nil

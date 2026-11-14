@@ -271,7 +271,7 @@ export interface NvimText {
 
 /**
  * OutsideFiles are the files a document's includes and out= name
- * outside its folder or repository, and what the user last said about
+ * outside its folder, or hidden in it, and what the user last said about
  * them.
  */
 export interface OutsideFiles {
@@ -281,8 +281,8 @@ export interface OutsideFiles {
     "paths": string[] | null;
 
     /**
-     * Root is the folder they are outside: the document's repository,
-     * or its folder, with the home folder as ~.
+     * Root is the folder they are outside: the document's folder,
+     * with the home folder as ~.
      */
     "root": string;
 

@@ -154,7 +154,7 @@ _mdsh() {
 		'--no-color[same as --color=never]' \
 		'-i[open in the terminal UI]' \
 		'--autosave[with -i, save after every block that runs]' \
-		"--allow-outside[let includes and out= files reach outside the document's repository]" \
+		"--allow-outside[let includes and out= files reach outside the document's folder]" \
 		'--version[print the version]' \
 		'-h[show help]' \
 		'1:markdown file:_files -g "*.md"' \

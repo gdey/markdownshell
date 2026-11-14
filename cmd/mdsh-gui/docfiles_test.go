@@ -24,6 +24,8 @@ func TestDocFiles(t *testing.T) {
 		"docs/run.cast":     "{}",
 		"docs/img/B.PNG":    "png",
 		"docs/key.png.pem":  "key",
+		"docs/.git/x.png":   "png",
+		"docs/.hidden.png":  "png",
 	} {
 		p := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -71,7 +73,10 @@ func TestDocFiles(t *testing.T) {
 		notebook.DocURL(filepath.Join(dir, "doc.md")):       http.StatusNotFound,
 		notebook.DocURL(filepath.Join(dir, "key.png.pem")):  http.StatusNotFound,
 		notebook.DocURL(fake):                               http.StatusNotFound,
-		"/index.html":                                       http.StatusTeapot,
+		// Nothing hidden, even an image.
+		notebook.DocURL(filepath.Join(dir, ".git", "x.png")): http.StatusNotFound,
+		notebook.DocURL(filepath.Join(dir, ".hidden.png")):   http.StatusNotFound,
+		"/index.html": http.StatusTeapot,
 	} {
 		if got := get(path); got != want {
 			t.Errorf("GET %s = %d, want %d", path, got, want)

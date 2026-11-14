@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
@@ -383,15 +384,26 @@ func (m *Model) imagePath(link string) string {
 	return filepath.Join(filepath.Dir(m.opts.Run.File), filepath.FromSlash(link))
 }
 
+// imageRoot is the folder image previews must stay in, as reports and
+// includes do: the document's folder, or "" with --allow-outside. See
+// package docroot.
+func (m *Model) imageRoot() string {
+	if m.opts.Run.AllowOutside {
+		return ""
+	}
+	return docroot.Root(filepath.Dir(m.opts.Run.File))
+}
+
 // preview draws the image at link as half blocks at most cols wide, or
 // returns "" when previews are off or the image can't be read. Previews
-// are cached by link, the file's time and the width.
+// are cached by link, the root, the file's time and the width.
 func (m *Model) preview(link string, cols int) string {
 	if !m.opts.Images || link == "" {
 		return ""
 	}
 	path := m.imagePath(link)
-	key := fmt.Sprintf("%s|%d", path, cols)
+	root := m.imageRoot()
+	key := fmt.Sprintf("%s|%s|%d", root, path, cols)
 	if !strings.HasPrefix(path, "data:") {
 		info, err := os.Stat(path)
 		if err != nil {
@@ -403,7 +415,7 @@ func (m *Model) preview(link string, cols int) string {
 		return s
 	}
 	s := ""
-	if img, err := termimg.Load(path); err == nil {
+	if img, err := termimg.Load(root, path); err == nil {
 		s = termimg.HalfBlocks(img, min(cols, previewCols), previewRows)
 	}
 	m.images[key] = s

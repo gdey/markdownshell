@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gdey/markdownshell/cmd/mdsh-gui/notebook"
+	"github.com/gdey/markdownshell/docroot"
 )
 
 // docCSP is the Content-Security-Policy sent with the files beside the
@@ -89,7 +90,9 @@ func (a *App) startImage(path string) bool {
 }
 
 // underDoc reports whether path is under the folder of a document open
-// in some tab.
+// in some tab, and not a hidden file or in a hidden folder below it (see
+// docroot.Hidden), so the route can't serve a .cast or image from .git
+// or another dot folder.
 func (a *App) underDoc(path string) bool {
 	a.mu.Lock()
 	tabs := make([]*docTab, 0, len(a.tabs))
@@ -106,7 +109,7 @@ func (a *App) underDoc(path string) bool {
 		if err != nil {
 			continue
 		}
-		if rel, err := filepath.Rel(dir, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if rel, err := filepath.Rel(dir, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !docroot.Hidden(rel) {
 			return true
 		}
 	}
