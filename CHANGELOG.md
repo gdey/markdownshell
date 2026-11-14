@@ -52,6 +52,20 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The History pane while "sleep 2; echo hi" runs: the dimmed prompt, "running 0.4s", and "abc" typed meanwhile in the focused input](docs/changelog/history-type-ahead.png)
 
+### Security
+
+- A repository's own `.git` folder (and `.hg`, `.jj`, `.svn`, in nested
+  repositories too) counts as outside the document's root, for includes,
+  `out=` files and report images alike. `{<include file=.git/config}`
+  read the repository's settings on open, and a remote's URL there can
+  hold a token, so `mdsh -w` or a report could carry it off without a
+  block running; an `out=` could write into `.git/hooks/` (finding 4 of
+  the v1.5.0 security review). Now those fail with an error that names
+  the folder, and mdsh-gui lists them in its question about files
+  outside the repository. `--allow-outside` still lifts it.
+
+  ![mdsh-gui's question about files outside the repository, listing .git/config, with a note that the .git folder holds the repository's settings and hooks and a remote's address there can hold a token](docs/changelog/outside-git.png)
+
 ## [1.5.0] - 2026-11-10
 
 mdsh-gui settles in. Settings and the cheat sheet open in tabs beside

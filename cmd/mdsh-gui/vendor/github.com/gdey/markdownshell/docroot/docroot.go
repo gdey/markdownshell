@@ -1,7 +1,8 @@
 // Package docroot keeps a document's reads and writes inside the folder
 // it belongs to: the root of the git (or Mercurial, Jujutsu or
 // Subversion) repository holding it, or the document's own folder when
-// it isn't in one. Includes, report images, casts and out= assets go
+// it isn't in one, less the repository's own .git (or .hg, .jj, .svn)
+// folder. Includes, report images, casts and out= assets go
 // through it, so a document can't read ~/.ssh/id_ed25519 into its output
 // or write over ~/.zshrc. Callers that trust the document skip it, as
 // mdsh --allow-outside does.
@@ -22,6 +23,21 @@ const MaxRead = 16 << 20
 
 // ErrOutside is returned for a path outside the document's root.
 var ErrOutside = errors.New("outside the document's folder or repository (mdsh --allow-outside allows it)")
+
+// ErrMetadata is returned for a path inside the root that is in, or is,
+// a repository's own folder: .git, .hg, .jj or .svn, at any depth. Those
+// hold the repository's settings, which can carry a token in a remote's
+// URL, and hooks that run later, so they count as outside. It matches
+// ErrOutside with errors.Is.
+var ErrMetadata error = metadataError{}
+
+type metadataError struct{}
+
+func (metadataError) Error() string {
+	return "in a repository's .git (or .hg, .jj, .svn) folder, which counts as outside (mdsh --allow-outside allows it)"
+}
+
+func (metadataError) Is(target error) bool { return target == ErrOutside }
 
 // ErrNotRegular is returned for a folder, device, FIFO or other file
 // that isn't a regular file.
@@ -71,14 +87,38 @@ func Root(dir string) string {
 }
 
 // Inside reports whether path, absolute and with symlinks resolved, is
-// root or under it.
+// root or under it, and not in a repository's own folder: see
+// ErrMetadata.
 func Inside(root, path string) bool {
+	rel, ok := relInside(root, path)
+	return ok && !InMetadata(rel)
+}
+
+// relInside returns path relative to root, and whether it is root or
+// under it.
+func relInside(root, path string) (string, bool) {
 	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+	ok := err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+	return rel, ok
+}
+
+// InMetadata reports whether rel, a path relative to a root, names a
+// repository's own folder (.git, .hg, .jj or .svn) or something in one,
+// at any depth, so a nested repository's is caught too. The names are
+// matched ignoring case, as macOS and Windows file systems do.
+func InMetadata(rel string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		for _, m := range markers {
+			if strings.EqualFold(part, m) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Resolve returns path with symlinks resolved, or ErrOutside if that is
-// outside root. A path that doesn't exist yet, such as a file about to
+// outside root, or ErrMetadata if it is in a repository's own folder. A path that doesn't exist yet, such as a file about to
 // be written, is resolved through its nearest existing folder.
 func Resolve(root, path string) (string, error) {
 	abs, err := filepath.Abs(path)
@@ -89,8 +129,12 @@ func Resolve(root, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !Inside(root, real) {
+	rel, ok := relInside(root, real)
+	if !ok {
 		return "", &fs.PathError{Op: "open", Path: path, Err: ErrOutside}
+	}
+	if InMetadata(rel) {
+		return "", &fs.PathError{Op: "open", Path: path, Err: ErrMetadata}
 	}
 	return real, nil
 }
