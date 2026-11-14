@@ -19,13 +19,13 @@ import { Clipboard, Events } from "/wails/runtime.js";
 import { App } from "./api.js";
 import { announce, el, iconButton, svg, icons } from "./dom.js";
 import { codeFont, textSize } from "./theme.js";
+import { type Cast, parseCast } from "./castparse.js";
 
 // step is the shortest time between frames, and maxDelay caps how long
 // playback waits on one, as the GIF does.
 const step = 0.1;
 const maxDelay = 2;
 
-type Cast = { cols: number; rows: number; events: [number, string][] };
 // A frame is the screen once events[0..upto) are written, at time at.
 type Frame = { at: number; upto: number };
 // used is how many rows, from the top, any frame shows something on.
@@ -41,20 +41,6 @@ export function isCast(src: string): boolean {
   } catch {
     return false;
   }
-}
-
-// parseCast reads asciicast v2: a JSON header line, then one
-// [seconds, type, text] line per event. Only output events are kept.
-export function parseCast(text: string): Cast {
-  const lines = text.split("\n").filter((l) => l.trim());
-  const h = JSON.parse(lines[0] ?? "");
-  if (h?.version !== 2) throw new Error("not an asciicast v2 file");
-  const events: [number, string][] = [];
-  for (const l of lines.slice(1)) {
-    const e = JSON.parse(l);
-    if (Array.isArray(e) && e[1] === "o" && typeof e[0] === "number" && typeof e[2] === "string") events.push([e[0], e[2]]);
-  }
-  return { cols: h.width > 0 ? h.width : 80, rows: h.height > 0 ? h.height : 24, events };
 }
 
 // mouseModes are the DEC private modes that turn on mouse reporting,
