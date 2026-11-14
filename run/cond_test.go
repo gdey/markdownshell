@@ -37,16 +37,16 @@ func TestRunCondition(t *testing.T) {
 
 func TestShowConditions(t *testing.T) {
 	src := "intro\n\n```sh {#a show={{$DEBUG}}}\necho a\n```\n\n```sh {#b show-output=!{{$QUIET}}}\necho b\n```\n\nend\n"
-	d, results := runDoc(t, src, run.Options{})
+	d, results := runDoc(t, src, run.Options{Now: fixedNow})
 
 	got := string(render.Markdown(d, results, render.Options{Env: environ("QUIET=1", "MDSH_EXPOSE=QUIET")}))
-	want := "intro\n\n```output {for=a exit=0}\na\n```\n\n```sh {#b show-output=!{{$QUIET}}}\necho b\n```\n\nend\n"
+	want := "intro\n\n```output {for=a exit=0 at=2026-11-13T19:08:00Z}\na\n```\n\n```sh {#b show-output=!{{$QUIET}}}\necho b\n```\n\nend\n"
 	if got != want {
 		t.Errorf("printed:\ngot  %q\nwant %q", got, want)
 	}
 
 	saved := string(render.Markdown(d, results, render.Options{WriteBack: true, Env: environ("QUIET=1", "MDSH_EXPOSE=QUIET")}))
-	for _, w := range []string{"echo a\n```", "```output {for=b exit=0}\nb\n```"} {
+	for _, w := range []string{"echo a\n```", "```output {for=b exit=0 at=2026-11-13T19:08:00Z}\nb\n```"} {
 		if !strings.Contains(saved, w) {
 			t.Errorf("write-back dropped %q:\n%s", w, saved)
 		}
@@ -74,7 +74,7 @@ func TestSections(t *testing.T) {
 func TestStderrVisibility(t *testing.T) {
 	src := "```sh {#ok}\necho warn >&2\n```\n```sh {#bad}\necho oops >&2; false\n```\n```sh {#loud show-stderr}\necho loud >&2\n```\n```sh {#hush show-stderr=false}\necho hush >&2; false\n```\n"
 	d, results := runDoc(t, src, run.Options{})
-	got := string(render.Markdown(d, results, render.Options{}))
+	got := noAt(string(render.Markdown(d, results, render.Options{})))
 	for w, want := range map[string]bool{"warn": false, "oops": true, "loud": true, "hush": false} {
 		if strings.Contains(got, "stream=stderr}\n"+w) != want {
 			t.Errorf("%q shown = %v, want %v:\n%s", w, !want, want, got)
@@ -82,7 +82,7 @@ func TestStderrVisibility(t *testing.T) {
 	}
 
 	d, results = runDoc(t, "---\nmdsh:\n  show_stderr: true\n---\n"+src, run.Options{})
-	got = string(render.Markdown(d, results, render.Options{}))
+	got = noAt(string(render.Markdown(d, results, render.Options{})))
 	if !strings.Contains(got, "stream=stderr}\nwarn") || strings.Contains(got, "stream=stderr}\nhush") {
 		t.Errorf("front matter show_stderr:\n%s", got)
 	}

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
@@ -476,6 +477,10 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 		stderr += "mdsh: " + r.Err.Error() + "\n"
 	}
 
+	// at= stamps the run's start on the entry's first part: the stdout
+	// fence or region, else the stderr fence.
+	at := At(r)
+	open := doc.RegionStartAt(id, at)
 	kind := run.OutKind(r.Block)
 	if kind == "recording" && r.Image == "" && len(r.Stdout) > 0 {
 		// A recording swapped for the text of a frame of it.
@@ -484,7 +489,7 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 	switch kind {
 	case "markdown":
 		if len(r.Stdout) > 0 {
-			b.WriteString(doc.RegionStart(id) + "\n")
+			b.WriteString(open + "\n")
 			b.WriteString(withNewline(string(r.Stdout)))
 			b.WriteString(doc.RegionEnd + "\n")
 		}
@@ -501,7 +506,7 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 			if !r.Block.Named() || doc.GeneratedID(id) {
 				alt = kind
 			}
-			b.WriteString(doc.RegionStart(id) + "\n")
+			b.WriteString(open + "\n")
 			fmt.Fprintf(&b, "![%s](%s)\n", alt, link)
 			b.WriteString(doc.RegionEnd + "\n")
 		}
@@ -511,13 +516,29 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 			if r.Exited {
 				attrs += " exited"
 			}
+			if at != "" {
+				attrs += " at=" + at
+			}
 			b.WriteString(Fence("output", attrs, string(r.Stdout)))
 		}
 	}
 	if stderr != "" {
-		errFence = Fence("output", fmt.Sprintf("for=%s stream=stderr", attrValue(id)), stderr)
+		attrs := fmt.Sprintf("for=%s stream=stderr", attrValue(id))
+		if at != "" && b.Len() == 0 {
+			attrs += " at=" + at
+		}
+		errFence = Fence("output", attrs, stderr)
 	}
 	return b.String(), errFence
+}
+
+// At is r's start time as an output's at= writes it: UTC, RFC 3339 to
+// the second. It is "" for a result with no start time.
+func At(r *run.Result) string {
+	if r.Start.IsZero() {
+		return ""
+	}
+	return r.Start.UTC().Format(time.RFC3339)
 }
 
 // writeInclude writes include block b with the lines r read as its body.

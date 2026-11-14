@@ -403,6 +403,15 @@ func (s *Session) Close() {
 	s.closeCtl()
 }
 
+// now is the time a block's run starts, in UTC to the second.
+func (s *Session) now() time.Time {
+	t := time.Now()
+	if s.opts.Now != nil {
+		t = s.opts.Now()
+	}
+	return t.UTC().Truncate(time.Second)
+}
+
 func (s *Session) emit(e Event) {
 	switch e.Kind {
 	case Started:
@@ -817,7 +826,7 @@ func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bo
 		return s.results[i], false, ErrNoTTY
 	}
 	s.Reap()
-	r = &Result{Block: b, Ran: true}
+	r = &Result{Block: b, Ran: true, Start: s.now()}
 	s.results[i] = r
 	s.emit(Event{Kind: Started, Block: b})
 	defer func() { s.emit(Event{Kind: Done, Block: b, Result: r}) }()
@@ -864,6 +873,7 @@ func (s *Session) confirm(b *doc.Block) (Answer, error) {
 func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	s.seq++
 	r.Seq, r.Deps = s.seq, depSeqs(s.d, s.results, b)
+	r.Start = s.now()
 	s.emit(Event{Kind: Started, Block: b})
 	s.logStart(b)
 	if b.Attrs.Has("background") {

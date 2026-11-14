@@ -70,6 +70,9 @@ type Options struct {
 	Only string
 	// OnEvent, if set, is called as blocks start, write and finish.
 	OnEvent func(Event)
+	// Now, if set, stands in for time.Now when a run is stamped with its
+	// start time (Result.Start), for tests.
+	Now func() time.Time
 	// ApproveSources is asked, right before the first shell starts,
 	// whether to read in the files the front matter's env.source names:
 	// paths are the files that would be read, each made absolute. Go
@@ -263,6 +266,10 @@ type Result struct {
 	// Done, for a block that ran in a Session. A background block's runs
 	// until Reap sees it end.
 	Duration time.Duration
+	// Start is when the block's run started, in UTC to the second. It
+	// is zero for a block that hasn't run. Write-back stamps the output
+	// with it as at=.
+	Start time.Time
 	// TimedOut is true when the block's timeout= ended it, which stops
 	// the run.
 	TimedOut bool
