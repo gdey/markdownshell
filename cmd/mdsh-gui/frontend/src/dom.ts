@@ -46,6 +46,8 @@ export const icons = {
   quote: '<path d="M2 3h1.5v10H2zm3.5 1h8.5v1.4H5.5zm0 3.3h8.5v1.4H5.5zm0 3.3h6v1.4h-6z"/>',
   table: '<path d="M1.5 2.5h13v11h-13zm1.4 1.4v2.2h4.4V3.9zm5.8 0v2.2h4.4V3.9zM2.9 7.5v4.6h4.4V7.5zm5.8 0v4.6h4.4V7.5z"/>',
   fence: '<path d="M2 2.5h12v11H2zm1.4 1.4v8.2h9.2V3.9zm1.4 1.5 2.3 2.3-2.3 2.3-.9-.9 1.4-1.4-1.4-1.4zm3 3.7h3.4v1.2H7.8z"/>',
+  // Copy as curl, on an http block: a prompt in a window.
+  curl: '<path d="M1.5 2.5h13v11h-13zm1.4 1.4v8.2h10.2V3.9zM4.2 5.3l.9-.9 3 3-3 3-.9-.9 2.1-2.1zm4 4.5h3.6V11H8.2z"/>',
   mdsh: '<path d="M2 2.5h12v11H2zm1.4 1.4v8.2h9.2V3.9zM6 5.5l4.5 2.5L6 10.5z"/>',
   // The outline's marks for a textbox and a choice.
   textbox: '<path d="M1.5 4.5h13v7h-13zm1.4 1.4v4.2h10.2V5.9zM4 6.8h1.2v2.4H4z"/>',

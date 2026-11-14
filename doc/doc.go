@@ -331,6 +331,9 @@ func Parse(src []byte) (*Document, error) {
 			return nil, fmt.Errorf("line %d: block %s: a background block can't be tty, since nobody is at its terminal", lineNo(src, b.Span.Start), b.ID)
 		}
 	}
+	if err := checkHTTP(d); err != nil {
+		return nil, err
+	}
 	if err := checkTapes(d); err != nil {
 		return nil, err
 	}
@@ -351,6 +354,9 @@ func Parse(src []byte) (*Document, error) {
 		if r.BlockID != "" && !ids[r.BlockID] {
 			return nil, fmt.Errorf("%s refers to unknown block %q", r, r.BlockID)
 		}
+	}
+	if err := checkResponseRefs(d); err != nil {
+		return nil, err
 	}
 	return d, nil
 }

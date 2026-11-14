@@ -615,3 +615,59 @@ func TestMirrorVar(t *testing.T) {
 		t.Errorf("SetText:\n%s", got)
 	}
 }
+
+func TestHTTPBlockAttrs(t *testing.T) {
+	for _, attr := range []string{"env=x", "share=A", "tty", "background", "out=markdown"} {
+		_, err := Parse([]byte("```http {#a " + attr + "}\nGET https://example.com\n```\n"))
+		if err == nil || !strings.Contains(err.Error(), "an http block takes no") {
+			t.Errorf("%s: err = %v", attr, err)
+		}
+	}
+	d, err := Parse([]byte("```http {#a}\nGET https://example.com/{{#b/env(X)}}\n[Captures]\nt: secret jsonpath $.t\nu: jsonpath $.u\n```\n```sh {#b}\nX=1\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refs := d.Refs(); len(refs) != 1 || refs[0] != (Ref{BlockID: "b", Var: "X"}) {
+		t.Errorf("refs = %v", refs)
+	}
+	if a := d.Block("a"); !a.SecretVar("t") || a.SecretVar("u") {
+		t.Errorf("SecretVar is wrong")
+	}
+	if _, err := Parse([]byte("```http {#a}\nGET https://example.com/{{#nope/env(X)}}\n```\n")); err == nil {
+		t.Errorf("a placeholder for an unknown block parsed")
+	}
+}
+
+func TestResponseRefs(t *testing.T) {
+	d, err := Parse([]byte("```http {#login}\nGET https://example.com\n```\n\nToken {{#login/json($.items[0]['id']):\"7\"}}, type {{#login/header(Content-Type)}}, status {{#login/status}}.\n\n```sh {#next run={{#login/status}}==200}\necho\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Ref{
+		{BlockID: "login", Fn: FnJSON, Var: "$.items[0]['id']"},
+		{BlockID: "login", Fn: FnHeader, Var: "Content-Type"},
+		{BlockID: "login", Fn: FnStatus},
+	}
+	for i, p := range d.Placeholders {
+		if p.Ref != want[i] {
+			t.Errorf("placeholder %d = %+v, want %+v", i, p.Ref, want[i])
+		}
+		if got := p.Ref.String(); !strings.Contains(string(d.Src), strings.TrimSuffix(got, "}}")) {
+			t.Errorf("String() = %s", got)
+		}
+	}
+	if d.Placeholders[0].Value != "7" {
+		t.Errorf("stored value = %q", d.Placeholders[0].Value)
+	}
+	if c, _ := d.Block("next").Cond("run"); c.Ref == nil || *c.Ref != want[2] {
+		t.Errorf("run= ref = %v", c.Ref)
+	}
+	for _, src := range []string{
+		"```sh {#a}\necho\n```\n{{#a/status}}\n",
+		"```http {#a}\nGET https://x\n```\n{{#a/json($.x[)}}\n",
+	} {
+		if _, err := Parse([]byte(src)); err == nil {
+			t.Errorf("Parse(%q) didn't fail", src)
+		}
+	}
+}

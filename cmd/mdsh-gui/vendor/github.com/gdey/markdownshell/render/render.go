@@ -329,6 +329,9 @@ func writeProse(buf *bytes.Buffer, d *doc.Document, from, to int, results []*run
 				// A nosave block's values, and a nosave input's, stay
 				// as the file has them.
 				buf.Write(d.Src[ph.Span.Start:ph.Span.End])
+			case opts.WriteBack && secretCapture(d, ph):
+				// An http block's secret capture or header is never stored.
+				buf.WriteString(ph.Ref.String())
 			case opts.WriteBack:
 				buf.WriteString(ph.Source(v))
 			case ph.Caller() && caller != nil && !hasKey(caller, ph.Var):
@@ -403,6 +406,16 @@ func copyText(d *doc.Document, c *doc.Copy, results []*run.Result, lookup doc.Lo
 		out = strings.TrimSuffix(out, "\n")
 	}
 	return out, true
+}
+
+// secretCapture reports whether placeholder ph reads a secret from an
+// http block: a capture marked secret, or a masked header.
+func secretCapture(d *doc.Document, ph *doc.Placeholder) bool {
+	if ph.BlockID == "" {
+		return false
+	}
+	b := d.Block(ph.BlockID)
+	return b != nil && b.SecretRef(ph.Ref, d.Options.HTTP.SecretHeaders)
 }
 
 // noSave reports whether placeholder ph reads a nosave block's variable

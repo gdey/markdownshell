@@ -142,6 +142,7 @@ on save.
 | ```` ```output {for=id exit=0} ```` | A block's output, right under it; elsewhere, a copy mdsh refills on every run. `stream=stderr` is its stderr; `nosave` keeps that fence out of the file |
 | `<!-- mdsh:output for="id" -->` … `<!-- /mdsh:output -->` | The same for `out=markdown` and image output |
 | ```` ```tape {for=id} ```` | Types the input for `tty` block `id`, in VHS commands: `Type "…"`, `Enter`, `Tab`, `Up`…, `Ctrl+X`, `Alt+X`, `Sleep 1s`, `Wait /regex/`, `Set TypingSpeed`, `WaitTimeout`, `WaitPattern`. Double-quoted `Type` takes placeholders. Can be an include |
+| ```` ```http ```` | One request: `METHOD URL`, headers, a blank line, the body; `HTTP 200`, then `[Asserts]` (`jsonpath $.id == 1`, `header X contains y`, `status`, `body`, `regex`, `duration`) and `[Captures]` (`token: secret jsonpath $.token`, read as `{{#id/env(token)}}`). `{{#id/status}}`, `{{#id/json($.x)}}` and `{{#id/header(Name)}}` read the response in prose and conditions. `[QueryStringParams]`, `[FormParams]`, `[Options]` |
 | ```` ```cast ```` | An asciinema recording, played in mdsh-gui; `frame=N` opens it there |
 | ```` ```d2 ````, ```` ```svg ```` | A diagram, a picture, drawn in mdsh-gui |
 | `- [ ] task` | A task item mdsh-gui checks in the file when clicked; table cells starting with `[ ]` too |
@@ -261,6 +262,7 @@ env starts in the document's folder.
 | `E` | Edit the whole file the same way, at the block |
 | `F` | Fix front matter that doesn't parse, when mdsh can: quote a value with a `: ` in it |
 | `y` | Copy the block's code to the clipboard (OSC 52, and the system clipboard locally) |
+| `Y` | Copy an `http` block as a `curl` command |
 | `V` | Select lines of History's output (shift+↑ in the pane too): ↑/↓ `j`/`k` extend, `g`/`G` ends, `o` other end, `y` or enter copies, esc cancels |
 | `J`/`K`, alt+↓/↑ | Move the block, with its output and tape, down or up |
 | `u` | Undo the last move |
@@ -271,6 +273,7 @@ env starts in the document's folder.
 | `v` | Show the block's image or recording full screen; enter goes back |
 | `o` | Show or hide the outline |
 | `x` | Show or hide the selected block's secret |
+| `H` | Show an `http` block's response headers, or its body |
 | `C` / `O` | Show or hide code / output |
 | `]` / `[` | Next / previous tab |
 | ctrl+t | New tab, on the list of files |

@@ -8,6 +8,45 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `http` blocks: a fence that makes one HTTP request, written the way
+  it goes over the wire, and checks the response in Hurl's words. `HTTP
+  201` checks the status; `[Asserts]` lines check `status`, `header`,
+  `jsonpath`, `body`, `regex` and `duration` with `==`, `contains`,
+  `exists`, `matches` and the rest; `[Captures]` set the block's own
+  variables, read as `{{#login/env(token)}}` by prose, conditions and
+  later requests, and `{{#login/status}}`, `{{#login/json($.expires)}}`
+  and `{{#login/header(Content-Type)}}` read the response itself, in
+  prose and in conditions such as `run={{#login/status}}==201`.
+  `[QueryStringParams]`, `[FormParams]`, `[Options]`
+  (`insecure`, `follow`, `timeout`) and an `@file` body are there too.
+  Placeholders are filled in as the request goes out and never saved.
+  The response is the block's output, with `Set-Cookie`,
+  `Authorization` and the other credential headers saved as `(secret)`,
+  and front matter `mdsh.http.secret_headers` adds more; a `secret`
+  capture is masked wherever the response holds it, and its placeholder
+  is saved bare. A failed check fails the block with one line on
+  stderr, so `on_error`, `depends=` and `{{#id/?}}` work as for any
+  block. The audit log records the method, the URL as written, the
+  status and each check, never headers or bodies. `raw` keeps a JSON
+  body as it came.
+
+  In mdsh-gui an http block's card shows the response's status next
+  to its exit status, the body and the headers as two tabs, body first,
+  with JSON highlighted, and the checks with a tick or a cross and what
+  the response had for each that failed. Its terminal button copies the
+  request as a `curl` command, placeholders filled in; the Insert menu
+  and the markdown bar's block button offer an http request. `mdsh -i`
+  shows the same under the block: `H` switches between body and
+  headers, and `Y` copies the request as `curl`.
+
+  ![An http block in mdsh-gui whose check failed: 200 OK and exit 1 in its head, the JSON body under a Body tab, and a cross by jsonpath $.user == "j" with got "guest"](docs/changelog/http-gui.png)
+
+  ![The same card's Headers tab, listing Content-Length, Content-Type and Date, with every check ticked](docs/changelog/http-gui-headers.png)
+
+  ![mdsh -i showing an http block's response headers after H, with 200 OK, its checks below, one crossed](docs/changelog/http-tui.png)
+
+  ![mdsh -w running a document with http blocks: a login that passes, with its Set-Cookie header and token saved as (secret), and a request whose jsonpath check fails with got "guest" on stderr](docs/changelog/http-cli.png)
+
 - An include block in mdsh-gui's rendered view has a grip above and
   below its lines. Dragging the bottom one down shows the lines after
   them, raising `to=`, and dragging the top one up shows the lines

@@ -37,6 +37,12 @@ type Options struct {
 		Cols int `yaml:"cols"`
 		Rows int `yaml:"rows"`
 	} `yaml:"terminal"`
+	HTTP struct {
+		// SecretHeaders are response headers, besides the credential
+		// ones httpblock.SecretHeaders names, whose values http blocks
+		// save masked. The list only adds; matching ignores case.
+		SecretHeaders []string `yaml:"secret_headers"`
+	} `yaml:"http"`
 	Env struct {
 		// Share lists the variables passed into the top-level env from
 		// the caller, besides env.Base (except in a remote document),

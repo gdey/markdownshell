@@ -87,6 +87,7 @@ github.com/gdey/markdownshell/doc
 github.com/gdey/markdownshell/docroot
 github.com/gdey/markdownshell/env
 github.com/gdey/markdownshell/history
+github.com/gdey/markdownshell/httpblock
 github.com/gdey/markdownshell/library
 github.com/gdey/markdownshell/lsp
 github.com/gdey/markdownshell/pdf
