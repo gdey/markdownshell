@@ -1,0 +1,8 @@
+{
+  "name": "mdsh-gui-stress",
+  "private": true,
+  "description": "Playwright for gui.cjs in CI. The Go workflow copies this and package-lock.json to a temporary directory and runs npm ci there, so the packages are checked against the lock's integrity hashes.",
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
