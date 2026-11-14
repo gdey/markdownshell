@@ -30,6 +30,21 @@ follow [Semantic Versioning](https://semver.org/).
   status and each check, never headers or bodies. `raw` keeps a JSON
   body as it came.
 
+  In mdsh-gui an http block's card shows the response's status next
+  to its exit status, the body and the headers as two tabs, body first,
+  with JSON highlighted, and the checks with a tick or a cross and what
+  the response had for each that failed. Its terminal button copies the
+  request as a `curl` command, placeholders filled in; the Insert menu
+  and the markdown bar's block button offer an http request. `mdsh -i`
+  shows the same under the block: `H` switches between body and
+  headers, and `Y` copies the request as `curl`.
+
+  ![An http block in mdsh-gui whose check failed: 200 OK and exit 1 in its head, the JSON body under a Body tab, and a cross by jsonpath $.user == "j" with got "guest"](docs/changelog/http-gui.png)
+
+  ![The same card's Headers tab, listing Content-Length, Content-Type and Date, with every check ticked](docs/changelog/http-gui-headers.png)
+
+  ![mdsh -i showing an http block's response headers after H, with 200 OK, its checks below, one crossed](docs/changelog/http-tui.png)
+
   ![mdsh -w running a document with http blocks: a login that passes, with its Set-Cookie header and token saved as (secret), and a request whose jsonpath check fails with got "guest" on stderr](docs/changelog/http-cli.png)
 
 - An include block in mdsh-gui's rendered view has a grip above and

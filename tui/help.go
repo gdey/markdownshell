@@ -65,6 +65,7 @@ var helpItems = []helpItem{
 
 	{group: "Edit", keys: "e", key: runeKey("e"), what: says("edit the block in $EDITOR"), off: noEdit},
 	{group: "Edit", keys: "y", key: runeKey("y"), what: says("copy the block's code to the clipboard"), off: noBlocks},
+	{group: "Edit", keys: "Y", key: runeKey("Y"), what: says("copy an http block as a curl command"), off: noHTTP},
 	{group: "Edit", keys: "V", key: runeKey("V"), what: says("select lines of History to copy (shift+↑ in the pane)"), off: func(m *Model) string {
 		switch {
 		case !m.hist.open:
@@ -112,6 +113,7 @@ var helpItems = []helpItem{
 	{group: "View", keys: "v", key: runeKey("v"), what: says("show the block's image full screen"), off: noImage},
 	{group: "View", keys: "o", key: runeKey("o"), what: says("show or hide the outline")},
 	{group: "View", keys: "x", key: runeKey("x"), what: says("show or hide the block's secret, until you move off it"), off: noSecret},
+	{group: "View", keys: "H", key: runeKey("H"), what: says("show an http block's response headers, or its body"), off: noHTTP},
 	{group: "View", keys: "C", key: runeKey("C"), what: says("show or hide code")},
 	{group: "View", keys: "O", key: runeKey("O"), what: says("show or hide output")},
 	{group: "View", keys: "?", key: runeKey("?"), what: says("this help")},
@@ -128,6 +130,13 @@ var helpItems = []helpItem{
 func noBlocks(m *Model) string {
 	if len(m.nav) == 0 {
 		return "the file has no blocks"
+	}
+	return ""
+}
+
+func noHTTP(m *Model) string {
+	if i := m.cur(); i < 0 || !m.d.Blocks[i].IsHTTP() {
+		return "the block isn't an http block"
 	}
 	return ""
 }

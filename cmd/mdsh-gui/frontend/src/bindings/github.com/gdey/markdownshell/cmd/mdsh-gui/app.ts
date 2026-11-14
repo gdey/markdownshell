@@ -207,6 +207,14 @@ export function CreateReport(r: notebook$0.Report): $CancellablePromise<void> {
 }
 
 /**
+ * Curl is http block i's request as a curl command line, with the
+ * placeholders filled in as running it now would, for Copy as curl.
+ */
+export function Curl(i: number): $CancellablePromise<string> {
+    return $Call.ByName("main.App.Curl", i);
+}
+
+/**
  * DeleteBlock takes top-level block i, with its output and tape, out of
  * the file. Undo puts it back.
  */

@@ -262,6 +262,7 @@ env starts in the document's folder.
 | `E` | Edit the whole file the same way, at the block |
 | `F` | Fix front matter that doesn't parse, when mdsh can: quote a value with a `: ` in it |
 | `y` | Copy the block's code to the clipboard (OSC 52, and the system clipboard locally) |
+| `Y` | Copy an `http` block as a `curl` command |
 | `V` | Select lines of History's output (shift+↑ in the pane too): ↑/↓ `j`/`k` extend, `g`/`G` ends, `o` other end, `y` or enter copies, esc cancels |
 | `J`/`K`, alt+↓/↑ | Move the block, with its output and tape, down or up |
 | `u` | Undo the last move |
@@ -272,6 +273,7 @@ env starts in the document's folder.
 | `v` | Show the block's image or recording full screen; enter goes back |
 | `o` | Show or hide the outline |
 | `x` | Show or hide the selected block's secret |
+| `H` | Show an `http` block's response headers, or its body |
 | `C` / `O` | Show or hide code / output |
 | `]` / `[` | Next / previous tab |
 | ctrl+t | New tab, on the list of files |

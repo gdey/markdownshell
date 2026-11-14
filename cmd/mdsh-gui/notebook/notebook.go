@@ -105,6 +105,9 @@ type Cell struct {
 	// OutputLine is the line a block's saved output starts on, counting
 	// from 1, or 0 when it has none, for folding it in the source.
 	OutputLine int `json:"outputLine,omitempty"`
+	// HTTP is set for an http block with a response to show, from this
+	// session's run or saved in the file.
+	HTTP *HTTPCell `json:"http,omitempty"`
 	// Include is set for an include block, whose lines come from a
 	// file: the view can drag its range, and show the whole file.
 	Include *IncludeCell `json:"include,omitempty"`

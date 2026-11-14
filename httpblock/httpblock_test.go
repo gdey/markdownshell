@@ -313,3 +313,31 @@ func TestBinaryBody(t *testing.T) {
 		t.Errorf("body = %q", got)
 	}
 }
+
+func TestCurl(t *testing.T) {
+	r, err := Parse("POST https://x.test/a?b=1\nAuthorization: Bearer it's\n[QueryStringParams]\nq: a b\n[Options]\ninsecure: true\n\n{\"a\": 1}\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `curl 'https://x.test/a?b=1&q=a+b' -H 'Authorization: Bearer it'\''s' -H 'Content-Type: application/json' --data-raw '{"a": 1}' -k`
+	if got := Curl(r); got != want {
+		t.Errorf("Curl =\n%s\nwant\n%s", got, want)
+	}
+	r, _ = Parse("DELETE https://x.test/a\n")
+	if got := Curl(r); got != "curl -X DELETE https://x.test/a" {
+		t.Errorf("Curl = %s", got)
+	}
+}
+
+func TestSplit(t *testing.T) {
+	status, headers, body, ok := Split("HTTP/1.1 201 Created\nA: 1\nB: 2\n\n{\n}\n")
+	if !ok || status != "201 Created" || headers != "A: 1\nB: 2\n" || body != "{\n}\n" {
+		t.Errorf("Split = %q %q %q %v", status, headers, body, ok)
+	}
+	if _, headers, body, ok = Split("HTTP/1.1 204 No Content\nA: 1\n"); !ok || headers != "A: 1\n" || body != "" {
+		t.Errorf("Split no body = %q %q", headers, body)
+	}
+	if _, _, _, ok = Split("hello"); ok {
+		t.Error("Split took text that isn't a response")
+	}
+}

@@ -1,11 +1,12 @@
 # HTTP request blocks with checks
 
 Status: design, Nov 13, 2026; j settled questions 1 to 7 the same
-day. Building for 1.6: the fence, its checks and captures, masking and
-the audit log and the response placeholders are built (see the
-spec's HTTP blocks); the views' tabs and *Copy as curl* come next, and `background` on an http block is a parse
-error for now. The open questions at the end keep their answers; the
-text above them reads as settled.
+day. Built for 1.6 (see the spec's HTTP blocks): the fence, its checks
+and captures, masking, the audit log, the response placeholders, the
+views' tabs and checks, and *Copy as curl*. Not yet: `background` on an
+http block (a parse error for now), and the LSP completing the
+`[Asserts]` words. The open questions at the end keep their answers;
+the text above them reads as settled.
 
 The idea (j, Nov 13): a runbook often has to make an HTTP request, with
 a body and parameters, and then check that the response matches some

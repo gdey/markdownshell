@@ -1071,6 +1071,16 @@ func (a *App) CopySecret(text string) error {
 	return copySecret(text, a.app.Clipboard, a.settings.Get().SecretShow())
 }
 
+// Curl is http block i's request as a curl command line, with the
+// placeholders filled in as running it now would, for Copy as curl.
+func (a *App) Curl(ctx context.Context, i int) (string, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return "", err
+	}
+	return n.Curl(i)
+}
+
 // CopyCastGIF puts an animated GIF of cast, an asciicast v2 recording, on
 // the clipboard.
 func (a *App) CopyCastGIF(cast string) error {
