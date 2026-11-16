@@ -1311,6 +1311,10 @@ func (m *Model) write(file string) error {
 	if err := m.opts.Save(file, out); err != nil {
 		return err
 	}
+	if file == m.opts.Run.File {
+		// Earlier runs the save dropped take their files along.
+		run.TidyHistoryAssets(m.d.Src, out, m.opts.Run)
+	}
 	if info, err := os.Stat(file); err == nil {
 		m.mtime = info.ModTime()
 	}

@@ -41,29 +41,95 @@ func TestHistoryPrinting(t *testing.T) {
 	}
 }
 
-// A run replaces the current output and, until rotation is built, keeps
-// the earlier runs as the file has them, under it. A run with nothing to
-// show keeps them too.
-func TestHistoryWriteBackKeepsEntries(t *testing.T) {
+// A run pushes the output the file holds down as earlier run 1, and the
+// others down one, up to the cap. A run that shows nothing is kept too,
+// as an empty fence with its time.
+func TestHistoryRotate(t *testing.T) {
 	d := parseHist(t, histSrc)
 	at := time.Date(2026, 11, 14, 8, 0, 0, 0, time.UTC)
 	r := []*run.Result{{Block: d.Blocks[0], Ran: true, Start: at, Stdout: []byte("fine\n")}}
-	want := histBlock + "\n```output {for=check exit=0 at=2026-11-14T08:00:00Z}\nfine\n```\n\n" + histEarlier + "\nEnd.\n"
-	if got := string(Markdown(d, r, Options{WriteBack: true})); got != want {
+	pushed := "```output {for=check exit=0 at=2026-11-13T19:08:00Z history=1}\nok\n```\n\n" +
+		"```output {for=check exit=7 history=2 at=2026-11-12T19:02:11Z}\nno\n```\n\n" +
+		"```output {for=check history=2 stream=stderr}\ncurl: (7)\n```\n"
+	want := histBlock + "\n```output {for=check exit=0 at=2026-11-14T08:00:00Z}\nfine\n```\n\n" + pushed + "\nEnd.\n"
+	got := string(Markdown(d, r, Options{WriteBack: true}))
+	if got != want {
 		t.Errorf("after a run:\ngot  %q\nwant %q", got, want)
 	}
 	if got := string(Markdown(d, r, Options{})); strings.Contains(got, "history=1") {
 		t.Errorf("printed after a run shows earlier runs:\n%s", got)
 	}
 
-	r[0].Stdout = nil
-	want = histBlock + "\n" + histEarlier + "\nEnd.\n"
-	got := string(Markdown(d, r, Options{WriteBack: true}))
-	if got != want {
-		t.Errorf("after a run with no output:\ngot  %q\nwant %q", got, want)
+	// Saving again in the same session, as mdsh-gui does after each
+	// run, doesn't push the same run twice.
+	d2 := parseHist(t, got)
+	r[0].Block = d2.Blocks[0]
+	inSource := func(*run.Result) bool { return true }
+	if again := string(Markdown(d2, r, Options{WriteBack: true, InSource: inSource})); again != got {
+		t.Errorf("second save of the same run:\ngot  %q\nwant %q", again, got)
 	}
-	if again := parseHist(t, got); len(again.Blocks[0].History) != 1 {
-		t.Errorf("earlier runs lost on reparse: %+v", again.Blocks[0].History)
+
+	// The next run pushes again, and the oldest falls off past 3.
+	r = []*run.Result{{Block: d2.Blocks[0], Ran: true, Start: at.Add(time.Hour), Status: 1}}
+	got = string(Markdown(d2, r, Options{WriteBack: true}))
+	want = histBlock + "\n```output {for=check exit=1 at=2026-11-14T09:00:00Z}\n```\n\n" +
+		"```output {for=check exit=0 at=2026-11-14T08:00:00Z history=1}\nfine\n```\n\n" +
+		"```output {for=check exit=0 at=2026-11-13T19:08:00Z history=2}\nok\n```\n\n" +
+		"```output {for=check exit=7 history=3 at=2026-11-12T19:02:11Z}\nno\n```\n\n" +
+		"```output {for=check history=3 stream=stderr}\ncurl: (7)\n```\n\nEnd.\n"
+	if got != want {
+		t.Errorf("third run:\ngot  %q\nwant %q", got, want)
+	}
+	d3 := parseHist(t, got)
+	r = []*run.Result{{Block: d3.Blocks[0], Ran: true, Start: at.Add(2 * time.Hour), Stdout: []byte("x\n")}}
+	got = string(Markdown(d3, r, Options{WriteBack: true}))
+	if strings.Contains(got, "curl: (7)") || strings.Count(got, "history=") != 4 || !strings.Contains(got, "history=3}\nok\n") {
+		t.Errorf("fourth run, past the cap:\n%s", got)
+	}
+}
+
+// The first run of a block with a history, and a run after output an
+// older mdsh wrote without at=, push what the file holds.
+func TestHistoryRotateFirst(t *testing.T) {
+	d := parseHist(t, "```sh {#a history}\necho a\n```\n\n```output {for=a exit=0}\nold\n```\n")
+	r := []*run.Result{{Block: d.Blocks[0], Ran: true, Stdout: []byte("new\n")}}
+	want := "```sh {#a history}\necho a\n```\n\n```output {for=a exit=0}\nnew\n```\n\n```output {for=a exit=0 history=1}\nold\n```\n"
+	if got := string(Markdown(d, r, Options{WriteBack: true})); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	d = parseHist(t, "```sh {#a history}\necho a\n```\n")
+	r = []*run.Result{{Block: d.Blocks[0], Ran: true, Stdout: []byte("new\n")}}
+	if got, want := string(Markdown(d, r, Options{WriteBack: true})), "```sh {#a history}\necho a\n```\n\n```output {for=a exit=0}\nnew\n```\n"; got != want {
+		t.Errorf("no output before:\ngot  %q\nwant %q", got, want)
+	}
+}
+
+// Saving holds the earlier runs to the cap, and numbers them again, even
+// for a block that didn't run; a block without history= drops them.
+func TestHistoryCapOnSave(t *testing.T) {
+	src := "```sh {#a history=1}\necho a\n```\n\n```output {for=a exit=0}\nnow\n```\n\n" +
+		"```output {for=a exit=0 history=2}\none\n```\n\n```output {for=a exit=0 history=5}\ntwo\n```\n\nEnd.\n"
+	want := "```sh {#a history=1}\necho a\n```\n\n```output {for=a exit=0}\nnow\n```\n\n```output {for=a exit=0 history=1}\none\n```\n\nEnd.\n"
+	if got := string(Markdown(parseHist(t, src), nil, Options{WriteBack: true})); got != want {
+		t.Errorf("history=1:\ngot  %q\nwant %q", got, want)
+	}
+	src = strings.Replace(src, " history=1}", "}", 1)
+	want = "```sh {#a}\necho a\n```\n\n```output {for=a exit=0}\nnow\n```\n\nEnd.\n"
+	if got := string(Markdown(parseHist(t, src), nil, Options{WriteBack: true})); got != want {
+		t.Errorf("no history=:\ngot  %q\nwant %q", got, want)
+	}
+}
+
+// An image output pushed down links to its file's earlier-run name.
+func TestHistoryRotateImage(t *testing.T) {
+	src := "```sh {#s out=screenshot history}\necho hi\n```\n\n<!-- mdsh:output for=\"s\" at=\"2026-11-13T19:08:00Z\" -->\n![s](d.md.assets/s.svg)\n<!-- /mdsh:output -->\n"
+	d := parseHist(t, src)
+	r := []*run.Result{{Block: d.Blocks[0], Ran: true, Start: time.Date(2026, 11, 14, 8, 0, 0, 0, time.UTC), Image: "d.md.assets/s.svg"}}
+	want := "```sh {#s out=screenshot history}\necho hi\n```\n\n" +
+		"<!-- mdsh:output for=\"s\" at=\"2026-11-14T08:00:00Z\" -->\n![s](d.md.assets/s.svg)\n<!-- /mdsh:output -->\n\n" +
+		"<!-- mdsh:output for=\"s\" at=\"2026-11-13T19:08:00Z\" history=\"1\" -->\n![s](d.md.assets/s.2026-11-13T190800Z.svg)\n<!-- /mdsh:output -->\n"
+	if got := string(Markdown(d, r, Options{WriteBack: true})); got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
 
@@ -72,9 +138,13 @@ func TestHistoryWriteBackNested(t *testing.T) {
 	src := "- step:\n\n  ```sh {#a history=2}\n  echo a\n  ```\n\n  ```output {for=a exit=0}\n  a\n  ```\n\n  ```output {for=a exit=0 history=1}\n  old\n  ```\n\n- next\n"
 	d := parseHist(t, src)
 	r := []*run.Result{{Block: d.Blocks[0], Ran: true, Stdout: []byte("new\n")}}
-	want := strings.Replace(src, "  a\n  ```\n\n  ```output {for=a exit=0 history=1}", "  new\n  ```\n\n  ```output {for=a exit=0 history=1}", 1)
+	want := "- step:\n\n  ```sh {#a history=2}\n  echo a\n  ```\n\n  ```output {for=a exit=0}\n  new\n  ```\n\n" +
+		"  ```output {for=a exit=0 history=1}\n  a\n  ```\n\n  ```output {for=a exit=0 history=2}\n  old\n  ```\n\n- next\n"
 	if got := string(Markdown(d, r, Options{WriteBack: true})); got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	if _, err := doc.Parse([]byte(want)); err != nil {
+		t.Error(err)
 	}
 }
 

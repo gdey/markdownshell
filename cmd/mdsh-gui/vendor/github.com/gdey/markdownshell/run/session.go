@@ -28,6 +28,9 @@ import (
 // A Session runs one thing at a time: don't call RunFrom or RunBlock
 // while another call is running.
 type Session struct {
+	// images remembers the files blocks with a history saved, for
+	// rotateAssets.
+	images   lastImages
 	d        *doc.Document
 	opts     Options
 	stack    *env.Stack
@@ -422,6 +425,9 @@ func (s *Session) emit(e Event) {
 		s.started[e.Block] = time.Now()
 		s.startMu.Unlock()
 	case Done:
+		if e.Result != nil && e.Result.Image != "" {
+			s.images.set(e.Block, e.Result.Image, e.Result.At())
+		}
 		s.startMu.Lock()
 		if t, ok := s.started[e.Block]; ok {
 			delete(s.started, e.Block)
@@ -833,6 +839,7 @@ func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bo
 	s.Reap()
 	r = &Result{Block: b, Ran: true, Start: s.now()}
 	s.results[i] = r
+	s.rotateAssets(b)
 	s.emit(Event{Kind: Started, Block: b})
 	defer func() { s.emit(Event{Kind: Done, Block: b, Result: r}) }()
 	e, err := envFor(ctx, s.stack, s.d, b)
@@ -879,6 +886,7 @@ func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	s.seq++
 	r.Seq, r.Deps = s.seq, depSeqs(s.d, s.results, b)
 	r.Start = s.now()
+	s.rotateAssets(b)
 	s.emit(Event{Kind: Started, Block: b})
 	s.logStart(b)
 	if b.IsHTTP() {

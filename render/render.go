@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
@@ -51,6 +50,12 @@ type Options struct {
 	// caller that draws the numbers in a gutter of its own, as mdsh-gui
 	// does. Otherwise printing puts each line's number in front of it.
 	PlainIncludes bool
+	// InSource, if set, reports whether r's output is already in the
+	// document's source, written there by an earlier write-back of the
+	// same run, as mdsh-gui does as each run ends. Write-back then
+	// replaces that output instead of pushing it down as an earlier run
+	// of a block with history=.
+	InSource func(r *run.Result) bool
 }
 
 // Markdown renders d with results spliced in after their blocks. Blocks
@@ -187,6 +192,20 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			saved = b.CurrentOutput()
 		}
 		if r == nil || !r.Ran {
+			if cap := b.HistoryCap(d.Options); opts.WriteBack && len(b.History) > 0 && historyTrimmed(b, cap) {
+				// Saving holds the earlier runs to the cap, and numbers
+				// them again.
+				end := b.Span.End
+				if n := len(b.CurrentParts); n > 0 {
+					end = b.CurrentParts[n-1].End
+				}
+				buf.Write(src[b.Span.End:end])
+				if earlier := earlierRuns(src, b, false, cap); earlier != "" {
+					buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+					buf.WriteString(earlier)
+				}
+				continue
+			}
 			if showCode {
 				buf.Write(src[b.Span.End:saved.End])
 			} else if kept := dropGap(src[b.Span.End:saved.End], b.Prefix); b.Lead != "" && len(kept) > 0 {
@@ -198,11 +217,19 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			continue
 		}
 		out := Output(r, showStderr(d, b, r, after(b)))
-		var earlier []byte
-		if opts.WriteBack && len(b.History) > 0 {
-			earlier = src[b.History[0].Span.Start:b.Output.End]
+		var earlier string
+		if cap := b.HistoryCap(d.Options); opts.WriteBack {
+			// A run of a block with a history pushes the output the
+			// file holds down as the run before, unless it is this
+			// run's own, written there by an earlier write-back.
+			push := cap > 0 && (opts.InSource == nil || !opts.InSource(r))
+			earlier = earlierRuns(src, b, push, cap)
+			if cap > 0 && out == "" {
+				// Every run is kept, even one that showed nothing.
+				out = emptyOutput(r)
+			}
 		}
-		if out == "" && earlier == nil {
+		if out == "" && earlier == "" {
 			if !showCode {
 				pos = skipBlankLine(src, pos)
 			}
@@ -222,11 +249,9 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 		} else if out != "" {
 			buf.WriteString(indent(out, b.Prefix))
 		}
-		if earlier != nil {
-			// The earlier runs stay as the file has them, under the
-			// new output.
+		if earlier != "" {
 			buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
-			buf.Write(earlier)
+			buf.WriteString(earlier)
 		}
 	}
 	buf = &bufs[len(bufs)-1]
@@ -565,12 +590,7 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 
 // At is r's start time as an output's at= writes it: UTC, RFC 3339 to
 // the second. It is "" for a result with no start time.
-func At(r *run.Result) string {
-	if r.Start.IsZero() {
-		return ""
-	}
-	return r.Start.UTC().Format(time.RFC3339)
-}
+func At(r *run.Result) string { return r.At() }
 
 // writeInclude writes include block b with the lines r read as its body.
 // Printing numbers the lines if b asks for it; with plain, as for
