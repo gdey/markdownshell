@@ -88,6 +88,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- In mdsh-gui's rendered view, the grip that drags a textbox or choice
+  to another spot sits on the line of its name, just before it, rather
+  than on a line of its own above the name.
+
+  ![A textbox named host with its grip just left of the name, a radio choice env under it, and a sh block](docs/changelog/input-grip.png)
+
 - Pressing enter in mdsh-gui's History pane no longer sends the keys you
   type next to the rendered view. While a command typed there runs, the
   input used to give its place to the run's clock, and hiding it dropped
