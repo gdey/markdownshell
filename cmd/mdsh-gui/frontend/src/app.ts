@@ -577,11 +577,17 @@ function drawCell(c: Cell, now = false): HTMLElement {
   if (c.block >= 0 && !c.textbox && !c.choice) e.style.setProperty("--guess", guessHeight(c) + "px");
   if (stubbed) return e;
   if (c.movable) {
-    // The grip goes first in a block's head, or before an input's name.
+    // The grip goes first in a block's head, or on the line of an
+    // input's name, before it.
     const g = grip("Drag to move this block (alt+↑/↓)", (ev, handle) => startDrag(ev, handle, e, c.from, 0, "doc"));
     const head = e.querySelector(".head");
+    const name = e.querySelector(":scope.input-cell > .name");
     if (head) head.prepend(g);
-    else {
+    else if (name) {
+      const line = el("div", { className: "name-line" });
+      name.before(line);
+      line.append(g, name);
+    } else {
       // A fence that doesn't run has no head; its grip sits in the
       // margin beside it.
       e.classList.add("fence");

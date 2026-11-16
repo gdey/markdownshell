@@ -902,6 +902,11 @@ body.shell { overflow: hidden; }
 .running .grip { display: none; }
 .prose.fence { position: relative; }
 .prose.fence > .grip { position: absolute; left: -18px; top: 6px; }
+/* An input's grip sits on its name's line, just before the name, and
+   hangs in the margin so the name lines up with the control under it. */
+.input-cell .name-line { position: relative; margin: 0 0 4px; }
+.input-cell .name-line > .grip { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); margin-right: 2px; }
+.input-cell .name-line > .name { margin: 0; }
 .dragging { opacity: 0.5; }
 .drop-line { position: fixed; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; z-index: 100; }
 /* The drag is past a depends= limit, so the line holds at the last spot short of it. */
