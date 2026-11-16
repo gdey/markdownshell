@@ -80,6 +80,10 @@ type Config struct {
 	// Transport, if set, makes the request instead of a transport with
 	// the system's proxy and certificates. Tests use it.
 	Transport http.RoundTripper
+	// SecretHeaders are headers masked in the output besides
+	// SecretHeaders, from the front matter's mdsh.http.secret_headers.
+	// A failed check on one of them reports Masked, not the value.
+	SecretHeaders []string
 }
 
 // Response is what a request got back, with its checks' and captures'
@@ -141,11 +145,14 @@ func (r *Response) Failures() []string {
 
 // Do makes the request r, an expanded Request, and runs its checks and
 // captures on the response. The error is for a request that got no
-// response; failed checks are in the Response.
+// response; failed checks are in the Response. The error names the
+// URL's scheme and host only: its path, query and user info hold the
+// placeholders' values, which the saved file and the audit log, where
+// the error goes, must not.
 func Do(ctx context.Context, r *Request, cfg Config) (*Response, error) {
 	u, err := url.Parse(r.URL)
 	if err != nil {
-		return nil, fmt.Errorf("URL: %w", err)
+		return nil, fmt.Errorf("URL: %w", bare(err))
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return nil, fmt.Errorf("URL %s: want http:// or https://", r.URL)
@@ -228,7 +235,7 @@ func Do(ctx context.Context, r *Request, cfg Config) (*Response, error) {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return nil, fmt.Errorf("%s %s: no response after %s", r.Method, redactURL(u), timeout)
 		}
-		return nil, err
+		return nil, fmt.Errorf("%s %s: %w", r.Method, redactURL(u), bare(err))
 	}
 	defer resp.Body.Close()
 	got, err := io.ReadAll(io.LimitReader(resp.Body, MaxBody+1))
@@ -246,25 +253,38 @@ func Do(ctx context.Context, r *Request, cfg Config) (*Response, error) {
 	if len(got) > MaxBody {
 		out.Body, out.Truncated = got[:MaxBody], true
 	}
-	out.check(r)
+	out.check(r, cfg.SecretHeaders)
 	out.capture(r)
 	return out, nil
 }
 
-// redactURL is u without its query or user info, for an error.
+// redactURL is u's scheme and host, for an error: its path, query and
+// user info may hold a placeholder's value.
 func redactURL(u *url.URL) string {
-	c := *u
-	c.RawQuery, c.User, c.Fragment = "", nil, ""
+	c := url.URL{Scheme: u.Scheme, Host: u.Host}
 	return c.String()
 }
 
-// check runs r's status check and asserts.
-func (resp *Response) check(r *Request) {
+// bare is err without the URL net/http and net/url put in their
+// messages, which is the expanded one.
+func bare(err error) error {
+	if ue := (*url.Error)(nil); errors.As(err, &ue) {
+		return ue.Err
+	}
+	return err
+}
+
+// check runs r's status check and asserts. A failed check on a header
+// in more or SecretHeaders reports Masked as what it got.
+func (resp *Response) check(r *Request, more []string) {
 	if r.StatusLine != "" && r.Status != 0 {
 		resp.Checks = append(resp.Checks, Check{Text: r.StatusLine, OK: resp.Code == r.Status, Got: fmt.Sprint(resp.Code)})
 	}
 	for _, a := range r.Asserts {
 		ok, got := resp.assert(a)
+		if !ok && a.What == "header" && IsSecretHeader(a.Arg, more) {
+			got = Masked
+		}
 		resp.Checks = append(resp.Checks, Check{Text: a.Text, OK: ok, Got: got})
 	}
 }

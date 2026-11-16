@@ -98,9 +98,43 @@ func TestHTTPNoResponse(t *testing.T) {
 	srv := apiServer(t)
 	url := srv.URL
 	srv.Close()
-	_, results := runDoc(t, "```http {#a}\nGET "+url+"/me\n```\n", run.Options{})
+	var log bytes.Buffer
+	d, results := runDoc(t, "```http {#a}\nGET "+url+"/me?token={{$TOK}}\n```\n", run.Options{
+		Environ: []string{"PATH=" + os.Getenv("PATH"), "TOK=sekrit", "MDSH_EXPOSE=TOK"},
+		Audit:   audit.New(&log),
+	})
 	if r := results[0]; r.Err == nil || !r.Failed() {
 		t.Errorf("err = %v", r.Err)
+	}
+	// The error names the host, not the filled-in URL, in the saved
+	// file and the audit log.
+	out := string(render.Markdown(d, results, render.Options{WriteBack: true}))
+	for _, text := range []string{out, log.String()} {
+		if strings.Contains(text, "sekrit") {
+			t.Errorf("the filled-in URL got out:\n%s", text)
+		}
+	}
+	if !strings.Contains(out, "mdsh: GET "+url+": ") {
+		t.Errorf("saved:\n%s", out)
+	}
+}
+
+// A secret capture's value is masked in the saved body however the
+// body escaped it.
+func TestHTTPSecretCaptureEscaped(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"token":"ab\u003ccd\/ef","note":"x"}`)
+	}))
+	defer srv.Close()
+	doc := "```http {#a}\nGET " + srv.URL + "/\n\nHTTP 200\n[Asserts]\njsonpath $.token == \"nope\"\n[Captures]\ntoken: secret jsonpath $.token\n```\n"
+	d, results := runDoc(t, doc, run.Options{})
+	if v, ok := results[0].Vars["token"]; !ok || v != "ab<cd/ef" {
+		t.Fatalf("token = %q", v)
+	}
+	out := string(render.Markdown(d, results, render.Options{WriteBack: true}))
+	if strings.Contains(out, "ab<") || strings.Contains(out, "u003c") || !strings.Contains(out, `"token": "(secret)"`) || !strings.Contains(out, `got "(secret)"`) {
+		t.Errorf("saved:\n%s", out)
 	}
 }
 

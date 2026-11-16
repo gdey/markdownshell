@@ -236,21 +236,28 @@ items: jsonpath $.items
 func TestDoFailures(t *testing.T) {
 	srv := serve(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Set-Cookie", "session=cookie123")
+		w.Header().Set("X-Session-Id", "sid456")
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"user":"guest"}`)
 	})
-	req, err := Parse("GET " + srv.URL + "\nHTTP 200\n[Asserts]\njsonpath $.user == \"j\"\njsonpath $.id exists\n[Captures]\nid: jsonpath $.id\n")
+	req, err := Parse("GET " + srv.URL + "\nHTTP 200\n[Asserts]\njsonpath $.user == \"j\"\njsonpath $.id exists\nheader Set-Cookie == none\nheader X-Session-Id == none\nheader Content-Type == none\n[Captures]\nid: jsonpath $.id\n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := Do(context.Background(), req, Config{})
+	resp, err := Do(context.Background(), req, Config{SecretHeaders: []string{"x-session-id"}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A failed check on a credential header says (secret), not the
+	// value: the line goes to stderr, which the file saves.
 	want := []string{
 		"HTTP 200: got 404",
 		`assert jsonpath $.user == "j": got "guest"`,
 		"assert jsonpath $.id exists: got nothing",
+		"assert header Set-Cookie == none: got (secret)",
+		"assert header X-Session-Id == none: got (secret)",
+		`assert header Content-Type == none: got "application/json"`,
 		"capture id: jsonpath $.id found nothing",
 	}
 	if got := resp.Failures(); !reflect.DeepEqual(got, want) {
@@ -299,6 +306,51 @@ func TestDoTimeout(t *testing.T) {
 	}
 }
 
+// A request that gets no response reports the URL's host only: its
+// path, query and user info hold the placeholders' values, and the
+// error goes to the saved file and the audit log.
+func TestDoNoResponse(t *testing.T) {
+	srv := serve(t, func(w http.ResponseWriter, r *http.Request) {})
+	srv.Close()
+	req, _ := Parse("GET " + strings.Replace(srv.URL, "http://", "http://u:hunter2@", 1) + "/v1/sekrit?key=secret\n")
+	_, err := Do(context.Background(), req, Config{})
+	if err == nil {
+		t.Fatal("no error")
+	}
+	for _, bad := range []string{"secret", "sekrit", "hunter2", "u:"} {
+		if strings.Contains(err.Error(), bad) {
+			t.Errorf("err = %v: holds %q", err, bad)
+		}
+	}
+	if !strings.HasPrefix(err.Error(), "GET "+srv.URL+": ") || !strings.Contains(err.Error(), "connection refused") {
+		t.Errorf("err = %v", err)
+	}
+	req = &Request{Method: "GET", URL: "http://x y/?key=secret"} // as a placeholder could fill it in
+	if _, err := Do(context.Background(), req, Config{}); err == nil || strings.Contains(err.Error(), "secret") {
+		t.Errorf("bad URL: err = %v", err)
+	}
+}
+
+// MaskValue takes a secret's value out of a body however the body
+// escaped it.
+func TestMaskValue(t *testing.T) {
+	v := `ab<c/d"e`
+	for _, body := range []string{
+		`{"token":"ab<c/d\"e"}`,
+		`{"token":"ab\u003cc/d\"e"}`,
+		`{"token":"ab\u003cc\/d\"e"}`,
+		`{"token":"ab<c\/d\"e"}`,
+		"token=ab<c/d\"e",
+	} {
+		if got := MaskValue(body, v); strings.Contains(got, "ab") || !strings.Contains(got, Masked) {
+			t.Errorf("MaskValue(%s) = %s", body, got)
+		}
+	}
+	if got := MaskValue("nothing here", ""); got != "nothing here" {
+		t.Errorf("empty value: %q", got)
+	}
+}
+
 func TestExpandRefusesLineBreaks(t *testing.T) {
 	req, _ := Parse("GET https://x\nX-A: {{v}}\n")
 	_, err := req.Expand(func(s string) (string, error) { return strings.ReplaceAll(s, "{{v}}", "a\r\nX-Evil: 1"), nil })
@@ -325,6 +377,11 @@ func TestCurl(t *testing.T) {
 	}
 	r, _ = Parse("DELETE https://x.test/a\n")
 	if got := Curl(r); got != "curl -X DELETE https://x.test/a" {
+		t.Errorf("Curl = %s", got)
+	}
+	// A request line whose URL starts with - isn't pasted as an option.
+	r, _ = Parse("GET -K/home/j/curlrc\n")
+	if got := Curl(r); got != "curl --url -K/home/j/curlrc" {
 		t.Errorf("Curl = %s", got)
 	}
 }

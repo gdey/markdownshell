@@ -102,6 +102,33 @@ func Body(resp *Response, raw bool) string {
 	return body
 }
 
+// MaskValue returns text with every copy of v, a secret capture's
+// value, replaced by Masked: as it is, and as a JSON string holds it,
+// since the body may escape it (\u003c for <, \/ for /, \" for ") where
+// the capture read it unescaped.
+func MaskValue(text, v string) string {
+	if v == "" {
+		return text
+	}
+	forms := []string{v}
+	for _, escapeHTML := range []bool{true, false} {
+		var b bytes.Buffer
+		enc := json.NewEncoder(&b)
+		enc.SetEscapeHTML(escapeHTML)
+		if enc.Encode(v) == nil {
+			s := strings.TrimSuffix(b.String(), "\n")
+			s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+			forms = append(forms, s, strings.ReplaceAll(s, "/", `\/`))
+		}
+	}
+	for _, f := range forms {
+		if f != "" {
+			text = strings.ReplaceAll(text, f, Masked)
+		}
+	}
+	return text
+}
+
 // IsJSON reports whether media type mt is JSON: application/json, or a
 // type ending in +json.
 func IsJSON(mt string) bool {

@@ -34,7 +34,8 @@ func runHTTP(ctx context.Context, d *doc.Document, b *doc.Block, r *Result, opts
 		return
 	}
 	cfg := httpblock.Config{
-		Transport: opts.HTTPTransport,
+		Transport:     opts.HTTPTransport,
+		SecretHeaders: d.Options.HTTP.SecretHeaders,
 		ReadFile: func(name string) ([]byte, error) {
 			o := opts
 			if o.Dir == "" && o.File != "" {
@@ -73,11 +74,11 @@ func runHTTP(ctx context.Context, d *doc.Document, b *doc.Block, r *Result, opts
 		r.Status = 1
 	}
 	// A secret capture's value stays out of the output too, wherever
-	// the response held it.
+	// the response held it, however the body escaped it.
 	for _, name := range resp.Secret {
 		if v := resp.Vars[name]; v != "" {
-			out = strings.ReplaceAll(out, v, httpblock.Masked)
-			errs = strings.ReplaceAll(errs, v, httpblock.Masked)
+			out = httpblock.MaskValue(out, v)
+			errs = httpblock.MaskValue(errs, v)
 		}
 	}
 	r.Stdout = []byte(out)
