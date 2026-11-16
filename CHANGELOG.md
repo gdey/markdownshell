@@ -55,6 +55,13 @@ follow [Semantic Versioning](https://semver.org/).
   as before. This is the first step of output history; the design is
   in [docs/output-history/design.md](docs/output-history/design.md).
 
+- mdsh reads `history=N` on a block, and the earlier runs' outputs kept
+  under its current output as fences marked `history=K`. They belong to
+  the block: moving, deleting and renaming it carry them along, Clear
+  output removes them, saving keeps them, and printing shows only the
+  current output. One that isn't right under its block's output is an
+  error. Runs don't add to the history yet; that comes next.
+
 - `mdsh-gui`: a Coffee look in Settings › Look, in roast browns. The
   document is written on a sheet of old cream paper, splashed and
   ringed with coffee, lying on a wooden table with a latte on a red

@@ -1145,7 +1145,8 @@ func (m *Model) view() tea.Cmd {
 // imageOf is the image block i made, or saved in the file, or "".
 func (m *Model) imageOf(i int) string {
 	if b := m.d.Blocks[i]; !m.results[i].Ran && b.HasOutput() {
-		return imageLink(saved(m.d.Src[b.Output.Start:b.Output.End]))
+		cur := b.CurrentOutput()
+		return imageLink(saved(m.d.Src[cur.Start:cur.End]))
 	}
 	return m.results[i].Image
 }

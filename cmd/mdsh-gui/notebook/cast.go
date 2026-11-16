@@ -160,12 +160,13 @@ func (n *Notebook) ReplaceCast(i int, as string, frame int) error {
 // castRegion finds b's recording in its output: the link's offsets in
 // the source, and the link.
 func (n *Notebook) castRegion(b *doc.Block) (start, end int, link string, err error) {
-	out := n.d.Src[b.Output.Start:b.Output.End]
+	cur := b.CurrentOutput()
+	out := n.d.Src[cur.Start:cur.End]
 	for _, m := range castLink.FindAllSubmatchIndex(out, -1) {
 		l := string(out[m[4]:m[5]])
 		dest, _, _ := strings.Cut(l, "#")
 		if strings.HasPrefix(dest, "data:"+run.CastMIME) || strings.EqualFold(pathpkg.Ext(dest), ".cast") {
-			return b.Output.Start + m[4], b.Output.Start + m[5], l, nil
+			return cur.Start + m[4], cur.Start + m[5], l, nil
 		}
 	}
 	return 0, 0, "", fmt.Errorf("block %s has no recording in its output", n.d.Label(b))

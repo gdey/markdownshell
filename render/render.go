@@ -180,10 +180,16 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			}
 			continue
 		}
+		// Printing shows the current output; write-back keeps the
+		// earlier runs under it too.
+		saved := b.Output
+		if !opts.WriteBack {
+			saved = b.CurrentOutput()
+		}
 		if r == nil || !r.Ran {
 			if showCode {
-				buf.Write(src[b.Span.End:b.Output.End])
-			} else if kept := dropGap(src[b.Span.End:b.Output.End], b.Prefix); b.Lead != "" && len(kept) > 0 {
+				buf.Write(src[b.Span.End:saved.End])
+			} else if kept := dropGap(src[b.Span.End:saved.End], b.Prefix); b.Lead != "" && len(kept) > 0 {
 				buf.WriteString(b.Lead)
 				buf.Write(bytes.TrimPrefix(kept, []byte(b.Prefix)))
 			} else {
@@ -192,7 +198,11 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			continue
 		}
 		out := Output(r, showStderr(d, b, r, after(b)))
-		if out == "" {
+		var earlier []byte
+		if opts.WriteBack && len(b.History) > 0 {
+			earlier = src[b.History[0].Span.Start:b.Output.End]
+		}
+		if out == "" && earlier == nil {
 			if !showCode {
 				pos = skipBlankLine(src, pos)
 			}
@@ -202,13 +212,21 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			if !bytes.HasSuffix(src[b.Span.Start:b.Span.End], []byte("\n")) {
 				buf.WriteByte('\n')
 			}
-			buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
-			buf.WriteString(indent(out, b.Prefix))
-		} else if b.Lead != "" {
+			if out != "" {
+				buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+				buf.WriteString(indent(out, b.Prefix))
+			}
+		} else if out != "" && b.Lead != "" {
 			// The output takes the hidden fence's place in its list item.
 			buf.WriteString(b.Lead + strings.TrimPrefix(indent(out, b.Prefix), b.Prefix))
-		} else {
+		} else if out != "" {
 			buf.WriteString(indent(out, b.Prefix))
+		}
+		if earlier != nil {
+			// The earlier runs stay as the file has them, under the
+			// new output.
+			buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+			buf.Write(earlier)
 		}
 	}
 	buf = &bufs[len(bufs)-1]

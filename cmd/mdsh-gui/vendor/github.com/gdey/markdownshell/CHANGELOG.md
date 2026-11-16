@@ -55,6 +55,27 @@ follow [Semantic Versioning](https://semver.org/).
   as before. This is the first step of output history; the design is
   in [docs/output-history/design.md](docs/output-history/design.md).
 
+- mdsh reads `history=N` on a block, and the earlier runs' outputs kept
+  under its current output as fences marked `history=K`. They belong to
+  the block: moving, deleting and renaming it carry them along, Clear
+  output removes them, saving keeps them, and printing shows only the
+  current output. One that isn't right under its block's output is an
+  error. Runs don't add to the history yet; that comes next.
+
+- `mdsh-gui`: a Coffee look in Settings › Look, in roast browns. The
+  document is written on a sheet of old cream paper, splashed and
+  ringed with coffee, lying on a wooden table with a latte on a red
+  saucer by its corner; the paper scrolls over the table while the cup
+  stays put. Headings are typed, the cards are index cards, the accent
+  is the roast's brown and the saucer's red is kept for errors and Stop.
+  The dark theme is late at night: dark-roast paper, steamed-milk
+  lettering and a cup of black coffee, with crema amber for the accent.
+  The cup and saucer, the stains and the shadows under cards can each
+  be turned off. Its text, code, links and buttons measure at least
+  4.5:1 and its accent 3:1 in both themes.
+
+  ![The deploy runbook in the Coffee look: coffee-stained cream paper on a wooden table, a latte on a red saucer at its corner, with ship asking to run](docs/changelog/coffee.png)
+
 - An include block in mdsh-gui's rendered view has a grip above and
   below its lines. Dragging the bottom one down shows the lines after
   them, raising `to=`, and dragging the top one up shows the lines

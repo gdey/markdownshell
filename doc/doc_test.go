@@ -681,7 +681,7 @@ func TestRegionAttrs(t *testing.T) {
 		`<!-- mdsh:output for="a" at="2026-11-13T19:08:00Z" -->`,
 		`<!-- mdsh:output for="a"  at="2026-11-13T19:08:00Z"  history="1" -->`,
 	} {
-		if id, ok := regionStart([]byte(line)); !ok || id != "a" {
+		if id, _, ok := regionStart([]byte(line)); !ok || id != "a" {
 			t.Errorf("%s: id %q, ok %v", line, id, ok)
 		}
 	}
@@ -691,7 +691,7 @@ func TestRegionAttrs(t *testing.T) {
 		`<!-- mdsh:output for="a" at -->`,
 		`<!-- mdsh:output for=a -->`,
 	} {
-		if _, ok := regionStart([]byte(line)); ok {
+		if _, _, ok := regionStart([]byte(line)); ok {
 			t.Errorf("%s: read as a region", line)
 		}
 	}
