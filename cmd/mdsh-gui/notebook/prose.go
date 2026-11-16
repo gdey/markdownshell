@@ -112,7 +112,7 @@ func (n *Notebook) cells() []Cell {
 			Depends:         b.Depends(),
 			Output:          n.html(out),
 			HTTP:            httpCell(b, r, out),
-			OutputTasks:     tasksIn(l.tasks, b.Output),
+			OutputTasks:     tasksIn(l.tasks, b.CurrentOutput()),
 			Links:           b.Attrs.Has(weblink.Attr),
 			Secret:          b.Attrs.Has(secretAttr) || run.NamesAny(b.Body, secrets),
 			SecretCode:      b.Attrs.Has(secretAttr),

@@ -29,9 +29,13 @@ type Block struct {
 	// its info string.
 	Fence, Info string
 	// Output covers any output already attached to this block, starting
-	// right after Span. It is empty (Start == End == Span.End) when there
-	// is none.
+	// right after Span: the current output and, under it, the earlier
+	// runs History holds. It is empty (Start == End == Span.End) when
+	// there is none. CurrentOutput is the current output alone.
 	Output Span
+	// History holds the earlier runs' outputs kept under the current
+	// output by history=N, newest first. See Entry.
+	History []Entry
 	// Prefix is what starts each line of a block nested in block quotes or
 	// list items, such as "> " or "   ". Output written after the block
 	// starts each line with it. Empty at the top level.
@@ -62,6 +66,9 @@ type Block struct {
 	// outNoSave is set when a fence in Output is marked nosave: the
 	// output is kept as the file has it, as if the block were.
 	outNoSave bool
+	// outCur is where the current output ends, once History has an
+	// entry.
+	outCur int
 }
 
 // Document is a parsed markdown file.
@@ -167,7 +174,23 @@ func Parse(src []byte) (*Document, error) {
 			if lead {
 				b.Lead = string(head)
 			}
-			if last != nil && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) && !last.hasPart(b.Attrs["stream"] == "stderr") {
+			if b.Lang == "output" && b.Attrs.Has("history") && b.Attrs["for"] != "" {
+				// An earlier run's output, kept by history=N. It goes
+				// right under its block's output, or nowhere.
+				k, err := historyK(b.Attrs["history"])
+				if err == nil && !(last != nil && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q)) {
+					err = fmt.Errorf("an earlier run of %s (history=%d) must be right under its output", b.Attrs["for"], k)
+				}
+				if err == nil {
+					err = last.addEntryPart(k, pos, next, b.Attrs, false, b.Attrs["stream"] == "stderr")
+				}
+				if err != nil {
+					return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
+				}
+				pos = next
+				continue
+			}
+			if last != nil && len(last.History) == 0 && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) && !last.hasPart(b.Attrs["stream"] == "stderr") {
 				last.Output.End = next
 				last.addPart(b.Attrs["stream"] == "stderr")
 				if b.Attrs.Has("nosave") {
@@ -221,6 +244,9 @@ func Parse(src []byte) (*Document, error) {
 				return nil, fmt.Errorf("line %d: duplicate block id %q", lineNo(src, pos), b.ID)
 			}
 			ids[b.ID] = true
+			if err := checkHistoryAttr(b); err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
+			}
 			if v := b.Attrs["var"]; v != "" && b.IsInput() {
 				// Only one input sets a variable: the first. A later
 				// one that is the same control is a copy of it, which
@@ -245,9 +271,23 @@ func Parse(src []byte) (*Document, error) {
 			continue
 		}
 
-		if id, ok := regionStart(rest); ok {
+		if id, attrs, ok := regionStart(rest); ok {
 			next := regionEnd(src, end, q)
-			if last != nil && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q) && !last.hasPart(false) {
+			if v, ok := attrs["history"]; ok {
+				k, err := historyK(v)
+				if err == nil && !(last != nil && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q)) {
+					err = fmt.Errorf("an earlier run of %s (history=%d) must be right under its output", id, k)
+				}
+				if err == nil {
+					err = last.addEntryPart(k, pos, next, attrs, true, false)
+				}
+				if err != nil {
+					return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
+				}
+				pos = next
+				continue
+			}
+			if last != nil && len(last.History) == 0 && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q) && !last.hasPart(false) {
 				last.Output.End = next
 				last.addPart(false)
 			} else {
@@ -667,26 +707,27 @@ func RegionStartAt(id, at string) string {
 // RegionEnd is the line that closes an output region.
 const RegionEnd = regionClose
 
-// regionStart returns the id an output region's opening line names. The
-// id may be followed by more name="value" attributes, such as at=.
-func regionStart(line []byte) (string, bool) {
+// regionStart returns the id an output region's opening line names, and
+// the name="value" attributes after it, such as at=.
+func regionStart(line []byte) (string, map[string]string, bool) {
 	line = bytes.TrimSpace(line)
 	if !bytes.HasPrefix(line, []byte(regionOpen)) || !bytes.HasSuffix(line, []byte("-->")) {
-		return "", false
+		return "", nil, false
 	}
 	rest := string(bytes.TrimSpace(line[len(regionOpen) : len(line)-3]))
 	q, err := strconv.QuotedPrefix(rest)
 	if err != nil {
-		return "", false
+		return "", nil, false
 	}
 	id, _ := strconv.Unquote(q)
 	if more := rest[len(q):]; more != "" && more[0] != ' ' && more[0] != '\t' {
-		return "", false
+		return "", nil, false
 	}
-	if _, ok := regionAttrs(rest[len(q):]); !ok {
-		return "", false
+	attrs, ok := regionAttrs(rest[len(q):])
+	if !ok {
+		return "", nil, false
 	}
-	return id, true
+	return id, attrs, true
 }
 
 // regionAttrs parses the name="value" pairs after a region's for= id.

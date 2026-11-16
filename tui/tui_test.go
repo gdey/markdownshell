@@ -1495,3 +1495,12 @@ func TestDependOwnConfirm(t *testing.T) {
 	}
 	press(m, "s")
 }
+
+// A block's saved output shows without its earlier runs.
+func TestSavedOutputWithoutHistory(t *testing.T) {
+	src := "```sh {#a history=2}\necho a\n```\n\n```output {for=a exit=0}\nnow\n```\n\n```output {for=a exit=0 history=1}\nbefore\n```\n"
+	m, _ := newModel(t, src, Options{})
+	if v := m.View(); !strings.Contains(v, "now") || strings.Contains(v, "before") {
+		t.Errorf("view:\n%s", v)
+	}
+}

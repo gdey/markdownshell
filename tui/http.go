@@ -66,7 +66,8 @@ func (m *Model) httpOutput(b *doc.Block, r *run.Result, text string) (string, bo
 func savedResponse(b *doc.Block, src []byte) string {
 	var lines []string
 	fence := ""
-	for _, l := range strings.SplitAfter(string(src[b.Output.Start:b.Output.End]), "\n") {
+	cur := b.CurrentOutput()
+	for _, l := range strings.SplitAfter(string(src[cur.Start:cur.End]), "\n") {
 		l = strings.TrimPrefix(l, b.Prefix)
 		t := strings.TrimRight(l, "\r\n")
 		if fence == "" {

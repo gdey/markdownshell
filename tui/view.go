@@ -354,7 +354,8 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		}
 	}
 	if b.HasOutput() {
-		out := saved(m.d.Src[b.Output.Start:b.Output.End])
+		cur := b.CurrentOutput()
+		out := saved(m.d.Src[cur.Start:cur.End])
 		if link := imageLink(out); link != "" {
 			s := savedStyle.Render("saved output: " + link)
 			if p := m.preview(link, w-2); p != "" {

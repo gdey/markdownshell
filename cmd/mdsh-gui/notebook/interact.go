@@ -134,10 +134,10 @@ func (n *Notebook) SetTask(task int, done bool) error {
 func (n *Notebook) setResultTask(marks []int, task int, mark byte) []outChange {
 	for i, b := range n.d.Blocks {
 		r := n.results[i]
-		if r == nil || !r.Ran || marks[task] < b.Output.Start || marks[task] >= b.Output.End {
+		if cur := b.CurrentOutput(); r == nil || !r.Ran || marks[task] < cur.Start || marks[task] >= cur.End {
 			continue
 		}
-		j := tasksIn(marks[:task], b.Output) // the task's place in the output
+		j := tasksIn(marks[:task], b.CurrentOutput()) // the task's place in the output
 		if out := n.marksIn(r.Stdout); len(j) < len(out) {
 			before := r.Stdout
 			r.Stdout = append([]byte(nil), r.Stdout...)

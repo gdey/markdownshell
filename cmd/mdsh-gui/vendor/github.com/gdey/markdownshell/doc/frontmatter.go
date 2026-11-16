@@ -30,6 +30,9 @@ type Options struct {
 	// ShowStderr shows every block's stderr. Blocks can override it
 	// with show-stderr=. By default stderr shows only for failed blocks.
 	ShowStderr *bool `yaml:"show_stderr"`
+	// History is how many earlier runs a block marked with a bare
+	// history keeps. 0 means DefaultHistory.
+	History int `yaml:"history"`
 	// Terminal is the size, in cells, of the terminal tty blocks run on
 	// where mdsh draws it, as in the GUI. A zero cols fits the window;
 	// a zero rows is 24.
@@ -139,6 +142,9 @@ func parseFrontMatter(src []byte, pos int) (Span, Options, error) {
 			case "", "continue", "stop":
 			default:
 				return Span{pos, e}, opts, fmt.Errorf("front matter: on_error must be continue or stop, got %q", fm.Mdsh.OnError)
+			}
+			if fm.Mdsh.History < 0 {
+				return Span{pos, e}, opts, fmt.Errorf("front matter: history must be how many earlier runs to keep, 0 or more, got %d", fm.Mdsh.History)
 			}
 			if t := fm.Mdsh.Terminal; t.Cols < 0 || t.Rows < 0 || t.Cols > 1000 || t.Rows > 500 {
 				return Span{pos, e}, opts, fmt.Errorf("front matter: terminal cols must be 0 to 1000 and rows 0 to 500, got %d by %d", t.Cols, t.Rows)
