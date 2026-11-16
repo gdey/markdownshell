@@ -98,7 +98,7 @@ func TestRunAndSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved, _ := os.ReadFile(file)
-	if !strings.Contains(string(saved), "```output {for=hello exit=0}\nhello\n```") {
+	if !strings.Contains(noAt(saved), "```output {for=hello exit=0}\nhello\n```") {
 		t.Errorf("saved file:\n%s", saved)
 	}
 }
@@ -126,7 +126,7 @@ func TestSaveNamesBlocks(t *testing.T) {
 		t.Errorf("cell after saving = %+v", c)
 	}
 	saved, _ := os.ReadFile(file)
-	if want := "```sh {#" + c.ID + "}\necho hi\n```\n\n```output {for=" + c.ID + " exit=0}\nhi\n```\n"; !strings.HasSuffix(string(saved), want) {
+	if want := "```sh {#" + c.ID + "}\necho hi\n```\n\n```output {for=" + c.ID + " exit=0}\nhi\n```\n"; !strings.HasSuffix(noAt(saved), want) {
 		t.Errorf("saved file:\n%s", saved)
 	}
 }
@@ -249,7 +249,7 @@ func TestSaveAs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), "```output {for=hello exit=0}\nhello\n```") {
+	if !strings.Contains(noAt(got), "```output {for=hello exit=0}\nhello\n```") {
 		t.Errorf("the copy lacks the output:\n%s", got)
 	}
 	if orig, _ := os.ReadFile(file); string(orig) != src {

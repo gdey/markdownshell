@@ -396,13 +396,17 @@ func TestImageOutputRes(t *testing.T) {
 
 func TestWriteBackIsStable(t *testing.T) {
 	src := "#!/usr/bin/env mdsh\n# T\n\n```sh {#a}\necho '```'\necho err >&2\n```\n\n```sh {#m out=markdown}\necho '*hi*'\n```\n\ntext\n"
-	d, results := runDoc(t, src, run.Options{})
+	d, results := runDoc(t, src, run.Options{Now: fixedNow})
 	once := render.Markdown(d, results, render.Options{WriteBack: true})
 
-	d2, results2 := runDoc(t, string(once), run.Options{})
+	d2, results2 := runDoc(t, string(once), run.Options{Now: fixedNow})
 	twice := render.Markdown(d2, results2, render.Options{WriteBack: true})
 	if string(once) != string(twice) {
 		t.Errorf("not stable:\n--- once\n%s\n--- twice\n%s", once, twice)
+	}
+	// Saving again without a run keeps every output, at= and all.
+	if kept := render.Markdown(d2, nil, render.Options{WriteBack: true}); string(kept) != string(once) {
+		t.Errorf("save without a run changed the file:\n%s", kept)
 	}
 	if !strings.HasPrefix(string(once), "#!") {
 		t.Error("shebang dropped on write-back")

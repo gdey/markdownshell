@@ -101,7 +101,7 @@ func TestSetText(t *testing.T) {
 	if c := n.Cells()[1]; !strings.Contains(c.Output, "bye") {
 		t.Errorf("edited block output = %q", c.Output)
 	}
-	if !strings.Contains(n.Text(), "```output {for=hello exit=0}\nbye\n```") || !n.Cells()[1].Ran {
+	if !strings.Contains(noAt(n.Text()), "```output {for=hello exit=0}\nbye\n```") || !n.Cells()[1].Ran {
 		t.Errorf("after a run, the text should hold the output and results stay:\n%s", n.Text())
 	}
 	if !n.Dirty() {

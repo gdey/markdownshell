@@ -49,7 +49,7 @@ func TestInclude(t *testing.T) {
 		"```sh {<include file=a.sh}\n```\n\n" +
 		"```go {<include file=nope.go}\nkept\n```\n\n" +
 		"```go {<include file=nope.go skip}\n```\n"
-	d, results := runDoc(t, src, run.Options{Dir: dir})
+	d, results := runDoc(t, src, run.Options{Dir: dir, Now: fixedNow})
 	inc := results[1:]
 	// Includes are read even though the run stopped at a, and an sh
 	// include never runs.
@@ -78,7 +78,7 @@ func TestInclude(t *testing.T) {
 			t.Errorf("write-back missing %q:\n%s", want, once)
 		}
 	}
-	d2, results2 := runDoc(t, once, run.Options{Dir: dir})
+	d2, results2 := runDoc(t, once, run.Options{Dir: dir, Now: fixedNow})
 	if twice := string(render.Markdown(d2, results2, render.Options{WriteBack: true})); once != twice {
 		t.Errorf("not stable:\n--- once\n%s\n--- twice\n%s", once, twice)
 	}

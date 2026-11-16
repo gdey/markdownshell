@@ -301,7 +301,7 @@ func TestOutputTaskSaved(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved, _ := os.ReadFile(file)
-	if want := src + "\n<!-- mdsh:output for=\"t\" -->\n- [ ] a\n- [x] b\n<!-- /mdsh:output -->\n"; string(saved) != want {
+	if want := src + "\n<!-- mdsh:output for=\"t\" -->\n- [ ] a\n- [x] b\n<!-- /mdsh:output -->\n"; noAt(saved) != want {
 		t.Errorf("saved %q\nwant %q", saved, want)
 	}
 }
