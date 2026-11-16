@@ -327,7 +327,9 @@ mdsh -n --pdf report.pdf report.md              # the output saved by -w; nothin
 ```
 
 `--html FILE` writes the same view as a standalone HTML page instead, with
-local images inside it, so it can be sent on its own.
+local images inside it, so it can be sent on its own. HTML in the
+markdown, such as `<a href>` links, `<kbd>` or `<img>`, is kept, cleaned
+of scripts, styles and event handlers as GitHub cleans it.
 
 It's pure Go, with no external tools. Output shows in a terminal-style box,
 stderr in red, `out=screenshot` output as text, and `number_on` includes

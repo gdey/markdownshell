@@ -2,6 +2,7 @@ package notebook
 
 import (
 	"fmt"
+	"html"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -88,18 +89,43 @@ func remoteImage(link string) (string, bool) {
 
 // notLoaded is the note drawn in place of img, a remote image.
 func notLoaded(img *ast.Image, src []byte, host string) ast.Node {
+	e := ast.NewEmphasis(1)
+	e.SetAttributeString("class", []byte("remote-image"))
+	e.SetAttributeString("title", []byte(notLoadedTitle))
+	e.AppendChild(e, ast.NewString([]byte(notLoadedText(string(nodeText(img, src)), host))))
+	return e
+}
+
+const notLoadedTitle = "mdsh-gui doesn't load images from other sites"
+
+// notLoadedText is what the note for a remote image says.
+func notLoadedText(alt, host string) string {
 	what := "Image not loaded"
-	if alt := strings.TrimSpace(string(nodeText(img, src))); alt != "" {
+	if alt = strings.TrimSpace(alt); alt != "" {
 		what += ": " + alt
 	}
 	if host != "" {
 		what += " (from " + host + ")"
 	}
-	e := ast.NewEmphasis(1)
-	e.SetAttributeString("class", []byte("remote-image"))
-	e.SetAttributeString("title", []byte("mdsh-gui doesn't load images from other sites"))
-	e.AppendChild(e, ast.NewString([]byte(what)))
-	return e
+	return what
+}
+
+// rawImage is what an <img> written in the document's HTML loads, by
+// the rules docImages holds a markdown image to: a relative src is the
+// file beside the document, and a remote one isn't loaded, with the
+// same note drawn in its place. It runs while Cells holds n.mu.
+func (n *Notebook) rawImage(src, alt string) (string, string) {
+	if path, ok := beside(filepath.Dir(n.file), src); ok {
+		u := DocURL(path)
+		if _, frag, ok := strings.Cut(src, "#"); ok {
+			u += "#" + frag
+		}
+		return u, ""
+	}
+	if host, ok := remoteImage(src); ok {
+		return "", `<em class="remote-image" title="` + html.EscapeString(notLoadedTitle) + `">` + html.EscapeString(notLoadedText(alt, host)) + "</em>"
+	}
+	return src, ""
 }
 
 // nodeText is the plain text under n, such as an image's alt text.

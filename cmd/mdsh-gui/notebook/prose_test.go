@@ -287,3 +287,56 @@ func ranCell(cells []Cell, id string) bool {
 	}
 	return false
 }
+
+// Raw HTML in the prose is drawn, cleaned: a link written as <a href>
+// works and a script or handler in it doesn't.
+func TestProseRawHTML(t *testing.T) {
+	n, err := Open(write(t, "See <a href=\"https://example.com\" onclick=\"alert(1)\">the site</a>, press <kbd>q</kbd>.\n\n<script>alert(2)</script>\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var html string
+	for _, c := range n.Cells() {
+		html += c.HTML
+	}
+	for _, want := range []string{`<a href="https://example.com">the site</a>`, `<kbd>q</kbd>`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("no %s in %q", want, html)
+		}
+	}
+	for _, bad := range []string{"onclick", "<script", "alert(2)"} {
+		if strings.Contains(html, bad) {
+			t.Errorf("%s in %q", bad, html)
+		}
+	}
+}
+
+// An <img> in the prose loads by a markdown image's rules: beside the
+// document from the window's /doc route, and not at all from elsewhere.
+// An image map's areas are links.
+func TestProseRawImages(t *testing.T) {
+	src := "<img src=\"plan.png\" usemap=\"#m\" alt=\"Plan\">\n<map name=\"m\"><area shape=\"rect\" coords=\"0,0,5,5\" href=\"room.md\" alt=\"Room\"></map>\n\n<img src=\"https://example.com/t.png\" alt=\"Logo\">\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var html string
+	for _, c := range n.Cells() {
+		html += c.HTML
+	}
+	for _, want := range []string{
+		`<img src="` + DocPrefix,
+		`/plan.png" usemap="#m" alt="Plan">`,
+		`<map name="m"><area shape="rect" coords="0,0,5,5" href="room.md" alt="Room"></map>`,
+		`<em class="remote-image" title="mdsh-gui doesn&#39;t load images from other sites">Image not loaded: Logo (from example.com)</em>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("no %s in %q", want, html)
+		}
+	}
+	if strings.Contains(html, "example.com/t.png") {
+		t.Errorf("remote image loaded: %q", html)
+	}
+}

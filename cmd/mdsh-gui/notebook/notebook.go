@@ -21,6 +21,7 @@ import (
 
 	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/rawhtml"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 )
@@ -304,7 +305,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		lines:   newLineLog(d.Src),
 	}
 	n.idle = sync.NewCond(&n.mu)
-	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer(), diagramTransformer()), goldmark.WithRendererOptions(diagramRendererOption()))
+	n.md = goldmark.New(goldmark.WithExtensions(extension.GFM), goldmark.WithParserOptions(n.imageTransformer(), tableTaskTransformer(), diagramTransformer()), goldmark.WithRendererOptions(diagramRendererOption(), rawhtml.Option(rawhtml.Options{Image: n.rawImage})))
 	for i, b := range d.Blocks {
 		n.index[b] = i
 	}
