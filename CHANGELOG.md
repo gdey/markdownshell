@@ -6,6 +6,26 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-16
+
+mdsh learns to talk to web services. An `http` block makes one HTTP
+request, written the way it goes over the wire, checks the response in
+Hurl's words, and captures values for prose, conditions and later
+requests, with credential headers and secret captures saved masked;
+mdsh-gui and `mdsh -i` show its body and headers in tabs beside its
+checks. A block can now ask you a question while it runs with
+`mdsh ctl ask` and `mdsh ctl confirm`. 1.6's new look is Coffee, a
+coffee-stained sheet of cream paper on a wooden table. HTML written in
+markdown now draws, cleaned, in mdsh-gui and HTML reports, links,
+images and image maps included. An include's range can be dragged in
+the rendered view, saved output records when it ran with `at=`, and the
+History pane keeps the keyboard while a command runs. From the v1.5.0
+security review, a document now reaches only its own folder and no
+hidden files in it, a repository's `.git` folder is off limits, the
+cast player refuses oversized recordings, the mdsh link is no longer
+taken over by a copy of the app, and the site build checks its
+downloads. golang.org/x/net is updated for its HTML parser's fixes.
+
 ### Added
 
 - `http` blocks: a fence that makes one HTTP request, written the way
@@ -55,15 +75,7 @@ follow [Semantic Versioning](https://semver.org/).
   second (`at=2026-11-13T19:08:00Z`). It changes only when the block
   runs again, so the first save after upgrading stamps each block's
   output as it reruns. Output without `at=`, from an older mdsh, reads
-  as before. This is the first step of output history; the design is
-  in [docs/output-history/design.md](docs/output-history/design.md).
-
-- mdsh reads `history=N` on a block, and the earlier runs' outputs kept
-  under its current output as fences marked `history=K`. They belong to
-  the block: moving, deleting and renaming it carry them along, Clear
-  output removes them, saving keeps them, and printing shows only the
-  current output. One that isn't right under its block's output is an
-  error. Runs don't add to the history yet; that comes next.
+  as before.
 
 - `mdsh-gui`: a Coffee look in Settings › Look, in roast browns. The
   document is written on a sheet of old cream paper, splashed and
@@ -145,6 +157,13 @@ follow [Semantic Versioning](https://semver.org/).
   ![The History pane while "sleep 2; echo hi" runs: the dimmed prompt, "running 0.4s", and "abc" typed meanwhile in the focused input](docs/changelog/history-type-ahead.png)
 
 ### Security
+
+- golang.org/x/net is now v0.62.0, in mdsh and mdsh-gui alike. The HTML
+  that mdsh now draws from a document's markdown goes through its HTML
+  parser, which has had seven security fixes since the v0.33.0 mdsh
+  used (GO-2026-5025, 5027, 5028, 5029, 5030, 6860 and 6866), and its
+  HTTP/2 code one (GO-2026-4918). Finding 5 of the v1.6.0 security
+  review.
 
 - A document reaches only its own folder, and the folders under it, and
   no hidden file or folder in them (a name starting with a dot, such as
@@ -1795,7 +1814,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/gdey/markdownshell/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/gdey/markdownshell/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/gdey/markdownshell/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/gdey/markdownshell/compare/v1.3.0...v1.4.0
