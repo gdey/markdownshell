@@ -57,5 +57,17 @@ export const generated: Look[] = [
       "rules": "Stars and moons",
       "shadows": "Glow around cards"
     }
+  },
+  {
+    "id": "coffee",
+    "name": "Coffee",
+    "description": "Coffee writes the document on a sheet of old cream paper, splashed and ringed with coffee, lying on a wooden table beside a cup on a red saucer, with typewriter headings, or on dark-roast paper by a cup of black coffee when the theme is dark.",
+    "textSize": 100,
+    "texture": {
+      "label": "Café table",
+      "sprockets": "Cup and saucer",
+      "rules": "Coffee stains",
+      "shadows": "Shadows under cards"
+    }
   }
 ];

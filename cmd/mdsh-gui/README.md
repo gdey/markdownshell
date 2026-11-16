@@ -595,6 +595,14 @@ About tab with the version, build, paths and tools.
 
 ![Settings › Look with Witchcraft chosen: the stars and moons and the glow around cards can be turned off](../../site/static/images/gui/witchcraft-settings-look.png)
 
+**Coffee**, since 1.6. Coffee writes the document on a sheet of old cream paper, splashed and ringed with coffee, lying on a wooden table beside a cup on a red saucer, with typewriter headings, or on dark-roast paper by a cup of black coffee when the theme is dark.
+
+![The deploy runbook in the Coffee look: coffee-stained cream paper on a wooden table, a latte on a red saucer at its corner, with ship asking to run](../../site/static/images/gui/coffee-light.png)
+
+![The Coffee look with the dark theme: dark-roast paper on a night-dark table by a cup of black coffee](../../site/static/images/gui/coffee-dark.png)
+
+![Settings › Look with Coffee chosen: the cup and saucer, the coffee stains and the shadows under cards can be turned off](../../site/static/images/gui/coffee-settings-look.png)
+
 <!-- end looks -->
 
 ## Install
