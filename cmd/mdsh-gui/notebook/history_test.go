@@ -82,7 +82,7 @@ func TestHistory(t *testing.T) {
 		"```sh {#history-3 skip links}\nfalse\n```\n\n" +
 		"```output {for=history-3 exit=1}\n```\n\n" +
 		"```sh {#history-4 skip links tty}\nprintf '\\033[?1049hfull\\033[?1049l'\n```\n"
-	got := n.Text()
+	got := noAt(n.Text())
 	if !strings.HasPrefix(got, want) {
 		t.Errorf("text =\n%s\nwant it to start\n%s", got, want)
 	}
@@ -104,7 +104,7 @@ func TestHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved, _ := os.ReadFile(file)
-	if string(saved) != got {
+	if noAt(saved) != got {
 		t.Error("saved file differs from the text")
 	}
 }
@@ -281,7 +281,7 @@ func TestHistoryBackground(t *testing.T) {
 			t.Fatalf("background output never came: %s", n.Text())
 		}
 	}
-	if !strings.Contains(n.Text(), "{for=history-1 exit=0}\nlater\n") {
+	if !strings.Contains(noAt(n.Text()), "{for=history-1 exit=0}\nlater\n") {
 		t.Errorf("text = %s", n.Text())
 	}
 }
