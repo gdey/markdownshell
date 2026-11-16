@@ -27,6 +27,11 @@ func Curl(r *Request) string {
 		}
 		u += sep + q.Encode()
 	}
+	// --url keeps a URL that starts with - from reading as an option
+	// when the line is pasted.
+	if strings.HasPrefix(u, "-") {
+		args = append(args, "--url")
+	}
 	args = append(args, shellQuote(u))
 	for _, h := range r.Headers {
 		args = append(args, "-H", shellQuote(h.Name+": "+h.Value))
