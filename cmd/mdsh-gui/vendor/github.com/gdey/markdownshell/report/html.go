@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gdey/markdownshell/docroot"
+	"github.com/gdey/markdownshell/rawhtml"
 	"github.com/gdey/markdownshell/termrec"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -23,14 +24,15 @@ import (
 // exitRE finds an output fence's exit status.
 var exitRE = regexp.MustCompile(`\bexit=(\d+)`)
 
-// page lays md out as a standalone HTML page. Raw HTML in md is left
-// out, as GitHub leaves out what it doesn't allow, and local images are
+// page lays md out as a standalone HTML page. Raw HTML in md is cleaned
+// by rawhtml, as GitHub cleans it, and local images are
 // put inside the page as data: URIs, so the file can be sent on its own.
 func page(md []byte, opts Options) ([]byte, error) {
+	imgs := newImages(opts)
 	gm := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(parser.WithASTTransformers(util.Prioritized(newImages(opts), 100))),
-		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(fences{}, 100))),
+		goldmark.WithParserOptions(parser.WithASTTransformers(util.Prioritized(imgs, 100))),
+		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(fences{}, 100)), rawhtml.Option(rawhtml.Options{Image: imgs.raw})),
 	)
 	var body bytes.Buffer
 	if err := gm.Convert(stripFrontMatter(md), &body); err != nil {
@@ -152,6 +154,16 @@ func (t images) Transform(root *ast.Document, _ text.Reader, _ parser.Context) {
 		}
 		return ast.WalkContinue, nil
 	})
+}
+
+// raw is what an <img> written in the document's HTML loads: a local
+// image inside the page, as for a markdown image, and anything else as
+// it was written.
+func (t images) raw(src, _ string) (string, string) {
+	if uri := t.inline(src); uri != "" {
+		return uri, ""
+	}
+	return src, ""
 }
 
 func (t images) inline(dest string) string {

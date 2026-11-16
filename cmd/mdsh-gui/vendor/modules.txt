@@ -25,6 +25,10 @@ github.com/andybalholm/brotli/matchfinder
 # github.com/andybalholm/cascadia v1.3.2
 ## explicit; go 1.16
 github.com/andybalholm/cascadia
+# github.com/aymerick/douceur v0.2.0
+## explicit
+github.com/aymerick/douceur/css
+github.com/aymerick/douceur/parser
 # github.com/coder/websocket v1.8.14
 ## explicit; go 1.23
 github.com/coder/websocket
@@ -91,6 +95,7 @@ github.com/gdey/markdownshell/httpblock
 github.com/gdey/markdownshell/library
 github.com/gdey/markdownshell/lsp
 github.com/gdey/markdownshell/pdf
+github.com/gdey/markdownshell/rawhtml
 github.com/gdey/markdownshell/render
 github.com/gdey/markdownshell/report
 github.com/gdey/markdownshell/run
@@ -123,6 +128,9 @@ github.com/golang/freetype/truetype
 # github.com/google/pprof v0.0.0-20240927180334-d43a67379298
 ## explicit; go 1.22
 github.com/google/pprof/profile
+# github.com/gorilla/css v1.0.1
+## explicit; go 1.20
+github.com/gorilla/css/scanner
 # github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02
 ## explicit; go 1.14
 github.com/hinshun/vt10x
@@ -140,6 +148,10 @@ github.com/mattn/go-isatty
 # github.com/mazznoer/csscolorparser v0.1.5
 ## explicit; go 1.12
 github.com/mazznoer/csscolorparser
+# github.com/microcosm-cc/bluemonday v1.0.27
+## explicit; go 1.19
+github.com/microcosm-cc/bluemonday
+github.com/microcosm-cc/bluemonday/css
 # github.com/neovim/go-client v1.2.1
 ## explicit; go 1.15
 github.com/neovim/go-client/msgpack

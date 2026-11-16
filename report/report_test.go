@@ -24,7 +24,7 @@ title: t
 
 Value: {{#a}}.
 
-` + "```sh {#a}\necho hi\n```\n\n```sh {#b}\necho bad >&2; exit 3\n```\n\n![shot](shot.png) ![web](https://example.com/x.png)\n\n<script>alert(1)</script>\n"
+` + "```sh {#a}\necho hi\n```\n\n```sh {#b}\necho bad >&2; exit 3\n```\n\n![shot](shot.png) ![web](https://example.com/x.png)\n\n<script>alert(1)</script>\n\nSee <a href=\"https://example.com/\" onclick=\"x()\">the site</a>.\n\n<img src=\"shot.png\" alt=\"raw\" width=\"50\">\n"
 
 func results(t *testing.T, d *doc.Document) []*run.Result {
 	t.Helper()
@@ -67,12 +67,15 @@ func TestRender(t *testing.T) {
 		`<figure class="output stderr"><pre><code>bad`,
 		`src="data:image/png;base64,`,
 		`src="https://example.com/x.png"`,
+		`See <a href="https://example.com/">the site</a>.`,
+		`<img src="data:image/png;base64,`,
+		`alt="raw" width="50">`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("page lacks %q:\n%s", want, s)
 		}
 	}
-	if strings.Contains(s, "title: t") || strings.Contains(s, "<script>") {
+	if strings.Contains(s, "title: t") || strings.Contains(s, "<script>") || strings.Contains(s, "onclick") {
 		t.Errorf("page has front matter or raw HTML:\n%s", s)
 	}
 

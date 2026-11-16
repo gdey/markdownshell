@@ -88,6 +88,27 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- In mdsh-gui's rendered view, the grip that drags a textbox or choice
+  to another spot sits on the line of its name, just before it, rather
+  than on a line of its own above the name.
+
+  ![A textbox named host with its grip just left of the name, a radio choice env under it, and a sh block](docs/changelog/input-grip.png)
+
+- HTML written in a document's markdown now shows in mdsh-gui's rendered
+  view and in `mdsh --html` reports, as CommonMark allows, instead of
+  being left out. A link written as `<a href="...">` works like a
+  markdown one, and `<kbd>`, `<sub>`, `<sup>`, `<details>`,
+  `<p align="center">` and the other formatting tags GitHub allows draw
+  as they do there. `<img>` loads by a markdown image's rules: in
+  mdsh-gui, from beside the document, with a note in place of an image
+  from another site; in a report, inside the page. Image maps work too,
+  and each `<area>` is followed like a link. HTML is cleaned first:
+  scripts, styles, event handlers, forms, frames, `id` and `class`
+  attributes, and links and images other than http:, https:, mailto:
+  and relative ones are taken out.
+
+  ![A document in mdsh-gui with an <a> link, <kbd>, <sub> and <sup>, a centered image map, a note for an image from another site, and a <details> summary all drawn](docs/changelog/raw-html.png)
+
 - Pressing enter in mdsh-gui's History pane no longer sends the keys you
   type next to the rendered view. While a command typed there runs, the
   input used to give its place to the run's clock, and hiding it dropped

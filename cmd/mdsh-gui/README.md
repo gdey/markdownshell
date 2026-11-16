@@ -282,7 +282,11 @@ Each file opens in a tab of its own, with its own shells.
   heading. Any other file is shown in Finder (or the file manager), not
   opened, so a link can't run a script or an app; Settings › Files lists
   the file types, such as `pdf`, that open in the system's app for them
-  instead. Right-click a link to open or copy it.
+  instead. Right-click a link to open or copy it. Links written in HTML,
+  as `<a href="...">`, and the areas of an image map work the same.
+  HTML in the markdown is drawn cleaned, without scripts, styles or
+  handlers, and an `<img>` loads only from beside the document, as a
+  markdown image does.
 - **Source view** (the `<>` button or cmd/ctrl+\\): the whole file in a
   markdown editor beside the rendered view. Typing re-renders after a
   pause, and the two scroll together; clicking a block lines the source

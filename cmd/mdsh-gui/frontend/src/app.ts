@@ -775,7 +775,7 @@ function guessHeight(c: Cell): number {
 // markdown in the source pane, except on a link, which followLinks
 // follows.
 function drawProse(c: Cell): HTMLElement {
-  // goldmark's HTML, with raw HTML in the markdown left out.
+  // goldmark's HTML, with raw HTML in the markdown cleaned (rawhtml).
   const s = el("section", { className: "prose" + (c.hidden ? " hidden-block" : ""), innerHTML: c.html ?? "", title: "Click to show it in the source" });
   if (c.hidden) s.prepend(hiddenBadge(c.hidden));
   highlightProse(s);
@@ -1705,10 +1705,11 @@ async function foldsToRendered() {
 // followLinks makes a click on a link in the rendered view follow it,
 // rather than load it over the app's page: a web address opens in the
 // browser, a markdown file in a new tab and a heading in this document
-// scrolls into view. A right-click gets the link menu (menu.go), with
-// the link's href as its data.
+// scrolls into view. An image map's areas, from HTML in the document,
+// are links too. A right-click gets the link menu (menu.go), with the
+// link's href as its data.
 function followLinks() {
-  const link = (e: Event) => (e.target as HTMLElement).closest<HTMLAnchorElement>("#doc a[href]");
+  const link = (e: Event) => (e.target as HTMLElement).closest<HTMLAnchorElement | HTMLAreaElement>("#doc a[href], #doc area[href]");
   document.addEventListener(
     "click",
     (e) => {
@@ -1719,7 +1720,7 @@ function followLinks() {
       const href = a.getAttribute("href")!;
       if (href.startsWith("#")) return void scrollToHeading(href.slice(1));
       App.OpenLink(href)
-        .then((src) => src && viewSrc(src, a.textContent ?? ""))
+        .then((src) => src && viewSrc(src, a instanceof HTMLAreaElement ? a.alt : (a.textContent ?? "")))
         .catch(fail);
     },
     true,
