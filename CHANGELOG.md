@@ -27,8 +27,11 @@ follow [Semantic Versioning](https://semver.org/).
   is saved bare. A failed check fails the block with one line on
   stderr, so `on_error`, `depends=` and `{{#id/?}}` work as for any
   block. The audit log records the method, the URL as written, the
-  status and each check, never headers or bodies. `raw` keeps a JSON
-  body as it came.
+  status and each check, never headers or bodies; a request that gets
+  no response reports its error with the URL's scheme and host only,
+  and a failed check on a credential header reports `(secret)`, so
+  neither the saved file nor the log holds a filled-in placeholder.
+  `raw` keeps a JSON body as it came.
 
   In mdsh-gui an http block's card shows the response's status next
   to its exit status, the body and the headers as two tabs, body first,
