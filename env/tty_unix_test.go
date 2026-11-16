@@ -357,6 +357,10 @@ func TestRunTerminalReadsStdout(t *testing.T) {
 // path, as tty prints it, not /dev/tty. On macOS a descriptor opened
 // through /dev/tty names itself /dev/tty, and tmux won't run on that
 // ("open terminal failed: can't use /dev/tty").
+//
+// Each tty is followed by an echo, since the tty in Ubuntu 26.04 (from
+// uutils coreutils, before uutils/coreutils#10239 was fixed) prints the
+// name with no newline after it.
 func TestRunTerminalTTYName(t *testing.T) {
 	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
 	if err != nil {
@@ -366,7 +370,7 @@ func TestRunTerminalTTYName(t *testing.T) {
 	var rec bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	status, _, err := sh.RunTerminal(ctx, "tty; tty <&1; tty <&2", Terminal{Out: io.Discard}, &rec)
+	status, _, err := sh.RunTerminal(ctx, "tty; echo; tty <&1; echo; tty <&2; echo", Terminal{Out: io.Discard}, &rec)
 	if err != nil || status != 0 {
 		t.Fatalf("status %d, err %v, recorded %q", status, err, rec.String())
 	}
