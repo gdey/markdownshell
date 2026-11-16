@@ -67,7 +67,7 @@ func TestHTTPBlocks(t *testing.T) {
 	if got := string(r["anon"].Stderr); r["anon"].Status != 1 || got != "assert jsonpath $.user == \"j\": got \"guest\"\n" {
 		t.Errorf("anon: status %d, stderr %q", r["anon"].Status, got)
 	}
-	out := string(render.Markdown(d, results, render.Options{WriteBack: true}))
+	out := noAt(string(render.Markdown(d, results, render.Options{WriteBack: true})))
 	for _, want := range []string{
 		"```output {for=login exit=0}\nHTTP/1.1 201 Created\n",
 		"Set-Cookie: (secret)\n",

@@ -53,7 +53,7 @@ func TestDependsYes(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "d.md")
 	os.WriteFile(f, []byte("```sh {#deploy depends=build}\necho deploy\n```\n\n```sh {#build}\necho built\n```\n"), 0o644)
 	var out, errb bytes.Buffer
-	if rc := mdsh([]string{"--yes", "--no-color", f}, nil, &out, &errb); rc != 0 || strings.Count(out.String(), "```output {for=build exit=0}\nbuilt\n") != 1 || !strings.Contains(out.String(), "```output {for=deploy exit=0}\ndeploy\n") {
+	if rc := mdsh([]string{"--yes", "--no-color", f}, nil, &out, &errb); rc != 0 || strings.Count(noAt(out.String()), "```output {for=build exit=0}\nbuilt\n") != 1 || !strings.Contains(noAt(out.String()), "```output {for=deploy exit=0}\ndeploy\n") {
 		t.Errorf("--yes: rc = %d, stdout %s, stderr %s", rc, out.String(), errb.String())
 	}
 }
@@ -66,7 +66,7 @@ func TestDependsYesSkip(t *testing.T) {
 	os.WriteFile(f, []byte("```sh {#setup skip}\necho set up\n```\n\n```sh {#main depends=setup}\necho main\n```\n"), 0o644)
 	var out, errb bytes.Buffer
 	rc := mdsh([]string{"--yes", "--no-color", f}, nil, &out, &errb)
-	if rc != 0 || strings.Contains(out.String(), "for=setup") || !strings.Contains(out.String(), "```output {for=main exit=0}\nmain\n") {
+	if rc != 0 || strings.Contains(out.String(), "for=setup") || !strings.Contains(noAt(out.String()), "```output {for=main exit=0}\nmain\n") {
 		t.Errorf("rc = %d, stdout %s", rc, out.String())
 	}
 	if want := "main depends on setup, which is marked skip; going on without running it"; !strings.Contains(errb.String(), want) {
@@ -217,7 +217,7 @@ func TestWriteNamesBlocks(t *testing.T) {
 	if rc := mdsh([]string{"-o", filepath.Join(dir, "out.md"), f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
 		t.Fatalf("-o: rc = %d: %s", rc, errb.String())
 	}
-	if got, _ := os.ReadFile(filepath.Join(dir, "out.md")); !strings.Contains(string(got), "```output {for=block-1 exit=0}") {
+	if got, _ := os.ReadFile(filepath.Join(dir, "out.md")); !strings.Contains(noAt(got), "```output {for=block-1 exit=0}") {
 		t.Errorf("-o wrote:\n%s", got)
 	}
 	if rc := mdsh([]string{"-w", f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
@@ -227,7 +227,7 @@ func TestWriteNamesBlocks(t *testing.T) {
 		t.Errorf("stderr = %q", errb.String())
 	}
 	got, _ := os.ReadFile(f)
-	m := regexp.MustCompile("^```sh \\{#(block-[0-9a-f-]{36})\\}\necho hi\n```\n\n```output \\{for=(block-[0-9a-f-]{36}) exit=0\\}\nhi\n```\n\n```sh \\{#a\\}\n").FindStringSubmatch(string(got))
+	m := regexp.MustCompile("^```sh \\{#(block-[0-9a-f-]{36})\\}\necho hi\n```\n\n```output \\{for=(block-[0-9a-f-]{36}) exit=0\\}\nhi\n```\n\n```sh \\{#a\\}\n").FindStringSubmatch(noAt(got))
 	if m == nil || m[1] != m[2] {
 		t.Fatalf("-w wrote:\n%s", got)
 	}
@@ -235,7 +235,7 @@ func TestWriteNamesBlocks(t *testing.T) {
 	if rc := mdsh([]string{"-w", f}, nil, &bytes.Buffer{}, &errb); rc != 0 {
 		t.Fatalf("-w again: rc = %d", rc)
 	}
-	if again, _ := os.ReadFile(f); string(again) != string(got) {
+	if again, _ := os.ReadFile(f); noAt(again) != noAt(got) {
 		t.Errorf("second -w changed the file:\n%s", again)
 	}
 }
@@ -326,7 +326,7 @@ func TestOutputFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"```output {for=a exit=0}\nhi\n```", "![s](../in.md.assets/s.svg)"} {
-		if !strings.Contains(string(b), want) {
+		if !strings.Contains(noAt(b), want) {
 			t.Errorf("output missing %q:\n%s", want, b)
 		}
 	}
@@ -391,7 +391,7 @@ func TestIncludeExample(t *testing.T) {
 	if rc := mdsh([]string{"-o", out, filepath.Join(dir, "include.md")}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
 	}
-	if got, _ := os.ReadFile(out); string(got) != string(want) {
+	if got, _ := os.ReadFile(out); noAt(got) != noAt(want) {
 		t.Errorf("examples/include.md is stale; run mdsh -w on it. Got:\n%s", got)
 	}
 }
@@ -483,7 +483,7 @@ func TestPDF(t *testing.T) {
 	if rc := mdsh([]string{"-o", md, "--pdf", out, in}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc = %d, stderr %s", rc, stderr.String())
 	}
-	if b, _ := os.ReadFile(md); !strings.Contains(string(b), "```output {for=a exit=0}\nhi\n```") {
+	if b, _ := os.ReadFile(md); !strings.Contains(noAt(b), "```output {for=a exit=0}\nhi\n```") {
 		t.Errorf("out.md = %s", b)
 	}
 	if b, _ := os.ReadFile(out); !bytes.HasPrefix(b, []byte("%PDF-")) {
@@ -591,7 +591,7 @@ func TestWriteCopies(t *testing.T) {
 	}
 	got, _ := os.ReadFile(f)
 	want := "---\nmdsh:\n  env:\n    share: [N]\n---\n```sh {#a}\necho \"$N\"\n```\n\n```output {for=a exit=0}\n2\n```\n\n## Summary\n\n```output {for=a exit=0}\n2\n```\n\n```output {for=gone exit=0}\nx\n```\n"
-	if string(got) != want {
+	if noAt(got) != want {
 		t.Errorf("file:\ngot  %q\nwant %q", got, want)
 	}
 }

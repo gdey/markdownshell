@@ -354,3 +354,48 @@ func TestMaskSecrets(t *testing.T) {
 		t.Errorf("write-back masked the code:\n%s", got)
 	}
 }
+
+// TestAtStamp checks that a run's start time is written as at= on its
+// output: on the stdout fence or region, else on the stderr fence; and
+// that a result with no start time is written without one.
+func TestAtStamp(t *testing.T) {
+	src := "```sh {#a}\necho a\n```\n\n```sh {#m out=markdown}\necho m\n```\n\n```sh {#e show-stderr}\necho e >&2\n```\n\n```sh {#both show-stderr}\necho o; echo e >&2; false\n```\n\n```sh {#old}\necho old\n```\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 11, 13, 19, 8, 0, 0, time.UTC)
+	results := []*run.Result{
+		{Block: d.Blocks[0], Ran: true, Start: at, Stdout: []byte("a\n")},
+		{Block: d.Blocks[1], Ran: true, Start: at, Stdout: []byte("*m*\n")},
+		{Block: d.Blocks[2], Ran: true, Start: at, Stderr: []byte("e\n")},
+		{Block: d.Blocks[3], Ran: true, Start: at, Stdout: []byte("o\n"), Stderr: []byte("e\n"), Status: 1},
+		{Block: d.Blocks[4], Ran: true, Stdout: []byte("old\n")},
+	}
+	got := string(Markdown(d, results, Options{WriteBack: true}))
+	for _, want := range []string{
+		"```output {for=a exit=0 at=2026-11-13T19:08:00Z}\na\n```\n",
+		"<!-- mdsh:output for=\"m\" at=\"2026-11-13T19:08:00Z\" -->\n*m*\n<!-- /mdsh:output -->\n",
+		"```output {for=e stream=stderr at=2026-11-13T19:08:00Z}\ne\n```\n",
+		"```output {for=both exit=1 at=2026-11-13T19:08:00Z}\no\n```\n\n```output {for=both stream=stderr}\ne\n```\n",
+		"```output {for=old exit=0}\nold\n```\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+
+	// The stamped file parses back with each output still its block's.
+	again, err := doc.Parse([]byte(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again.Copies) != 0 {
+		t.Errorf("stamped outputs read as %d copies", len(again.Copies))
+	}
+	for _, b := range again.Blocks {
+		if !b.HasOutput() {
+			t.Errorf("%s lost its output", b.ID)
+		}
+	}
+}

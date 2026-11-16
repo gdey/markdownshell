@@ -95,14 +95,21 @@ func pump(t *testing.T, m *Model) {
 	}
 }
 
+// read returns file's text with the at= stamps on its outputs dropped,
+// since a test can't know when its blocks ran.
 func read(t *testing.T, file string) string {
 	t.Helper()
 	b, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(b)
+	return noAt(string(b))
 }
+
+// atStamp matches the at= a run stamps on its output.
+var atStamp = regexp.MustCompile(` at="?\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"?`)
+
+func noAt(s string) string { return atStamp.ReplaceAllString(s, "") }
 
 const twoBlocks = "# Title\n\n```sh {#one}\nX=hi; echo $X\n```\n\nSome prose.\n\n```sh {#two}\necho \"$X again\"\n```\n"
 
@@ -884,7 +891,7 @@ func TestEditFile(t *testing.T) {
 	pump(t, m)
 	press(m, "j")
 	text, line := m.fileText()
-	if !strings.Contains(text, "{for=one exit=0}\nhi\n") {
+	if !strings.Contains(noAt(text), "{for=one exit=0}\nhi\n") {
 		t.Fatalf("the editor doesn't get the output not saved:\n%s", text)
 	}
 	if got := strings.Split(text, "\n")[line-1]; got != "```sh {#two}" {
