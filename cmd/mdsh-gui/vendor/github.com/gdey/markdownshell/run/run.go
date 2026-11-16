@@ -23,6 +23,7 @@ import (
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/httpblock"
 	"github.com/gdey/markdownshell/tape"
 	"github.com/gdey/markdownshell/termrec"
 	"github.com/gdey/markdownshell/textimg"
@@ -30,6 +31,9 @@ import (
 
 // Options control a run.
 type Options struct {
+	// HTTPTransport, if set, makes http blocks' requests instead of a
+	// transport with the system's proxy and certificates. Tests use it.
+	HTTPTransport http.RoundTripper
 	// File is the document's path, used for MDSH_FILE and image paths.
 	// Empty when the document came from stdin.
 	File string
@@ -266,6 +270,13 @@ type Result struct {
 	// TimedOut is true when the block's timeout= ended it, which stops
 	// the run.
 	TimedOut bool
+	// Request is an http block's request as written, placeholders and
+	// all, and HTTP what came back, with its checks' results. HTTP
+	// holds the headers unmasked: a view masks them as the output does
+	// (see httpblock.Format). Both are nil for other blocks, and HTTP
+	// is nil when the request got no response.
+	Request *httpblock.Request
+	HTTP    *httpblock.Response
 }
 
 // Failed reports whether the block ran and did not succeed.
@@ -281,7 +292,13 @@ func (r *Result) ExitStatus() int {
 }
 
 // Runnable reports whether mdsh knows how to run b.
-func Runnable(b *doc.Block) bool { return (b.Lang == "sh" || b.Lang == "zsh") && !b.IsInclude() }
+func Runnable(b *doc.Block) bool {
+	return (b.Lang == "sh" || b.Lang == "zsh" || b.Lang == httpblock.Lang) && !b.IsInclude()
+}
+
+// UsesShell reports whether b runs in a shell: it is runnable and not
+// an http block, which mdsh runs itself.
+func UsesShell(b *doc.Block) bool { return Runnable(b) && !b.IsHTTP() }
 
 // Shell is the shell d's blocks run in: the front matter's shell, else
 // zsh if any block is a zsh block, else "" for the default /bin/sh.
@@ -343,6 +360,15 @@ func NewLookup(d *doc.Document, results []*Result, environ []string) doc.Lookup 
 		}
 		for _, r := range results {
 			if r != nil && r.Block.ID == ref.BlockID && (r.Ran || ref.Var == doc.Ran) {
+				if ref.Response() {
+					if r.HTTP == nil {
+						break
+					}
+					if v, ok := r.HTTP.Lookup(ref.Fn, ref.Var); ok {
+						return v, true
+					}
+					return "", true
+				}
 				if v, ok := r.fact(ref); ok {
 					return v, true
 				}

@@ -15,7 +15,24 @@ import (
 type Ref struct {
 	BlockID string
 	Var     string
+	// Fn is set for a ref to an http block's response, with Var its
+	// argument: "json" ({{#login/json($.token)}}, Var the path),
+	// "header" ({{#login/header(Content-Type)}}, Var the name) or
+	// "status" ({{#login/status}}, Var empty). It is empty for a
+	// variable or a block fact.
+	Fn string
 }
+
+// Response functions, which read an http block's response.
+const (
+	FnJSON   = "json"
+	FnHeader = "header"
+	FnStatus = "status"
+)
+
+// Response reports whether r reads an http block's response rather
+// than a variable or a fact.
+func (r Ref) Response() bool { return r.Fn != "" }
 
 // Block facts, which end in ? so they can't clash with shell variables.
 const (
@@ -25,7 +42,7 @@ const (
 )
 
 // Fact reports whether r is a block fact rather than a variable.
-func (r Ref) Fact() bool { return strings.HasSuffix(r.Var, "?") }
+func (r Ref) Fact() bool { return r.Fn == "" && strings.HasSuffix(r.Var, "?") }
 
 // Caller reports whether r is {{$VAR}} for a variable in mdsh's own
 // environment: not a block's variable, a block fact or an input's var=.
@@ -40,6 +57,10 @@ func (r Ref) String() string {
 	switch {
 	case r.BlockID == "":
 		return "{{$" + r.Var + "}}"
+	case r.Fn == FnStatus:
+		return "{{#" + r.BlockID + "/status}}"
+	case r.Fn != "":
+		return "{{#" + r.BlockID + "/" + r.Fn + "(" + r.Var + ")}}"
 	case r.Fact():
 		return "{{#" + r.BlockID + "/" + r.Var + "}}"
 	}
@@ -52,8 +73,15 @@ func newRef(dollar, block, tail string) Ref {
 	if block == "" {
 		return Ref{Var: dollar}
 	}
-	if strings.HasSuffix(tail, "?") {
+	switch {
+	case strings.HasSuffix(tail, "?"):
 		return Ref{BlockID: block, Var: tail}
+	case tail == FnStatus:
+		return Ref{BlockID: block, Fn: FnStatus}
+	case strings.HasPrefix(tail, FnJSON+"("):
+		return Ref{BlockID: block, Fn: FnJSON, Var: tail[len(FnJSON)+1 : len(tail)-1]}
+	case strings.HasPrefix(tail, FnHeader+"("):
+		return Ref{BlockID: block, Fn: FnHeader, Var: tail[len(FnHeader)+1 : len(tail)-1]}
 	}
 	return Ref{BlockID: block, Var: tail[len("env(") : len(tail)-1]}
 }
@@ -70,6 +98,8 @@ type Lookup func(Ref) (value string, ok bool)
 //	{{#build/?}}!=0               block build's exit status
 //	{{#build/err?}}               the same; true when build failed
 //	{{$ran?}}, {{#build/ran?}}    whether the block ran
+//	{{#login/status}}==201        an http block's response status;
+//	                              json($.path) and header(Name) too
 //	true, false                   constants
 //	once                          in run= only: the block has no output yet
 type Cond struct {
@@ -86,7 +116,7 @@ type Cond struct {
 
 var (
 	facts   = `\?|err\?|ran\?`
-	refBody = `(?:\$(` + facts + `|[A-Za-z_][A-Za-z0-9_]*)|#([^/{}\s]+)/(env\([A-Za-z_][A-Za-z0-9_]*\)|` + facts + `))`
+	refBody = `(?:\$(` + facts + `|[A-Za-z_][A-Za-z0-9_]*)|#([^/{}\s]+)/(env\([A-Za-z_][A-Za-z0-9_]*\)|json\(\$[^{}\s"]*\)|header\([!#$%&'*+.^_|~0-9A-Za-z-]+\)|status|` + facts + `))`
 	condRE  = regexp.MustCompile(`^(!?)\{\{` + refBody + `\}\}(?:(==|!=)(.*))?$`)
 )
 
@@ -107,7 +137,7 @@ func ParseCond(s string) (Cond, error) {
 	}
 	m := condRE.FindStringSubmatch(s)
 	if m == nil {
-		return c, fmt.Errorf("bad condition %q: want {{$VAR}}, {{#block/env(VAR)}}, {{$?}}, {{$ran?}} or a block's {{#block/?}} or {{#block/ran?}}, optionally with ==value or !=value, or true, false or once", s)
+		return c, fmt.Errorf("bad condition %q: want {{$VAR}}, {{#block/env(VAR)}}, {{$?}}, {{$ran?}}, a block's {{#block/?}} or {{#block/ran?}}, or an http block's {{#block/status}}, {{#block/json($.path)}} or {{#block/header(Name)}}, optionally with ==value or !=value, or true, false or once", s)
 	}
 	c.Not = m[1] == "!"
 	ref := newRef(m[2], m[3], m[4])
@@ -231,10 +261,11 @@ func (d *Document) Refs() []Ref {
 			refs = append(refs, *f.Cond.Ref)
 		}
 	}
-	// An included tape's lines are read when the document runs; see
-	// run.Run.
+	// A tape's input and an http block's request fill in placeholders
+	// as they run. An included tape's lines are read when the document
+	// runs; see run.Run.
 	for _, b := range d.Blocks {
-		if b.IsTape() && !b.IsInclude() {
+		if b.IsTape() && !b.IsInclude() || b.IsHTTP() {
 			refs = append(refs, TextRefs(b.Body)...)
 		}
 	}

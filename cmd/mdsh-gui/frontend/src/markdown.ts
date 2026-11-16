@@ -363,12 +363,13 @@ const actions: Action[] = [
   { name: "fence", icon: "fence", title: "Code block", run: insertBlock("```\n$SEL\n```", "$SEL") },
 ];
 
-// The mdsh block button offers a plain block, one marked confirm, a
-// textbox and a choice.
+// The mdsh block button offers a plain block, one marked confirm, an
+// http request, a textbox and a choice.
 const mdshBlocks: { name: string; label: string; text: string }[] = [
   { name: "sh", label: "sh block", text: "```sh {#id}\n$SEL\n```" },
   { name: "sh-confirm", label: "sh block, confirm first", text: "```sh {#id confirm}\n$SEL\n```" },
   { name: "zsh", label: "zsh block", text: "```zsh {#id}\n$SEL\n```" },
+  { name: "http", label: "http request", text: "```http {#id}\nGET https://$SEL\n\nHTTP 200\n[Asserts]\nheader Content-Type contains json\n```" },
   { name: "textbox", label: "textbox", text: "```textbox {#id lines=1}\n$SEL\n```" },
   { name: "choice", label: "choice", text: "```choice {#id mode=dropdown}\n- [ ] one\n- [ ] two\n```" },
 ];

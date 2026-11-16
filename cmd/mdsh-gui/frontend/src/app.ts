@@ -26,6 +26,7 @@ import { runGutter, setRunLines } from "./rungutter.js";
 import { secretMask, setSecretLines } from "./secretmask.js";
 import { textboxGrip } from "./textbox.js";
 import { includeControls } from "./include.js";
+import { drawHTTP, statusBadge } from "./http.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
@@ -847,6 +848,20 @@ async function copyCode(code: string, name: string, secret = false) {
   status("Copied " + (name ? name + ", " : "") + n + (n === 1 ? " line" : " lines") + (secret ? secretNote() : ""));
 }
 
+// copyCurl puts http block c's request on the clipboard as a curl
+// command line, with its placeholders filled in. It may hold a secret,
+// so it is copied as one.
+async function copyCurl(c: Cell) {
+  let text: string;
+  try {
+    text = await App.Curl(c.block);
+    await setClipboard(text, true);
+  } catch (err) {
+    return status("couldn't copy as curl: " + message(err));
+  }
+  status("Copied " + (c.name ?? c.id ?? "the request") + " as curl" + secretNote());
+}
+
 // copyOutputButton copies the block's output as text.
 function copyOutputButton(block: HTMLElement, c: Cell): HTMLButtonElement {
   const b = iconButton("copy", "Copy this block's output", () => void copyOutput(block, c));
@@ -1193,10 +1208,12 @@ function drawBlock(c: Cell): HTMLElement {
       c.hidden ? hiddenBadge(c.hidden) : "",
       c.stale ? el("span", { className: "stale-badge", title: staleNote }, "stale") : "",
       c.nosave ? nosaveBadge("block") : "",
+      c.http?.status ? statusBadge(c.http) : "",
       exit,
       timer,
       c.secret ? revealButton(c) : "",
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "", !!c.secretCode)),
+      c.lang === "http" ? iconButton("curl", "Copy as curl, with the placeholders filled in", () => void copyCurl(c)) : "",
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
       runs(iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block))),
       runs(iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block))),
@@ -1211,6 +1228,12 @@ function drawBlock(c: Cell): HTMLElement {
   const tools = el("div", { className: "output-tools" }, copyOutputButton(block, c));
   if (c.movable) tools.append(clearOutputButton(c));
   block.querySelector(".output-part")!.append(tools);
+  if (c.http) {
+    // The response's view takes the output's place; the output stays,
+    // hidden, so copying it copies the response as the file saves it.
+    block.querySelector(".output")!.before(drawHTTP(c.http));
+    block.classList.add("has-http");
+  }
   colorOutput(block.querySelector(".output")!);
   if (c.links) linkify(block.querySelector<HTMLElement>(".output")!);
   markOutput(block.querySelector<HTMLElement>(".output")!);

@@ -118,7 +118,7 @@ func (m *Model) openHistory() tea.Cmd {
 		m.sess.Close()
 		m.sess = sess
 		for i, r := range m.results {
-			if r.Ran && run.Runnable(m.d.Blocks[i]) {
+			if r.Ran && run.UsesShell(m.d.Blocks[i]) {
 				m.histLog(helpStyle.Render("(The shells started again, on a terminal, so variables that blocks set are gone.)"))
 				break
 			}

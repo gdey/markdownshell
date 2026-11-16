@@ -24,6 +24,70 @@ import { c, cpp, java, kotlin } from "@codemirror/legacy-modes/mode/clike";
 
 import { el } from "./dom.js";
 
+// httpWords are the words an http block's checks and captures use, in
+// Hurl's names.
+const httpWords = new Set(["status", "header", "jsonpath", "body", "regex", "duration", "count", "not", "secret", "redact", "contains", "startsWith", "endsWith", "matches", "exists", "isEmpty", "isNumber", "isString", "isBoolean", "isCollection"]);
+
+// httpState is where an http block's parser is: the request line, its
+// headers, a section, or the body.
+interface HTTPState {
+  part: "request" | "headers" | "body" | "section" | "response";
+}
+
+// httpMode highlights an http block: the method, header names, the HTTP
+// line, [Sections], the words of checks and captures, placeholders and
+// strings. The body is plain but for its strings and placeholders.
+const httpMode: StreamParser<HTTPState> = {
+  name: "http",
+  startState: () => ({ part: "request" }),
+  token(stream, state) {
+    if (stream.sol()) {
+      if (stream.match(/^\s*#.*/)) return "comment";
+      if (stream.match(/^\s*\[[A-Za-z]+\]\s*$/)) {
+        state.part = "section";
+        return "header";
+      }
+      if (stream.match(/^HTTP(\/[\d.]+)?\s+/)) {
+        state.part = "response";
+        return "keyword";
+      }
+      if (state.part === "request" && stream.match(/^[A-Z]+(?=\s)/)) {
+        state.part = "headers";
+        return "keyword";
+      }
+      if (state.part === "headers" && stream.match(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+(?=\s*:)/)) return "attribute";
+      if ((state.part === "section" || state.part === "response") && stream.match(/^[A-Za-z_][\w-]*(?=\s*:)/)) return "def";
+    }
+    if (stream.match("{{")) {
+      if (stream.skipTo("}}")) stream.match("}}");
+      else stream.skipToEnd();
+      return "variable-2";
+    }
+    if (stream.match(/^"(?:[^"\\]|\\.)*"?/)) return "string";
+    if (stream.match(/^-?\d+(\.\d+)?\b/)) return "number";
+    if (stream.match(/^(==|!=|<=|>=|<|>)/)) return "operator";
+    const word = stream.match(/^[A-Za-z]+/) as RegExpMatchArray | null;
+    if (word) return state.part === "section" && httpWords.has(word[0]) ? "keyword" : null;
+    stream.next();
+    return null;
+  },
+  blankLine(state) {
+    if (state.part === "headers") state.part = "body";
+  },
+};
+
+// headerMode highlights a response's header lines: names, then values.
+const headerMode: StreamParser<null> = {
+  name: "http-headers",
+  startState: () => null,
+  token(stream) {
+    if (stream.sol() && stream.match(/^[^:\s]+(?=:)/)) return "attribute";
+    if (stream.match("(secret)")) return "comment";
+    stream.next();
+    return null;
+  },
+};
+
 // modes are the languages code is highlighted in: a parser, the fence's
 // language and its other names.
 const modes: [StreamParser<unknown>, string, string[]][] = [
@@ -49,6 +113,8 @@ const modes: [StreamParser<unknown>, string, string[]][] = [
   [cpp as StreamParser<unknown>, "cpp", ["c++", "cc", "cxx", "hpp"]],
   [java as StreamParser<unknown>, "java", []],
   [kotlin as StreamParser<unknown>, "kotlin", ["kt"]],
+  [httpMode as StreamParser<unknown>, "http", ["hurl"]],
+  [headerMode as StreamParser<unknown>, "http-headers", []],
 ];
 
 // codeLanguages are the languages of fenced code, for the markdown

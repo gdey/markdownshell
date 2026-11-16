@@ -79,6 +79,9 @@ type Model struct {
 	// 0; see masked.
 	secretVars  []string
 	secretShown int
+	// httpHeaders holds the http blocks whose response shows its
+	// headers instead of its body; H switches.
+	httpHeaders map[*doc.Block]bool
 	// results are the latest result of each block. They are copied from
 	// run events, so drawing and saving never read the session while a
 	// run is going.
@@ -775,6 +778,12 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if cmd := m.copyBlock(); cmd != nil {
 			return m, cmd
 		}
+	case "Y":
+		if cmd := m.copyCurl(); cmd != nil {
+			return m, cmd
+		}
+	case "H":
+		m.toggleHeaders()
 	case "v":
 		if cmd := m.view(); cmd != nil {
 			return m, cmd

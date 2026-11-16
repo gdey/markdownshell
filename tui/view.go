@@ -318,6 +318,11 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		}
 		return wrap.Render(strings.TrimRight(b.String(), "\n"))
 	}
+	if r.Ran && r.HTTP != nil {
+		if s, ok := m.httpOutput(r.Block, r, string(r.Stdout)); ok {
+			return wrap.Render(s)
+		}
+	}
 	if r.Ran && !r.Block.IsInclude() {
 		var parts []string
 		if r.Image != "" {
@@ -343,6 +348,11 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		return out
 	}
 	b := m.d.Blocks[i]
+	if b.IsHTTP() && b.HasOutput() {
+		if s, ok := m.httpOutput(b, nil, savedResponse(b, m.d.Src)); ok {
+			return wrap.Render(savedStyle.Render("saved response:") + "\n" + s)
+		}
+	}
 	if b.HasOutput() {
 		out := saved(m.d.Src[b.Output.Start:b.Output.End])
 		if link := imageLink(out); link != "" {

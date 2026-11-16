@@ -199,6 +199,12 @@ export interface Cell {
     "outputLine"?: number;
 
     /**
+     * HTTP is set for an http block with a response to show, from this
+     * session's run or saved in the file.
+     */
+    "http"?: HTTPCell | null;
+
+    /**
      * Include is set for an include block, whose lines come from a
      * file: the view can drag its range, and show the whole file.
      */
@@ -432,6 +438,42 @@ export interface FrontMatter {
      * Other is the other top-level keys, as YAML, in the file's order.
      */
     "other": string;
+}
+
+/**
+ * HTTPCell is what the view shows of an http block's response, over
+ * its output: the status, the body and the headers as two tabs, and the
+ * checks with a tick or a cross. Headers are masked as the output is.
+ */
+export interface HTTPCell {
+    /**
+     * Status is the status line's code and text, such as 201 Created,
+     * and Code its number; both are empty when there is no response.
+     */
+    "status"?: string;
+    "code"?: number;
+
+    /**
+     * Headers and Body are the response's parts, as the output shows
+     * them: the body pretty-printed, the credential headers masked.
+     */
+    "headers"?: string;
+    "body"?: string;
+
+    /**
+     * Checks are the last run's checks, in order: none for a response
+     * read from the file.
+     */
+    "checks"?: HTTPCheck[] | null;
+}
+
+/**
+ * HTTPCheck is one check's result.
+ */
+export interface HTTPCheck {
+    "text": string;
+    "ok": boolean;
+    "got"?: string;
 }
 
 /**

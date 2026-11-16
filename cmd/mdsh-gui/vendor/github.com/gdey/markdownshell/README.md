@@ -272,6 +272,7 @@ its output.
 | `V` | select lines of the History pane's output (shift+↑ in the pane does too): ↑/↓ or `j`/`k` move the selection's end, `g`/`G` to the first or last line, `o` to its other end, `y` or enter copies them as text, without colors, the way `y` copies a block; esc cancels |
 | `e` | edit the whole block, fences and attributes included, in `$VISUAL`, `$EDITOR` or `vi`; it is saved to the file, and enter runs it |
 | `y` | copy the block's code, without its fences, to the clipboard. It is sent to the terminal as OSC 52, which works over ssh in terminals that allow it, and run locally it also goes to the system clipboard (`pbcopy`, `wl-copy`, `xclip` or `xsel`), for terminals that don't, such as macOS's Terminal or tmux by default |
+| `Y` | copy an `http` block's request as a `curl` command, with its placeholders filled in |
 | `E` | edit the whole file in `$VISUAL`, `$EDITOR` or `vi`, at the block under the cursor, with output not saved yet in it. Blocks whose code didn't change keep their output, as in `mdsh-gui`'s source view; save with `w` |
 | `F` | fix front matter that doesn't parse, when mdsh can tell how: a value with a `: ` in it gets quotes. Until the front matter parses, a banner says why and no block runs |
 | alt+↑/↓, or `K`/`J` | move the block, with its output and tape, up or down past the paragraph, heading or block next to it, as alt+↑/↓ does in `mdsh-gui`. Prose stays put. What the move breaks that depends on block order, such as a `run=` that now reads a block below it, shows in the footer. Not while a block runs |
@@ -279,6 +280,7 @@ its output.
 | `v` | show the block's image or recording full screen; enter goes back |
 | `o` | show or hide the outline: the headings and blocks down the left, with each block's state (✓ ran, ✗ failed, ? waiting for an answer, … running) |
 | `x` | show or hide the selected block's secret: a `secret` block's code and output, masked until then, and masked again when you move off it |
+| `H` | switch an `http` block's response between its body and its headers |
 | `C` / `O` | hide or show the code / the output of blocks |
 | `p` | create a report, as `mdsh-gui`'s Create Report: PDF, HTML or markdown, with or without code and output, of this run, of a run of every block, or of the file as saved. It shows the `mdsh` command that makes the same report |
 | `,` | run options for this file: the arguments `$1` and on, `--only`, `--step` and `--stop-on-error`. Setting them starts new shells, and the file keeps them when opened again |
@@ -590,6 +592,61 @@ these, with the recordings they make.
 
 With no terminal (cron, CI) or with mdsh in the background, a `tty` block
 without a tape fails with an error instead of hanging.
+
+## HTTP requests
+
+An `http` block makes one HTTP request, written the way it goes over
+the wire, and checks what comes back in [Hurl](https://hurl.dev)'s
+words. mdsh makes the request itself, so it needs no `curl` or `jq`:
+
+````markdown
+```http {#login}
+POST {{$API}}/sessions
+Content-Type: application/json
+
+{"user": "j", "password": "{{$API_PASSWORD}}"}
+
+HTTP 201
+[Asserts]
+header Content-Type contains application/json
+jsonpath $.token exists
+[Captures]
+token: secret jsonpath $.token
+```
+
+```http {#whoami depends=login}
+GET {{$API}}/me
+Authorization: Bearer {{#login/env(token)}}
+
+HTTP 200
+[Asserts]
+jsonpath $.user == "j"
+jsonpath $.roles count == 2
+```
+````
+
+Headers follow the request line; the body comes after a blank line.
+`[QueryStringParams]` and `[FormParams]` take `name: value` lines,
+`[Options]` takes `insecure`, `follow` and `timeout`, and `@file` as
+the body sends a file. `HTTP 201` checks the status, and each
+`[Asserts]` line checks `status`, `header NAME`, `jsonpath PATH`,
+`body`, `regex PATTERN` or `duration` with `==`, `!=`, `<`, `>`,
+`contains`, `startsWith`, `endsWith`, `matches`, `exists`, `isEmpty`
+and the `is…` type checks, `not` in front to turn it around. A
+`[Captures]` line sets a variable of the block that prose, conditions
+and later `http` blocks read as `{{#login/env(token)}}`; `secret` keeps
+it out of the file. Prose and conditions can also read the response
+itself: `{{#login/status}}`, `{{#login/json($.expires)}}` and
+`{{#login/header(Content-Type)}}`, as in `run={{#login/status}}==201`.
+
+Placeholders are filled in as the request is made and never stored.
+The output is the response, saved under the block like any other, with
+`Set-Cookie`, `Authorization` and the other credential headers saved as
+`(secret)`; list more under `mdsh.http.secret_headers` in the front
+matter. A failed check fails the block with one line on stderr, such as
+`assert jsonpath $.user == "j": got "guest"`, so `on_error`,
+`depends=` and `{{#whoami/?}}` work as for any block. See the spec for
+everything an `http` block takes.
 
 ## Conditions
 

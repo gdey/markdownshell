@@ -66,6 +66,7 @@ var inserts = []struct{ label, name string }{
 	{"sh Block", "sh"},
 	{"sh Block, Confirm First", "sh-confirm"},
 	{"zsh Block", "zsh"},
+	{"http Request", "http"},
 	{"Textbox", "textbox"},
 	{"Choice", "choice"},
 }
