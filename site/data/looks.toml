@@ -45,3 +45,9 @@
   name = "Witchcraft"
   since = "1.5"
   tagline = "for a purple grimoire under the moon"
+
+[[looks]]
+  id = "coffee"
+  name = "Coffee"
+  since = "1.6"
+  tagline = "for notes by the cup, stains and all"

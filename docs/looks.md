@@ -1,7 +1,7 @@
 # Adding a look
 
 A look is the desktop app's paint: Plain, Teletype, Blueprint, Bubble
-Gum, Witchcraft, and one more each minor release. Each look is one
+Gum, Witchcraft, Coffee, and one more each minor release. Each look is one
 file, `look.css`, in its own folder in
 [`cmd/mdsh-gui/frontend/looks`](../cmd/mdsh-gui/frontend/looks). Its
 first comment opens with the look's **front matter**, TOML between
