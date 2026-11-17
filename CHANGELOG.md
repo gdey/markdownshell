@@ -79,8 +79,7 @@ follow [Semantic Versioning](https://semver.org/).
   is renamed with its run's time, `d.md.assets/check.2026-11-13T190800Z.svg`,
   and its link follows; the current one keeps its path. Saving holds
   the history to N, so lowering N, or dropping `history=`, trims it,
-  and deletes the files of the runs it drops. `mdsh -i` doesn't show
-  the earlier runs yet.
+  and deletes the files of the runs it drops.
 
   Note: mdsh 1.6.0 and older read the earlier runs as copies of the
   output, and `-w` overwrites them all with the current output.
@@ -96,6 +95,15 @@ follow [Semantic Versioning](https://semver.org/).
   console that its earlier runs past the cap were dropped.
 
   ![A block with history=3 in mdsh-gui: its current output, then "3 earlier runs" opened to a run from today, one from yesterday that failed with exit 7 and a curl error, and one from Friday](docs/changelog/earlier-runs.png)
+
+- `mdsh -i` shows a block's earlier runs too: a dim line under its
+  output says how many, and `b` shows each one under a line with how
+  far back it is, its exit status and when it ran, and hides them
+  again. Running a block with `history=N` several times before saving
+  now keeps every run, as mdsh-gui does, not only the last; and saving
+  says in the footer when a lowered `history=` dropped earlier runs.
+
+  ![mdsh -i with a history=3 block's earlier runs shown under its saved output: run 1 back from today, run 2 back from yesterday failed with exit 7 and a curl error in red, and run 3 back from Friday](docs/changelog/earlier-runs-tui.png)
 
 ### Fixed
 

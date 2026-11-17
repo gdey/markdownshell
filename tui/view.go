@@ -223,6 +223,13 @@ func (m *Model) block(i int) string {
 		}
 		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Render(o)
 	}
+	if e := m.earlier(b, w); e != "" {
+		if maskOutput {
+			// The count, but not what a secret printed before.
+			e, _, _ = strings.Cut(e, "\n")
+		}
+		out += "\n" + lipgloss.NewStyle().MarginLeft(4).Render(e)
+	}
 	return out
 }
 
