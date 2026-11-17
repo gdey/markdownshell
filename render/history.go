@@ -132,3 +132,26 @@ func retag(line string, k int, region bool) string {
 	}
 	return line[:i] + " history=" + n + line[i:]
 }
+
+// DropEarlierRuns is src with the earlier runs of block b that drop
+// says to drop taken out from under its output, and the rest numbered
+// again from 1, newest first. Dropping all of them leaves the current
+// output as it is. src must be the source b was parsed from.
+func DropEarlierRuns(src []byte, b *doc.Block, drop func(e doc.Entry) bool) []byte {
+	if len(b.History) == 0 {
+		return src
+	}
+	var entries []string
+	for _, e := range b.History {
+		if !drop(e) {
+			entries = append(entries, entryText(src, e.Parts, len(entries)+1, e.At, false))
+		}
+	}
+	cur := b.CurrentOutput().End
+	out := append([]byte(nil), src[:cur]...)
+	if len(entries) > 0 {
+		gap := strings.TrimRight(b.Prefix, " ") + "\n"
+		out = append(out, gap+strings.Join(entries, gap)...)
+	}
+	return append(out, src[b.Output.End:]...)
+}

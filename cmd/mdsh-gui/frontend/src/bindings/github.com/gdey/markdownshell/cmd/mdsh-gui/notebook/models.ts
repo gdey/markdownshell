@@ -110,6 +110,12 @@ export interface Cell {
     "output"?: string;
 
     /**
+     * Earlier are the block's earlier runs, kept by history=N, newest
+     * first.
+     */
+    "earlier"?: EarlierRun[] | null;
+
+    /**
      * OutputTasks number the task list checkboxes in Output, as Tasks
      * does for HTML.
      */
@@ -337,6 +343,37 @@ export interface DependsProblem {
     "line": number;
     "name": string;
     "input": boolean;
+}
+
+/**
+ * EarlierRun is one of a block's earlier runs, as the card draws it.
+ */
+export interface EarlierRun {
+    /**
+     * K is its place: 1 for the run before the current one, 2 for the
+     * one before that, and so on.
+     */
+    "k": number;
+
+    /**
+     * At is when it ran, as its at= has it (RFC 3339, in UTC), or ""
+     * for output saved without one.
+     */
+    "at"?: string;
+
+    /**
+     * Exit is its exit status. Failed is set when it isn't 0 or the
+     * block ended its shell, and Region when its output is markdown, an
+     * image or a recording, which have no exit status of their own.
+     */
+    "exit": number;
+    "failed"?: boolean;
+    "region"?: boolean;
+
+    /**
+     * Output is its output, rendered.
+     */
+    "output": string;
 }
 
 /**

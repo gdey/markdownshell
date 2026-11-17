@@ -155,3 +155,33 @@ func TestClearHistory(t *testing.T) {
 		t.Errorf("cleared:\ngot  %q\nwant %q", got, want)
 	}
 }
+
+func TestDropEarlierRuns(t *testing.T) {
+	src := "```sh {#n history=3}\necho 4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:04Z}\n4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:03Z history=1}\n3\n```\n\n" +
+		"```output {for=n exit=1 at=2026-11-16T22:20:02Z history=2}\n2\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:01Z history=3}\n1\n```\n\nAfter.\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := d.Blocks[0]
+	got := string(DropEarlierRuns(d.Src, b, func(e doc.Entry) bool { return e.K == 2 }))
+	want := "```sh {#n history=3}\necho 4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:04Z}\n4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:03Z history=1}\n3\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:01Z history=2}\n1\n```\n\nAfter.\n"
+	if got != want {
+		t.Errorf("dropping run 2:\n%s\nwant\n%s", got, want)
+	}
+	if d2, err := doc.Parse([]byte(got)); err != nil || len(d2.Blocks[0].History) != 2 {
+		t.Errorf("after dropping run 2: %v, %d earlier runs", err, len(d2.Blocks[0].History))
+	}
+	got = string(DropEarlierRuns(d.Src, b, func(doc.Entry) bool { return true }))
+	want = "```sh {#n history=3}\necho 4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:04Z}\n4\n```\n\nAfter.\n"
+	if got != want {
+		t.Errorf("dropping all:\n%s\nwant\n%s", got, want)
+	}
+}

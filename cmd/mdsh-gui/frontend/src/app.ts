@@ -27,6 +27,7 @@ import { secretMask, setSecretLines } from "./secretmask.js";
 import { textboxGrip } from "./textbox.js";
 import { includeControls } from "./include.js";
 import { drawHTTP, statusBadge } from "./http.js";
+import { drawEarlier } from "./earlier.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
@@ -1263,8 +1264,20 @@ function drawBlock(c: Cell): HTMLElement {
   // The output's buttons sit in its top right corner: copy, and on the
   // selected card the trash.
   const tools = el("div", { className: "output-tools" }, copyOutputButton(block, c));
+  if (c.movable && c.earlier?.length) tools.append(clearEarlierButton(c));
   if (c.movable) tools.append(clearOutputButton(c));
   block.querySelector(".output-part")!.append(tools);
+  if (c.earlier?.length) {
+    // The earlier runs history=N keeps, folded under the output.
+    block.querySelector(".output-part")!.after(
+      drawEarlier(c.earlier, {
+        key: partKey(block, "output"),
+        copy: (r, out, b) => void copyEarlier(c, r.k, out, b),
+        remove: (k) => void deleteEarlier(c.block, k),
+        view: viewImage,
+      }),
+    );
+  }
   if (c.http) {
     // The response's view takes the output's place; the output stays,
     // hidden, so copying it copies the response as the file saves it.
@@ -3587,6 +3600,58 @@ function clearOutputButton(c: Cell): HTMLButtonElement {
   const b = iconButton("trash", "Clear this block's output", () => void clearOutput(c.block));
   b.classList.add("trash", "clear-output");
   return b;
+}
+
+// clearEarlierButton clears the earlier runs on the selected card, and
+// keeps the current output. The bar's Undo puts them back.
+function clearEarlierButton(c: Cell): HTMLButtonElement {
+  const b = iconButton("clearEarlier", "Clear earlier runs, keeping this output", () => void clearEarlier(c.block));
+  b.classList.add("trash", "clear-earlier");
+  return b;
+}
+
+async function clearEarlier(i: number) {
+  await dropEarlier(() => App.ClearEarlierRuns(i), "Cleared the earlier runs.", "cleared earlier runs");
+}
+
+async function deleteEarlier(i: number, k: number) {
+  await dropEarlier(() => App.DeleteEarlierRun(i, k), "Deleted an earlier run.", "deleted earlier run");
+}
+
+async function dropEarlier(call: () => Promise<void>, said: string, short: string) {
+  if (running) return status("can't change the file while a block runs");
+  await applySource();
+  try {
+    await call();
+  } catch (err) {
+    return fail(err);
+  }
+  await refresh();
+  $("moved-text").textContent = said;
+  $("moved-undo").onclick = () => {
+    $("moved").hidden = true;
+    void undoEdit(false);
+  };
+  $("moved").hidden = false;
+  status(short);
+}
+
+// copyEarlier copies earlier run k of block c, as copyOutput copies the
+// current output.
+async function copyEarlier(c: Cell, k: number, out: HTMLElement, b: HTMLElement) {
+  const text = outputText(out).replace(/\n$/, "");
+  if (!text) return status("no text output to copy");
+  try {
+    await setClipboard(text, !!c.secret);
+  } catch (err) {
+    return status("couldn't copy: " + message(err));
+  }
+  const n = text.split("\n").length;
+  const name = c.name ?? c.id ?? "";
+  status(`Copied run ${k} back of ` + (name ? name + ", " : "") + n + (n === 1 ? " line" : " lines") + (c.secret ? secretNote() : ""));
+  b.classList.add("copied");
+  clearTimeout(copiedTimers.get(b));
+  copiedTimers.set(b, setTimeout(() => b.classList.remove("copied"), 1500));
 }
 
 async function clearOutput(i: number) {

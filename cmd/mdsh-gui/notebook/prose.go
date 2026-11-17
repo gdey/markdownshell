@@ -111,6 +111,7 @@ func (n *Notebook) cells() []Cell {
 			Attrs:           attrsText(b.Info),
 			Depends:         b.Depends(),
 			Output:          n.html(out),
+			Earlier:         n.earlier(b),
 			HTTP:            httpCell(b, r, out),
 			OutputTasks:     tasksIn(l.tasks, b.CurrentOutput()),
 			Links:           b.Attrs.Has(weblink.Attr),

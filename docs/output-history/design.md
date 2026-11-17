@@ -1,8 +1,8 @@
 # Output history for a block (`history=N`)
 
-Design. Steps 1 to 3 of the work order (the `at=` stamp, parsing
-earlier runs, and rotating them on write-back) are built; the rest is
-not yet.
+Design. Steps 1 to 4 of the work order (the `at=` stamp, parsing
+earlier runs, rotating them on write-back, and showing them in
+mdsh-gui) are built; the rest is not yet.
 
 ## The ask
 

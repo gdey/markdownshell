@@ -149,6 +149,14 @@ export function ClearConsole(): $CancellablePromise<void> {
 }
 
 /**
+ * ClearEarlierRuns takes block i's earlier runs, kept by history=N, out
+ * of the file, and keeps its current output. Undo puts them back.
+ */
+export function ClearEarlierRuns(i: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.ClearEarlierRuns", i);
+}
+
+/**
  * ClearOutput takes block i's output out of the file and forgets its
  * run. Undo puts it back.
  */
@@ -220,6 +228,14 @@ export function Curl(i: number): $CancellablePromise<string> {
  */
 export function DeleteBlock(i: number): $CancellablePromise<notebook$0.Deleted> {
     return $Call.ByName("main.App.DeleteBlock", i);
+}
+
+/**
+ * DeleteEarlierRun takes block i's earlier run k out of the file, and
+ * numbers the rest again. Undo puts it back.
+ */
+export function DeleteEarlierRun(i: number, k: number): $CancellablePromise<void> {
+    return $Call.ByName("main.App.DeleteEarlierRun", i, k);
 }
 
 /**
