@@ -4,7 +4,9 @@
 // when the list of files changes. The answers live in one JSON file,
 // shared by every front end. A second store, at OutsidePath, keeps in
 // the same way whether a document's includes and out= files may reach
-// outside its folder, or hidden in it (see run.Outside).
+// outside its folder, or hidden in it (see run.Outside), and a third, at
+// ImagesPath, the images from other sites the user loaded in each
+// document, which load again without asking (see Add).
 package trust
 
 import (
@@ -74,6 +76,75 @@ func OpenOutside() *Store {
 		return nil
 	}
 	return Open(p)
+}
+
+// ImagesPath is mdsh/images.json in the user's config folder, where the
+// images from other sites each document's user chose to load are kept.
+func ImagesPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "mdsh", "images.json"), nil
+}
+
+// OpenImages opens the store at ImagesPath, or returns nil, which
+// remembers nothing, if there is no config folder.
+func OpenImages() *Store {
+	p, err := ImagesPath()
+	if err != nil {
+		return nil
+	}
+	return Open(p)
+}
+
+// MaxItems is how many items Add keeps for one document; the oldest go
+// first.
+const MaxItems = 200
+
+// Add puts item, such as an image's address, in file's list of allowed
+// items, keeping the ones already there. It is for stores that grow an
+// answer at a time, as ImagesPath's does, rather than answer a whole
+// list at once.
+func (st *Store) Add(file, item string) error {
+	if file == "" || item == "" {
+		return nil
+	}
+	return st.update(func(s *state) {
+		var items []string
+		if i := slices.IndexFunc(s.Files, func(c Choice) bool { return c.File == file }); i >= 0 {
+			items = s.Files[i].Sources
+			s.Files = slices.Delete(s.Files, i, i+1)
+		}
+		items = slices.DeleteFunc(slices.Clone(items), func(x string) bool { return x == item })
+		items = slices.Insert(items, 0, item)
+		if len(items) > MaxItems {
+			items = items[:MaxItems]
+		}
+		s.Files = slices.Insert(s.Files, 0, Choice{File: file, Sources: items, Allow: true, At: time.Now().UTC()})
+		if len(s.Files) > Max {
+			s.Files = s.Files[:Max]
+		}
+	})
+}
+
+// Has reports whether Add put item in file's list.
+func (st *Store) Has(file, item string) bool {
+	if st == nil || file == "" {
+		return false
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	s, err := st.read()
+	if err != nil {
+		return false
+	}
+	for _, c := range s.Files {
+		if c.File == file {
+			return c.Allow && slices.Contains(c.Sources, item)
+		}
+	}
+	return false
 }
 
 // Open returns the store kept in path. The file is made on the first

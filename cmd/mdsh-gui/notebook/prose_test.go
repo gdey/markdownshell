@@ -330,13 +330,13 @@ func TestProseRawImages(t *testing.T) {
 		`<img src="` + DocPrefix,
 		`/plan.png" usemap="#m" alt="Plan">`,
 		`<map name="m"><area shape="rect" coords="0,0,5,5" href="room.md" alt="Room"></map>`,
-		`<em class="remote-image" title="mdsh-gui doesn&#39;t load images from other sites">Image not loaded: Logo (from example.com)</em>`,
+		`<em class="remote-image" title="mdsh-gui doesn&#39;t load images from other sites until you ask" data-src="https://example.com/t.png" data-alt="Logo">Image not loaded: Logo (from example.com)</em>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("no %s in %q", want, html)
 		}
 	}
-	if strings.Contains(html, "example.com/t.png") {
+	if strings.Contains(html, `<img src="https://example.com/t.png"`) {
 		t.Errorf("remote image loaded: %q", html)
 	}
 }

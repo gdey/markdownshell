@@ -1,6 +1,7 @@
 package trust_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -80,5 +81,43 @@ func TestAllowedForget(t *testing.T) {
 	}
 	if got := (*trust.Store)(nil).Allowed(); got != nil {
 		t.Errorf("nil store: Allowed = %q", got)
+	}
+}
+
+// Add grows a document's list an item at a time; Has finds them, for
+// that document only, and Forget drops the list.
+func TestAddHas(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "images.json")
+	st := trust.Open(path)
+	if st.Has("/a.md", "https://x/1.png") {
+		t.Fatal("empty store has an item")
+	}
+	for _, item := range []string{"https://x/1.png", "https://x/2.png", "https://x/1.png"} {
+		if err := st.Add("/a.md", item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !st.Has("/a.md", "https://x/1.png") || !st.Has("/a.md", "https://x/2.png") {
+		t.Error("lost an item")
+	}
+	if st.Has("/b.md", "https://x/1.png") {
+		t.Error("another document has the item")
+	}
+	// A new store on the same file, as another front end would open it.
+	if !trust.Open(path).Has("/a.md", "https://x/2.png") {
+		t.Error("not kept on disk")
+	}
+	for i := range trust.MaxItems + 5 {
+		st.Add("/a.md", fmt.Sprintf("https://x/%d.png", i+10))
+	}
+	if st.Has("/a.md", "https://x/2.png") {
+		t.Error("oldest item kept past trust.MaxItems")
+	}
+	if err := st.Forget("/a.md"); err != nil || st.Has("/a.md", "https://x/20.png") {
+		t.Errorf("forget: %v", err)
+	}
+	var nilStore *trust.Store
+	if nilStore.Has("/a.md", "x") || nilStore.Add("/a.md", "x") != nil {
+		t.Error("nil store")
 	}
 }

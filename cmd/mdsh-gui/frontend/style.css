@@ -457,6 +457,9 @@ th { background: var(--code-bg); }
 .block .output pre { background: none; padding: 4px 0 10px; }
 .block .output img, .prose img { max-width: 100%; height: auto; }
 .prose em.remote-image, .block .output em.remote-image { display: inline-block; padding: 1px 6px; border: 1px dashed var(--border); border-radius: 4px; font-size: .9em; color: var(--muted); }
+em.remote-image button.load-image { margin-left: 4px; padding: 0 8px; font: inherit; font-style: normal; font-size: .95em; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); cursor: pointer; }
+em.remote-image button.load-image:hover:not(:disabled) { border-color: var(--accent); }
+em.remote-image button.load-image:disabled { cursor: progress; opacity: .7; }
 .block .output img { display: block; margin: 12px 0; cursor: zoom-in; }
 /* d2 and svg fences drawn as pictures, with a button to switch to their
    code. A d2 diagram comes in a light and a dark theme. */

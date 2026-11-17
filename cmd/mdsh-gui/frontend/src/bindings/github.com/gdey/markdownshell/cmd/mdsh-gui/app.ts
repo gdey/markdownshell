@@ -646,6 +646,22 @@ export function RememberView(file: string, view: string, history: boolean): $Can
 }
 
 /**
+ * RemoteImage returns the image at src, an image in this window's
+ * document that the window doesn't load by itself, as a data: URI for it
+ * to show: an http: or https: address on another site, or a file outside
+ * the document's folder (or hidden in it), which the window's /doc route
+ * doesn't serve. With load false, it only does so for an
+ * image the user loaded in this document before, and returns "" for any
+ * other, without going to the network. With load true, from the note's
+ * Load button, it fetches the image, and remembers that this document
+ * may load it, so it loads by itself from then on. Anything that isn't
+ * a PNG, JPEG, GIF, WebP, BMP or icon, or is over 20 MB, is refused.
+ */
+export function RemoteImage(src: string, load: boolean): $CancellablePromise<string> {
+    return $Call.ByName("main.App.RemoteImage", src, load);
+}
+
+/**
  * ReplaceCast swaps tty block i's recording, in its output, for the
  * text of frame n (as "text") or an animated GIF of it (as "gif"). Undo
  * puts the recording back.

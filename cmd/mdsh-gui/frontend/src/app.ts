@@ -783,6 +783,7 @@ function drawProse(c: Cell): HTMLElement {
   const code = c.firstLine ? s.querySelector<HTMLElement>("pre.numbered > code") : null;
   if (code) code.style.counterReset = `line ${c.firstLine! - 1}`;
   enableDiagrams(s);
+  enableRemoteImages(s);
   enableCasts(s, { save: (n, body) => void saveFrame(-1, body, n) });
   enableCopy(s);
   if (c.include) includeControls(s, c, { commit: (i, from, to) => edit(() => App.SetIncludeRange(i, from, to)), busy: () => running, say: status });
@@ -969,6 +970,36 @@ window.addEventListener("blur", maskAll);
 // shownAsCode holds the source of the diagrams switched to their code,
 // so a redraw keeps them that way.
 const shownAsCode = new Set<string>();
+
+// enableRemoteImages draws the images from other sites in e that the
+// user loaded in this document before, and gives the note for each of
+// the others a Load button. Go fetches the image (App.RemoteImage), as
+// the window's CSP loads none from elsewhere, and remembers the answer
+// for that image in this document, so it loads by itself from then on.
+function enableRemoteImages(e: HTMLElement) {
+  for (const note of e.querySelectorAll<HTMLElement>("em.remote-image[data-src]")) {
+    const src = note.dataset.src!;
+    const show = (uri: string) => {
+      if (!uri || !note.isConnected) return;
+      note.replaceWith(el("img", { src: uri, alt: note.dataset.alt ?? "", title: src }));
+    };
+    const b = el("button", { className: "load-image", title: "Load " + src + " and show it here, now and whenever this document opens" }, "Load image");
+    b.onclick = (ev) => {
+      ev.stopPropagation();
+      b.disabled = true;
+      b.textContent = "Loading…";
+      App.RemoteImage(src, true)
+        .then(show)
+        .catch((err) => {
+          b.disabled = false;
+          b.textContent = "Load image";
+          fail(err);
+        });
+    };
+    note.append(" ", b);
+    App.RemoteImage(src, false).then(show).catch(() => {});
+  }
+}
 
 // enableDiagrams gives each d2 or svg diagram, or cast recording, Go drew
 // in e a button that switches between the picture and its code. A diagram Go couldn't draw
@@ -1258,6 +1289,7 @@ function drawBlock(c: Cell): HTMLElement {
   // too, until the block runs again.
   enableTasks(block.querySelector<HTMLElement>(".output")!, c.outputTasks);
   enableDiagrams(block.querySelector<HTMLElement>(".output")!);
+  enableRemoteImages(block.querySelector<HTMLElement>(".output")!);
   enableCasts(block.querySelector<HTMLElement>(".output")!, { frame: Number(/(?:^|\s)frame=(\d+)/.exec(c.attrs ?? "")?.[1] ?? 0) || undefined, save: (n) => void saveFrame(c.block, "", n), replace: (as, n) => void replaceCast(c.block, as, n) });
   block.querySelector<HTMLElement>(".output")!.onclick = (e) => {
     const img = (e.target as HTMLElement).closest("img");
