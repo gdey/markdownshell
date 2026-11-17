@@ -169,6 +169,9 @@ Printing, reports, PDF:
 
 ### 6. Work, in order
 
+All six steps are built (#270, #276, #279, #289, #291, and the
+`--history` PR).
+
 1. `run`: stamp results with their start time. `render`: write `at=`
    on every output fence and region. Small, on its own, and useful
    alone.

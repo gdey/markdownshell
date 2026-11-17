@@ -15,6 +15,9 @@ type Report struct {
 	Format     report.Format `json:"format"`
 	HideCode   bool          `json:"hideCode"`
 	HideOutput bool          `json:"hideOutput"`
+	// History shows each block's earlier runs, kept by history=N, under
+	// its output, as mdsh --history does.
+	History bool `json:"history"`
 	// Saved reports the file as last saved, running nothing, like
 	// mdsh -n. Otherwise the report shows this window's output. "Run
 	// all first" is a run, then a report of the window.
@@ -53,6 +56,7 @@ func (n *Notebook) MakeReport(r Report) ([]byte, error) {
 		Format:     r.Format,
 		HideCode:   r.HideCode,
 		HideOutput: r.HideOutput,
+		History:    r.History,
 		// The report's conditions see $MDSH_MODE report, so
 		// show={{$MDSH_MODE}}!=report leaves a block out of it.
 		Env:   run.WithMode(os.Environ(), run.ModeReport),
@@ -75,6 +79,9 @@ func (n *Notebook) MakeReport(r Report) ([]byte, error) {
 	if n.running {
 		return nil, ErrBusy
 	}
+	// Each run is written into the document as it ends, so what it
+	// holds is this run's own output, not the run before it.
+	opts.InSource = func(r *run.Result) bool { return n.inSource[r] }
 	return report.Render(n.d, n.results, opts)
 }
 
@@ -102,6 +109,7 @@ func (n *Notebook) ReportCommand(r Report, home string) string {
 		Format:      r.Format,
 		HideCode:    r.HideCode,
 		HideOutput:  r.HideOutput,
+		History:     r.History,
 		Run:         r.Ran && !r.Saved,
 		Args:        ro.Args,
 		Only:        ro.Only,

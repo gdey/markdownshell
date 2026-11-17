@@ -1,9 +1,11 @@
 package render
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
@@ -155,3 +157,71 @@ func DropEarlierRuns(src []byte, b *doc.Block, drop func(e doc.Entry) bool) []by
 	}
 	return append(out, src[b.Output.End:]...)
 }
+
+// printedEarlier is block b's earlier runs as printing shows them with
+// Options.History: newest first, at most cap of them, each under an
+// emphasized line saying how far back it is, when it ran and its exit
+// status. With push, the output the file holds comes first, as the run
+// before this one. It returns "" when there are none.
+func printedEarlier(src []byte, b *doc.Block, push bool, cap int) string {
+	type earlier struct {
+		parts  []doc.Span
+		at     string
+		rename bool
+	}
+	var runs []earlier
+	if push && len(b.CurrentParts) > 0 {
+		runs = append(runs, earlier{b.CurrentParts, b.CurrentAt, true})
+	}
+	for _, e := range b.History {
+		runs = append(runs, earlier{e.Parts, e.At, false})
+	}
+	if len(runs) > cap {
+		runs = runs[:cap]
+	}
+	gap := strings.TrimRight(b.Prefix, " ") + "\n"
+	var out []string
+	for i, r := range runs {
+		out = append(out, b.Prefix+runLine(src, i+1, r.parts, r.at)+"\n"+gap+entryText(src, r.parts, i+1, r.at, r.rename))
+	}
+	return strings.Join(out, gap)
+}
+
+// runLine is the line printing puts over earlier run k, whose parts
+// are parts and whose at= is at: *Run 2 back, 2026-11-12 19:02 UTC,
+// exit 7*. Output that goes in a region, such as an image, says its
+// exit status only when it failed.
+func runLine(src []byte, k int, parts []doc.Span, at string) string {
+	says := []string{fmt.Sprintf("Run %d back", k)}
+	if t, err := time.Parse(time.RFC3339, at); err == nil {
+		says = append(says, t.UTC().Format("2006-01-02 15:04 MST"))
+	}
+	for _, p := range parts {
+		first := string(src[p.Start:p.End])
+		if nl := strings.IndexByte(first, '\n'); nl >= 0 {
+			first = first[:nl]
+		}
+		if strings.Contains(first, "stream=stderr") {
+			continue
+		}
+		exit := exitAttr.FindStringSubmatch(first)
+		exited := exitedAttr.MatchString(first)
+		region := strings.Contains(first, "<!-- mdsh:output")
+		switch {
+		case exit != nil && (!region || exit[1] != "0"):
+			s := "exit " + exit[1]
+			if exited {
+				s += ", exited"
+			}
+			says = append(says, s)
+		case exited:
+			says = append(says, "exited")
+		}
+	}
+	return "*" + strings.Join(says, ", ") + "*"
+}
+
+var (
+	exitAttr   = regexp.MustCompile(`[\s{]exit="?(-?\d+)`)
+	exitedAttr = regexp.MustCompile(`[\s{]exited[\s}"]`)
+)

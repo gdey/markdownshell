@@ -90,3 +90,20 @@ func TestRunAt(t *testing.T) {
 		}
 	}
 }
+
+// The report form's Earlier runs switch puts --history in the command
+// and the earlier runs in the report.
+func TestReportEarlierRuns(t *testing.T) {
+	src := "```sh {#c history=2}\necho ok\n```\n\n```output {for=c exit=0 at=2026-11-16T10:00:00Z}\nok\n```\n\n" +
+		"```output {for=c exit=0 at=2026-11-15T10:00:00Z history=1}\nbefore\n```\n"
+	m, file := newModel(t, src, Options{})
+	press(m, "p", "right", "right", "down", "down", "down", "space")
+	if v := m.View(); !strings.Contains(v, "mdsh -n --history -o doc-report.md doc.md") {
+		t.Fatalf("the command doesn't have --history:\n%s", v)
+	}
+	press(m, "enter")
+	got := read(t, strings.TrimSuffix(file, ".md")+"-report.md")
+	if !strings.Contains(got, "*Run 1 back, 2026-11-15 10:00 UTC, exit 0*") || !strings.Contains(got, "before") {
+		t.Errorf("report:\n%s", got)
+	}
+}

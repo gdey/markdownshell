@@ -673,6 +673,12 @@ export interface Report {
     "hideOutput": boolean;
 
     /**
+     * History shows each block's earlier runs, kept by history=N, under
+     * its output, as mdsh --history does.
+     */
+    "history": boolean;
+
+    /**
      * Saved reports the file as last saved, running nothing, like
      * mdsh -n. Otherwise the report shows this window's output. "Run
      * all first" is a run, then a report of the window.

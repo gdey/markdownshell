@@ -200,6 +200,7 @@ mdsh --hide-output notes.md
 mdsh --hide-code --hide-output notes.md   # prose only, nothing runs
 mdsh -n notes.md           # print with the output saved by -w; nothing runs
 mdsh -n -o view.md notes.md  # save that printout to view.md instead
+mdsh -n --history notes.md # also print each block's earlier runs, kept by history=N
 mdsh --pdf notes.pdf notes.md   # what it would print, as a PDF
 mdsh --only greet notes.md # one block, plus what it depends on
 mdsh --yes notes.md        # run confirm blocks without asking

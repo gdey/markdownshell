@@ -185,3 +185,35 @@ func TestDropEarlierRuns(t *testing.T) {
 		t.Errorf("dropping all:\n%s\nwant\n%s", got, want)
 	}
 }
+
+// Printing with History shows the earlier runs under the output, each
+// under a line saying when it ran; without it, only the current output.
+func TestPrintHistory(t *testing.T) {
+	src := "```sh {#n history=3}\necho 4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:04Z}\n4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:03Z history=1}\n3\n```\n\n" +
+		"```output {for=n exit=7 at=2026-11-12T19:02:00Z history=2}\n```\n\n```output {for=n stream=stderr history=2}\nrefused\n```\n\nAfter.\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(Markdown(d, nil, Options{})); strings.Contains(got, "history=1") || strings.Contains(got, "Run 1 back") {
+		t.Errorf("printed without History:\n%s", got)
+	}
+	got := string(Markdown(d, nil, Options{History: true}))
+	want := "```sh {#n history=3}\necho 4\n```\n\n" +
+		"```output {for=n exit=0 at=2026-11-16T22:20:04Z}\n4\n```\n\n" +
+		"*Run 1 back, 2026-11-16 22:20 UTC, exit 0*\n\n```output {for=n exit=0 at=2026-11-16T22:20:03Z history=1}\n3\n```\n\n" +
+		"*Run 2 back, 2026-11-12 19:02 UTC, exit 7*\n\n```output {for=n exit=7 at=2026-11-12T19:02:00Z history=2}\n```\n\n```output {for=n stream=stderr history=2}\nrefused\n```\n\nAfter.\n"
+	if got != want {
+		t.Errorf("printed with History:\n%s\nwant\n%s", got, want)
+	}
+	// After a run, what the file holds is the run before it.
+	r := &run.Result{Block: d.Blocks[0], Ran: true, Stdout: []byte("5\n"), Start: time.Date(2026, 11, 17, 8, 0, 0, 0, time.UTC)}
+	got = string(Markdown(d, []*run.Result{r}, Options{History: true}))
+	for _, want := range []string{"5\n```", "*Run 1 back, 2026-11-16 22:20 UTC, exit 0*\n\n```output {for=n exit=0 at=2026-11-16T22:20:04Z history=1}\n4", "*Run 3 back, 2026-11-12 19:02 UTC, exit 7*"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("printed after a run has no %q:\n%s", want, got)
+		}
+	}
+}
