@@ -19,7 +19,9 @@ import (
 // The History pane is a terminal at the bottom of the window, like a
 // paper tape: a command typed there runs in the document's shell, on the
 // terminal, and is added to the end of the document as a block with its
-// output. A note, lines starting with #, is added as prose.
+// output. A note, lines starting with #, is added as prose. A block
+// typed there, from a line such as # ```bash to a line of ```, is added
+// as it was typed, without running.
 
 // ErrHistoryOff is returned by Enter while the History pane is off.
 var ErrHistoryOff = errors.New("the History pane is off")
@@ -225,7 +227,9 @@ func (n *Notebook) History() bool {
 // finish; one ending in a lone & is added as a background block instead,
 // without the &, and left running. A command that took over the screen, as vim does, is marked
 // tty, so its output is a recording. A command that fails is kept, with
-// its exit status.
+// its exit status. A block, from a line such as # ```bash to a line of
+// ```, is added to the end of the document as it was typed, without
+// running.
 func (n *Notebook) Enter(input string) error {
 	input = strings.TrimRight(input, "\n")
 	if strings.TrimSpace(input) == "" {
@@ -233,6 +237,9 @@ func (n *Notebook) Enter(input string) error {
 	}
 	if text, ok := note(input); ok {
 		return n.addNote(text)
+	}
+	if info, body, ok := history.Block(input); ok {
+		return n.addBlock(info, body)
 	}
 	n.mu.Lock()
 	on := n.history
@@ -366,6 +373,25 @@ func (n *Notebook) addNote(text string) error {
 	return nil
 }
 
+// addBlock adds a block typed in the History pane to the end of the
+// document, without running it.
+func (n *Notebook) addBlock(info, body string) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.running {
+		return ErrBusy
+	}
+	if _, err := history.AddBlock(n.d, info, body); err != nil {
+		return err
+	}
+	if err := n.sync(); err != nil {
+		return err
+	}
+	n.noteEnd = -1
+	n.dirty = true
+	return nil
+}
+
 // nextHistoryID is the id for the next command, with n.mu held.
 func (n *Notebook) nextHistoryID() string { return history.NextID(n.d) }
 
@@ -396,12 +422,19 @@ func (n *Notebook) lang() string {
 // partway through a command.
 var incomplete = regexp.MustCompile("end of file|EOF|[Uu]nterminated|unmatched|near `\\\\n'")
 
-// Complete reports whether input is a whole command, or a note, so
-// pressing enter in the History pane runs it rather than starting
-// another line. Input ending in \, |, && or ||, or inside a quote, an
-// if, a loop or a here-document, isn't.
+// Complete reports whether input is a whole command, a note or a
+// block, so pressing enter in the History pane runs or adds it rather
+// than starting another line. Input ending in \, |, && or ||, inside a
+// quote, an if, a loop or a here-document, or inside a block it opens,
+// isn't.
 func (n *Notebook) Complete(input string) bool {
 	input = strings.TrimRight(input, "\n")
+	if _, ok := history.InBlock(input); ok {
+		return false
+	}
+	if _, _, ok := history.Block(input); ok {
+		return true
+	}
 	if _, ok := note(input); ok || strings.TrimSpace(input) == "" {
 		return true
 	}

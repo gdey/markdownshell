@@ -64,7 +64,9 @@ only*.
 
 View › History opens a terminal along the bottom, with your shell's
 prompt and completion. Each command you type is added to the file as a
-block, with its output; a line starting with `#` becomes a note. It is
+block, with its output; a line starting with `#` becomes a note, and
+``# ```sh`` starts a block that is added, unrun, when a line of
+```` ``` ```` ends it. It is
 how a document starts when you don't know yet what it will say.
 
 {{< shot name="history" title="2026-11-02.md · History" >}}A session: the commands typed below became the blocks above.{{< /shot >}}

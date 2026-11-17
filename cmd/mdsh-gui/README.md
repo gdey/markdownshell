@@ -522,7 +522,10 @@ A `tty` block runs in a terminal in its card.
 
 View › History opens a terminal along the bottom. Each command typed
 there is added to the end of the file with its output, and each `#`
-line as prose. Each file remembers whether its History pane was
+line as prose. A line such as ``# ```sh {#setup}`` starts a block
+instead: the prompt becomes ```` ```sh> ````, the lines typed after it
+are kept rather than run, and a line of ```` ``` ```` adds the block to
+the end of the file, as typed; ctrl+c drops it. Each file remembers whether its History pane was
 open: a file opens with it closed until you open it there, so opening
 a file doesn't start its shell unless you left History open in it.
 
