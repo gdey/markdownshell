@@ -36,6 +36,13 @@ type Block struct {
 	// History holds the earlier runs' outputs kept under the current
 	// output by history=N, newest first. See Entry.
 	History []Entry
+	// CurrentParts cover the current output's parts, the stdout fence
+	// or region and the stderr fence, each from its opening line to its
+	// end, prefixes included.
+	CurrentParts []Span
+	// CurrentAt is the current output's at=, when its run started, or
+	// "" when it has none.
+	CurrentAt string
 	// Prefix is what starts each line of a block nested in block quotes or
 	// list items, such as "> " or "   ". Output written after the block
 	// starts each line with it. Empty at the top level.
@@ -193,6 +200,7 @@ func Parse(src []byte) (*Document, error) {
 			if last != nil && len(last.History) == 0 && isOutputFor(b, last.ID) && b.quote == last.quote && b.col == last.col && gap(src, last.Output.End, pos, q) && !last.hasPart(b.Attrs["stream"] == "stderr") {
 				last.Output.End = next
 				last.addPart(b.Attrs["stream"] == "stderr")
+				last.addCurrentPart(Span{pos, next}, b.Attrs["at"], b.Attrs["stream"] == "stderr")
 				if b.Attrs.Has("nosave") {
 					last.outNoSave = true
 				}
@@ -290,6 +298,7 @@ func Parse(src []byte) (*Document, error) {
 			if last != nil && len(last.History) == 0 && id == last.ID && last.quote == q && gap(src, last.Output.End, pos, q) && !last.hasPart(false) {
 				last.Output.End = next
 				last.addPart(false)
+				last.addCurrentPart(Span{pos, next}, attrs["at"], false)
 			} else {
 				head := line[:len(line)-len(rest)+spaces(rest)]
 				c := &Copy{For: id, Region: true, Span: Span{pos, next}, Prefix: linePrefix(head)}
@@ -459,6 +468,15 @@ func (b *Block) addPart(stderr bool) {
 		b.outErr = true
 	} else {
 		b.outMain = true
+	}
+}
+
+// addCurrentPart records a part of b's current output, and its at=: the
+// stdout part's, else the stderr fence's.
+func (b *Block) addCurrentPart(s Span, at string, stderr bool) {
+	b.CurrentParts = append(b.CurrentParts, s)
+	if at != "" && (!stderr || b.CurrentAt == "") {
+		b.CurrentAt = at
 	}
 }
 

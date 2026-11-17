@@ -1,7 +1,8 @@
 # Output history for a block (`history=N`)
 
-Design. Steps 1 and 2 of the work order (the `at=` stamp, and parsing
-earlier runs) are built; the rest is not yet.
+Design. Steps 1 to 3 of the work order (the `at=` stamp, parsing
+earlier runs, and rotating them on write-back) are built; the rest is
+not yet.
 
 ## The ask
 

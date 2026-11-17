@@ -564,6 +564,12 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		if err := writeFile(target, out, mode); err != nil {
 			return err
 		}
+		if *outFile == "" {
+			// Earlier runs the save dropped take their files along.
+			if err := run.TidyHistoryAssets(d.Src, out, opts); err != nil {
+				fmt.Fprintln(stderr, "mdsh:", err)
+			}
+		}
 		log.Event("write", audit.Fields{"what": "document", "file": target})
 	}
 	if live != nil {

@@ -28,6 +28,8 @@ type Entry struct {
 	// Region is set when its stdout part is an output region, as for
 	// markdown, image and recording output.
 	Region bool
+	// Parts cover its parts, each from its opening line to its end.
+	Parts []Span
 
 	main, err bool // the parts it has: stdout and stderr
 }
@@ -118,6 +120,7 @@ func (b *Block) addEntryPart(k int, start, end int, attrs map[string]string, reg
 			e.At = at
 		}
 	}
+	e.Parts = append(e.Parts, Span{start, end})
 	e.Span.End = end
 	b.Output.End = end
 	return nil

@@ -231,12 +231,16 @@ type Notebook struct {
 	warned  map[string]bool
 	sess    *run.Session
 	results []*run.Result
-	index   map[*doc.Block]int
-	cancel  context.CancelFunc
-	running bool
-	clicked *doc.Block // the block RunBlock runs, which needs no confirm
-	dirty   bool       // output changed since the last save
-	stamp   fileStamp  // the file as last read or written
+	// inSource are the results fold has written into d's source, which
+	// a later fold rewrites in place rather than pushing them down as
+	// earlier runs (see render.Options.InSource).
+	inSource map[*run.Result]bool
+	index    map[*doc.Block]int
+	cancel   context.CancelFunc
+	running  bool
+	clicked  *doc.Block // the block RunBlock runs, which needs no confirm
+	dirty    bool       // output changed since the last save
+	stamp    fileStamp  // the file as last read or written
 	// bg are the background blocks still running. While nothing else
 	// runs, reaper checks on them every reapEvery; reaping is set while
 	// it does, and idle tells those waiting for it that it is done.
@@ -842,10 +846,19 @@ func (n *Notebook) readIncludes() {
 }
 
 func (n *Notebook) fold() error {
-	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: environ()})
+	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: environ(), InSource: func(r *run.Result) bool { return n.inSource[r] }})
+	n.inSource = map[*run.Result]bool{}
+	for _, r := range n.results {
+		if r != nil && r.Ran {
+			n.inSource[r] = true
+		}
+	}
 	if bytes.Equal(out, n.d.Src) {
 		return nil
 	}
+	// Earlier runs that fell past their block's cap take their files
+	// along.
+	run.TidyHistoryAssets(n.d.Src, out, run.Options{File: n.file})
 	if err := n.d.SetSource(out); err != nil {
 		return err
 	}

@@ -32,6 +32,27 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![An http block in mdsh-gui with its body folded to { … 6 more lines, and its three checks still showing under it](docs/changelog/http-body-fold.png)
 
+- mdsh reads `history=N` on a block, and the earlier runs' outputs kept
+  under its current output as fences marked `history=K`. They belong to
+  the block: moving, deleting and renaming it carry them along, Clear
+  output removes them, saving keeps them, and printing shows only the
+  current output. One that isn't right under its block's output is an
+  error.
+
+- Each run of a block with `history=N` keeps the run before it: the
+  output the file held moves down as `history=1`, the older ones down
+  one, and those past N are dropped. Every run counts, even one with
+  the same output, and one that prints nothing is kept as an empty
+  output with its time. An image, screenshot or recording moved down
+  is renamed with its run's time, `d.md.assets/check.2026-11-13T190800Z.svg`,
+  and its link follows; the current one keeps its path. Saving holds
+  the history to N, so lowering N, or dropping `history=`, trims it,
+  and deletes the files of the runs it drops. mdsh-gui and `mdsh -i`
+  don't show the earlier runs yet.
+
+  Note: mdsh 1.6.0 and older read the earlier runs as copies of the
+  output, and `-w` overwrites them all with the current output.
+
 ### Fixed
 
 - mdsh-gui: with Use Neovim on, a block's Edit button, or a click on
