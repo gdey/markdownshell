@@ -70,8 +70,8 @@ With no terminal the run stops at a question unless `--yes` answers it.
 ## Fence attributes
 
 Attributes sit in `{…}` after the language: ```` ```sh {#build env=ci confirm="Deploy?"} ````.
-Every `sh` and `zsh` block runs; other languages are left alone. Unknown
-attributes are kept as written.
+Every `sh` and `zsh` block runs, and an `http` block makes its request;
+other languages are left alone. Unknown attributes are kept as written.
 
 | Attribute | Does |
 | --- | --- |
@@ -102,6 +102,7 @@ attributes are kept as written.
 | `out=screenshot[:path]` | The text output drawn as a terminal-style image: SVG, or PNG when the path ends in `.png` |
 | `out=recording:path` | With `tty`, where the cast goes; a path ending in `.gif` links an animated GIF too |
 | `embed=inline` | With `out=image` or `out=screenshot`, a data URI instead of a file |
+| `raw` | On an `http` block, save the response body as it came instead of pretty-printing JSON |
 
 Paths default to `<doc>.assets/<id>.<ext>`; `res://name` is `name` in
 that folder.
@@ -142,7 +143,7 @@ on save.
 | ```` ```output {for=id exit=0} ```` | A block's output, right under it; elsewhere, a copy mdsh refills on every run. `stream=stderr` is its stderr; `nosave` keeps that fence out of the file |
 | `<!-- mdsh:output for="id" -->` … `<!-- /mdsh:output -->` | The same for `out=markdown` and image output |
 | ```` ```tape {for=id} ```` | Types the input for `tty` block `id`, in VHS commands: `Type "…"`, `Enter`, `Tab`, `Up`…, `Ctrl+X`, `Alt+X`, `Sleep 1s`, `Wait /regex/`, `Set TypingSpeed`, `WaitTimeout`, `WaitPattern`. Double-quoted `Type` takes placeholders. Can be an include |
-| ```` ```http ```` | One request: `METHOD URL`, headers, a blank line, the body; `HTTP 200`, then `[Asserts]` (`jsonpath $.id == 1`, `header X contains y`, `status`, `body`, `regex`, `duration`) and `[Captures]` (`token: secret jsonpath $.token`, read as `{{#id/env(token)}}`). `{{#id/status}}`, `{{#id/json($.x)}}` and `{{#id/header(Name)}}` read the response in prose and conditions. `[QueryStringParams]`, `[FormParams]`, `[Options]` |
+| ```` ```http ```` | One request: `METHOD URL`, headers, a blank line, the body; `HTTP 200`, then `[Asserts]` (`jsonpath $.id == 1`, `header X contains y`, `status`, `body`, `regex`, `duration`) and `[Captures]` (`token: secret jsonpath $.token`, read as `{{#id/env(token)}}`). `{{#id/status}}`, `{{#id/json($.x)}}` and `{{#id/header(Name)}}` read the response in prose and conditions. `[QueryStringParams]`, `[FormParams]`, `[Options]` (`insecure`, `follow`, `timeout`) and an `@file` body. `env=`, `share=`, `tty`, `background` and `out=` are errors on it |
 | ```` ```cast ```` | An asciinema recording, played in mdsh-gui; `frame=N` opens it there |
 | ```` ```d2 ````, ```` ```svg ```` | A diagram, a picture, drawn in mdsh-gui |
 | `- [ ] task` | A task item mdsh-gui checks in the file when clicked; table cells starting with `[ ]` too |
@@ -190,6 +191,8 @@ mdsh:
   terminal:
     cols: 100
     rows: 30
+  http:
+    secret_headers: [X-Session-Id]
   env:
     share: [..., -GITHUB_TOKEN]
     source: [~/.zsh_aliases, lib/helpers.sh]
@@ -204,6 +207,7 @@ mdsh:
 | `interpolate` | `true`, `false` | `true` | Fill in `{{…}}` placeholders in prose |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none; a block's `show-stderr` overrides it |
 | `terminal.cols`, `terminal.rows` | cells, up to 1000 by 500 | fit the card, 24 | The size of the terminal mdsh-gui runs `tty` blocks on |
+| `http.secret_headers` | header names | none | Response headers, besides `Set-Cookie`, `Authorization`, `Proxy-Authorization`, `WWW-Authenticate` and `X-API-Key`, that `http` blocks save as `(secret)` |
 | `env.share` | names, `...`, `-NAME` | the base set | Variables from mdsh's environment that reach the top-level shell, and the default `share=` for sub-envs |
 | `env.source` | file paths | none | Files sourced into every shell before its first block; `~/` is home, other relative paths are from the document |
 
@@ -339,7 +343,7 @@ explains an attribute and `zc`/`zo` fold.
 | Run | Run Current Block · Run Section · Run All · Stop · Clear All Outputs… · Run Options… |
 | View | Source View · Rendered View · Outline · History · Console · Show Code · Show Output · Folding › Collapse All Blocks, Collapse All Sections, Expand All, Copy Folds to Source View, Copy Folds to Rendered View · Zoom In · Zoom Out · Actual Size · Toggle Full Screen · Show Next Tab · Show Previous Tab |
 | Help | Cheat Sheet · Changelog |
-| Insert (right-click in the source view) | Heading · Bold · Italic · Code · Link · Image · Bulleted List · Numbered List · Task List · Quote · Table · Code Block · sh Block · sh Block, Confirm First · zsh Block · Textbox · Choice |
+| Insert (right-click in the source view) | Heading · Bold · Italic · Code · Link · Image · Bulleted List · Numbered List · Task List · Quote · Table · Code Block · sh Block · sh Block, Confirm First · zsh Block · http Request · Textbox · Choice |
 
 Settings has six tabs: General, Look, Editing, Shell, Files and About;
 About links to this cheat sheet and the changelog, which open in

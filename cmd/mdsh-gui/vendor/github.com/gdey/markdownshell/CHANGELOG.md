@@ -8,6 +8,23 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The site's docs have an [HTTP requests](site/content/docs/http.md)
+  page: how to write an `http` block, its checks and captures, the
+  placeholders that read a response, what is saved and what is masked,
+  its attributes, and the views in mdsh-gui and `mdsh -i`, with both
+  folds. The examples tour has a seventh part,
+  [examples/http.md](examples/http.md), which runs each of those
+  against a small API of its own, started in a `background` block.
+  The other docs pages catch up with the code: `raw`,
+  `out=recording:`, `at=` on output, `{{$?}}` and the other result
+  placeholders, `http.secret_headers`, the `x`, `H`, `Y` and `F` keys,
+  `--show-secrets`, the Load image button, and typing a block in the
+  History pane.
+
+  ![The HTTP requests page on the site, in the teletype skin: the login block, its saved response with the token and Set-Cookie masked, and the whoami block](docs/changelog/http-docs.png)
+
+  ![The same page's desktop app section in the plain dark skin: the Headers tab and a folded response](docs/changelog/http-docs-dark.png)
+
 - An image mdsh-gui's rendered view doesn't load by itself, one from
   another site or a file outside the document's folder (or hidden in
   it), has a Load image button on the note that stands in for it.

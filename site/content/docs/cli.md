@@ -17,6 +17,7 @@ weight: 50
 | `mdsh --pdf doc.pdf doc.md` | Nothing; lays out what it would print as `doc.pdf` | No; with `-w` or `-o` it writes those too |
 | `mdsh --html doc.html doc.md` | Nothing; writes what it would print as a standalone `doc.html` | No; with `-w` or `-o` it writes those too |
 | `mdsh --only build doc.md` | That block, plus what it depends on | Per flags |
+| `mdsh --show-secrets --pdf doc.pdf doc.md` | Puts `secret` blocks' code and output in a report; without it they read `(secret)` | Per flags |
 | `mdsh --yes doc.md` | Runs `confirm` blocks without asking | Per flags |
 | `mdsh --step doc.md` | Asks before every block: run, skip or stop | Per flags |
 | `mdsh --stop-on-error doc.md` | Stops at the first block that fails, as if every block had `on_error=stop` | Per flags |

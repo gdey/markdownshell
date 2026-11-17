@@ -30,7 +30,9 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   stop on error.
 - **History**, with `h`: a shell along the bottom with your shell's own
   prompt, completion and emacs line keys. Each command is added to the file as a block,
-  with its output; a line starting with `#` becomes prose. Shift+↑ in
+  with its output; a line starting with `#` becomes prose, and
+  ``# ```sh`` opens a block typed line by line, added to the file when a
+  ```` ``` ```` line ends it. Shift+↑ in
   the pane, or `V`, selects lines of its output, and `y` copies them.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
@@ -38,6 +40,9 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
 - **See** an outline of the file with `o`, hide code or output with `C`
   and `O`, and show a block's image full screen with `v`. `tty` blocks
   run in their card and stay open for reading.
+- **HTTP requests.** An [`http` block]({{< relref "http" >}}) shows
+  its response's status, body and checks under it; `H` switches to the
+  headers and `Y` copies the request as `curl`.
 - **Reports**, with `p`: a PDF, HTML or markdown copy, as the desktop
   app's Create Report makes.
 - **Save** with `w`, Save As with `W`. If the file changes on disk, a
@@ -65,6 +70,10 @@ with the reason.
 | ctrl+] | stop a `tty` block running in its card |
 | `e` / `E` | edit the block, or the whole file, in `$EDITOR` |
 | `y` | copy the block's code to the clipboard |
+| `Y` | copy an `http` block's request as a `curl` command |
+| `H` | show an `http` block's response headers, or its body again |
+| `x` | show or hide a `secret` block's code and output |
+| `F` | fix front matter that doesn't parse, when mdsh can |
 | `V` | select lines of History's output; `y` copies them |
 | `J`/`K`, alt+↓/↑ | move the block down or up |
 | `u` | undo the last move |

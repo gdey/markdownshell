@@ -20,6 +20,8 @@ mdsh:
   terminal:
     cols: 100
     rows: 30
+  http:
+    secret_headers: [X-Session-Id]
   env:
     share: [PATH, HOME]
     source: [~/.zsh_aliases]
@@ -40,6 +42,7 @@ closing line, the `---` is just a thematic break.
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
 | `terminal.cols`, `terminal.rows` | cells | fit the window, 24 | In mdsh-gui, the size of the terminal `tty` blocks run on |
+| `http.secret_headers` | list of header names | none | Response headers, besides the built-in five, whose values `http` blocks save as `(secret)` |
 | `env.share` | list of variable names, `...`, `-NAME` | the base set | Variables passed from mdsh's environment into the shell, besides the base set (`PATH`, `HOME`, `USER`, ...), and the default `share=` for sub-envs |
 | `env.source` | list of file paths | none | Files sourced into every shell before its first block, such as aliases and functions |
 
@@ -83,6 +86,20 @@ the width too, while its height is what you drag it to. Either may be
 left out, and 0 is the same. `cols` goes up to 1000 and `rows` to 500.
 `mdsh` itself runs `tty` blocks on the terminal it is in, at that
 terminal's size.
+
+### `http.secret_headers`
+
+An [http block]({{< relref "http#secrets" >}}) saves the values of
+`Set-Cookie`, `Authorization`, `Proxy-Authorization`, `WWW-Authenticate`
+and `X-API-Key` as `(secret)`. An API that puts a token in a header of
+its own can add names here; they match in any case, and the built-in
+five can't be taken off. Checks and captures still see the real values.
+
+```yaml
+mdsh:
+  http:
+    secret_headers: [X-Session-Id, X-Request-Token]
+```
 
 ### `interpolate`
 
