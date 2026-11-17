@@ -281,6 +281,7 @@ its output.
 | `o` | show or hide the outline: the headings and blocks down the left, with each block's state (✓ ran, ✗ failed, ? waiting for an answer, … running) |
 | `x` | show or hide the selected block's secret: a `secret` block's code and output, masked until then, and masked again when you move off it |
 | `H` | switch an `http` block's response between its body and its headers |
+| `b` | show or hide the block's earlier runs, kept by `history=N` |
 | `C` / `O` | hide or show the code / the output of blocks |
 | `p` | create a report, as `mdsh-gui`'s Create Report: PDF, HTML or markdown, with or without code and output, of this run, of a run of every block, or of the file as saved. It shows the `mdsh` command that makes the same report |
 | `,` | run options for this file: the arguments `$1` and on, `--only`, `--step` and `--stop-on-error`. Setting them starts new shells, and the file keeps them when opened again |

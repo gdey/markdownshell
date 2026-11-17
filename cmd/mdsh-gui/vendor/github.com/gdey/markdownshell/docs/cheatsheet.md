@@ -278,6 +278,7 @@ env starts in the document's folder.
 | `o` | Show or hide the outline |
 | `x` | Show or hide the selected block's secret |
 | `H` | Show an `http` block's response headers, or its body |
+| `b` | Show or hide the block's earlier runs, kept by `history=N` |
 | `C` / `O` | Show or hide code / output |
 | `]` / `[` | Next / previous tab |
 | ctrl+t | New tab, on the list of files |

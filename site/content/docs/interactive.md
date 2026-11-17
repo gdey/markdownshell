@@ -72,6 +72,7 @@ with the reason.
 | `y` | copy the block's code to the clipboard |
 | `Y` | copy an `http` block's request as a `curl` command |
 | `H` | show an `http` block's response headers, or its body again |
+| `b` | show or hide the block's earlier runs, kept by `history=N` |
 | `x` | show or hide a `secret` block's code and output |
 | `F` | fix front matter that doesn't parse, when mdsh can |
 | `V` | select lines of History's output; `y` copies them |

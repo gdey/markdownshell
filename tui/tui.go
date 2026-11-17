@@ -82,6 +82,15 @@ type Model struct {
 	// httpHeaders holds the http blocks whose response shows its
 	// headers instead of its body; H switches.
 	httpHeaders map[*doc.Block]bool
+	// earlierShown holds the blocks whose earlier runs, kept by
+	// history=N, show under their output; b switches.
+	earlierShown map[*doc.Block]bool
+	// inSource are the results foldRuns has written into the document's
+	// source, so writing it back doesn't push them down twice.
+	inSource map[*run.Result]bool
+	// trimmed says which blocks' earlier runs the last write dropped,
+	// past their history=, or "".
+	trimmed string
 	// results are the latest result of each block. They are copied from
 	// run events, so drawing and saving never read the session while a
 	// run is going.
@@ -581,6 +590,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		// A block with a history keeps this run under the next one.
+		m.foldRuns()
 		// What ran may have changed the prompt, as cd does.
 		if m.hist.open {
 			m.askPrompt()
@@ -784,6 +795,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "H":
 		m.toggleHeaders()
+	case "b":
+		m.toggleEarlier()
 	case "v":
 		if cmd := m.view(); cmd != nil {
 			return m, cmd
@@ -1302,12 +1315,18 @@ func (m *Model) save(force bool) {
 	if !m.opts.AutoSave {
 		m.status = "saved"
 	}
+	// Earlier runs a lowered or dropped history= let go are worth a
+	// word, even when saving says nothing else.
+	if m.trimmed != "" {
+		m.status = strings.TrimPrefix(m.status+"; "+m.trimmed, "; ")
+	}
 }
 
 // write saves the document with its results to file, which then is the
 // file the TUI watches.
 func (m *Model) write(file string) error {
-	out := render.Markdown(m.d, m.results, render.Options{WriteBack: true, Env: m.opts.Run.Environ})
+	trimmed := trims(m.d)
+	out := render.Markdown(m.d, m.results, m.writeOptions())
 	if err := m.opts.Save(file, out); err != nil {
 		return err
 	}
@@ -1319,6 +1338,7 @@ func (m *Model) write(file string) error {
 		m.mtime = info.ModTime()
 	}
 	m.dirty, m.changed = false, false
+	m.trimmed = trimmed
 	return nil
 }
 

@@ -1,8 +1,10 @@
 # Output history for a block (`history=N`)
 
-Design. Steps 1 to 4 of the work order (the `at=` stamp, parsing
-earlier runs, rotating them on write-back, and showing them in
-mdsh-gui) are built; the rest is not yet.
+Design. Steps 1 to 5 of the work order (the `at=` stamp, parsing
+earlier runs, rotating them on write-back, and showing them in mdsh-gui
+and `mdsh -i`) are built; `--history` for printing and reports is not
+yet. `mdsh -i` shows them with `b`, as `H` already switches an http
+block's response to its headers.
 
 ## The ask
 

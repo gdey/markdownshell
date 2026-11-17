@@ -114,6 +114,7 @@ var helpItems = []helpItem{
 	{group: "View", keys: "o", key: runeKey("o"), what: says("show or hide the outline")},
 	{group: "View", keys: "x", key: runeKey("x"), what: says("show or hide the block's secret, until you move off it"), off: noSecret},
 	{group: "View", keys: "H", key: runeKey("H"), what: says("show an http block's response headers, or its body"), off: noHTTP},
+	{group: "View", keys: "b", key: runeKey("b"), what: says("show or hide the block's earlier runs, kept by history=N"), off: noEarlier},
 	{group: "View", keys: "C", key: runeKey("C"), what: says("show or hide code")},
 	{group: "View", keys: "O", key: runeKey("O"), what: says("show or hide output")},
 	{group: "View", keys: "?", key: runeKey("?"), what: says("this help")},
@@ -130,6 +131,13 @@ var helpItems = []helpItem{
 func noBlocks(m *Model) string {
 	if len(m.nav) == 0 {
 		return "the file has no blocks"
+	}
+	return ""
+}
+
+func noEarlier(m *Model) string {
+	if i := m.cur(); i < 0 || len(m.d.Blocks[i].History) == 0 {
+		return "the block has no earlier runs"
 	}
 	return ""
 }
