@@ -149,3 +149,32 @@ func TestHistoryInputStaysWhileRunning(t *testing.T) {
 		t.Error("history.ts: historyBusy disables the input for a command the pane started, which blurs it")
 	}
 }
+
+// A folded part hides everything it shows unfolded. An http block's
+// output part holds its response view as well as the output, so
+// folding it must hide the view too, not only the output under it.
+func TestFoldedOutputHidesHTTPView(t *testing.T) {
+	src, err := os.ReadFile("frontend/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`\.block \.part\.folded > :is\([^)]*\.http-view[^)]*\) \{ display: none; \}`).Match(src) {
+		t.Error("style.css: a folded part doesn't hide .http-view, so a folded http block still shows its response")
+	}
+}
+
+// An http block's body folds on its own: the folded pane hides the body
+// and shows its summary, and the open one the other way round, so the
+// checks under the pane stay either way.
+func TestFoldedHTTPBodyKeepsChecks(t *testing.T) {
+	src, err := os.ReadFile("frontend/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`\.block \.http-pane\.folded > \.http-body, \.block \.http-pane:not\(\.folded\) > \.http-body-summary \{ display: none; \}`).Match(src) {
+		t.Error("style.css: a folded http body doesn't swap the body for its summary")
+	}
+	if regexp.MustCompile(`\.folded[^{]*\.http-checks[^{]*\{ display: none`).Match(src) {
+		t.Error("style.css: folding the body hides the checks")
+	}
+}

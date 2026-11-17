@@ -24,6 +24,28 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh -i's History pane while a block is typed: its lines under ```sh> prompts, and the pane's rule saying ``` ends it and ctrl+c drops it](docs/changelog/history-block-tui.png)
 
+- An http block's body folds on its own in mdsh-gui, by the chevron
+  beside its Body tab, to its first line and how many more there are.
+  The status in the card's head and the checks under the body stay in
+  view; folding the whole output still hides the lot. The body's fold
+  lasts while the app is open and isn't saved to the file.
+
+  ![An http block in mdsh-gui with its body folded to { … 6 more lines, and its three checks still showing under it](docs/changelog/http-body-fold.png)
+
+### Fixed
+
+- mdsh-gui: with Use Neovim on, a block's Edit button, or a click on
+  prose, while the source view was closed opened Neovim with the cursor
+  on line 1. It now waits for Neovim to start and puts the cursor on
+  that block or prose, as it does when the view is already open.
+
+- Folding an http block's output in mdsh-gui, or opening it with
+  `collapse-output`, left its response's body showing. The whole
+  response folds now, to its status line and how many more lines there
+  are.
+
+  ![A folded http block in mdsh-gui: under its code, one line reads HTTP/1.1 200 OK … 10 more lines](docs/changelog/http-fold.png)
+
 ## [1.6.0] - 2026-11-16
 
 mdsh learns to talk to web services. An `http` block makes one HTTP

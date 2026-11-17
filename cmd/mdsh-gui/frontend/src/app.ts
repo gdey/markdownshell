@@ -1237,7 +1237,7 @@ function drawBlock(c: Cell): HTMLElement {
   if (c.http) {
     // The response's view takes the output's place; the output stays,
     // hidden, so copying it copies the response as the file saves it.
-    block.querySelector(".output")!.before(drawHTTP(c.http));
+    block.querySelector(".output")!.before(drawHTTP(c.http, partKey(block, "output")));
     block.classList.add("has-http");
   }
   colorOutput(block.querySelector(".output")!);
@@ -1532,7 +1532,9 @@ function drawPart(block: HTMLElement, part: Part) {
   wrap.querySelector(":scope > button.fold")?.setAttribute("aria-expanded", String(!on));
   const summary = wrap.querySelector<HTMLElement>(".fold-summary")!;
   summary.hidden = !on;
-  if (on) summarize(wrap.children[1] as HTMLElement, summary);
+  // An http block's response view sits before its output, which still
+  // holds the response as text: the summary is that, from its status line.
+  if (on) summarize(wrap.querySelector<HTMLElement>(":scope > :is(pre.code, .output)")!, summary);
 }
 
 // summarize puts full's first line in summary, and how much more there is.
