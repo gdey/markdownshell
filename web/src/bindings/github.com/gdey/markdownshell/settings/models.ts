@@ -66,6 +66,13 @@ export interface Settings {
     "neovimOwnColors": boolean;
 
     /**
+     * Serve lets mdsh-gui serve notebooks: to a web browser on this
+     * machine, from File › Serve in Browser, and to the program that
+     * started it with --serve=stdio. Experimental, and off by default.
+     */
+    "serve": boolean;
+
+    /**
      * Theme is "light" or "dark"; empty follows the system.
      */
     "theme": string;

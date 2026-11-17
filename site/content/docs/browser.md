@@ -10,6 +10,21 @@ rendered prose, blocks that stream their output as they run, the source
 view, `tty` blocks in a terminal, reports and tabs. It prints the
 address to open.
 
+`--serve` is only in an mdsh built with the `serve` tag, because anyone
+who can reach the page can run commands as you. Release builds and
+Homebrew leave it out. Build it in with:
+
+```sh
+go install -tags serve github.com/gdey/markdownshell/cmd/mdsh@latest
+```
+
+The [desktop app]({{< relref "desktop" >}}) can serve too, with no
+command line tool. Turn on Settings › Shell › Serve notebooks to
+browsers and other programs, which is experimental and off by default.
+Then File › Serve in Browser serves the file in front on a free port of
+127.0.0.1 and opens it in your browser. The page has its own shells,
+apart from the app's tab, and runs until the app quits.
+
 ```sh
 mdsh --serve                      # the markdown files under this folder, at 127.0.0.1:8080
 mdsh --serve notes.md staging     # notes.md, with $1 set to staging

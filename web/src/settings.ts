@@ -71,6 +71,7 @@ function draw() {
   input("neovim-clean").checked = s.neovimClean;
   input("neovim-colors").checked = !s.neovimOwnColors;
   input("neovim-path").value = s.neovimPath;
+  input("serve").checked = s.serve;
   select("theme").value = s.theme;
   select("look").value = s.look;
   drawLook();
@@ -184,6 +185,7 @@ select("secret-show").onchange = () => ((s.secretShowSeconds = Number(select("se
 input("vim").onchange = () => ((s.vim = input("vim").checked), save().then(draw));
 input("spellcheck").onchange = () => ((s.noSpellCheck = !input("spellcheck").checked), save());
 input("neovim").onchange = () => ((s.neovim = input("neovim").checked), save());
+input("serve").onchange = () => ((s.serve = input("serve").checked), save());
 input("neovim-clean").onchange = () => ((s.neovimClean = input("neovim-clean").checked), save());
 input("neovim-colors").onchange = () => ((s.neovimOwnColors = !input("neovim-colors").checked), save());
 input("neovim-path").onchange = async () => {

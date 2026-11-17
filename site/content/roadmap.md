@@ -19,8 +19,9 @@ including where the trust boundary sits.
 `mdsh --serve` opens a notebook in a browser, from a machine that has no
 display, over an SSH tunnel. It listens on loopback only, with a token
 and a cookie. It is on the main branch, documented in
-[Browser]({{< relref "docs/browser" >}}); its security review lands
-before it is in a release.
+[Browser]({{< relref "docs/browser" >}}), and built only into an mdsh
+built with `-tags serve`; its security review lands before releases
+build it in.
 
 ## An MCP server
 

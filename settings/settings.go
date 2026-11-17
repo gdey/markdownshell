@@ -60,6 +60,10 @@ type Settings struct {
 	// NeovimOwnColors keeps the colorscheme from the user's Neovim
 	// config, rather than the app's theme, which is the default.
 	NeovimOwnColors bool `json:"neovimOwnColors"`
+	// Serve lets mdsh-gui serve notebooks: to a web browser on this
+	// machine, from File › Serve in Browser, and to the program that
+	// started it with --serve=stdio. Experimental, and off by default.
+	Serve bool `json:"serve"`
 	// Theme is "light" or "dark"; empty follows the system.
 	Theme string `json:"theme"`
 	// Look is a look's id from its look.css in web/looks, such as
@@ -142,6 +146,9 @@ type Store struct {
 
 	mu sync.Mutex
 	s  Settings
+	// watch are called after each Update, with the settings as they
+	// are then.
+	watch []func(Settings)
 }
 
 // DefaultPath is where the settings live: mdsh/gui.json in the user's
@@ -190,21 +197,35 @@ func (s Settings) clone() Settings {
 	return s
 }
 
-// Update changes the settings with f and writes them out.
+// Update changes the settings with f and writes them out, then calls
+// the functions OnChange was given.
 func (st *Store) Update(f func(*Settings)) error {
 	st.mu.Lock()
-	defer st.mu.Unlock()
 	s := st.s.clone()
 	f(&s)
 	out, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return err
+	if err == nil {
+		err = write(st.path, append(out, '\n'))
 	}
-	if err := write(st.path, append(out, '\n')); err != nil {
+	if err != nil {
+		st.mu.Unlock()
 		return err
 	}
 	st.s = s
+	watch := slices.Clone(st.watch)
+	st.mu.Unlock()
+	for _, fn := range watch {
+		fn(s.clone())
+	}
 	return nil
+}
+
+// OnChange has fn called with the settings after each Update, such as
+// for a menu that follows one.
+func (st *Store) OnChange(fn func(Settings)) {
+	st.mu.Lock()
+	st.watch = append(st.watch, fn)
+	st.mu.Unlock()
 }
 
 // write puts data in path, readable by the user only: the settings

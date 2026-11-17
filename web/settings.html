@@ -258,6 +258,13 @@
         <button id="wrapper-install" class="primary">Install and Turn On</button>
         <button id="wrapper-cancel">Cancel</button>
       </div>
+      <div class="setting">
+        <div class="text">
+          <label for="serve">Serve notebooks to browsers and other programs <span class="experimental">Experimental</span></label>
+          <p class="muted">Adds File › Serve in Browser, which serves the file in front to your web browser on this machine, and lets <code>mdsh-gui --serve=stdio</code> serve it to the program that started it, such as an editor plugin. The browser page, and that program, can run blocks as you.</p>
+        </div>
+        <input id="serve" type="checkbox">
+      </div>
     </section>
 
     <section id="files" role="tabpanel" hidden>

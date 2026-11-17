@@ -278,3 +278,26 @@ func TestSecretShow(t *testing.T) {
 		}
 	}
 }
+
+// OnChange's functions see each Update, after it is written.
+func TestOnChange(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "gui.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []bool
+	st.OnChange(func(s Settings) {
+		if st.Get().Serve != s.Serve {
+			t.Error("OnChange ran before the store had the change")
+		}
+		got = append(got, s.Serve)
+	})
+	for _, on := range []bool{true, false} {
+		if err := st.Update(func(s *Settings) { s.Serve = on }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(got) != 2 || !got[0] || got[1] {
+		t.Errorf("OnChange saw %v, want [true false]", got)
+	}
+}

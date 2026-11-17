@@ -208,7 +208,7 @@ mdsh --step notes.md       # ask before every block: run, skip or stop
 mdsh --source defs.zsh notes.md  # source defs.zsh into every shell first
 mdsh -i notes.md           # open it in a terminal UI and run blocks as you pick them
 mdsh -i ~/notes            # pick a file under ~/notes first (mdsh -i alone: this folder)
-mdsh --serve notes.md      # open it in a web browser instead; see Serving to a browser
+mdsh --serve notes.md      # open it in a web browser instead, built with -tags serve; see Serving to a browser
 ```
 
 Shell completion covers flags, `.md` files and, after `--only`, the
@@ -323,6 +323,20 @@ won't save over it until you pick one or press `w` twice.
 rendered prose, blocks you run and watch stream, the source view, tty
 blocks in a terminal, reports and tabs. It prints the address to open.
 
+`--serve` is only in an mdsh built with the `serve` tag, since anyone
+who can reach the page can run commands as you. Release builds and
+Homebrew leave it out. To build it in, run
+`go install -tags serve github.com/gdey/markdownshell/cmd/mdsh@latest`,
+or `go build -tags serve ./cmd/mdsh` in a checkout.
+
+mdsh-gui can do the same without the command line tool. Turn on
+Settings › Shell › Serve notebooks to browsers and other programs
+(experimental, off by default), then File › Serve in Browser serves the
+file in front on a free port of 127.0.0.1 and opens it in your browser.
+The page has its own shells, apart from the app's tab, and keeps
+running until the app quits. Serving the same file again opens the same
+page.
+
 ```
 mdsh --serve                     # the markdown files under this folder, at 127.0.0.1:8080
 mdsh --serve notes.md a b        # notes.md, with $1 and $2 set
@@ -381,7 +395,9 @@ a shell login:
 mdsh, such as an editor plugin, instead of to a browser: the same calls,
 events and questions, as one JSON object per line on stdin and stdout.
 `mdsh-gui --serve=stdio` does the same and opens no window, so a plugin
-can use whichever is installed.
+can use whichever is installed. In mdsh-gui it is experimental and off
+by default: turn on Settings › Shell › Serve notebooks to browsers
+and other programs first, or it says so and exits.
 
 ```
 {"id":1,"name":"ui.App.RunBlock","args":[0],"window":1,"tab":1}   → stdin

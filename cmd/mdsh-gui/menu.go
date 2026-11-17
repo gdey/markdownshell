@@ -142,6 +142,7 @@ func (g *gui) buildMenu() *application.Menu {
 	file.Add("Save As…").SetAccelerator("CmdOrCtrl+Shift+S").OnClick(send("saveas"))
 	file.Add("Create Report…").OnClick(send("report"))
 	file.Add("Reload").OnClick(send("reload"))
+	g.addServeItem(file)
 	file.AddSeparator()
 	file.Add("Close Tab").SetAccelerator("CmdOrCtrl+W").OnClick(func(*application.Context) { g.ctrl.CloseTab() })
 	file.Add("Close Window").SetAccelerator("CmdOrCtrl+Shift+W").OnClick(func(*application.Context) { g.ctrl.CloseWindow() })

@@ -12,7 +12,8 @@
 // folder to pick from, or under folder when one is given.
 //
 // With --serve=stdio it opens no window and serves the notebook on stdin
-// and stdout instead, as mdsh --serve=stdio does.
+// and stdout instead, as mdsh --serve=stdio does. It is experimental,
+// and runs only once Settings › Shell turns it on.
 package main
 
 import (
@@ -27,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -133,7 +135,7 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.BoolVar(&o.run.StopOnError, "stop-on-error", false, "stop at the first failing block")
 	fs.BoolVar(&o.run.Step, "step", false, "ask before running each block, as if every block were marked confirm")
 	fs.BoolVar(&o.version, "version", false, "print the version and exit")
-	fs.Func("serve", "with `stdio`, open no window and serve the notebook on stdin and stdout, as mdsh --serve=stdio does, for a program that starts mdsh-gui", func(v string) error {
+	fs.Func("serve", "with `stdio`, open no window and serve the notebook on stdin and stdout, as mdsh --serve=stdio does, for a program that starts mdsh-gui; experimental, and only once Settings › Shell turns it on", func(v string) error {
 		if v != serve.Stdio {
 			return fmt.Errorf("mdsh-gui can only serve on %s", serve.Stdio)
 		}
@@ -185,13 +187,19 @@ func mdshGUI(o options) error {
 	a := ui.New(g, store, cwd, dir, o.source)
 	g.ctrl = ui.ControlOf(a)
 	g.ctrl.SetBuild(thisBuild())
-	g.ctrl.SetTrust(trust.OpenDefault())
+	trusted := trust.OpenDefault()
+	g.ctrl.SetTrust(trusted)
 	g.ctrl.SetOutside(trust.OpenOutside())
 	g.ctrl.SetImages(trust.OpenImages())
 	// The Neovim pane's language server is this program, run with --lsp.
+	var lsp func(string) []string
 	if exe, err := os.Executable(); err == nil {
-		g.ctrl.SetLSP(func(file string) []string { return []string{exe, "--lsp", file} })
+		lsp = func(file string) []string { return []string{exe, "--lsp", file} }
+		g.ctrl.SetLSP(lsp)
 	}
+	// File › Serve in Browser serves with the same settings and trust.
+	g.browsers = newBrowsers(serve.Options{Settings: store, Cwd: cwd, Source: o.source, Build: thisBuild(), LSP: lsp, Trust: trusted})
+	defer g.browsers.close(3 * time.Second)
 	// What Wails and the app log goes to the Console pane, as well as
 	// where Wails would send it.
 	cons := g.ctrl.Console()

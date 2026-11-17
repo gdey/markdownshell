@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,10 +13,15 @@ import (
 	"github.com/gdey/markdownshell/ui"
 )
 
+// errServeOff is why mdsh-gui won't serve a notebook: it is
+// experimental, and off until Settings turns it on.
+var errServeOff = errors.New("serving notebooks is experimental and off: turn on Settings › Shell › Serve notebooks to browsers and other programs")
+
 // serveStdio serves the notebook on stdin and stdout until stdin ends, as
 // mdsh --serve=stdio does, for a program that starts mdsh-gui, such as an
 // editor plugin: with the file named open, run with its arguments, or the
-// start screen listing the markdown files under the folder named.
+// start screen listing the markdown files under the folder named. It
+// runs only when Settings turns it on.
 func serveStdio(o options) error {
 	args := o.args
 	path, err := settings.DefaultPath()
@@ -25,6 +31,9 @@ func serveStdio(o options) error {
 	store, err := settings.Open(path)
 	if err != nil {
 		return err
+	}
+	if !store.Get().Serve {
+		return errServeOff
 	}
 	dir, err := argDir(args)
 	if err != nil {

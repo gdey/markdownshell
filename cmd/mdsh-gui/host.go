@@ -27,6 +27,10 @@ type gui struct {
 	// item for it, which says Install or Uninstall.
 	cli     *cliHost
 	cliItem *application.MenuItem
+	// browsers are the servers File › Serve in Browser started, and
+	// serveItem that item, shown while Settings turns serving on.
+	browsers  *browsers
+	serveItem *application.MenuItem
 
 	mu          sync.Mutex
 	named       int                  // windows made so far, for unique names
