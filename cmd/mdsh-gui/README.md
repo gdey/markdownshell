@@ -324,7 +324,11 @@ Each file opens in a tab of its own, with its own shells.
   block, and so do images in the prose, from the document's folder.
   Click an output image to see it full size. Images from other sites
   are not loaded: opening a file never reaches the network, so a note
-  with the image's alt text and host shows in its place.
+  with the image's alt text and host shows in its place, and so it is
+  for an image outside the document's folder, or hidden in it. The
+  note's Load image button loads the image and shows it, and remembers
+  that the document may load that image, so it shows by itself the next
+  time the document opens.
 - **Diagrams:** a fenced `d2` block shows as the diagram it draws, a
   fenced `svg` block as its picture, and a fenced `cast` block (an
   asciinema recording) in the cast player, with a button to switch to

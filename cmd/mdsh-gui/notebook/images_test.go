@@ -24,7 +24,7 @@ func TestImages(t *testing.T) {
 	defer n.Close()
 	prose := n.Cells()[0].HTML
 	logo := DocPrefix + filepath.ToSlash(filepath.Join(dir, "img", "logo.svg")) + "?v="
-	if !strings.Contains(prose, `src="`+logo) || strings.Contains(prose, "https://example.com") {
+	if !strings.Contains(prose, `src="`+logo) || strings.Contains(prose, `<img src="https://example.com`) || !strings.Contains(prose, `data-src="https://example.com/a.png"`) {
 		t.Errorf("prose images: %s", prose)
 	}
 	if err := n.RunBlock(0); err != nil {
@@ -96,6 +96,55 @@ func TestBeside(t *testing.T) {
 	} {
 		if _, ok := beside("/d", link); ok != want {
 			t.Errorf("beside(%q) = %v, want %v", link, ok, want)
+		}
+	}
+}
+
+// An image outside the document's folder, or hidden in it, isn't loaded
+// by itself: a note with a Load button stands in for it, and
+// OutsideImage names the file the button loads.
+func TestOutsideImages(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docs")
+	os.MkdirAll(filepath.Join(dir, ".hidden"), 0o755)
+	in := filepath.Join(dir, "in.png")
+	file := filepath.Join(dir, "doc.md")
+	src := "![up](../up.png) ![abs](" + filepath.ToSlash(in) + ") ![dot](.hidden/a.png) ![file](file://" + filepath.ToSlash(filepath.Join(root, "f.png")) + ")\n\n<img src=\"../raw.png\" alt=\"raw\">\n"
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var html string
+	for _, c := range n.Cells() {
+		html += c.HTML
+	}
+	for _, want := range []string{
+		`data-src="../up.png" data-alt="up">Image not loaded: up (outside this document`,
+		`<img src="` + DocPrefix + filepath.ToSlash(in),
+		`data-src=".hidden/a.png" data-alt="dot">Image not loaded: dot (outside this document`,
+		`data-alt="file">Image not loaded: file (outside this document`,
+		`data-src="../raw.png" data-alt="raw">Image not loaded: raw (outside this document&#39;s folder)`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("no %s in\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, `<img src="../`) || strings.Contains(html, `/up.png?`) {
+		t.Errorf("outside image loaded: %s", html)
+	}
+	for link, want := range map[string]string{
+		"../up.png":       filepath.Join(root, "up.png"),
+		".hidden/a.png":   filepath.Join(dir, ".hidden", "a.png"),
+		"in.png":          "",
+		"https://x/a.png": "",
+	} {
+		got, ok := OutsideImage(file, link)
+		if got != want || ok != (want != "") {
+			t.Errorf("OutsideImage(%q) = %q, %v; want %q", link, got, ok, want)
 		}
 	}
 }

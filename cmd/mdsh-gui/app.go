@@ -39,6 +39,13 @@ type App struct {
 	// or hidden in it, and for which files. Nil remembers nothing, so each
 	// file is asked every time it opens.
 	outside *trust.Store
+	// images remembers, for each file, the images from other sites the
+	// user loaded in it, which load again without asking. Nil remembers
+	// nothing, so each one waits for its button every time.
+	images *trust.Store
+	// remote holds the images from other sites loaded this run, by
+	// address, as data: URIs, so a redraw doesn't fetch them again.
+	remote remoteCache
 
 	menu       *application.Menu
 	viewItems  struct{ split, rendered, outline, history, console, code, output *application.MenuItem }

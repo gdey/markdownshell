@@ -8,6 +8,21 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An image mdsh-gui's rendered view doesn't load by itself, one from
+  another site or a file outside the document's folder (or hidden in
+  it), has a Load image button on the note that stands in for it.
+  mdsh-gui fetches or reads the image when it is clicked (PNG, JPEG,
+  GIF, WebP, BMP or an icon, up to 20 MB) and shows it in place of the
+  note, and remembers that this document may load this image, so it
+  shows by itself whenever the document opens again. Other images in the
+  document still wait for their own click, and opening a document never
+  reaches the network, or outside its folder, for an image nobody loaded
+  in it. The answers are kept in `images.json` in mdsh's config folder.
+  Before, an image outside the document's folder showed as a broken
+  image.
+
+  ![Two images not loaded, one outside the document's folder and one from another site, each a note with a Load image button beside it](docs/changelog/remote-image-load.png)
+
 - A block can be typed in the History pane, in mdsh-gui and `mdsh -i`.
   A line such as ``# ```sh {#rollout}`` opens it, the `#` making it a
   comment should it reach a shell. The prompt becomes ```` ```sh> ````
