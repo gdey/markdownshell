@@ -22,7 +22,9 @@ import (
 // shell, on a terminal, and is added to the end of the file as a block,
 // #history-N, with its output. A full-screen command, such as vi, is kept
 // as a tty block with its recording. A line starting with # is added as
-// prose.
+// prose. A line such as # ```bash starts a block, which takes the lines
+// typed after it, without running them, until a line of ``` ends it and
+// adds it to the end of the file.
 
 // hist is the History pane's state.
 type hist struct {
@@ -183,13 +185,33 @@ func (m *Model) ps2() string {
 	return termsafe.SGROnly(m.hist.prompt.PS2)
 }
 
+// blockPromptStyle marks the lines of a block being typed, which are
+// kept rather than run.
+var blockPromptStyle = lipgloss.NewStyle().Bold(true).Foreground(accent)
+
+// more is the prompt on a line after the first of what is typed, lines:
+// PS2, or, inside a block they open, the block's prompt.
+func (m *Model) more(lines []string) string {
+	if info, ok := history.InBlock(strings.Join(lines, "\n")); ok {
+		return blockPromptStyle.Render(history.BlockPrompt(info))
+	}
+	return m.ps2()
+}
+
+// inBlock reports whether the lines typed so far open a block.
+func (m *Model) inBlock() bool {
+	_, ok := history.InBlock(strings.Join(m.hist.lines, "\n"))
+	return len(m.hist.lines) > 0 && ok
+}
+
 // setPrompt puts the prompt before what is typed: PS1, or PS2 on a line
-// that carries on a command. Only the last line of a prompt of several
-// lines goes there; the others show above it.
+// that carries on a command, or the block's prompt on a line of a block.
+// Only the last line of a prompt of several lines goes there; the
+// others show above it.
 func (m *Model) setPrompt() {
 	p := m.ps1()
 	if len(m.hist.lines) > 0 {
-		p = m.ps2()
+		p = m.more(m.hist.lines)
 	}
 	m.hist.input.Prompt = lastLine(p)
 }
@@ -323,9 +345,10 @@ func (h *hist) kill(before []rune, at int, appending bool) {
 // after their prompts.
 func (m *Model) echo(line string) {
 	p := m.ps1()
-	for _, l := range append(slices.Clone(m.hist.lines), line) {
+	lines := append(slices.Clone(m.hist.lines), line)
+	for i, l := range lines {
 		m.histLog(p + l)
-		p = m.ps2()
+		p = m.more(lines[:i+1])
 	}
 }
 
@@ -358,7 +381,37 @@ func (m *Model) entered() {
 	}
 	h.recall = append(h.recall, text)
 	h.recallAt = len(h.recall)
+	if info, body, ok := history.Block(text); ok {
+		m.addBlock(info, body)
+		return
+	}
 	m.runTyped(text)
+}
+
+// addBlock adds a block typed in the pane to the end of the file, as it
+// was typed, without running it, and moves to it, or to the end for a
+// block the cursor doesn't stop on, such as one of Python.
+func (m *Model) addBlock(info, body string) {
+	b, err := history.AddBlock(m.d, info, body)
+	if err == nil {
+		err = m.sess.Sync()
+	}
+	if err != nil {
+		m.histLog(stderrStyle.Render(err.Error()))
+		return
+	}
+	m.hist.noteEnd = -1
+	m.results = append(m.results, m.sess.Results()[len(m.results):]...)
+	m.layout()
+	m.dirty = true
+	m.md = map[string]string{}
+	m.refresh()
+	if i := m.index[b]; slices.Contains(m.nav, i) {
+		m.moveTo(i)
+	} else {
+		m.vp.GotoBottom()
+	}
+	m.histLog(helpStyle.Render("(added to the end of the file; it hasn't run)"))
 }
 
 // addNote adds a note to the end of the file as prose.
@@ -527,6 +580,9 @@ func (m *Model) histView() string {
 	if !m.hist.focus {
 		hint = " h type here "
 	}
+	if m.hist.focus && m.inBlock() {
+		hint = " typing a block · ``` ends it · ctrl+c drops it "
+	}
 	if m.hist.running {
 		hint = " keys go to the command · ctrl+] stops it "
 	}
@@ -544,9 +600,9 @@ func (m *Model) histView() string {
 		lines = slices.Clone(m.hist.log)
 		// The prompt's lines before its last show above what is typed.
 		p := m.ps1()
-		for _, l := range m.hist.lines {
+		for i, l := range m.hist.lines {
 			lines = append(lines, strings.Split(p+l, "\n")...)
-			p = m.ps2()
+			p = m.more(m.hist.lines[:i+1])
 		}
 		if i := strings.LastIndexByte(p, '\n'); i >= 0 {
 			lines = append(lines, strings.Split(p[:i], "\n")...)

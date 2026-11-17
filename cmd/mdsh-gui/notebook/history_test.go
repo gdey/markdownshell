@@ -145,6 +145,33 @@ func TestCellLinks(t *testing.T) {
 	}
 }
 
+// TestHistoryBlock checks that a block typed in the History pane is
+// added to the end of the document as typed, without running, with the
+// History pane off as well as on.
+func TestHistoryBlock(t *testing.T) {
+	file := write(t, "# Log\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.Enter("# ```sh {#greet}\necho hi > ran\n```"); err != nil {
+		t.Fatal(err)
+	}
+	if want := "# Log\n\n```sh {#greet}\necho hi > ran\n```\n"; n.Text() != want {
+		t.Errorf("text = %q, want %q", n.Text(), want)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(file), "ran")); err == nil {
+		t.Error("the block ran")
+	}
+	if !n.Dirty() {
+		t.Error("not marked changed")
+	}
+	if err := n.Enter("# ```sh\n```"); err == nil || n.Text() != "# Log\n\n```sh {#greet}\necho hi > ran\n```\n" {
+		t.Errorf("an empty block: err %v, text %q", err, n.Text())
+	}
+}
+
 func TestNoteInOpenFence(t *testing.T) {
 	src := "```sh\necho open\n"
 	n, err := Open(write(t, src), Options{})
@@ -182,6 +209,9 @@ func TestComplete(t *testing.T) {
 		"cat <<EOF\nhi":           false,
 		"cat <<'EOF'\nhi\nEOF":    true,
 		"f() {":                   false,
+		"# ```sh":                 false,
+		"# ```sh\necho 'abc":      false,
+		"# ```sh\necho `x\n```":   true,
 	} {
 		if got := n.Complete(in); got != want {
 			t.Errorf("Complete(%q) = %v", in, got)

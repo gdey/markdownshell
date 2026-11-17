@@ -15,6 +15,7 @@ import { terminalLinks } from "./links.js";
 import { readlineKey } from "./readline.js";
 import { typeKeys, wanted } from "./terminal.js";
 import { codeFont, textSize } from "./theme.js";
+import { blockPrompt, inBlock, isBlock, openBlock } from "./typedblock.js";
 
 // rows is how many lines the transcript shows, which dragging the pane's
 // top edge changes, from one to most of the window. Commands run at this
@@ -343,7 +344,7 @@ function say(text: string) {
 const isNote = (text: string) => text.split("\n").every((l) => l.trimStart().startsWith("#"));
 
 // echo writes what was entered to the transcript: a command after a
-// prompt, a note dimmed.
+// prompt, a note dimmed, a block's lines after its prompt.
 function echo(text: string) {
   const lines = text.split("\n");
   if (isNote(text)) {
@@ -351,7 +352,8 @@ function echo(text: string) {
     return;
   }
   const first = ps1 ? `${ps1}\x1b[0m` : "\x1b[1;32m$\x1b[0m ";
-  const more = ps2 ? `${ps2}\x1b[0m` : "\x1b[1;32m>\x1b[0m ";
+  const open = openBlock(lines[0]);
+  const more = open ? `\x1b[1;34m${blockPrompt(open.info)}\x1b[0m` : ps2 ? `${ps2}\x1b[0m` : "\x1b[1;32m>\x1b[0m ";
   say(lines.map((l, i) => `${i ? more : first}${l}`).join("\n"));
 }
 
@@ -405,12 +407,14 @@ async function submit(entered: string) {
   echo(text);
   fitHistory();
   last = -1;
-  if (!isNote(text)) startClock();
+  const block = isBlock(text);
+  if (!isNote(text) && !block) startClock();
   entering = true;
   try {
     await hooks.enter(async () => {
       try {
         await App.HistoryEnter(text);
+        if (block) say("\x1b[2m(added to the end of the file; it hasn't run)\x1b[0m");
       } catch (err) {
         say(`\x1b[31m${message(err)}\x1b[0m`);
       }
@@ -430,12 +434,24 @@ async function submit(entered: string) {
   input().focus();
 }
 
-// grow fits the input to its lines, up to a few.
+// grow fits the input to its lines, up to a few. While they are a block
+// being typed, its prompt takes PS1's place, so it is plain they are
+// kept, not run.
 function grow() {
   const box = input();
   box.rows = Math.min(6, Math.max(1, box.value.split("\n").length));
+  const info = inBlock(box.value);
+  const pane = $("history");
+  if ((info !== null) !== pane.classList.contains("block")) {
+    pane.classList.toggle("block", info !== null);
+    box.setAttribute("aria-label", info !== null ? blockLabel : commandLabel);
+  }
+  if (info !== null) $("history-block-prompt").textContent = blockPrompt(info);
   placeCursor();
 }
+
+const commandLabel = "Command to run and add to the file, or a note starting with #";
+const blockLabel = "Block to add to the file, without running it: a line of ``` ends it, ctrl+c drops it";
 
 // The block cursor, for Settings › Look › History prompt focus set to
 // the cursor, sits over the character at the caret, as a terminal's
@@ -570,6 +586,16 @@ async function onKey(e: KeyboardEvent) {
   if (copyKey(e) && box.selectionStart === box.selectionEnd && term?.hasSelection()) {
     e.preventDefault();
     return copyHistory();
+  }
+  // ctrl+c drops what is typed, as at a shell's prompt: a block partway
+  // through, or a command not yet entered. On Linux it is the copy key
+  // too, so text selected in the input is copied instead.
+  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.code === "KeyC" && box.selectionStart === box.selectionEnd && box.value) {
+    e.preventDefault();
+    echo(box.value + "^C");
+    box.value = "";
+    grow();
+    return;
   }
   if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
     // Tab completes, as in a shell, rather than leaving the input.

@@ -80,6 +80,54 @@ func TestHistoryPane(t *testing.T) {
 	}
 }
 
+func TestHistoryBlock(t *testing.T) {
+	m, _ := newModel(t, "# Log\n", Options{})
+	press(m, "h")
+
+	// # ```lang opens a block: the lines after it are kept, not run,
+	// under a prompt of their own.
+	typeLine(m, "# ```sh {#greet}")
+	if !m.inBlock() || m.hist.input.Prompt != blockPromptStyle.Render("```sh> ") {
+		t.Fatalf("not in a block: lines %q, prompt %q", m.hist.lines, m.hist.input.Prompt)
+	}
+	if v := m.View(); !strings.Contains(v, "``` ends it") {
+		t.Errorf("no hint that ``` ends the block:\n%s", v)
+	}
+	typeLine(m, "echo 'not run")
+	typeLine(m, "")
+	if len(m.hist.lines) != 3 || m.running {
+		t.Fatalf("lines %q, running %v", m.hist.lines, m.running)
+	}
+	typeLine(m, "```")
+	if m.inBlock() || len(m.hist.lines) != 0 || m.running {
+		t.Fatalf("the block didn't end: lines %q, running %v", m.hist.lines, m.running)
+	}
+	if want := "# Log\n\n```sh {#greet}\necho 'not run\n\n```\n"; string(m.d.Src) != want {
+		t.Errorf("src = %q, want %q", m.d.Src, want)
+	}
+	if !m.dirty || m.d.Blocks[m.cur()].ID != "greet" {
+		t.Errorf("dirty %v, at block %q", m.dirty, m.d.Blocks[m.cur()].ID)
+	}
+	if log := strings.Join(m.hist.log, "\n"); !strings.Contains(log, "```sh> echo 'not run") || !strings.Contains(log, "hasn't run") {
+		t.Errorf("log:\n%s", log)
+	}
+
+	// ctrl+c drops a block partway, and the prompt is PS1 again.
+	typeLine(m, "# ```sh")
+	typeLine(m, "ls")
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if m.inBlock() || m.hist.input.Prompt != lastLine(m.ps1()) || len(m.d.Blocks) != 1 {
+		t.Errorf("ctrl+c: lines %q, prompt %q, %d blocks", m.hist.lines, m.hist.input.Prompt, len(m.d.Blocks))
+	}
+
+	// An empty block isn't added.
+	typeLine(m, "# ```sh")
+	typeLine(m, "```")
+	if len(m.d.Blocks) != 1 || !strings.Contains(strings.Join(m.hist.log, "\n"), "empty") {
+		t.Errorf("%d blocks, log %q", len(m.d.Blocks), m.hist.log)
+	}
+}
+
 func TestHistoryFullScreen(t *testing.T) {
 	m, file := newModel(t, "# Log\n", Options{AutoSave: true})
 	press(m, "h")

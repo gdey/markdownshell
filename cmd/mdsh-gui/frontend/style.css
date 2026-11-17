@@ -748,6 +748,13 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history .history-line:has(.prompt.custom) { gap: 0; }
 #history-prompt-head { padding: 4px 8px 0; color: var(--fg); font: calc(13px * var(--text-scale))/18px var(--font-code); white-space: pre; overflow: hidden; }
 #history-prompt-head[hidden] { display: none; }
+/* A block being typed, from a line such as # ```bash to a line of ```,
+   is kept rather than run: its prompt, in the accent color, takes PS1's
+   place until it ends. */
+#history-block-prompt { display: none; }
+#history.block #history-prompt { display: none; }
+#history.block #history-block-prompt { display: inline; color: var(--accent); white-space: pre; }
+#history.block .history-line { gap: 0; }
 #history:has(#history-prompt-head:not([hidden])):not(.closed) .history-line { padding-top: 0; }
 #history-input { flex: 1; resize: none; border: 0; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
 #history-input::placeholder { color: var(--muted); }

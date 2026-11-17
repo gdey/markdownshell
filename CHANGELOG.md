@@ -6,6 +6,24 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A block can be typed in the History pane, in mdsh-gui and `mdsh -i`.
+  A line such as ``# ```sh {#rollout}`` opens it, the `#` making it a
+  comment should it reach a shell. The prompt becomes ```` ```sh> ````
+  while the block is open, the lines typed are kept rather than run, and
+  a line of ```` ``` ```` (a fence as long as the opening one, or
+  longer) adds the block to the end of the file as it was typed, without
+  running it. ctrl+c drops a block partway through, as it drops a
+  command at a shell's prompt; mdsh-gui's pane now takes ctrl+c for
+  that too, when nothing is selected to copy.
+
+  ![mdsh-gui's History pane while a block is typed: the prompt reads ```sh> in place of the shell's, over the block's lines](docs/changelog/history-block-typing.png)
+
+  ![mdsh-gui's History pane after typing a block: the lines under a ```sh> prompt, and the rollout block added to the end of the file](docs/changelog/history-block.png)
+
+  ![mdsh -i's History pane while a block is typed: its lines under ```sh> prompts, and the pane's rule saying ``` ends it and ctrl+c drops it](docs/changelog/history-block-tui.png)
+
 ## [1.6.0] - 2026-11-16
 
 mdsh learns to talk to web services. An `http` block makes one HTTP

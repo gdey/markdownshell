@@ -221,12 +221,19 @@ func Info(lang, id string, background bool) string {
 // partway through a command.
 var incomplete = regexp.MustCompile("end of file|EOF|[Uu]nterminated|unmatched|near `\\\\n'")
 
-// Whole reports whether input is a whole command, or a note, so pressing
-// enter runs it rather than starting another line. Input ending in \, |,
-// && or ||, or inside a quote, an if, a loop or a here-document, isn't.
-// shell checks what the simple rules don't.
+// Whole reports whether input is a whole command, a note or a block, so
+// pressing enter runs or adds it rather than starting another line.
+// Input ending in \, |, && or ||, inside a quote, an if, a loop or a
+// here-document, or inside a block it opens, isn't. shell checks what the
+// simple rules don't.
 func Whole(shell, input string) bool {
 	input = strings.TrimRight(input, "\n")
+	if _, ok := InBlock(input); ok {
+		return false
+	}
+	if _, _, ok := Block(input); ok {
+		return true
+	}
 	if _, ok := Note(input); ok || strings.TrimSpace(input) == "" {
 		return true
 	}

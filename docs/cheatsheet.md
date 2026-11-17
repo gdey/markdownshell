@@ -283,7 +283,9 @@ env starts in the document's folder.
 
 In the History pane: tab completes, ↑/↓ or ctrl+p/n recall, ctrl+a/e,
 ctrl+b/f, alt+b/f, ctrl+w, alt+d, ctrl+u/k, ctrl+y edit, ctrl+l clears,
-esc goes back to the document, ctrl+d closes the pane. On the start
+esc goes back to the document, ctrl+d closes the pane. ``# ```sh`` starts
+a block, added without running when a line of ```` ``` ```` ends it;
+ctrl+c drops it. On the start
 screen: type to filter, ↑/↓ or tab pick, enter opens, esc goes back,
 ctrl+c quits. A `tty` block takes every key while it runs, ctrl+c
 included.
