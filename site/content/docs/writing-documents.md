@@ -35,8 +35,9 @@ hello from a sub-env
 
 - `#name` gives a block an id. When mdsh saves the file (`-w`, or a save in `mdsh -i` or mdsh-gui), it gives each unlabeled block an id of its own, such as `#block-0192f3a4-7c1e-7b2a-9d3e-5f6a7b8c9d0e`, so the id stays the same when blocks move. Until then an unlabeled block is `block-N` by position. Give a block a name to refer to it by something readable.
   Ids must be unique.
-- Every `sh` and `zsh` block runs. Other languages are left alone, and
-  `skip` turns a block off.
+- Every `sh` and `zsh` block runs, and an `http` block makes its
+  request (see [HTTP requests]({{< relref "http" >}})). Other
+  languages are left alone, and `skip` turns a block off.
 - Blocks run in `/bin/sh`, or in `zsh` when the document has any `zsh`
   block. `shell:` under `mdsh:` in the front matter picks another shell.
   Each env is one shell, so every block in the document runs in it.
@@ -71,11 +72,13 @@ hello from a sub-env
 | `timeout=30s` | Interrupt the block after this long, keeping its shell (stops the run); mdsh-gui and `mdsh -i` show the time against it while the block runs |
 | `background` | Start the block and go straight on to the next; see [Background blocks](#background-blocks) |
 | `tty` | Run on the terminal, for commands like `docker run -it`; the session is saved as an asciinema cast, which mdsh-gui plays |
-| `frame=N` | With `tty`, the frame a PDF shows (default the last) |
+| `frame=N` | With `tty`, or on a `cast` fence, the frame still views (a PDF, the card before the player opens) show, counting from 1 (default the last) |
 | `out=markdown` | Insert output as raw markdown |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image |
+| `out=recording:path` | With `tty`, where the cast goes; a path ending in `.gif` links an animated GIF too |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
+| `raw` | On an `http` block, save the response body as it came instead of pretty-printing JSON |
 
 Blocks marked `<include` take their own attributes; see [Including files](#including-files).
 
@@ -101,6 +104,14 @@ printf 'name\tvalue\nGREETING\thello\n' | md_table
 terminal-style image: SVG by default, PNG when the path ends in `.png`.
 Both save to `<doc>.assets/<block-id>.<ext>` unless you give a path, and
 link the image between the same markers.
+
+Each output fence or region a run writes carries `at=`, the time the
+block started, in UTC to the second (`at=2026-11-13T19:08:00Z`). It
+changes only when the block runs again, so output without it, from an
+older mdsh, reads as before.
+
+An `http` block's output is the response it got; see
+[HTTP requests]({{< relref "http" >}}).
 
 ### Output copies
 
@@ -281,7 +292,9 @@ file; nothing else reads them. A `<!-- mdsh:collapse -->` line, or
 `<!-- mdsh:collapse COND -->`, folds the heading section it is in, down
 to the next heading of the same or a higher level. Folding by hand in
 mdsh-gui writes these for you, and unfolding takes them out; a fold set
-by a condition is left as it is.
+by a condition is left as it is. An `http` block's response folds as
+a whole with `collapse-output`, and its body on its own in mdsh-gui;
+see [HTTP requests]({{< relref "http#in-the-desktop-app-and-the-terminal" >}}).
 
 ## Terminal blocks
 

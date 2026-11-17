@@ -14,6 +14,9 @@ with `==` or `!=`, or negated with `!`:
 | `{{$DEBUG}}` | `DEBUG` is exposed (see below), set, and not `0`, `false`, `no` or `off` |
 | `!{{$QUIET}}` | the opposite |
 | `{{#detect/env(OS)}}==Linux` | block `detect` left `OS` set to `Linux` |
+| `{{#build/?}}!=0` | block `build` failed; `{{$?}}` is the last block's status |
+| `{{$MDSH_VAR_env}}==prod` | an [input]({{< relref "inputs" >}}) or `mdsh ctl set` left `env` as `prod` |
+| `{{#login/status}}==201` | [http block]({{< relref "http" >}}) `login` got that status |
 | `true`, `false` | always, never |
 | `once` | in `run=` only: the block has no output yet |
 
@@ -44,6 +47,16 @@ environment mdsh was started in, if you exposed it.
 Printed output shows the value. `-w` keeps the placeholder and stores the
 value inside it, `{{#setup/env(NAME):"world"}}`, so the markdown reads well
 without running it and keeps the last value when the block doesn't run.
+
+The other forms read a block's result rather than a variable:
+
+| Form | Means |
+| --- | --- |
+| `{{$?}}`, `{{#build/?}}` | The exit status of the last block that ran, or of block `build`. In `run=`, `{{$?}}` is the previous block's status; in `show=`, `show-output=` and `show-stderr=` it is the block's own |
+| `{{$err?}}`, `{{#build/err?}}` | The same statuses, read as true when non-zero |
+| `{{$ran?}}`, `{{#build/ran?}}` | Whether the last runnable block, or `build`, ran |
+| `{{$MDSH_VAR_name}}`, `{{$MDSH_MODE}}` | An input's value, or what `mdsh ctl set` set; `running`, `interactive` or `report`. mdsh's own `MDSH_` variables need no exposing |
+| `{{#login/status}}`, `{{#login/json($.id)}}`, `{{#login/header(Content-Type)}}` | The status, a value from the JSON body, or a header of the response an [http block]({{< relref "http#the-response-in-prose-and-conditions" >}}) got |
 
 ## Exposing variables
 

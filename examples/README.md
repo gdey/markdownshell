@@ -186,14 +186,33 @@ the clearest way to see that two blocks really do run at once.
   close it, and `timeout=` on the background block keeping the run from
   hanging. This one goes wrong on purpose.
 
-The deploy runbook in part 9 uses the same idea to check links while
+The deploy runbook in part 10 uses the same idea to check links while
 the next step runs.
 
 ```sh {#try-fifo skip}
 mdsh --hide-code fifo/handoff.md
 ```
 
-## 7. Reports: PDF and HTML
+## 7. Talking to web services
+
+**[http.md](http.md)** calls a web service with `http` blocks: the
+request written the way it goes over the wire, then the checks on the
+response in [Hurl](https://hurl.dev)'s words, one per line. A login
+captures a token (`[Captures]`, marked `secret` so the saved response
+masks it) and the next request sends it back through
+`{{#login/env(token)}}`; a search checks a list with `jsonpath`,
+`count` and `regex`; a form, a body read from a file with `@file`,
+`[Options]` and a header masked by the front matter's
+`mdsh.http.secret_headers` follow; and one check fails on purpose, to
+show the line it leaves on stderr. The file starts a small API of its
+own, [http/api.go](http/api.go), in a `background` block with `go run`
+and stops it at the end.
+
+```sh {#try-http skip}
+mdsh --hide-code http.md
+```
+
+## 8. Reports: PDF and HTML
 
 **[report.md](report.md)** is written to be read as a report. Run
 `mdsh --pdf pdf/report.pdf report.md` and the PDF holds what `mdsh
@@ -204,14 +223,14 @@ gutter. `--html` writes the same view as a single HTML page, and
 `--hide-code` leaves the code out for readers who won't run it.
 
 **[pdf/](pdf)** holds PDFs made this way of this report, of parts 1, 2
-and 5, and of a run of the test coverage runbook in part 9. This
+and 5, and of a run of the test coverage runbook in part 10. This
 refreshes the report's PDF there:
 
 ```sh {#try-report skip}
 mdsh --pdf pdf/report.pdf report.md >/dev/null && ls -l pdf/report.pdf
 ```
 
-## 8. Working interactively
+## 9. Working interactively
 
 **[history.md](history.md)** is about the History pane that `mdsh -i`
 (press `h`) and mdsh-gui (View › History) have: a shell at the bottom of
@@ -234,7 +253,7 @@ Settings › Look, from Plain to Teletype (typewriter text on fan-fold
 paper, or green phosphor in the dark theme), with a new one in most
 releases.
 
-## 9. Real runbooks
+## 10. Real runbooks
 
 **[runbooks/](runbooks)** puts all of the above to work. Each file is a
 document someone would actually keep, and `go test ./cmd/mdsh` runs
@@ -283,7 +302,10 @@ mdsh --yes --hide-code runbooks/deploy.md
 | `mdsh ctl set`, `$MDSH_SOCK` | [inputs.md](inputs.md) |
 | `collapse`, `mdsh:collapse` | [inputs.md](inputs.md) |
 | `tty` blocks, tapes, recordings | [terminal.md](terminal.md) |
-| `background` blocks | [fifo/](fifo), [runbooks/deploy.md](runbooks/deploy.md) |
+| `background` blocks | [fifo/](fifo), [http.md](http.md), [runbooks/deploy.md](runbooks/deploy.md) |
+| `http` blocks, `[Asserts]`, `[Captures]` | [http.md](http.md) |
+| `{{#id/status}}`, `{{#id/json(…)}}`, `{{#id/header(…)}}` | [http.md](http.md) |
+| Front matter: `http.secret_headers` | [http.md](http.md) |
 | `--pdf`, `--html`, `--hide-code` | [report.md](report.md), [pdf/](pdf), [runbooks/onboarding.md](runbooks/onboarding.md) |
 | `#history-N` blocks from the History pane | [history.md](history.md) |
 | Front matter: `on_error`, `title` | [guardrails.md](guardrails.md), [runbooks/](runbooks) |
@@ -307,9 +329,11 @@ terminal.md           5. tty blocks and tapes
 terminal.md.assets/   its recordings, as asciinema casts
 terminal/             the prompt script and tape it uses
 fifo/                 6. background blocks and named pipes
-report.md             7. a document written as a report
+http.md               7. http blocks: requests, checks, captures
+http/                 the small API it talks to, and a body it sends
+report.md             8. a document written as a report
 report.md.assets/     its screenshot
 pdf/                  PDFs of hello, include, terminal, report and the test coverage runbook
-history.md            8. what a History session leaves behind
-runbooks/             9. complete runbooks: deploy, release, onboarding, reports, triage
+history.md            9. what a History session leaves behind
+runbooks/             10. complete runbooks: deploy, release, onboarding, reports, triage
 ```

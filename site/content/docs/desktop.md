@@ -135,6 +135,12 @@ This page is the reference.
   `depends=` names one that hasn't run asks to run it first. A `tty`
   block runs in a terminal in its card and is recorded; a `background`
   block runs on, with a dashed edge, while the next ones do.
+- **HTTP requests.** An [`http` block]({{< relref "http" >}})'s card
+  shows the response's status beside its exit status, the body and the
+  headers as two tabs, and each check with a tick or a cross. Its
+  terminal button copies the request as a `curl` command, the chevron by
+  the Body tab folds the body on its own, and Insert › http Request in
+  the source view starts one.
 - **Dependencies.** `depends=` is drawn as colored lines in the margin,
   from a block up to each block it names; select a block to bring its
   lines forward, and drag a line's end to change what it depends on. A
@@ -156,7 +162,10 @@ This page is the reference.
   the file as `#history-N` blocks with their output, with `skip`, so
   Run all doesn't run them again, and `links`, so the web addresses they
   print are clickable; `#` lines become
-  notes. A history block deletes without asking, and becomes a plain
+  notes. A line such as ``# ```sh {#rollout}`` opens a block: the prompt
+  becomes ```` ```sh> ````, the lines typed are kept rather than run,
+  and a ```` ``` ```` line adds the block to the end of the file without
+  running it (ctrl+c drops it). A history block deletes without asking, and becomes a plain
   block once moved.
 - **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from
   the app, with a count on the toolbar; a line about a place in a file
@@ -175,8 +184,13 @@ This page is the reference.
   `d2` fences draw diagrams, `svg` fences pictures, and `cast` fences
   (asciinema recordings) play in the cast player, as do `tty` blocks'
   recordings: play, pause, step a frame, select text and copy it, or
-  copy the recording as a GIF. Images from other
-  sites are never loaded.
+  copy the recording as a GIF. An image from another site, or a file
+  outside the document's folder or hidden in it, isn't loaded by itself:
+  a note with a Load image button stands in for it, and clicking it
+  fetches or reads that image (PNG, JPEG, GIF, WebP, BMP or an icon, up
+  to 20 MB) and remembers that this document may show it. Other images
+  still wait for their own click, and opening a document never reaches
+  the network for an image nobody loaded.
 - **Reports.** Save writes the output into the file, and File › Create
   Report… makes a PDF, HTML or markdown report, and shows the `mdsh`
   command that makes the same one.

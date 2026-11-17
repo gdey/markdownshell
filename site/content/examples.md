@@ -1,8 +1,8 @@
 ---
 title: The examples tour
-description: A guided tour of mdsh in nine parts, in the examples folder of the repository.
+description: A guided tour of mdsh in ten parts, in the examples folder of the repository.
 layout: landing
-lede: "The fastest way to see what mdsh does is to run it. The repository's `examples/` folder is a tour in nine parts, from a two-block hello to whole runbooks, and every part has a **Try it** block that runs the example it describes."
+lede: "The fastest way to see what mdsh does is to run it. The repository's `examples/` folder is a tour in ten parts, from a two-block hello to whole runbooks, and every part has a **Try it** block that runs the example it describes."
 ---
 
 ## Open it
@@ -33,7 +33,7 @@ mdsh -w hello.md              # run it and write the output back
 mdsh --pdf hello.pdf hello.md # the run, as a PDF
 ```
 
-## The nine parts
+## The ten parts
 
 | Part | File | What it shows |
 | --- | --- | --- |
@@ -41,11 +41,12 @@ mdsh --pdf hello.pdf hello.md # the run, as a PDF
 | 2 | `include.md` | A block that quotes lines from another file and keeps the quote current |
 | 3 | `guardrails.md` | `on_error: stop`, `run=once`, `confirm`, `depends=`, `timeout=`, `skip`, and an output copy at the end |
 | 4 | `inputs.md` | `textbox` and `choice` blocks with `var=`, `mdsh ctl set`, and sections that open folded |
-| 5 | `terminal.md` | `tty` blocks on a real terminal, recorded as GIFs, and tapes that type for them |
+| 5 | `terminal.md` | `tty` blocks on a real terminal, recorded as asciinema casts, and tapes that type for them |
 | 6 | `fifo/` | `background` blocks handing data through a named pipe, and a `timeout=` that saves a hung run |
-| 7 | `report.md` | A document written to be read as a PDF or HTML report |
-| 8 | `history.md` | What a History session leaves behind |
-| 9 | `runbooks/` | Whole runbooks: deploy, release, onboarding, disk and system reports, triage, test coverage |
+| 7 | `http.md` | `http` blocks: a request as it goes over the wire, checks in Hurl's words, a captured token sent back in the next request, and masked secrets |
+| 8 | `report.md` | A document written to be read as a PDF or HTML report |
+| 9 | `history.md` | What a History session leaves behind |
+| 10 | `runbooks/` | Whole runbooks: deploy, release, onboarding, disk and system reports, triage, test coverage |
 
 ## Things to try
 

@@ -118,7 +118,7 @@ run, to a file only you can read. Each has `seq`, a time `t` and an
 | --- | --- |
 | `run.start` / `run.end` | The file and a SHA-256 of it, the mode, flags and arguments, the mdsh version; then the exit code |
 | `env.start` | An env's shell starting, and the names `share` let through (names, not values) |
-| `block.start` / `block.end` | A block running, then its exit code and time taken |
+| `block.start` / `block.end` | A block running, then its exit code and time taken. For an [http block]({{< relref "http" >}}), also the method, the URL as written, the status and each check's result, never a header or a body |
 | `block.skip` | A block not run, and why: `skip`, the `run=` condition and the value it saw, `once`, `--only`, a failed `depends=` |
 | `ctl` | Every `mdsh ctl` call, refused ones too, with the block, arguments and result |
 | `var` | A variable changing, with the old and new values and what changed it |
