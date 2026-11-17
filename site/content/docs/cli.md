@@ -12,6 +12,7 @@ weight: 50
 | `mdsh --hide-code --hide-output doc.md` | Prose only; nothing runs | No |
 | `mdsh --no-run doc.md` (or `-n`) | Prose, code and the output saved by `-w`; nothing runs | No |
 | `mdsh -n -o view.md doc.md` | Nothing; saves what `-n` prints to `view.md` | No |
+| `mdsh -n --history doc.md` | As `-n`, with each block's earlier runs, kept by `history=N`, under its output, each under its time and exit status; `--html` and `--pdf` take it too | No |
 | `mdsh -w doc.md` | Progress on stderr | Yes: output rewritten |
 | `mdsh -o out.md doc.md` | Progress on stderr | No; writes what `-w` would to `out.md` |
 | `mdsh --pdf doc.pdf doc.md` | Nothing; lays out what it would print as `doc.pdf` | No; with `-w` or `-o` it writes those too |

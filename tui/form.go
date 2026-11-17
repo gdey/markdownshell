@@ -190,6 +190,7 @@ const (
 	repFormat = iota
 	repCode
 	repOutput
+	repHistory
 	repFrom
 	repDest
 )
@@ -213,11 +214,12 @@ func (m *Model) reportForm() tea.Cmd {
 	format := &field{label: "Format", kind: choiceField, choices: []string{"PDF", "HTML", "Markdown"}}
 	code := &field{label: "Code", kind: switchField, on: !m.shown.HideCode, help: "show the code of runnable blocks"}
 	output := &field{label: "Output", kind: switchField, on: !m.shown.HideOutput, help: "show the output of blocks"}
+	history := &field{label: "Earlier runs", kind: switchField, help: "show each block's earlier runs, kept by history=N, under its output"}
 	ran, total := m.ran()
 	this := fmt.Sprintf("this run (%d of %d ran)", ran, total)
 	from := &field{label: "Output from", kind: choiceField, choices: []string{this, "run all first", "the saved file"}}
 	dest := newText("Save to", m.tilde(m.reportDest(report.PDF)), "")
-	f := &form{title: "Create report", fields: []*field{format, code, output, from, dest}}
+	f := &form{title: "Create report", fields: []*field{format, code, output, history, from, dest}}
 	f.note = func() string {
 		return helpStyle.Render("Same as: ") + m.reportCommand().String()
 	}
@@ -267,6 +269,7 @@ func (m *Model) reportCommand() report.Command {
 		Format:      m.reportFormat(),
 		HideCode:    !f[repCode].on,
 		HideOutput:  !f[repOutput].on,
+		History:     f[repHistory].on,
 		Run:         f[repFrom].pick == fromAll,
 		Args:        ro.Args,
 		Only:        ro.Only,
@@ -331,6 +334,8 @@ func (m *Model) writeReport(r pendingReport) {
 		Format:     r.Format,
 		HideCode:   r.HideCode,
 		HideOutput: r.HideOutput,
+		History:    r.History,
+		InSource:   func(r *run.Result) bool { return m.inSource[r] },
 		// The report's conditions see $MDSH_MODE report, so
 		// show={{$MDSH_MODE}}!=report leaves a block out of it.
 		Env:          run.WithMode(m.environ(), run.ModeReport),

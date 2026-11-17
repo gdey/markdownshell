@@ -56,6 +56,11 @@ type Options struct {
 	// replaces that output instead of pushing it down as an earlier run
 	// of a block with history=.
 	InSource func(r *run.Result) bool
+	// History prints each block's earlier runs, kept by history=N, under
+	// its output, newest first, each under a line saying how far back
+	// it is, when it ran and its exit status. Otherwise printing shows
+	// the current output only. Write-back always keeps them.
+	History bool
 }
 
 // Markdown renders d with results spliced in after their blocks. Blocks
@@ -214,6 +219,12 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			} else {
 				buf.Write(kept)
 			}
+			if opts.History && !opts.WriteBack {
+				if earlier := printedEarlier(src, b, false, b.HistoryCap(d.Options)); earlier != "" {
+					buf.WriteString(strings.TrimRight(b.Prefix, " ") + "\n")
+					buf.WriteString(earlier)
+				}
+			}
 			continue
 		}
 		out := Output(r, showStderr(d, b, r, after(b)))
@@ -228,6 +239,11 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 				// Every run is kept, even one that showed nothing.
 				out = emptyOutput(r)
 			}
+		} else if opts.History {
+			// What the file holds is the run before this one, unless it
+			// is this run's own.
+			push := cap > 0 && (opts.InSource == nil || !opts.InSource(r))
+			earlier = printedEarlier(src, b, push, cap)
 		}
 		if out == "" && earlier == "" {
 			if !showCode {

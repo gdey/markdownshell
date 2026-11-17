@@ -958,7 +958,7 @@ func TestReportForm(t *testing.T) {
 
 	// Again, of the saved file, which has no output yet: it asks before
 	// overwriting.
-	press(m, "p", "right", "right", "down", "down", "down", "right", "right", "enter")
+	press(m, "p", "right", "right", "down", "down", "down", "down", "right", "right", "enter")
 	if m.form == nil || !strings.Contains(m.form.status, "exists") {
 		t.Fatalf("it didn't ask before overwriting")
 	}
@@ -979,7 +979,7 @@ func TestReportForm(t *testing.T) {
 
 func TestReportRunAllFirst(t *testing.T) {
 	m, file := newModel(t, twoBlocks, Options{})
-	press(m, "p", "right", "down", "down", "down", "right")
+	press(m, "p", "right", "down", "down", "down", "down", "right")
 	if v := m.View(); !strings.Contains(v, "mdsh --html doc.html doc.md") {
 		t.Errorf("the command isn't a run:\n%s", v)
 	}

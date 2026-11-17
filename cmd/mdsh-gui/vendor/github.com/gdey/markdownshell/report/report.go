@@ -79,6 +79,13 @@ type Options struct {
 	// their code and output are "(secret)": a report is made to be read
 	// by others (see render.Options.MaskSecrets).
 	ShowSecrets bool
+	// History prints each block's earlier runs, kept by history=N, under
+	// its output, as --history does (see render.Options.History).
+	History bool
+	// InSource reports whether a result is already in the document's
+	// source, as for an mdsh-gui document a run was written into; see
+	// render.Options.InSource. Nil means none is.
+	InSource func(r *run.Result) bool
 }
 
 // Render makes a report of d with results, matched to its blocks as
@@ -86,7 +93,7 @@ type Options struct {
 // saved in the file, so run.Includes(d, ...) as results reports the file
 // as it was last saved, running nothing.
 func Render(d *doc.Document, results []*run.Result, opts Options) ([]byte, error) {
-	md := render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env, MaskSecrets: !opts.ShowSecrets})
+	md := render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env, MaskSecrets: !opts.ShowSecrets, History: opts.History, InSource: opts.InSource})
 	switch opts.Format {
 	case Markdown, "":
 		return md, nil

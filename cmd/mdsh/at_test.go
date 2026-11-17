@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -41,4 +42,28 @@ func mustRead(t *testing.T, f string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// --history prints the earlier runs under the output; without it,
+// printing shows the current output only.
+func TestPrintHistoryFlag(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "d.md")
+	os.WriteFile(f, []byte("```sh {#n history=2}\necho 3\n```\n\n```output {for=n exit=0 at=2026-11-16T10:00:00Z}\n3\n```\n\n```output {for=n exit=1 at=2026-11-15T10:00:00Z history=1}\ntwo\n```\n"), 0o644)
+	// A run makes what the file holds the run before it.
+	for _, c := range []struct {
+		args []string
+		want bool
+		line string
+	}{{[]string{"-n", f}, false, "Run 1 back, 2026-11-15 10:00 UTC, exit 1"}, {[]string{"-n", "--history", f}, true, "Run 1 back, 2026-11-15 10:00 UTC, exit 1"}, {[]string{"--history", f}, true, "Run 2 back, 2026-11-15 10:00 UTC, exit 1"}} {
+		var out, errb bytes.Buffer
+		mdsh(c.args, nil, &out, &errb)
+		got := out.String()
+		if has := strings.Contains(got, c.line) && strings.Contains(got, "two"); has != c.want {
+			t.Errorf("mdsh %v: earlier run shown %v, want %v:\n%s%s", c.args, has, c.want, got, errb.String())
+		}
+	}
+	var errb bytes.Buffer
+	if rc := mdsh([]string{"-i", "--history", f}, nil, &bytes.Buffer{}, &errb); rc == 0 || !strings.Contains(errb.String(), "-history can't be used with -i") {
+		t.Errorf("-i --history: rc %d: %s", rc, errb.String())
+	}
 }

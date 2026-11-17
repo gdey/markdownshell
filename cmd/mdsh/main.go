@@ -152,6 +152,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	}
 	hideCode := fs.Bool("hide-code", false, "print prose and output, not runnable code blocks")
 	hideOutput := fs.Bool("hide-output", false, "print prose and code, not output (blocks still run unless --hide-code is also set)")
+	history := fs.Bool("history", false, "print each block's earlier runs, kept by history=N, under its output, each under its time")
 	var noRun bool
 	fs.BoolVar(&noRun, "no-run", false, "print the document with the output saved in it, without running any block (-o saves the printout)")
 	fs.BoolVar(&noRun, "n", false, "short for --no-run")
@@ -214,7 +215,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	if *interactive {
 		set := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
-		for _, name := range []string{"w", "o", "pdf", "html", "show-secrets", "no-run", "n", "only", "hide-code", "hide-output", "audit"} {
+		for _, name := range []string{"w", "o", "pdf", "html", "show-secrets", "no-run", "n", "only", "hide-code", "hide-output", "history", "audit"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with -i", name)
 			}
@@ -316,7 +317,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	// with image links read from linkDir.
 	show := func(results []*run.Result, opts report.Options, linkDir string) error {
 		if reportFile == "" {
-			return print(stdout, render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env, Terminal: true}), styled)
+			return print(stdout, render.Markdown(d, results, render.Options{HideCode: opts.HideCode, HideOutput: opts.HideOutput, Env: opts.Env, Terminal: true, History: opts.History}), styled)
 		}
 		if linkDir == "" && file != "" {
 			if abs, err := filepath.Abs(file); err == nil {
@@ -334,7 +335,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 		return writeFile(reportFile, out, 0o644)
 	}
-	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, ShowSecrets: *showSecrets, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose), AllowOutside: *allowOutside}
+	reportOpts := report.Options{HideCode: *hideCode, HideOutput: *hideOutput, History: *history, ShowSecrets: *showSecrets, Env: run.WithExpose(run.WithMode(os.Environ(), mode), expose), AllowOutside: *allowOutside}
 
 	// Nothing to run, or nowhere to show what it printed: print the
 	// document with the output already saved in it. Include blocks are
@@ -393,7 +394,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 			opts.File = abs
 		}
 	}
-	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, Env: reportOpts.Env, Terminal: true}
+	renderOpts := render.Options{HideCode: *hideCode, HideOutput: *hideOutput, History: *history, Env: reportOpts.Env, Terminal: true}
 	// When the run stops to ask, print the document as it goes, so each
 	// question comes after the prose and code it is about, and each
 	// block's output shows before the next question. With -w this is

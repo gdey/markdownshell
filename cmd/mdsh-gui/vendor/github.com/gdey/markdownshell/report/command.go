@@ -16,6 +16,8 @@ type Command struct {
 	Format     Format
 	HideCode   bool
 	HideOutput bool
+	// History asks for each block's earlier runs, as --history does.
+	History bool
 	// Run says the report comes from running the blocks. Otherwise it is
 	// of the file as saved, like mdsh -n.
 	Run bool
@@ -64,6 +66,9 @@ func (c Command) String() string {
 	}
 	if c.HideOutput {
 		cmd = append(cmd, "--hide-output")
+	}
+	if c.History && !c.HideOutput {
+		cmd = append(cmd, "--history")
 	}
 	dest := path(c.Dest)
 	if c.Dest == "" {

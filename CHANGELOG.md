@@ -105,6 +105,15 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh -i with a history=3 block's earlier runs shown under its saved output: run 1 back from today, run 2 back from yesterday failed with exit 7 and a curl error in red, and run 3 back from Friday](docs/changelog/earlier-runs-tui.png)
 
+- `--history` prints each block's earlier runs, kept by `history=N`,
+  under its output, newest first, each under a line such as *Run 1
+  back, 2026-11-13 19:08 UTC, exit 7*. `--html` and `--pdf` take it
+  too, and the Report forms in mdsh-gui and `mdsh -i` have an Earlier
+  runs switch that adds it. Without it, printing and reports show the
+  current output only, as before.
+
+  ![An HTML report made with --history: a block's current output, then its earlier runs, each under an italic line with how far back it is, its time and exit status](docs/changelog/earlier-runs-report.png)
+
 ### Fixed
 
 - mdsh-gui: with Use Neovim on, a block's Edit button, or a click on

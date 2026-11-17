@@ -167,3 +167,35 @@ func TestTrimWarning(t *testing.T) {
 		t.Errorf("saving kept run 2 back:\n%s", n.Text())
 	}
 }
+
+// A report with History shows the earlier runs, and a run written into
+// the document isn't shown again as the run before it.
+func TestReportHistory(t *testing.T) {
+	n, err := Open(write(t, earlierDoc), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	out, err := n.MakeReport(Report{History: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(out); !strings.Contains(got, "*Run 1 back, 2026-11-16 22:20 UTC, exit 0*") || !strings.Contains(got, "*Run 2 back, 2026-11-16 22:20 UTC, exit 7*") {
+		t.Errorf("report:\n%s", got)
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	out, err = n.MakeReport(Report{History: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The run pushed 4 down: runs back are 4, 3 and 2, each once.
+	got := string(out)
+	if strings.Count(got, "Run 1 back") != 1 || strings.Count(got, "Run 3 back") != 1 || strings.Contains(got, "Run 4 back") || strings.Count(got, "\n4\n") != 2 {
+		t.Errorf("report after a run:\n%s", got)
+	}
+	if out, _ := n.MakeReport(Report{}); strings.Contains(string(out), "Run 1 back") {
+		t.Errorf("report without History:\n%s", out)
+	}
+}

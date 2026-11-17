@@ -45,6 +45,7 @@ function request(): Report {
     format,
     hideCode: !$<HTMLInputElement>("rep-code").checked,
     hideOutput: !$<HTMLInputElement>("rep-output").checked,
+    history: $<HTMLInputElement>("rep-history").checked,
     saved: from() === "saved",
     ran: from() === "run",
     dest: untilde($<HTMLInputElement>("rep-dest").value.trim()),
