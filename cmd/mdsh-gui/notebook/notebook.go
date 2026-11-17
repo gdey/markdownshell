@@ -56,6 +56,9 @@ type Cell struct {
 	Depends []string `json:"depends,omitempty"`
 	// Output is the block's output, saved or from this session, rendered.
 	Output string `json:"output,omitempty"`
+	// Earlier are the block's earlier runs, kept by history=N, newest
+	// first.
+	Earlier []EarlierRun `json:"earlier,omitempty"`
 	// OutputTasks number the task list checkboxes in Output, as Tasks
 	// does for HTML.
 	OutputTasks []int `json:"outputTasks,omitempty"`
@@ -823,8 +826,16 @@ func (n *Notebook) write(file string) error {
 	if err := n.fold(); err != nil {
 		return err
 	}
+	var before []byte
+	if file == n.file {
+		before, _ = os.ReadFile(file)
+	}
 	if err := os.WriteFile(file, n.d.Src, 0o644); err != nil {
 		return err
+	}
+	// Earlier runs cleared since the last save take their files along.
+	if before != nil {
+		run.TidyHistoryAssets(before, n.d.Src, run.Options{File: n.file})
 	}
 	n.dirty = false
 	n.stamp = stampOf(file)
@@ -846,6 +857,7 @@ func (n *Notebook) readIncludes() {
 }
 
 func (n *Notebook) fold() error {
+	n.warnTrims()
 	out := render.Markdown(n.d, n.results, render.Options{WriteBack: true, Env: environ(), InSource: func(r *run.Result) bool { return n.inSource[r] }})
 	n.inSource = map[*run.Result]bool{}
 	for _, r := range n.results {

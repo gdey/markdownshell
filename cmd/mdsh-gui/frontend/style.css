@@ -366,6 +366,32 @@ th { background: var(--code-bg); }
 .block .output-part:hover button.copy-output, .block.selected button.copy-output, .block button.copy-output:focus-visible, .block button.copy-output.copied { opacity: 1; }
 .block button.copy-output.copied::before { content: "Copied"; color: var(--ok); font: calc(12px * var(--text-scale)) var(--font-ui); }
 .block .output-tools > button.trash:hover:not(:disabled) { color: var(--bad); }
+.block.selected .output-tools > button.clear-earlier { display: inline-block; }
+.block .output-tools > button.clear-earlier { display: none; }
+/* The earlier runs history=N keeps: a fold line under the output, and
+   each run under a line with its time, exit status, copy and trash. */
+body.hide-output .block > .earlier-part { display: none !important; }
+.block .earlier-part { border-top: 1px dashed var(--border); }
+.block .earlier-line { display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; color: var(--muted); font-size: calc(12px * var(--text-scale)); cursor: pointer; user-select: none; -webkit-user-select: none; }
+.block .earlier-line:hover { color: var(--fg); }
+.block .earlier-line:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.block .earlier-line svg { width: 12px; height: 12px; fill: currentColor; transform: rotate(-90deg); transition: transform 0.1s; }
+.block .earlier-part.open .earlier-line svg { transform: none; }
+.block .earlier-part:not(.open) > .earlier-runs { display: none; }
+.block .earlier-run { border-top: 1px solid var(--border); opacity: 0.85; }
+.block .earlier-run:hover { opacity: 1; }
+.block .earlier-head { display: flex; align-items: center; gap: 4px; padding: 3px 6px 0 22px; color: var(--muted); font-size: calc(12px * var(--text-scale)); }
+.block .earlier-when { margin-right: 6px; }
+.block .earlier-head .exit { margin-right: 0; }
+.block .earlier-tools { margin-left: auto; display: flex; gap: 2px; }
+.block .earlier-tools > button { opacity: 0; isolation: isolate; }
+.block .earlier-run:hover .earlier-tools > button, .block .earlier-tools > button:focus-visible, .block .earlier-tools > button.copied { opacity: 1; }
+.block .earlier-tools > button.trash:hover { color: var(--bad); }
+.block .earlier-tools > button.copy-output { display: inline-flex; align-items: center; gap: 4px; }
+.block.masked .earlier-runs { filter: blur(6px); user-select: none; -webkit-user-select: none; }
+/* An earlier run's line says what it is, so its output has no label. */
+.block .earlier-run .output::before { content: none; }
+.block .earlier-run .output pre { padding-top: 2px; }
 /* A secret is blurred until its eye button shows it, and can't be
    selected meanwhile; copy still takes the real text. */
 .block.masked .output-part > :is(.output, .fold-summary), .block.masked.secret-code .code-part > :is(pre.code, .fold-summary) { filter: blur(6px); user-select: none; -webkit-user-select: none; }

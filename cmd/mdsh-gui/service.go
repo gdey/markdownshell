@@ -1176,6 +1176,30 @@ func (a *App) ClearOutput(ctx context.Context, i int) error {
 	return err
 }
 
+// ClearEarlierRuns takes block i's earlier runs, kept by history=N, out
+// of the file, and keeps its current output. Undo puts them back.
+func (a *App) ClearEarlierRuns(ctx context.Context, i int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.ClearEarlierRuns(i)
+	t.changed()
+	return err
+}
+
+// DeleteEarlierRun takes block i's earlier run k out of the file, and
+// numbers the rest again. Undo puts it back.
+func (a *App) DeleteEarlierRun(ctx context.Context, i, k int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	err = n.DeleteEarlierRun(i, k)
+	t.changed()
+	return err
+}
+
 // MoveTo moves the block or heading's section that starts at from to
 // at, a cell's From or -1 for the end, as dragging does.
 func (a *App) MoveTo(ctx context.Context, from, at int) (notebook.Move, error) {
