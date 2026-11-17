@@ -2052,6 +2052,13 @@ async function showInSource(card: HTMLElement, line: number, open: boolean) {
     toggle("split", true);
     await loadSource();
   }
+  // A Neovim that is still starting can't take the jump yet: wait for it,
+  // or the cursor stays on line 1. If it fails, the pane falls back to
+  // CodeMirror, which then needs the text.
+  if (nvimStarting) {
+    await nvimStarting;
+    if (!nvimDoc && source) await loadSource();
+  }
   if (nvimDoc && nvim) {
     const pane = $("source-editor").getBoundingClientRect();
     const rows = view.rendered ? Math.round((card.getBoundingClientRect().top - pane.top) / nvim.rowHeight) : 2;
@@ -2394,8 +2401,20 @@ function useNvim() {
   return settings.vim && settings.neovim && !nvimFailed;
 }
 
-async function startNvim() {
-  if (nvim || doc.file === "") return;
+// nvimStarting is startNvim's promise while a Neovim starts.
+let nvimStarting: Promise<void> | null = null;
+
+function startNvim(): Promise<void> {
+  if (nvimStarting) return nvimStarting;
+  if (nvim || doc.file === "") return Promise.resolve();
+  const p = startNvimNow().finally(() => {
+    if (nvimStarting === p) nvimStarting = null;
+  });
+  nvimStarting = p;
+  return p;
+}
+
+async function startNvimNow() {
   const pane = new NvimPane($("source-editor"), nvimKey);
   nvim = pane;
   $("source-editor").classList.add("nvim");

@@ -24,6 +24,13 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh -i's History pane while a block is typed: its lines under ```sh> prompts, and the pane's rule saying ``` ends it and ctrl+c drops it](docs/changelog/history-block-tui.png)
 
+### Fixed
+
+- mdsh-gui: with Use Neovim on, a block's Edit button, or a click on
+  prose, while the source view was closed opened Neovim with the cursor
+  on line 1. It now waits for Neovim to start and puts the cursor on
+  that block or prose, as it does when the view is already open.
+
 ## [1.6.0] - 2026-11-16
 
 mdsh learns to talk to web services. An `http` block makes one HTTP
