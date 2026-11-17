@@ -340,3 +340,43 @@ func TestProseRawImages(t *testing.T) {
 		t.Errorf("remote image loaded: %q", html)
 	}
 }
+
+func TestProseCellsHTMLBlock(t *testing.T) {
+	src := "# T\n\n" +
+		"<details>\n<summary>More</summary>\n\nThe **body**.\n\n- a\n\n<div><p>inner</p></div>\n\n</details>\n\n" +
+		"After.\n\n" +
+		"<div>\n\nnever closed\n\n" +
+		"<br>\n\nlast\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	cells := n.Cells()
+	var got []string
+	for _, c := range cells {
+		got = append(got, src[c.From:c.To])
+	}
+	want := []string{
+		"# T\n",
+		"<details>\n<summary>More</summary>\n\nThe **body**.\n\n- a\n\n<div><p>inner</p></div>\n\n</details>\n",
+		"After.\n",
+		// What isn't closed is drawn block by block, as before.
+		"<div>\n",
+		"never closed\n",
+		"<br>\n",
+		"last\n",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("cells:\n%q\nwant:\n%q", got, want)
+	}
+	h := cells[1].HTML
+	for _, s := range []string{"<details>", "<summary>More</summary>", "<strong>body</strong>", "<li>a</li>", "</details>"} {
+		if !strings.Contains(h, s) {
+			t.Errorf("details cell should hold %q: %q", s, h)
+		}
+	}
+	if i, j := strings.Index(h, "<strong>"), strings.Index(h, "</details>"); i > j {
+		t.Errorf("the body should be inside the details: %q", h)
+	}
+}

@@ -103,6 +103,15 @@ follow [Semantic Versioning](https://semver.org/).
   prose, while the source view was closed opened Neovim with the cursor
   on line 1. It now waits for Neovim to start and puts the cursor on
   that block or prose, as it does when the view is already open.
+- mdsh-gui: a `<details>` block with markdown inside, written with
+  blank lines around the markdown, was drawn as separate cards, so the
+  markdown always showed under a summary that folded nothing. An HTML
+  block that opens an element is now drawn in one card through the
+  block that closes it, the markdown between rendered inside it.
+
+  ![mdsh-gui before the fix: the Troubleshooting summary is closed, yet the list under it shows](docs/changelog/details-card-before.png)
+
+  ![mdsh-gui after the fix: the Troubleshooting summary opened, its list inside it](docs/changelog/details-card.png)
 
 - Folding an http block's output in mdsh-gui, or opening it with
   `collapse-output`, left its response's body showing. The whole

@@ -11,6 +11,7 @@ import (
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
+	"golang.org/x/net/html"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/render"
@@ -319,7 +320,15 @@ func (l *layout) prose(from, to int) {
 	starts := []int{from + leadingBlank(src[from:to])}
 	headings := map[int]int{} // start: level
 	root := l.n.md.Parser().Parse(text.NewReader(src[from:to]))
+	var inside ast.Node // the last block of HTML the block is inside
 	for c := root.FirstChild(); c != nil; c = c.NextSibling() {
+		if inside != nil {
+			if c == inside {
+				inside = nil
+			}
+			continue
+		}
+		inside = htmlEnd(c, src[from:to])
 		if s, ok := firstLine(c, src[from:to]); ok {
 			start := from + lineStart(src[from:to], s)
 			starts = append(starts, start)
@@ -340,6 +349,74 @@ func (l *layout) prose(from, to int) {
 			l.part(doc.Span{Start: s, End: e}, headings[s])
 		}
 	}
+}
+
+// htmlEnd is the block of HTML that closes the elements node opens,
+// when node is a block of HTML that leaves one open, such as
+// <details><summary>More</summary> above markdown and a </details> line
+// below it, so the markdown between is drawn inside them, as one cell,
+// not as cells of their own. It is nil when node opens nothing or what
+// it opens isn't closed in src, the prose that was parsed.
+func htmlEnd(node ast.Node, src []byte) ast.Node {
+	if _, ok := node.(*ast.HTMLBlock); !ok {
+		return nil
+	}
+	open := htmlTags(nil, node, src)
+	if len(open) == 0 {
+		return nil
+	}
+	for c := node.NextSibling(); c != nil; c = c.NextSibling() {
+		if _, ok := c.(*ast.HTMLBlock); !ok {
+			continue
+		}
+		if open = htmlTags(open, c, src); len(open) == 0 {
+			return c
+		}
+	}
+	return nil
+}
+
+// htmlTags is open, the elements left open, after the tags of the block
+// of HTML node. A closing tag closes the latest element of its name and
+// those opened after it; one with nothing to close is passed over.
+func htmlTags(open []string, node ast.Node, src []byte) []string {
+	var b bytes.Buffer
+	lines := node.Lines()
+	for i := range lines.Len() {
+		seg := lines.At(i)
+		b.Write(seg.Value(src))
+	}
+	if h := node.(*ast.HTMLBlock); h.HasClosure() {
+		seg := h.ClosureLine
+		b.Write(seg.Value(src))
+	}
+	z := html.NewTokenizer(&b)
+	for {
+		switch z.Next() {
+		case html.ErrorToken:
+			return open
+		case html.StartTagToken:
+			name, _ := z.TagName()
+			if !voidElements[string(name)] {
+				open = append(open, string(name))
+			}
+		case html.EndTagToken:
+			name, _ := z.TagName()
+			for i := len(open) - 1; i >= 0; i-- {
+				if open[i] == string(name) {
+					open = open[:i]
+					break
+				}
+			}
+		}
+	}
+}
+
+// voidElements are the elements HTML never closes.
+var voidElements = map[string]bool{
+	"area": true, "base": true, "br": true, "col": true, "embed": true, "hr": true,
+	"img": true, "input": true, "link": true, "meta": true, "source": true,
+	"track": true, "wbr": true,
 }
 
 // part adds the prose at span, leaving out what is cut. heading is its
