@@ -55,6 +55,9 @@ jobs:
           echo "MDSH_TEST_NVIM=$RUNNER_TEMP/nvim-linux64/bin/nvim" >> "$GITHUB_ENV"
       - run: go vet ./...
       - run: go test -race ./...
+      # mdsh --serve is built in only with -tags serve.
+      - run: go vet -tags serve ./cmd/mdsh
+      - run: go test -race -tags serve ./cmd/mdsh
 
   gui:
     strategy:

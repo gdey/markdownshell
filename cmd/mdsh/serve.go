@@ -1,8 +1,11 @@
+//go:build serve
+
 package main
 
 import (
 	"context"
 	"errors"
+	"flag"
 	"io"
 	"log/slog"
 	"os"
@@ -16,6 +19,18 @@ import (
 	"github.com/gdey/markdownshell/trust"
 	"github.com/gdey/markdownshell/ui"
 )
+
+// serveBuilt is whether this mdsh has --serve. It is built in only with
+// -tags serve: anyone who can reach the server, with its token, can run
+// commands as the user, so a plain build leaves it out.
+const serveBuilt = true
+
+// addServeFlag adds --serve to fs.
+func addServeFlag(fs *flag.FlagSet) *serveFlag {
+	f := &serveFlag{}
+	fs.Var(f, "serve", "serve the notebook to a web browser, on `host:port` (default "+serve.DefaultAddr+"), or with =stdio to the program that started mdsh, as JSON lines on stdin and stdout; anyone who can reach it with its token can run commands as you")
+	return f
+}
 
 // serveFlag is --serve, with an optional address: --serve alone listens
 // on serve.DefaultAddr, --serve=host:port where it says, and

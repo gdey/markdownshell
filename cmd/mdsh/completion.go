@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
@@ -19,14 +21,37 @@ func completionCmd(args []string, stdout io.Writer) error {
 	}
 	switch args[0] {
 	case "bash":
-		_, err := io.WriteString(stdout, bashCompletion)
+		_, err := io.WriteString(stdout, completionScript(bashCompletion))
 		return err
 	case "zsh":
-		_, err := io.WriteString(stdout, zshCompletion)
+		_, err := io.WriteString(stdout, completionScript(zshCompletion))
 		return err
 	default:
 		return fmt.Errorf("no completion for %q; try bash or zsh", args[0])
 	}
+}
+
+// serveWord is --serve, or one of its options, in a list of words.
+var serveWord = regexp.MustCompile(` --serve[a-z-]*`)
+
+// completionScript is script as this mdsh completes: without --serve
+// and its options when it was built without them.
+func completionScript(script string) string {
+	if serveBuilt {
+		return script
+	}
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(script, "\n") {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "'--serve") || strings.HasPrefix(t, "\"--serve") {
+			continue
+		}
+		if strings.Contains(line, "compgen -W") {
+			line = serveWord.ReplaceAllString(line, "")
+		}
+		b.WriteString(line)
+	}
+	return b.String()
 }
 
 // blocksCmd lists a file's runnable block ids, one per line, for
