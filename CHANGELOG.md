@@ -208,6 +208,10 @@ follow [Semantic Versioning](https://semver.org/).
   title through the same cleaning as the rest of what the shell prints,
   so a folder name holding escape codes can't move the cursor or
   recolor the screen. Finding 2 of the v1.7.0 review.
+- golang.org/x/net is now v0.63.0, in mdsh and mdsh-gui alike, with
+  x/sys, x/term, x/text and x/sync brought up with it. Its HTML parser
+  is what mdsh draws a document's HTML through, so it is kept current.
+  Finding 4 of [the v1.7.0 security review](docs/security/v1.7.0.md).
 
 ## [1.6.0] - 2026-11-16
 
