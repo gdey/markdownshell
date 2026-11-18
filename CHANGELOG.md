@@ -289,7 +289,7 @@ downloads. golang.org/x/net is updated for its HTML parser's fixes.
 
   ![mdsh -i asking Deploy where? in the running block's card, with staging picked and prod beside it](docs/changelog/ctl-ask-tui.png)
 
-  ![mdsh on the command line asking Deploy where? with numbered choices, then Deploy to prod now? [y/N]](docs/changelog/ctl-ask-cli.png)
+  ![mdsh on the command line asking Deploy where? with numbered choices, then Deploy to prod now? y/N](docs/changelog/ctl-ask-cli.png)
 
 ### Fixed
 
