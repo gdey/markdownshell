@@ -747,3 +747,33 @@ func TestSecretCells(t *testing.T) {
 		t.Errorf("secret, secretCode by block = %v", got)
 	}
 }
+
+// StopBackground kills a background block that outlived the run that
+// started it, and the reaper brings in its result, stopped.
+func TestStopBackground(t *testing.T) {
+	file := write(t, "# T\n\n```sh {#server background}\necho up; sleep 60\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if !n.Cells()[1].Running {
+		t.Fatal("the block isn't running in the background")
+	}
+	if !n.StopBackground(0) {
+		t.Fatal("StopBackground = false, want true")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for n.Cells()[1].Running {
+		if time.Now().After(deadline) {
+			t.Fatal("the block never stopped")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if c := n.Cells()[1]; !c.Failed || !strings.Contains(c.Output, "stopped") {
+		t.Errorf("cell after StopBackground = %+v", c)
+	}
+}

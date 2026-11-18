@@ -43,8 +43,11 @@ type Session struct {
 	qs         questions
 	wanted     map[string][]string
 	tty        bool // whether the shells have terminals of their own
-	jobs       []*bgJob
-	seq        uint64 // the last Result.Seq given out
+	// jobs are the background blocks still running. jobsMu guards
+	// it, since StopBackground can come while a run reaps.
+	jobsMu sync.Mutex
+	jobs   []*bgJob
+	seq    uint64 // the last Result.Seq given out
 	// started holds when each running block started, for its
 	// Result.Duration.
 	startMu sync.Mutex
@@ -398,7 +401,7 @@ func (s *Session) PTY() bool { return s.tty }
 // Close ends the session's shells, and any background block still
 // running, which it reports as killed, and removes the control socket.
 func (s *Session) Close() {
-	for _, j := range s.jobs {
+	for _, j := range s.running() {
 		j.job.Kill()
 	}
 	s.Reap()

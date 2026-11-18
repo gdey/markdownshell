@@ -246,6 +246,17 @@ func (a *App) Stop(ctx context.Context) {
 	}
 }
 
+// StopBackground kills block, which runs in the background, as Stop
+// can't once the run that started it is over. It reports whether the
+// block was still running.
+func (a *App) StopBackground(ctx context.Context, block int) bool {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return false
+	}
+	return n.StopBackground(block)
+}
+
 // Answer replies to the question a confirm event asked: "run", "skip"
 // or "stop".
 func (a *App) Answer(ctx context.Context, reply string) error {

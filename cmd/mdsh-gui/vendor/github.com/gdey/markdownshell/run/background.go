@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -24,9 +25,9 @@ type bgJob struct {
 	timer   *time.Timer
 	revoke  func() // stops the block's $MDSH_TOKEN working
 	start   time.Time
-	// timedOut is set when timeout= killed the job, and overdue when
-	// the run's end did.
-	timedOut, overdue atomic.Bool
+	// timedOut is set when timeout= killed the job, overdue when the
+	// run's end did, and stopped when StopBackground did.
+	timedOut, overdue, stopped atomic.Bool
 }
 
 // PIDVar is the shell variable that holds the process ID of background
@@ -78,7 +79,29 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 			job.Kill()
 		})
 	}
+	s.jobsMu.Lock()
 	s.jobs = append(s.jobs, j)
+	s.jobsMu.Unlock()
+}
+
+// running returns the background blocks still running.
+func (s *Session) running() []*bgJob {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+	return slices.Clone(s.jobs)
+}
+
+// StopBackground kills background block b, if it is still running, and
+// reports whether it was. Its result, stopped, comes with the next Reap.
+func (s *Session) StopBackground(b *doc.Block) bool {
+	for _, j := range s.running() {
+		if j.r.Block == b {
+			j.stopped.Store(true)
+			j.job.Kill()
+			return true
+		}
+	}
+	return false
 }
 
 // Reap finishes the results of background blocks that have ended, and
@@ -86,6 +109,13 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 // at the end; a front end running blocks one at a time can call it to
 // catch up while nothing runs.
 func (s *Session) Reap() {
+	type end struct {
+		j      *bgJob
+		status int
+		err    error
+	}
+	var ended []end
+	s.jobsMu.Lock()
 	running := s.jobs[:0]
 	for _, j := range s.jobs {
 		status, done, err := j.job.Done()
@@ -93,10 +123,16 @@ func (s *Session) Reap() {
 			running = append(running, j)
 			continue
 		}
-		s.finish(j, status, err)
+		ended = append(ended, end{j, status, err})
 	}
 	clear(s.jobs[len(running):])
 	s.jobs = running
+	s.jobsMu.Unlock()
+	// Done events go out without the lock, as what follows them may
+	// stop another block.
+	for _, e := range ended {
+		s.finish(e.j, e.status, e.err)
+	}
 }
 
 // Wait waits for the background blocks still running, each until its
@@ -108,10 +144,11 @@ func (s *Session) Wait(ctx context.Context) error {
 	defer tick.Stop()
 	for {
 		s.Reap()
-		if len(s.jobs) == 0 {
+		jobs := s.running()
+		if len(jobs) == 0 {
 			return nil
 		}
-		for _, j := range s.jobs {
+		for _, j := range jobs {
 			if j.timer == nil && time.Since(end) >= BackgroundWait {
 				j.overdue.Store(true)
 				j.job.Kill()
@@ -119,7 +156,7 @@ func (s *Session) Wait(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			for _, j := range s.jobs {
+			for _, j := range jobs {
 				j.job.Kill()
 			}
 			s.Reap()
@@ -149,6 +186,8 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 			err = fmt.Errorf("timed out after %s", j.timeout)
 		case j.overdue.Load():
 			err = fmt.Errorf("still running %s after the last block, so it was killed", BackgroundWait)
+		case j.stopped.Load():
+			err = errors.New("stopped")
 		default:
 			err = errors.New("killed before it ended")
 		}

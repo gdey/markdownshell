@@ -286,6 +286,9 @@ curl -fsS localhost:8000/ >/dev/null && echo up
   running until their `timeout=`, or 5 seconds, and then kills them.
 - A background block that fails doesn't stop the run, and it can't be
   `tty`, since nobody is at its terminal.
+- In mdsh-gui and `mdsh -i` a background block can outlive the run
+  that started it. Its play button turns into Stop while it runs (in
+  `mdsh -i`, enter on it), which kills it and what it started.
 
 [examples/fifo](https://github.com/gdey/markdownshell/tree/main/examples/fifo)
 hands data between background blocks through named pipes.

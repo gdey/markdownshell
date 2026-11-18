@@ -36,7 +36,17 @@ var helpItems = []helpItem{
 	{group: "Move", keys: "space/pgup", key: tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")}, what: says("page down (pgup, ctrl+b: up)")},
 	{group: "Move", keys: "ctrl+d/ctrl+u", key: tea.KeyMsg{Type: tea.KeyCtrlD}, what: says("half a page down (ctrl+u: up)")},
 
-	{group: "Run", keys: "enter r", key: tea.KeyMsg{Type: tea.KeyEnter}, what: says("run the block"), off: noRun},
+	{group: "Run", keys: "enter r", key: tea.KeyMsg{Type: tea.KeyEnter}, what: func(m *Model) string {
+		if len(m.nav) > 0 && m.bg[m.cur()] {
+			return "stop the block running in the background"
+		}
+		return "run the block"
+	}, off: func(m *Model) string {
+		if len(m.nav) > 0 && m.bg[m.cur()] {
+			return ""
+		}
+		return noRun(m)
+	}},
 	{group: "Run", keys: "a", key: runeKey("a"), what: says("run from this block to the end"), off: noRun},
 	{group: "Run", keys: "s", key: runeKey("s"), what: says("run the section the block is in"), off: noSection},
 	{group: "Run", keys: "i :", key: runeKey("i"), what: says("type a new sh block and run it"), off: func(m *Model) string {

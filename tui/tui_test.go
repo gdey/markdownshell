@@ -478,6 +478,36 @@ func TestBackgroundBlock(t *testing.T) {
 	}
 }
 
+// Enter on a block running in the background stops it, since ctrl+c
+// can't once the run that started it is over.
+func TestStopBackgroundBlock(t *testing.T) {
+	src := "```sh {#bg background}\necho up; sleep 60\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	if !strings.Contains(m.View(), "enter stop this background block") {
+		t.Errorf("footer doesn't offer to stop the block:\n%s", m.View())
+	}
+	press(m, "enter")
+	if m.running {
+		t.Fatal("enter on a background block started a run")
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for len(m.bg) > 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the background block never stopped")
+		}
+		m.Update(reapMsg{m})
+		for len(m.events) > 0 {
+			m.Update(<-m.events)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if v := m.View(); !strings.Contains(v, "stopped") {
+		t.Errorf("view after stopping doesn't say so:\n%s", v)
+	}
+}
+
 func TestDependsAsksInTUI(t *testing.T) {
 	src := "```sh {#deploy depends=build}\necho deploy\n```\n\n```sh {#build}\necho built\n```\n"
 	for _, tc := range []struct {

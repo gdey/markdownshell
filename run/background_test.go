@@ -152,3 +152,39 @@ func TestBackgroundSessionEvents(t *testing.T) {
 		t.Errorf("forever after Close: running %v, err %v", r.Running, r.Err)
 	}
 }
+
+// StopBackground kills a background block that outlived the run that
+// started it; its result comes with the next Reap, marked stopped.
+func TestStopBackground(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#forever background}\necho up; sleep 60\n```\n```sh {#b}\necho b\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := run.NewSession(d, run.Options{Dir: t.TempDir(), Environ: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	r, err := s.RunBlock(ctx, 0)
+	if err != nil || !r.Running {
+		t.Fatalf("forever: running %v, err %v", r.Running, err)
+	}
+	if s.StopBackground(d.Blocks[1]) {
+		t.Error("StopBackground of a block not in the background = true")
+	}
+	if !s.StopBackground(d.Blocks[0]) {
+		t.Fatal("StopBackground = false, want true")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for r.Running && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+		s.Reap()
+	}
+	if r.Running || r.Err == nil || r.Err.Error() != "stopped" {
+		t.Errorf("after StopBackground: running %v, err %v", r.Running, r.Err)
+	}
+	if s.StopBackground(d.Blocks[0]) {
+		t.Error("StopBackground of a block that ended = true")
+	}
+}

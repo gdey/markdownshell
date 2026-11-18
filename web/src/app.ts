@@ -1231,6 +1231,26 @@ function runs(b: HTMLButtonElement): HTMLButtonElement {
   return b;
 }
 
+// runBlockButton is a block's play button.
+function runBlockButton(block: number): HTMLButtonElement {
+  const b = runs(iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", block)));
+  b.classList.add("run-block");
+  return b;
+}
+
+// stopBackgroundButton stands in for a block's play button while it
+// runs in the background, which a run's Stop can't reach once that run
+// is over.
+function stopBackgroundButton(block: number): HTMLButtonElement {
+  const b = iconButton("stop", "Stop this background block", () => void stopBackground(block));
+  b.classList.add("stop-bg");
+  return b;
+}
+
+async function stopBackground(block: number) {
+  if (!(await App.StopBackground(block))) status("that block already ended");
+}
+
 function drawBlock(c: Cell): HTMLElement {
   // The outline names a block by the .name's first child.
   const name = el("span", { className: "name" }, el("span", { className: "id" }, c.name ?? c.id ?? ""), el("span", { className: "lang" }, c.lang ?? ""), c.attrs ? el("span", { className: "attrs" }, c.attrs) : "");
@@ -1253,7 +1273,8 @@ function drawBlock(c: Cell): HTMLElement {
       iconButton("copy", "Copy this block's code (c)", () => void copyCode(c.body ?? "", c.name ?? c.id ?? "", !!c.secretCode)),
       c.lang === "http" ? iconButton("curl", "Copy as curl, with the placeholders filled in", () => void copyCurl(c)) : "",
       iconButton("pencil", "Edit this block in the source (e)", () => void editBlock(block, c)),
-      runs(iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", c.block))),
+      runBlockButton(c.block),
+      stopBackgroundButton(c.block),
       runs(iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block))),
       ...(c.movable ? [trashButton(c)] : []),
     ),
@@ -2002,7 +2023,8 @@ function busy(on: boolean) {
   runAllButton();
   historyBusy(on);
   busyFrontMatter(on);
-  for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button, #outline .run, .heading-cell .run-section")) x.disabled = on;
+  // A background block's Stop stays, as it runs on beside the run.
+  for (const x of document.querySelectorAll<HTMLButtonElement>(".block .head button:not(.stop-bg), #outline .run, .heading-cell .run-section")) x.disabled = on;
   if (!on && noRun) for (const x of document.querySelectorAll<HTMLButtonElement>(runButtons)) x.disabled = true;
 }
 

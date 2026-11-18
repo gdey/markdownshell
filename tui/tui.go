@@ -668,6 +668,14 @@ func (m *Model) stop() {
 	}
 }
 
+// stopBackground kills background block i. Its result comes in as
+// any background block's does, marked stopped.
+func (m *Model) stopBackground(i int) {
+	if m.sess.StopBackground(m.d.Blocks[i]) {
+		m.status = "stopped " + termsafe.Visible(m.d.Label(m.d.Blocks[i]))
+	}
+}
+
 func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// While a tty block runs in its card, keys are for it.
 	if m.termBlock >= 0 {
@@ -776,6 +784,13 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.vp.HalfPageUp()
 	case "enter", "r":
+		// On a block running in the background they stop it, as its
+		// card's play button does in mdsh-gui: ctrl+c can't, once the
+		// run that started it is over.
+		if len(m.nav) > 0 && m.bg[m.cur()] {
+			m.stopBackground(m.cur())
+			break
+		}
 		m.start(false)
 	case "a":
 		m.start(true)
@@ -1643,6 +1658,11 @@ func (m *Model) footer() string {
 		help = helpStyle.Render("↑/↓ j/k move the end · g/G first/last · o other end · y enter copy · esc cancel")
 	case m.hist.focus:
 		help = helpStyle.Render("shift+↑ select lines · enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
+	case len(m.nav) > 0 && m.bg[m.cur()]:
+		help = helpStyle.Render("? keys · j/k move · enter stop this background block")
+		if m.running {
+			help = helpStyle.Render("? keys · j/k move · enter stop this background block · ctrl+c stop the run")
+		}
 	case m.running:
 		help = helpStyle.Render("? keys · j/k move · ctrl+c stop")
 	case m.notice != "":
