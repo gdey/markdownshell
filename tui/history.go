@@ -623,7 +623,7 @@ func (m *Model) histView() string {
 	// The shell's directory follows the title; a long one loses its
 	// start.
 	dir := ""
-	if d := m.hist.prompt.Dir; d != "" {
+	if d := termsafe.Visible(m.hist.prompt.Dir); d != "" {
 		room := m.width - lipgloss.Width(title) - lipgloss.Width(hint) - 6
 		if r := []rune(d); len(r) > room {
 			d = ""
