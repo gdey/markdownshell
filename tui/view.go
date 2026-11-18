@@ -54,6 +54,7 @@ func (m *Model) refresh() {
 	m.secretVars = m.sess.SecretVars()
 	var buf strings.Builder
 	m.tops, m.bots = map[int]int{}, map[int]int{}
+	m.agoNext = time.Time{}
 	line, blank := 0, true
 	add := func(s string) {
 		s = strings.TrimRight(s, "\n")
@@ -298,12 +299,12 @@ func (m *Model) state(i int, r *run.Result) string {
 	case r.Ran && r.Err != nil:
 		return lipgloss.NewStyle().Foreground(failCol).Render("✗ " + r.Err.Error())
 	case r.Ran && r.Failed():
-		return lipgloss.NewStyle().Foreground(failCol).Render(fmt.Sprintf("✗ exit %d", r.ExitStatus())) + took(r)
+		return lipgloss.NewStyle().Foreground(failCol).Render(fmt.Sprintf("✗ exit %d", r.ExitStatus())) + took(r) + m.ranAgo(r)
 	case r.Ran && !r.Block.IsInclude() && run.Stale(m.d, m.results)[i]:
 		// A block it depends on ran again, or was cleared, since.
-		return lipgloss.NewStyle().Foreground(runningCol).Render("✓ stale") + took(r)
+		return lipgloss.NewStyle().Foreground(runningCol).Render("✓ stale") + took(r) + m.ranAgo(r)
 	case r.Ran && !r.Block.IsInclude():
-		return lipgloss.NewStyle().Foreground(okCol).Render("✓") + took(r)
+		return lipgloss.NewStyle().Foreground(okCol).Render("✓") + took(r) + m.ranAgo(r)
 	case r.Skipped && run.Runnable(r.Block):
 		return tagStyle.Render("skipped")
 	}
@@ -357,23 +358,23 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 	b := m.d.Blocks[i]
 	if b.IsHTTP() && b.HasOutput() {
 		if s, ok := m.httpOutput(b, nil, savedResponse(b, m.d.Src)); ok {
-			return wrap.Render(savedStyle.Render("saved response:") + "\n" + s)
+			return wrap.Render(savedStyle.Render(m.savedLabel(b, "saved response")) + "\n" + s)
 		}
 	}
 	if b.HasOutput() {
 		cur := b.CurrentOutput()
 		out := saved(m.d.Src[cur.Start:cur.End])
 		if link := imageLink(out); link != "" {
-			s := savedStyle.Render("saved output: " + link)
+			s := savedStyle.Render(m.savedLabel(b, "saved output") + " " + link)
 			if p := m.preview(link, w-2); p != "" {
 				s += "\n" + p
 			}
 			return s
 		}
 		if run.OutKind(b) == "markdown" {
-			return savedStyle.Render("saved output:") + "\n" + m.markdown(out)
+			return savedStyle.Render(m.savedLabel(b, "saved output")) + "\n" + m.markdown(out)
 		}
-		return wrap.Render(savedStyle.Render("saved output:\n" + links(b, clean(termsafe.Styled(out)))))
+		return wrap.Render(savedStyle.Render(m.savedLabel(b, "saved output") + "\n" + links(b, clean(termsafe.Styled(out)))))
 	}
 	return ""
 }
@@ -501,6 +502,38 @@ func (m *Model) elapsed(i int) string {
 
 // took is how long a block that ran took, after its state, or "" when
 // that isn't known.
+// ranAgo says how long ago block r's run this session started, after
+// how long it took: " · 3 mins ago".
+func (m *Model) ranAgo(r *run.Result) string {
+	if w := m.ago(r.Start); w != "" {
+		return tagStyle.Render(" · " + w)
+	}
+	return ""
+}
+
+// savedLabel is the dim line over block b's saved output, what with
+// how long ago its run started, when the file saved that: "saved
+// output, 3 mins ago:".
+func (m *Model) savedLabel(b *doc.Block, what string) string {
+	if t, err := time.Parse(time.RFC3339, b.CurrentAt); err == nil {
+		return what + ", " + m.ago(t) + ":"
+	}
+	return what + ":"
+}
+
+// ago is runAgo from now, and notes when its words change, so the view
+// is drawn again then (see agoNext).
+func (m *Model) ago(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	w, next := runAgo(t, time.Now())
+	if m.agoNext.IsZero() || next.Before(m.agoNext) {
+		m.agoNext = next
+	}
+	return w
+}
+
 func took(r *run.Result) string {
 	if r.Duration <= 0 {
 		return ""

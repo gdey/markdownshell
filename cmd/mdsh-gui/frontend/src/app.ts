@@ -27,7 +27,7 @@ import { secretMask, setSecretLines } from "./secretmask.js";
 import { textboxGrip } from "./textbox.js";
 import { includeControls } from "./include.js";
 import { drawHTTP, statusBadge } from "./http.js";
-import { drawEarlier } from "./earlier.js";
+import { drawEarlier, fullTime, timeAgo } from "./earlier.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
 import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
@@ -1263,7 +1263,7 @@ function drawBlock(c: Cell): HTMLElement {
   );
   // The output's buttons sit in its top right corner: copy, and on the
   // selected card the trash.
-  const tools = el("div", { className: "output-tools" }, copyOutputButton(block, c));
+  const tools = el("div", { className: "output-tools" }, el("span", { className: "output-at" }), copyOutputButton(block, c));
   if (c.movable && c.earlier?.length) tools.append(clearEarlierButton(c));
   if (c.movable) tools.append(clearOutputButton(c));
   block.querySelector(".output-part")!.append(tools);
@@ -1284,6 +1284,8 @@ function drawBlock(c: Cell): HTMLElement {
     block.querySelector(".output")!.before(drawHTTP(c.http, partKey(block, "output")));
     block.classList.add("has-http");
   }
+  drawAt(block, c, new Date());
+  startAtTicker();
   colorOutput(block.querySelector(".output")!);
   if (c.links) linkify(block.querySelector<HTMLElement>(".output")!);
   markOutput(block.querySelector<HTMLElement>(".output")!);
@@ -4377,6 +4379,38 @@ function stopTimer(block: HTMLElement) {
   block.classList.remove("timing", "late", "later");
   restTimer(block.querySelector<HTMLElement>(".head .timer")!, performance.now() - t0, false, Number(block.dataset.timeout ?? 0));
   if (!timerStarts.size) stopTicker();
+}
+
+// Each output says when its run started, as "3 mins ago", on its
+// title bar beside its tools, with the exact time in its tooltip. A
+// ticker keeps them current; it reads each card's cell, which a run
+// updates in place, so a card needn't be drawn again for its time.
+let atTicker = 0;
+
+function startAtTicker() {
+  if (!atTicker) atTicker = window.setInterval(tickAts, 1000);
+}
+
+function tickAts() {
+  const now = new Date();
+  for (const span of document.querySelectorAll<HTMLElement>("#doc .output-at")) {
+    const block = span.closest<HTMLElement>(".block");
+    const c = block && cellOf.get(block);
+    if (block && c) drawAt(block, c, now);
+  }
+}
+
+// drawAt shows when block's output ran. A block that is running has
+// no time to show: the output under way isn't the one the time was for.
+function drawAt(block: HTMLElement, c: Cell, now: Date) {
+  const span = block.querySelector<HTMLElement>(".output-at");
+  if (!span) return;
+  const at = c.running || timerStarts.has(c.block) ? "" : (c.at ?? "");
+  const text = at ? timeAgo(at, now) : "";
+  if (span.textContent !== text) span.textContent = text;
+  const title = at ? "Ran " + fullTime(at).replace("\n", "\nat=") : "";
+  if (span.title !== title) span.title = title;
+  span.hidden = !text;
 }
 
 // stopTimers stops the timers of the blocks that aren't running in the

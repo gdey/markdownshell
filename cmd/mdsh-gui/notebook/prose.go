@@ -112,6 +112,7 @@ func (n *Notebook) cells() []Cell {
 			Attrs:           attrsText(b.Info),
 			Depends:         b.Depends(),
 			Output:          n.html(out),
+			At:              outputAt(b, r, out),
 			Earlier:         n.earlier(b),
 			HTTP:            httpCell(b, r, out),
 			OutputTasks:     tasksIn(l.tasks, b.CurrentOutput()),
@@ -191,6 +192,18 @@ func (n *Notebook) cells() []Cell {
 		}
 	}
 	return l.cells
+}
+
+// outputAt is when the run that made block b's output out started: r's,
+// when b ran this session, or else the at= the file saved with it.
+func outputAt(b *doc.Block, r *run.Result, out []byte) string {
+	if len(bytes.TrimSpace(out)) == 0 {
+		return ""
+	}
+	if r.Ran && !r.Start.IsZero() {
+		return r.Start.UTC().Format(time.RFC3339)
+	}
+	return b.CurrentAt
 }
 
 // blockAt is the index of the block that starts at pos, or -1.

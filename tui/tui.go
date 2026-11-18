@@ -116,7 +116,10 @@ type Model struct {
 	// any, a clock ticks each second, so their headers count up.
 	started  map[int]time.Time
 	clocking bool
-	prompt   *confirmMsg
+	// agoNext is when an output's "3 mins ago" in the view next changes,
+	// or zero when none shows; the file check draws the view again then.
+	agoNext time.Time
+	prompt  *confirmMsg
 	// asks are the questions blocks put with mdsh ctl ask and confirm,
 	// asked one at a time, the first in its block's card with askIn or
 	// askPick.
@@ -490,6 +493,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !m.changed && m.diskChanged() {
 			m.changed = true
+			m.refresh()
+		} else if !m.agoNext.IsZero() && !time.Now().Before(m.agoNext) {
+			// An output's "3 mins ago" is due to change.
 			m.refresh()
 		}
 		return m, m.check()

@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 // atStamp matches the at= a run stamps on its output.
@@ -35,5 +36,39 @@ func TestRunHistory(t *testing.T) {
 	want := "{for=n exit=0}\n3\n```\n\n```output {for=n exit=0 history=1}\n2\n```\n\n```output {for=n exit=0 history=2}\n1\n```\n"
 	if !strings.HasSuffix(got, want) || strings.Count(got, "history=1") != 1 {
 		t.Errorf("text:\n%s\nwant it to end\n%s", got, want)
+	}
+}
+
+// A cell's at is the time its output's run started: the at= saved with
+// it, then this session's run's once it runs, and none without output.
+func TestCellAt(t *testing.T) {
+	file := write(t, "```sh {#a}\necho hi\n```\n\n```output {for=a exit=0 at=2026-01-02T03:04:05Z}\nold\n```\n\n```sh {#b}\ntrue\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	at := func(id string) string {
+		for _, c := range n.Cells() {
+			if c.ID == id {
+				return c.At
+			}
+		}
+		t.Fatalf("no cell %s", id)
+		return ""
+	}
+	if got := at("a"); got != "2026-01-02T03:04:05Z" {
+		t.Errorf("saved at = %q, want the file's", got)
+	}
+	if got := at("b"); got != "" {
+		t.Errorf("at of a block without output = %q, want none", got)
+	}
+	before := time.Now().UTC().Truncate(time.Second)
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	got, err := time.Parse(time.RFC3339, at("a"))
+	if err != nil || got.Before(before) || got.After(time.Now()) {
+		t.Errorf("at after a run = %q (%v), want this run's start", at("a"), err)
 	}
 }

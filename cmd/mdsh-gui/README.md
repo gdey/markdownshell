@@ -345,6 +345,11 @@ Each file opens in a tab of its own, with its own shells.
   when the pointer is over it. A block's output has one too, in its
   corner, which copies the output as text, without its colors; it says
   Copied for a moment.
+- **Run time:** a block's output says, beside its copy button, how
+  long ago the run that made it started: "42 secs ago" under a minute,
+  then minutes, hours, days, weeks, months and years. It keeps counting
+  while the window is open, and its tooltip has the exact time and the
+  `at=` the file holds. Output saved without an `at=` shows none.
 - **Secrets:** a block marked `secret` has its code and output blurred
   until you press the eye on its card; they blur again after a minute
   (Settings › Editing › Show secrets for) or when the window loses

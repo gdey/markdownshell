@@ -110,6 +110,11 @@ block started, in UTC to the second (`at=2026-11-13T19:08:00Z`). It
 changes only when the block runs again, so output without it, from an
 older mdsh, reads as before.
 
+mdsh-gui shows it on the output's title bar as how long ago that was,
+such as "3 mins ago", with the exact time in its tooltip, and `mdsh -i`
+on the saved output's label ("saved output, 3 mins ago:") and, for a
+run this session, after the block's time in its header.
+
 An `http` block's output is the response it got; see
 [HTTP requests]({{< relref "http" >}}).
 
