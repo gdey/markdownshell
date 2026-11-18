@@ -94,3 +94,35 @@ func TestHistoryAssetsOwnOnly(t *testing.T) {
 		t.Errorf("tidy deleted a file it didn't name: %v", err)
 	}
 }
+
+// The at= an earlier run's file is named from comes out of the document,
+// so only a time is taken: anything else names the file "earlier", and a
+// run never moves a file out of its own folder (finding 1 of the v1.7.0
+// security review).
+func TestHistoryAssetsAtStaysInFolder(t *testing.T) {
+	for at, want := range map[string]string{
+		"2026-11-13T19:08:00Z":      "a/s.2026-11-13T190800Z.svg",
+		"2026-11-13T20:08:00+01:00": "a/s.2026-11-13T190800Z.svg",
+		"":                          "a/s.earlier.svg",
+		"x/../../../elsewhere/x":    "a/s.earlier.svg",
+		"2026-11-13T19:08:00Z/..":   "a/s.earlier.svg",
+	} {
+		if got := run.HistoryAssetName("a/s.svg", at); got != want {
+			t.Errorf("at=%q: got %s, want %s", at, got, want)
+		}
+	}
+	root := t.TempDir()
+	dir := filepath.Join(root, "docs")
+	assets := filepath.Join(dir, "d.md.assets")
+	os.MkdirAll(filepath.Join(assets, "s.x"), 0o755)
+	os.MkdirAll(filepath.Join(root, "elsewhere"), 0o755)
+	os.WriteFile(filepath.Join(assets, "s.svg"), []byte("planted"), 0o644)
+	src := "```sh {#s out=screenshot history}\necho hi\n```\n\n<!-- mdsh:output for=\"s\" at=\"x/../../../elsewhere/x\" -->\n![s](d.md.assets/s.svg)\n<!-- /mdsh:output -->\n"
+	runDoc(t, src, run.Options{Dir: dir, File: filepath.Join(dir, "d.md")})
+	if _, err := os.Stat(filepath.Join(root, "elsewhere", "x.svg")); err == nil {
+		t.Fatal("the run moved the block's file out of the document's folder")
+	}
+	if b, err := os.ReadFile(filepath.Join(assets, "s.earlier.svg")); err != nil || string(b) != "planted" {
+		t.Errorf("s.earlier.svg = %q, %v; want the file kept beside the document", b, err)
+	}
+}

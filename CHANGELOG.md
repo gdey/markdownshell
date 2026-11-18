@@ -193,6 +193,22 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![A folded http block in mdsh-gui: under its code, one line reads HTTP/1.1 200 OK … 10 more lines](docs/changelog/http-fold.png)
 
+### Security
+
+- The file an earlier run's image is renamed to, when a block with
+  `history=` runs again, takes its time from the output's `at=` as a
+  parsed RFC 3339 time, not as the text in the file. A document that
+  wrote a path there, and shipped a folder beside its assets for it,
+  could have a run move the block's own image file to a path of its
+  choosing outside the document's folder, as a new file, before the
+  block's code ran. Anything that isn't a time now names the file
+  `earlier`, and a rename never leaves the file's folder. Finding 1 of
+  [the v1.7.0 security review](docs/security/v1.7.0.md).
+- `mdsh -i` draws the shell's working directory on the History pane's
+  title through the same cleaning as the rest of what the shell prints,
+  so a folder name holding escape codes can't move the cursor or
+  recolor the screen. Finding 2 of the v1.7.0 review.
+
 ## [1.6.0] - 2026-11-16
 
 mdsh learns to talk to web services. An `http` block makes one HTTP
