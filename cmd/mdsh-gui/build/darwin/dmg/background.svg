@@ -9,8 +9,8 @@
     </linearGradient>
     <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fff" stop-opacity="0"/>
-      <stop offset="0.6" stop-color="#fff" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0.35"/>
+      <stop offset="0.6" stop-color="#fff" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.6"/>
     </linearGradient>
     <mask id="shot-mask">
       <rect x="0" y="0" width="640" height="400" fill="url(#fade)"/>
@@ -23,14 +23,13 @@
 
   <rect width="640" height="400" fill="url(#sky)"/>
 
-  <!-- A faint mdsh window rising from the bottom edge. -->
+  <!-- A faint mdsh window rising from the bottom edge, in the newest look:
+       render.sh puts in the last hero of site/data/looks.toml. -->
   <g mask="url(#shot-mask)">
-    <image xlink:href="../../../../../docs/gui/notebook.png" x="90" y="312" width="460" height="302" preserveAspectRatio="xMidYMin slice"/>
+    <image xlink:href="../../../../../site/static/images/app/hero-greentea.png" x="90" y="312" width="460" height="302" preserveAspectRatio="xMidYMin meet"/>
   </g>
 
   <text x="320" y="54" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', Inter, 'Helvetica Neue', sans-serif" font-size="22" font-weight="600" fill="#1f2937">Drag mdsh to Applications to install</text>
-  <text x="320" y="80" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', Inter, 'Helvetica Neue', sans-serif" font-size="13" fill="#6b7280">Blocked the first time? Open Anyway in System Settings › Privacy &amp; Security.</text>
-  <text x="320" y="104" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', Inter, 'Helvetica Neue', sans-serif" font-size="13" fill="#6b7280">Or in Terminal: <tspan font-family="Menlo, 'JetBrains Mono', monospace" font-size="12" fill="#374151">xattr -dr com.apple.quarantine /Applications/mdsh.app</tspan></text>
 
   <!-- The arrow, from the app to Applications. -->
   <path d="M 250 196 Q 320 160 390 196" fill="none" stroke="url(#arrow)" stroke-width="6" stroke-linecap="round"/>
