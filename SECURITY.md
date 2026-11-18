@@ -7,8 +7,8 @@ Older releases don't get fixes; upgrade to the latest one.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.6.x   | Yes       |
-| < 1.6   | No        |
+| 1.7.x   | Yes       |
+| < 1.7   | No        |
 
 ## What counts as a security bug
 
@@ -37,7 +37,8 @@ heading, crediting you if you'd like.
 
 ## Past reviews
 
-The reviews are in [docs/security](docs/security): for v1.6.0,
+The reviews are in [docs/security](docs/security): for v1.7.0,
+[what changed since v1.6.0](docs/security/v1.7.0.md); for v1.6.0,
 [what changed since v1.5.0](docs/security/v1.6.0.md); for v1.5.0,
 [what changed since v1.4.0](docs/security/v1.5.0.md); for v1.4.0,
 [the whole surface](docs/security/v1.4.0.md); for v1.2.1,
