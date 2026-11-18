@@ -633,6 +633,20 @@ func (n *Notebook) Stop() {
 	}
 }
 
+// StopBackground kills block i if it is running in the background,
+// and reports whether it was. Its result comes in as it would have had
+// it ended, marked stopped.
+func (n *Notebook) StopBackground(i int) bool {
+	n.mu.Lock()
+	if i < 0 || i >= len(n.d.Blocks) {
+		n.mu.Unlock()
+		return false
+	}
+	b, sess := n.d.Blocks[i], n.sess
+	n.mu.Unlock()
+	return sess.StopBackground(b)
+}
+
 // HasOutput reports whether ClearOutputs would take anything out of the
 // document: any run's output, a filled output copy or a stored value.
 // Once outputs are cleared it is false until a block's output comes in.

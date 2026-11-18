@@ -172,6 +172,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `background` block that outlived the run that started it couldn't
+  be stopped: its play button stayed a play button, and only Restart
+  Shells ended it. In mdsh-gui the play button is now a red Stop while
+  the block runs in the background, and in `mdsh -i` enter on the block
+  stops it. It is killed with what it started, and its output says
+  `stopped`.
+
+  ![mdsh-gui: the server block, running in the background, has a red Stop where its play button was](docs/changelog/background-stop.png)
+
+  ![mdsh -i: the server block reads running in the background, and the footer offers enter stop this background block](docs/changelog/background-stop-tui.png)
+
 - mdsh-gui: with Use Neovim on, a block's Edit button, or a click on
   prose, while the source view was closed opened Neovim with the cursor
   on line 1. It now waits for Neovim to start and puts the cursor on

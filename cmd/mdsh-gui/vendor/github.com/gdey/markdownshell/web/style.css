@@ -409,6 +409,10 @@ body.hide-output .block > .earlier-part { display: none !important; }
 .stale-badge { padding: 0 8px; border: 1px solid var(--warn-border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; background: var(--warn-bg); margin-right: 8px; white-space: nowrap; cursor: help; }
 .block.background { border-left: 3px dashed var(--accent); }
 .block.background .exit { color: var(--muted); background: none; }
+/* While a block runs in the background its play button is a stop. */
+.block.background .head button.run-block,
+.block:not(.background) .head button.stop-bg { display: none; }
+.block .head button.stop-bg { color: var(--bad); }
 .block .head { display: flex; gap: 4px; align-items: center; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--text-scale)); }
 .block .head .name { flex: 1; display: flex; gap: 8px; align-items: baseline; min-width: 0; font-family: var(--font-code); }
 .block .head .id { font-weight: 600; }

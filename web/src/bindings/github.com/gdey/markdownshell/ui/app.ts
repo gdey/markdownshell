@@ -952,6 +952,15 @@ export function Stop(): $CancellablePromise<void> {
 }
 
 /**
+ * StopBackground kills block, which runs in the background, as Stop
+ * can't once the run that started it is over. It reports whether the
+ * block was still running.
+ */
+export function StopBackground(block: number): $CancellablePromise<boolean> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.StopBackground", block);
+}
+
+/**
  * Tabs are the calling window's tabs, for its tab bar.
  */
 export function Tabs(): $CancellablePromise<$models.Tabs> {
