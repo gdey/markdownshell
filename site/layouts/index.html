@@ -133,7 +133,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
 <section class="band">
   <div class="wrap">
     {{- /* The looks are site/data/looks.toml, made from the app's
-       cmd/mdsh-gui/frontend/looks by go generate. */ -}}
+       web/looks by go generate. */ -}}
     {{- $looks := site.Data.looks.looks }}
     {{- $count := slice "No" "One" "Two" "Three" "Four" "Five" "Six" "Seven" "Eight" "Nine" "Ten" "Eleven" "Twelve" }}
     <h2>{{ if lt (len $looks) (len $count) }}{{ index $count (len $looks) }}{{ else }}{{ len $looks }}{{ end }} looks. Light and dark.</h2>
@@ -178,17 +178,19 @@ cd markdownshell/examples` "sh" "" }}</div></li>
 
 <section class="band">
   <div class="wrap">
-    <h2>One file, three ways to run it.</h2>
-    <p class="sub">The desktop app, the terminal UI and the command line share one engine, so a document runs the same in all three and saves the same bytes.</p>
+    <h2>One file, four ways to run it.</h2>
+    <p class="sub">The desktop app, the browser, the terminal UI and the command line share one engine, so a document runs the same in all four and saves the same bytes.</p>
     <ul class="fronts">
       <li><span class="tag">Shipping</span><h3>Desktop app</h3><p>Tabs, the start screen with collections and pins, source beside rendered, History, Console, outline, diagrams. macOS and Linux.</p>
 {{ highlight `mdsh-gui runbooks/` "sh" "" }}</li>
+      <li><span class="tag">New</span><h3>Browser</h3><p>The desktop app's notebook in a web browser, on this machine by default and behind a token. See <a href="{{ "docs/browser/" | relURL }}">Browser</a>.</p>
+{{ highlight `mdsh --serve deploy.md` "sh" "" }}</li>
       <li><span class="tag">Shipping</span><h3>Terminal UI</h3><p>The same notebook over SSH: outline, block moves with undo, reports, tabs, and a History pane with your shell's prompt.</p>
 {{ highlight `mdsh -i deploy.md` "sh" "" }}</li>
       <li><span class="tag">Shipping</span><h3>Command line</h3><p>Run in CI, write output back, make PDF and HTML reports, keep an audit log. One static binary.</p>
 {{ highlight `mdsh --yes -w deploy.md` "sh" "" }}</li>
     </ul>
-    <p class="caption">Coming: blocks that run over SSH on the machine they belong to, and a notebook served to a browser. See the <a href="{{ "roadmap/" | relURL }}">roadmap</a>.</p>
+    <p class="caption">Coming: blocks that run over SSH on the machine they belong to. See the <a href="{{ "roadmap/" | relURL }}">roadmap</a>.</p>
   </div>
 </section>
 
