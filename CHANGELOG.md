@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The `.dmg` window shows the newest look, Green Tea, in the app rising
+  from its bottom edge. `build/darwin/dmg/render.sh` takes the newest
+  look's picture from `site/data/looks.toml`, so running it again when a
+  release brings a new look is enough.
+
 ### Fixed
 
 - The `.dmg` window no longer says to choose Open Anyway or run `xattr`
