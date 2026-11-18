@@ -152,6 +152,24 @@ follow [Semantic Versioning](https://semver.org/).
   file in front to your web browser, as `mdsh --serve` does, on a free
   port of 127.0.0.1, and opens it there.
 
+- `mdsh-gui`: a Green Tea look in Settings › Look, in matcha greens. The
+  document is written on a sheet of washi laid on a tatami mat, with a
+  bowl of whisked matcha and a bamboo whisk by its top corner; the washi
+  is a field notebook's page, with faint ink sketches of the tea things
+  (a sprig of camellia sinensis, a chawan, a chasen, a chashaku, a
+  tetsubin and a natsume) labeled in script in its margins and between
+  the cards. The paper and its sketches scroll over the mat while the
+  bowl stays put. Headings are set in a mincho serif, the cards are
+  paper slips, the accent is the matcha's green and lacquer vermilion
+  is kept for errors and Stop. The dark theme is the same room at
+  evening: the washi dusk-dark, the ink steam-white, the bowl black raku
+  and the lit matcha for the accent. The bowl and whisk, the sketches
+  and the shadows under cards can each be turned off. Its text, code,
+  links and buttons measure at least 4.5:1 and its accent 3:1 in both
+  themes.
+
+  ![The deploy runbook in the Green Tea look: washi on a tatami mat, a bowl of matcha and a whisk by its corner, ink sketches of tea things in the margins, with ship asking to run](docs/changelog/greentea.png)
+
 ### Fixed
 
 - mdsh-gui: with Use Neovim on, a block's Edit button, or a click on

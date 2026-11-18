@@ -69,5 +69,17 @@ export const generated: Look[] = [
       "rules": "Coffee stains",
       "shadows": "Shadows under cards"
     }
+  },
+  {
+    "id": "greentea",
+    "name": "Green Tea",
+    "description": "Green Tea writes the document on a sheet of washi laid on a tatami mat, with a bowl of matcha and a whisk by its corner and faint ink sketches of the tea things in its margins, or on the same sheet at evening, the room ink-dark and the matcha lit, when the theme is dark.",
+    "textSize": 100,
+    "texture": {
+      "label": "Tea room",
+      "sprockets": "Bowl and whisk",
+      "rules": "Sketches",
+      "shadows": "Shadows under cards"
+    }
   }
 ];

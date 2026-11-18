@@ -621,6 +621,14 @@ About tab with the version, build, paths and tools.
 
 ![Settings › Look with Coffee chosen: the cup and saucer, the coffee stains and the shadows under cards can be turned off](../../site/static/images/gui/coffee-settings-look.png)
 
+**Green Tea**, since 1.7. Green Tea writes the document on a sheet of washi laid on a tatami mat, with a bowl of matcha and a whisk by its corner and faint ink sketches of the tea things in its margins, or on the same sheet at evening, the room ink-dark and the matcha lit, when the theme is dark.
+
+![The deploy runbook in the Green Tea look: washi on a tatami mat, a bowl of matcha and a whisk by its corner, ink sketches of tea things in the margins, with ship asking to run](../../site/static/images/gui/greentea-light.png)
+
+![The Green Tea look with the dark theme: the same tea room at evening, the washi dusk-dark and the matcha lit in a black raku bowl](../../site/static/images/gui/greentea-dark.png)
+
+![Settings › Look with Green Tea chosen: the bowl and whisk, the sketches and the shadows under cards can be turned off](../../site/static/images/gui/greentea-settings-look.png)
+
 <!-- end looks -->
 
 ## Install
