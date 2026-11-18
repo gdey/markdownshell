@@ -62,10 +62,11 @@ with the reason.
 | `j`/`k`, arrows | next or previous block |
 | `g`/`G` | first or last block |
 | space, pgup, ctrl+d/ctrl+u | scroll |
-| enter or `r` | run the block |
+| enter or `r` | run the block; on a block running in the background, stop it |
 | `a` | run from this block to the end |
 | `s` | run the section the block is in |
 | `h` | History: a shell whose commands are added to the file |
+| `P` | Processes: what runs under the file's shells, as a tree, with how long each has run; `x` kills the one picked and what it started |
 | `i` or `:` | type a new block and run it |
 | `,` | run options |
 | ctrl+c | stop the run, keeping the shells and what blocks set there; again kills the shell of a block that won't stop. Quits when nothing runs |

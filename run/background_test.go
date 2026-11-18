@@ -188,3 +188,43 @@ func TestStopBackground(t *testing.T) {
 		t.Error("StopBackground of a block that ended = true")
 	}
 }
+
+// Processes names a background block's process by its block, and
+// KillProcess on it ends the block, which Reap reports.
+func TestProcessesNamesBackgroundBlocks(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#server background}\nsleep 60\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := run.NewSession(d, run.Options{Dir: t.TempDir(), Environ: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r, err := s.RunBlock(context.Background(), 0)
+	if err != nil || !r.Running {
+		t.Fatalf("server: running %v, err %v", r.Running, err)
+	}
+	pid := 0
+	for _, sh := range s.Processes() {
+		for _, p := range sh.Children {
+			if p.Block == "server" {
+				pid = p.PID
+			}
+		}
+	}
+	if pid == 0 {
+		t.Fatalf("no process named server: %+v", s.Processes())
+	}
+	if !s.KillProcess(pid) {
+		t.Fatal("KillProcess = false")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for r.Running && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+		s.Reap()
+	}
+	if r.Running || r.Err == nil {
+		t.Errorf("after KillProcess: running %v, err %v", r.Running, r.Err)
+	}
+}

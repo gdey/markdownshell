@@ -122,6 +122,12 @@ Each file opens in a tab of its own, with its own shells.
   shows in the status line. Copy there copies the events as JSON
   lines. The log keeps the last 2,000 events, and lasts as long as the
   file is open in the tab, reloads included.
+  Its **Processes** tab shows what runs under the tab's shells, as a
+  tree read from `ps` every second while it shows: the block running,
+  background blocks, named by their block, and whatever a block or
+  History left running. Each line says how long the process has run
+  and has a Kill button, which ends it and what it started; a shell
+  itself is only ended by Restart Shells.
 - **History** (View › History, cmd/ctrl+shift+H): a terminal along the
   bottom that works like a paper tape. Closed, it is a status bar with
   the shell's prompt, the status, and buttons to stop (ctrl+c for a

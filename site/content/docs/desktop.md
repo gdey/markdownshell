@@ -182,6 +182,11 @@ This page is the reference.
   and `timeout=` interrupt the block, as ctrl+c would, and only Kill
   Shell, offered when a block won't stop, and Restart Shells, which
   asks first, start a shell afresh.
+  Its Processes tab shows what runs under the file's shells, as a tree:
+  the block running, background blocks (named by their block), and
+  anything a block or History left running, such as `cmd &`, each with
+  how long it has run and a Kill button that ends it and what it
+  started. It reads them again every second while it shows.
 - **Outline** (cmd/ctrl+shift+O). Headings, blocks and controls, with a
   play button on the selected block.
 - **Pictures.** Images, screenshots and recordings show in the block.

@@ -55,6 +55,7 @@ var helpItems = []helpItem{
 		}
 		return busy(m)
 	}},
+	{group: "Run", keys: "P", key: runeKey("P"), what: says("processes: what runs under the shells, for how long, x kills one")},
 	{group: "Run", keys: "h", key: runeKey("h"), what: says("History: a shell whose commands are added to the file"), off: func(m *Model) string {
 		if m.running && !m.hist.open {
 			return "a block is running"

@@ -21,6 +21,7 @@ const BackgroundWait = 5 * time.Second
 type bgJob struct {
 	r       *Result
 	job     *env.Job
+	label   string // the block's name, as Processes shows it
 	timeout string // the block's timeout=, or ""
 	timer   *time.Timer
 	revoke  func() // stops the block's $MDSH_TOKEN working
@@ -72,7 +73,7 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 		return
 	}
 	r.Running = true
-	j := &bgJob{r: r, job: job, timeout: t, revoke: revoke, start: time.Now()}
+	j := &bgJob{r: r, job: job, label: s.d.Label(b), timeout: t, revoke: revoke, start: time.Now()}
 	if hasTimeout {
 		j.timer = time.AfterFunc(dur, func() {
 			j.timedOut.Store(true)
@@ -89,6 +90,45 @@ func (s *Session) running() []*bgJob {
 	s.jobsMu.Lock()
 	defer s.jobsMu.Unlock()
 	return slices.Clone(s.jobs)
+}
+
+// Processes lists the session's shells, each with the processes under
+// it, as env.Stack.Processes does. It may be called while a run goes.
+// Each background block's process is named by its block.
+func (s *Session) Processes() []env.ShellProcs {
+	all := s.stack.Processes()
+	names := map[int]string{}
+	for _, j := range s.running() {
+		names[j.job.PID] = j.label
+	}
+	var name func(ps []*env.Proc)
+	name = func(ps []*env.Proc) {
+		for _, p := range ps {
+			p.Block = names[p.PID]
+			name(p.Children)
+		}
+	}
+	for _, sh := range all {
+		name(sh.Children)
+	}
+	return all
+}
+
+// KillProcess kills process pid and what it started, if it runs under
+// one of the session's shells, and reports whether it did. A background
+// block it ends is reported killed by the next Reap.
+func (s *Session) KillProcess(pid int) bool {
+	// A background block's own process is stopped as the block, so its
+	// job knows it was killed rather than waiting for a status that
+	// won't come.
+	for _, j := range s.running() {
+		if j.job.PID == pid {
+			j.stopped.Store(true)
+			j.job.Kill()
+			return true
+		}
+	}
+	return s.stack.KillProcess(pid)
 }
 
 // StopBackground kills background block b, if it is still running, and

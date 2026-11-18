@@ -13,6 +13,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/docroot"
+	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/fonts"
 	"github.com/gdey/markdownshell/library"
 	"github.com/gdey/markdownshell/looks"
@@ -255,6 +256,26 @@ func (a *App) StopBackground(ctx context.Context, block int) bool {
 		return false
 	}
 	return n.StopBackground(block)
+}
+
+// Processes lists the tab's shells, each with the processes under it,
+// for the Console's Processes tab. It is empty when no shell runs.
+func (a *App) Processes(ctx context.Context) []env.ShellProcs {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return nil
+	}
+	return n.Processes()
+}
+
+// KillProcess kills process pid and what it started, if it runs under
+// one of the tab's shells, and reports whether it did.
+func (a *App) KillProcess(ctx context.Context, pid int) bool {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return false
+	}
+	return n.KillProcess(pid)
 }
 
 // Answer replies to the question a confirm event asked: "run", "skip"

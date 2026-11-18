@@ -57,6 +57,12 @@ func processTree() map[int][]int {
 	return children
 }
 
+// psRows lists every process, as ps does.
+func psRows() map[int]psRow {
+	out, _ := exec.Command("ps", "-A", "-o", "pid=", "-o", "ppid=", "-o", "stat=", "-o", "etime=", "-o", "args=").Output()
+	return parsePS(string(out))
+}
+
 // killTree ends process pid and everything it started. A background
 // job shares its shell's process group, so it is found by walking the
 // process tree that ps lists.

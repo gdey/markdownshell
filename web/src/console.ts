@@ -21,6 +21,7 @@ import { Clipboard, Events } from "/wails/runtime.js";
 import { App, type AuditEvent, type ConsoleEntry } from "./api.js";
 import { $, el } from "./dom.js";
 import { hinted } from "./keys.js";
+import { initProcs, watchProcs } from "./procs.js";
 
 let entries: ConsoleEntry[] = [];
 let lastSeq = 0;
@@ -47,7 +48,10 @@ export interface ConsoleHooks {
 
 let hooks: ConsoleHooks;
 // tab is which of the pane's tabs shows.
-let tab: "log" | "events" = "log";
+type Tab = "log" | "events" | "procs";
+let tab: Tab = "log";
+const tabs: Tab[] = ["log", "events", "procs"];
+const tabIDs: Record<Tab, string> = { log: "console-tab-log", events: "console-tab-events", procs: "console-tab-procs" };
 const tabKey = "mdsh.consoleTab";
 let events: AuditEvent[] = [];
 let lastEvent = 0;
@@ -289,26 +293,28 @@ export function addEvent(e: AuditEvent) {
   }
 }
 
-// showTab shows the Console's log or its Events.
-function showTab(which: "log" | "events", focus = false) {
+// showTab shows the Console's log, its Events or its Processes.
+function showTab(which: Tab, focus = false) {
   tab = which;
   const ev = which === "events";
-  for (const [id, on] of [
-    ["console-tab-log", !ev],
-    ["console-tab-events", ev],
-  ] as const) {
-    $(id).setAttribute("aria-selected", String(on));
-    $(id).tabIndex = on ? 0 : -1;
+  const pr = which === "procs";
+  for (const t of tabs) {
+    $(tabIDs[t]).setAttribute("aria-selected", String(t === which));
+    $(tabIDs[t]).tabIndex = t === which ? 0 : -1;
   }
-  $("console-log").hidden = ev;
+  $("console-log").hidden = which !== "log";
   $("events-log").hidden = !ev;
-  $("console-empty").hidden = ev || entries.length > 0;
+  $("procs-list").hidden = !pr;
+  $("console-empty").hidden = which !== "log" || entries.length > 0;
   $("events-empty").hidden = !ev || events.length > 0;
-  $("console-clear").hidden = ev;
+  if (!pr) $("procs-empty").hidden = true;
+  $("console-clear").hidden = which !== "log";
+  $("console-copy").hidden = pr;
   $("console-copy").title = ev ? "Copy the selected lines, or every event as JSON lines" : "Copy the selected lines, or all of them";
+  watchProcs(pr && open);
   const log = ev ? $("events-log") : $("console-log");
-  log.scrollTop = log.scrollHeight;
-  if (focus) $(ev ? "console-tab-events" : "console-tab-log").focus();
+  if (!pr) log.scrollTop = log.scrollHeight;
+  if (focus) $(tabIDs[which]).focus();
   try {
     localStorage.setItem(tabKey, which);
   } catch {
@@ -325,6 +331,7 @@ export function showEvents() {
 export function showConsole(on: boolean) {
   open = on;
   $("console").hidden = !on;
+  watchProcs(on && tab === "procs");
   $("console-toggle").classList.toggle("on", on);
   $("console-toggle").setAttribute("aria-expanded", String(on));
   if (on) {
@@ -359,15 +366,19 @@ export function initConsole(h: ConsoleHooks) {
   $("console-log").onclick = click;
   $("console-tab-log").onclick = () => showTab("log");
   $("console-tab-events").onclick = () => showTab("events");
-  for (const id of ["console-tab-log", "console-tab-events"]) {
-    $(id).onkeydown = (e) => {
+  $("console-tab-procs").onclick = () => showTab("procs");
+  initProcs($("procs-list"), $("procs-empty"), flash);
+  for (const t of tabs) {
+    $(tabIDs[t]).onkeydown = (e) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       e.preventDefault();
-      showTab(tab === "log" ? "events" : "log", true);
+      const i = tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : -1);
+      showTab(tabs[(i + tabs.length) % tabs.length], true);
     };
   }
   try {
-    if (localStorage.getItem(tabKey) === "events") showTab("events");
+    const saved = localStorage.getItem(tabKey);
+    if (saved === "events" || saved === "procs") showTab(saved);
   } catch {
     // The Console it is.
   }

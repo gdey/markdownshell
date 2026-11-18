@@ -24,3 +24,6 @@ func killTree(pid int) {
 		p.Kill()
 	}
 }
+
+// psRows can't list processes here.
+func psRows() map[int]psRow { return nil }

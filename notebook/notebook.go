@@ -21,6 +21,7 @@ import (
 
 	"github.com/gdey/markdownshell/audit"
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/rawhtml"
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
@@ -647,6 +648,25 @@ func (n *Notebook) StopBackground(i int) bool {
 	b, sess := n.d.Blocks[i], n.sess
 	n.mu.Unlock()
 	return sess.StopBackground(b)
+}
+
+// Processes lists the notebook's shells, each with the processes under
+// it: blocks running, background blocks, and whatever blocks or the
+// History pane left running.
+func (n *Notebook) Processes() []env.ShellProcs {
+	n.mu.Lock()
+	sess := n.sess
+	n.mu.Unlock()
+	return sess.Processes()
+}
+
+// KillProcess kills process pid and what it started, if it runs under
+// one of the notebook's shells, and reports whether it did.
+func (n *Notebook) KillProcess(pid int) bool {
+	n.mu.Lock()
+	sess := n.sess
+	n.mu.Unlock()
+	return sess.KillProcess(pid)
 }
 
 // HasOutput reports whether ClearOutputs would take anything out of the
