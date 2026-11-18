@@ -51,3 +51,9 @@
   name = "Coffee"
   since = "1.6"
   tagline = "for notes by the cup, stains and all"
+
+[[looks]]
+  id = "greentea"
+  name = "Green Tea"
+  since = "1.7"
+  tagline = "for a quiet hour in the tea room"
