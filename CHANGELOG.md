@@ -8,6 +8,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The History pane can stop recording. Its record button, a dot beside
+  Stop in mdsh-gui and ctrl+o in `mdsh -i`, turns recording off: a
+  command typed then still runs in the document's shell, so a `cd` or a
+  variable it sets carries over to what runs next, but isn't added to
+  the document as a `#history-N` block. Notes and typed blocks are
+  still added. The pane says "not recording" while it is off, and
+  closing the pane turns recording back on.
+
+  ![mdsh-gui's History pane with recording off: echo recorded became the block history-2, while ls / | head -3, typed after the record button was pressed, ran in the pane without being added, and the pane's controls read not recording beside a hollow record button](docs/changelog/history-record.png)
+
+  ![mdsh -i's History pane with recording off after ctrl+o: its rule reads History not recording in red, and ls / | head -3 ran in the pane while the file shows only history-1 and history-2](docs/changelog/history-record-tui.png)
+
 - Each block's output says how long ago the run that made it started,
   from its `at=`: "42 secs ago" under a minute, then minutes, hours,
   days, weeks, months and years. mdsh-gui shows it on the output's

@@ -539,7 +539,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, m.wait
 	case paneTurnMsg:
-		i := m.index[msg.block]
+		i, inFile := m.index[msg.block]
+		if !inFile {
+			// A command typed in History while it doesn't record: it
+			// has no card.
+			i = unrecordedBlock
+		}
 		if msg.end {
 			m.termBlock = -1
 			m.refresh()
@@ -549,15 +554,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.termBlock = i
 		m.helping = false
 		close(msg.reply)
-		m.moveTo(i)
-		m.follow(i)
+		if inFile {
+			m.moveTo(i)
+			m.follow(i)
+		}
 		return m, m.wait
 	case paneMsg:
 		if msg.m != m {
 			return m, nil
 		}
-		if m.termBlock >= 0 {
+		if m.termBlock != -1 {
 			m.refresh()
+		}
+		if m.termBlock >= 0 {
 			m.follow(m.termBlock)
 		}
 		return m, m.watchPane
@@ -677,8 +686,9 @@ func (m *Model) stopBackground(i int) {
 }
 
 func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// While a tty block runs in its card, keys are for it.
-	if m.termBlock >= 0 {
+	// While a tty block runs in its card, or a command in History, keys
+	// are for it.
+	if m.termBlock != -1 {
 		if k.String() == "ctrl+]" {
 			m.stop()
 		} else {
@@ -1632,7 +1642,7 @@ func (m *Model) footer() string {
 	switch {
 	case m.helping:
 		help = helpStyle.Render("↑/↓ pick · enter do it · esc close")
-	case m.termBlock >= 0 && m.hist.running:
+	case m.termBlock != -1 && m.hist.running:
 		help = promptStyle.Render("The command runs in History:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.termBlock >= 0:
 		help = promptStyle.Render(m.name(m.d.Blocks[m.termBlock])+" runs in its card:") + helpStyle.Render(" keys go to it · ctrl+] stops it")

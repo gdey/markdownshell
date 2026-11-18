@@ -576,8 +576,10 @@ func (a *App) SetHistory(ctx context.Context, on, restart bool) (bool, error) {
 }
 
 // HistoryEnter takes what was typed in the History pane: a note is added
-// to the file as prose, and a command is added as a block and run.
-func (a *App) HistoryEnter(ctx context.Context, input string) error {
+// to the file as prose, and a command is added as a block and run. With
+// record false, as the pane's Record switch sets, a command runs without
+// being added.
+func (a *App) HistoryEnter(ctx context.Context, input string, record bool) error {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
@@ -585,7 +587,12 @@ func (a *App) HistoryEnter(ctx context.Context, input string) error {
 	if err := a.beforeRun(t, n); err != nil {
 		return err
 	}
-	err = t.run(func() error { return n.Enter(input) })
+	err = t.run(func() error {
+		if !record {
+			return n.EnterUnrecorded(input)
+		}
+		return n.Enter(input)
+	})
 	a.afterRun(t, n)
 	return err
 }

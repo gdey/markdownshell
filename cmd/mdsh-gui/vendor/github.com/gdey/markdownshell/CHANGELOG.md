@@ -8,6 +8,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The History pane can stop recording. Its record button, a dot beside
+  Stop in mdsh-gui and ctrl+o in `mdsh -i`, turns recording off: a
+  command typed then still runs in the document's shell, so a `cd` or a
+  variable it sets carries over to what runs next, but isn't added to
+  the document as a `#history-N` block. Notes and typed blocks are
+  still added. The pane says "not recording" while it is off, and
+  closing the pane turns recording back on.
+
+  ![mdsh-gui's History pane with recording off: echo recorded became the block history-2, while ls / | head -3, typed after the record button was pressed, ran in the pane without being added, and the pane's controls read not recording beside a hollow record button](docs/changelog/history-record.png)
+
+  ![mdsh -i's History pane with recording off after ctrl+o: its rule reads History not recording in red, and ls / | head -3 ran in the pane while the file shows only history-1 and history-2](docs/changelog/history-record-tui.png)
+
 - Each block's output says how long ago the run that made it started,
   from its `at=`: "42 secs ago" under a minute, then minutes, hours,
   days, weeks, months and years. mdsh-gui shows it on the output's
@@ -172,6 +184,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `background` block that outlived the run that started it couldn't
+  be stopped: its play button stayed a play button, and only Restart
+  Shells ended it. In mdsh-gui the play button is now a red Stop while
+  the block runs in the background, and in `mdsh -i` enter on the block
+  stops it. It is killed with what it started, and its output says
+  `stopped`.
+
+  ![mdsh-gui: the server block, running in the background, has a red Stop where its play button was](docs/changelog/background-stop.png)
+
+  ![mdsh -i: the server block reads running in the background, and the footer offers enter stop this background block](docs/changelog/background-stop-tui.png)
+
 - mdsh-gui: with Use Neovim on, a block's Edit button, or a click on
   prose, while the source view was closed opened Neovim with the cursor
   on line 1. It now waits for Neovim to start and puts the cursor on
@@ -192,6 +215,26 @@ follow [Semantic Versioning](https://semver.org/).
   are.
 
   ![A folded http block in mdsh-gui: under its code, one line reads HTTP/1.1 200 OK … 10 more lines](docs/changelog/http-fold.png)
+
+### Security
+
+- The file an earlier run's image is renamed to, when a block with
+  `history=` runs again, takes its time from the output's `at=` as a
+  parsed RFC 3339 time, not as the text in the file. A document that
+  wrote a path there, and shipped a folder beside its assets for it,
+  could have a run move the block's own image file to a path of its
+  choosing outside the document's folder, as a new file, before the
+  block's code ran. Anything that isn't a time now names the file
+  `earlier`, and a rename never leaves the file's folder. Finding 1 of
+  [the v1.7.0 security review](docs/security/v1.7.0.md).
+- `mdsh -i` draws the shell's working directory on the History pane's
+  title through the same cleaning as the rest of what the shell prints,
+  so a folder name holding escape codes can't move the cursor or
+  recolor the screen. Finding 2 of the v1.7.0 review.
+- golang.org/x/net is now v0.63.0, in mdsh and mdsh-gui alike, with
+  x/sys, x/term, x/text and x/sync brought up with it. Its HTML parser
+  is what mdsh draws a document's HTML through, so it is kept current.
+  Finding 4 of [the v1.7.0 security review](docs/security/v1.7.0.md).
 
 ## [1.6.0] - 2026-11-16
 

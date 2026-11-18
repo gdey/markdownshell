@@ -529,3 +529,68 @@ function cd() { __zoxide_doctor; builtin cd "$@"; }
 		t.Errorf("text = %s", text)
 	}
 }
+
+// TestHistoryUnrecorded checks that a command typed with recording off
+// runs in the shell blocks run in, on the History pane, but isn't added
+// to the document, while a note still is.
+func TestHistoryUnrecorded(t *testing.T) {
+	dir := t.TempDir()
+	file := write(t, "# Log\n")
+	var (
+		mu     sync.Mutex
+		panes  []string
+		blocks []int
+		shown  strings.Builder
+	)
+	n, err := Open(file, Options{OnEvent: func(e Event) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch e.Kind {
+		case "terminal":
+			panes = append(panes, e.Data)
+			blocks = append(blocks, e.Block)
+		case "tty":
+			shown.Write(e.Bytes)
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.EnterUnrecorded("true"); !errors.Is(err, ErrHistoryOff) {
+		t.Fatalf("EnterUnrecorded with the pane off: %v", err)
+	}
+	if _, err := n.SetHistory(true, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []string{"X=kept; cd " + dir, "echo \"unseen $X\"", "# a note", "false"} {
+		if err := n.EnterUnrecorded(in); err != nil {
+			t.Fatalf("EnterUnrecorded(%q): %v", in, err)
+		}
+	}
+	if got, want := n.Text(), "# Log\n\na note\n"; got != want {
+		t.Errorf("text = %q, want %q", got, want)
+	}
+	mu.Lock()
+	if got := strings.Join(panes, ","); got != "history,history,history" {
+		t.Errorf("terminal events said %q", got)
+	}
+	for _, b := range blocks {
+		if b != Unrecorded {
+			t.Errorf("terminal event for block %d, want %d", b, Unrecorded)
+		}
+	}
+	if !strings.Contains(shown.String(), "unseen kept") {
+		t.Errorf("the pane showed %q", shown.String())
+	}
+	mu.Unlock()
+	// What it set is there for the next command, which is recorded, and
+	// numbered as if the others weren't typed.
+	if err := n.Enter("echo \"$X $PWD\""); err != nil {
+		t.Fatal(err)
+	}
+	got := noAt(n.Text())
+	if !strings.Contains(got, "{#history-1 skip links}") || !strings.Contains(got, "kept "+dir) {
+		t.Errorf("text =\n%s", got)
+	}
+}

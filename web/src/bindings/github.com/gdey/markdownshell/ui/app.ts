@@ -378,10 +378,12 @@ export function HistoryCompletions(before: string): $CancellablePromise<notebook
 
 /**
  * HistoryEnter takes what was typed in the History pane: a note is added
- * to the file as prose, and a command is added as a block and run.
+ * to the file as prose, and a command is added as a block and run. With
+ * record false, as the pane's Record switch sets, a command runs without
+ * being added.
  */
-export function HistoryEnter(input: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryEnter", input);
+export function HistoryEnter(input: string, record: boolean): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryEnter", input, record);
 }
 
 /**

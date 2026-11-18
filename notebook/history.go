@@ -236,7 +236,17 @@ func (n *Notebook) History() bool {
 // its exit status. A block, from a line such as # ```bash to a line of
 // ```, is added to the end of the document as it was typed, without
 // running.
-func (n *Notebook) Enter(input string) error {
+func (n *Notebook) Enter(input string) error { return n.enter(input, true) }
+
+// EnterUnrecorded is Enter with recording off: a command runs on the
+// terminal pane, in the shell blocks run in, but isn't added to the
+// document, so nothing it does there is kept but what it changed in the
+// shell. A command ending in a lone & runs in the shell's background,
+// as a shell would run it. A note or a block is still added, since it
+// is typed to be.
+func (n *Notebook) EnterUnrecorded(input string) error { return n.enter(input, false) }
+
+func (n *Notebook) enter(input string, record bool) error {
 	input = strings.TrimRight(input, "\n")
 	if strings.TrimSpace(input) == "" {
 		return nil
@@ -252,6 +262,9 @@ func (n *Notebook) Enter(input string) error {
 	n.mu.Unlock()
 	if !on {
 		return ErrHistoryOff
+	}
+	if !record {
+		return n.runUnrecorded(input)
 	}
 	body, bg := backgrounded(input)
 	return n.start(func(ctx context.Context) error {
@@ -295,6 +308,30 @@ func (n *Notebook) Enter(input string) error {
 			return errors.Join(err, serr)
 		}
 		return errors.Join(err, n.sync())
+	})
+}
+
+// runUnrecorded runs input on the terminal pane, as Enter runs a
+// command, without adding it to the document.
+func (n *Notebook) runUnrecorded(input string) error {
+	return n.start(func(ctx context.Context) error {
+		n.mu.Lock()
+		lang := n.lang()
+		n.noteEnd = -1
+		n.term.mu.Lock()
+		n.term.history = true
+		n.term.mu.Unlock()
+		n.mu.Unlock()
+		defer func() {
+			n.term.mu.Lock()
+			n.term.history = false
+			n.term.mu.Unlock()
+		}()
+		r, _, err := n.sess.RunUnrecorded(ctx, lang, input)
+		if err == nil && r != nil {
+			err = r.Err
+		}
+		return err
 	})
 }
 

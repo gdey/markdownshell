@@ -165,7 +165,9 @@ This page is the reference.
   notes. A line such as ``# ```sh {#rollout}`` opens a block: the prompt
   becomes ```` ```sh> ````, the lines typed are kept rather than run,
   and a ```` ``` ```` line adds the block to the end of the file without
-  running it (ctrl+c drops it). A history block deletes without asking, and becomes a plain
+  running it (ctrl+c drops it). The record button, a dot, turns
+  recording off: commands still run in the file's shell but aren't
+  added to the file, until it is pressed again or the pane closes. A history block deletes without asking, and becomes a plain
   block once moved. The separator over the input shows the shell's
   working directory, and the button with the two arrows has the pane
   fill the tab, up to the tab bar, until it is pressed again.

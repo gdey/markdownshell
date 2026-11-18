@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -57,6 +58,10 @@ type hist struct {
 	killing bool
 	// sel, when set, is the lines selected in log, to copy.
 	sel *histSel
+	// unrecorded is set while recording is off, as ctrl+o sets it: a
+	// command typed runs, but isn't added to the file. Closing the pane
+	// clears it.
+	unrecorded bool
 }
 
 // maxLog is the most lines the pane keeps.
@@ -169,6 +174,8 @@ func (m *Model) fillHistory() tea.Cmd {
 func (m *Model) closeHistory() {
 	m.hist.sel = nil
 	m.hist.open, m.hist.focus, m.hist.full = false, false, false
+	// Closing it records again.
+	m.hist.unrecorded = false
 	m.hist.lines = nil
 	m.hist.input.Reset()
 	m.hist.input.Blur()
@@ -286,6 +293,15 @@ func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 			v, at := []rune(h.input.Value()), h.input.Position()
 			h.input.SetValue(string(v[:at]) + h.killed + string(v[at:]))
 			h.input.SetCursor(at + len([]rune(h.killed)))
+		}
+		return nil
+	case "ctrl+o":
+		// Recording on or off.
+		h.unrecorded = !h.unrecorded
+		if h.unrecorded {
+			m.histLog(helpStyle.Render("(recording off: commands typed here run but aren't added to the file; ctrl+o records again)"))
+		} else {
+			m.histLog(helpStyle.Render("(recording on: commands typed here are added to the file)"))
 		}
 		return nil
 	case "ctrl+l":
@@ -413,7 +429,32 @@ func (m *Model) entered() {
 		m.addBlock(info, body)
 		return
 	}
+	if h.unrecorded {
+		m.runUnrecorded(text)
+		return
+	}
 	m.runTyped(text)
+}
+
+// runUnrecorded runs text on the terminal the pane shows, in the file's
+// shell, as runTyped does, but doesn't add it to the file: recording is
+// off. A lone & at its end runs it in the shell's background.
+func (m *Model) runUnrecorded(text string) {
+	if m.askSources(func() tea.Cmd { m.runUnrecorded(text); return nil }) {
+		return
+	}
+	lang := history.Lang(m.shellPath())
+	ctx, cancel := context.WithCancel(context.Background())
+	m.running, m.cancel, m.status = true, cancel, ""
+	m.hist.running = true
+	m.fit()
+	go func() {
+		r, full, err := m.sess.RunUnrecorded(ctx, lang, text)
+		if err == nil && r != nil {
+			err = r.Err
+		}
+		m.events <- runDoneMsg{err: err, hist: &histDone{result: r, fullScreen: full}}
+	}()
 }
 
 // addBlock adds a block typed in the pane to the end of the file, as it
@@ -506,6 +547,21 @@ func (m *Model) typedDone(d *histDone) {
 	m.hist.running = false
 	m.fit()
 	b, r := d.block, d.result
+	if b == nil {
+		// Not recorded: what it showed goes in the log, and nothing in
+		// the file.
+		if d.fullScreen {
+			m.histLog(helpStyle.Render("(full screen; not recorded)"))
+		} else if r != nil {
+			if out := strings.TrimRight(clean(string(r.Stdout)), "\n"); out != "" {
+				m.histLog(out)
+			}
+		}
+		if r != nil && r.Status != 0 {
+			m.histLog(stderrStyle.Render(fmt.Sprintf("[exit %d]", r.Status)))
+		}
+		return
+	}
 	if d.fullScreen {
 		text := b.Fence + strings.TrimSuffix(b.Info, "}") + " tty}\n" + b.Body + b.Fence + "\n"
 		if err := m.d.SetBlock(b, text); err != nil {
@@ -607,7 +663,11 @@ var (
 func (m *Model) histView() string {
 	rows := m.histRows()
 	title := " History "
-	hint := " esc back to the file · ctrl+d close "
+	off := ""
+	if m.hist.unrecorded {
+		off = stderrStyle.Render("not recording") + " "
+	}
+	hint := " esc back to the file · ctrl+o recording · ctrl+d close "
 	if !m.hist.focus {
 		hint = " h type here "
 	}
@@ -624,7 +684,7 @@ func (m *Model) histView() string {
 	// start.
 	dir := ""
 	if d := termsafe.Visible(m.hist.prompt.Dir); d != "" {
-		room := m.width - lipgloss.Width(title) - lipgloss.Width(hint) - 6
+		room := m.width - lipgloss.Width(title) - lipgloss.Width(off) - lipgloss.Width(hint) - 6
 		if r := []rune(d); len(r) > room {
 			d = ""
 			if room > 1 {
@@ -635,8 +695,8 @@ func (m *Model) histView() string {
 			dir = histDir.Render(d) + " "
 		}
 	}
-	fill := max(m.width-lipgloss.Width(title)-lipgloss.Width(dir)-lipgloss.Width(hint)-2, 1)
-	rule := histRule.Render("──"+title) + dir + histRule.Render(strings.Repeat("─", fill)) + helpStyle.Render(hint)
+	fill := max(m.width-lipgloss.Width(title)-lipgloss.Width(off)-lipgloss.Width(dir)-lipgloss.Width(hint)-2, 1)
+	rule := histRule.Render("──"+title) + off + dir + histRule.Render(strings.Repeat("─", fill)) + helpStyle.Render(hint)
 	var lines []string
 	if m.hist.sel != nil {
 		lines = m.selView(rows)

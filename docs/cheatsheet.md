@@ -290,7 +290,9 @@ env starts in the document's folder.
 
 In the History pane: tab completes, ↑/↓ or ctrl+p/n recall, ctrl+a/e,
 ctrl+b/f, alt+b/f, ctrl+w, alt+d, ctrl+u/k, ctrl+y edit, ctrl+l clears,
-esc goes back to the document, ctrl+d closes the pane. ``# ```sh`` starts
+ctrl+o turns recording off (commands run but aren't added to the file)
+and on again, esc goes back to the document, ctrl+d closes the pane and
+turns recording back on. ``# ```sh`` starts
 a block, added without running when a line of ```` ``` ```` ends it;
 ctrl+c drops it. On the start
 screen: type to filter, ↑/↓ or tab pick, enter opens, esc goes back,
@@ -332,7 +334,9 @@ In the outline ↑/↓ move between entries and ←/→ fold and unfold a
 section; the window's tabs take the arrows, enter and delete. The
 History pane takes the same line keys as `mdsh -i`'s, shift+enter for
 another line, ctrl+c to stop a command (or copy selected lines),
-ctrl+z to stop and keep the job, ctrl+d to close. With Vim keys on, `:w`
+ctrl+z to stop and keep the job, ctrl+d to close. Its record button
+(the dot) turns recording off, so commands run without being added to
+the file; closing the pane turns it back on. With Vim keys on, `:w`
 saves and `:RunBlock` and `:RunSection` run; in the Neovim pane `K`
 explains an attribute and `zc`/`zo` fold.
 

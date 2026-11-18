@@ -16,7 +16,7 @@ type terminal struct {
 
 	mu         sync.Mutex
 	cols, rows int
-	block      int  // the block using it, or -1
+	block      int  // the block using it, Unrecorded, or -1
 	history    bool // the block was typed in the History pane
 }
 
@@ -59,6 +59,10 @@ func (o termOut) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Unrecorded is the block a command typed in the History pane with
+// recording off runs as, in terminal events: it is in no card.
+const Unrecorded = -2
+
 // take marks block i as using the terminal, emitting "terminal" so the
 // window opens the pane, and "terminal-end" when the block gives it back.
 // A block typed in the History pane says so in the event's Data, since
@@ -89,7 +93,7 @@ func (t *terminal) take(i int, emit func(Event)) (giveBack func()) {
 func (n *Notebook) Type(keys string) {
 	t := n.term
 	t.mu.Lock()
-	running := t.block >= 0
+	running := t.block != -1
 	t.mu.Unlock()
 	if !running || keys == "" {
 		return
@@ -166,8 +170,11 @@ func (n *Notebook) SetTerminalSize(cols, rows int) {
 // takeTTY is run's TakeTTY.
 func (n *Notebook) takeTTY(b *doc.Block) func() {
 	n.mu.Lock()
-	i := n.index[b]
+	i, ok := n.index[b]
 	n.mu.Unlock()
+	if !ok {
+		i = Unrecorded
+	}
 	return n.term.take(i, n.emit)
 }
 
