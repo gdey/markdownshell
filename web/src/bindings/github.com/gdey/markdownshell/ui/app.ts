@@ -21,6 +21,9 @@ import * as collection$0 from "../collection/models.js";
 import * as doc$0 from "../doc/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as env$0 from "../env/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as fonts$0 from "../fonts/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -411,6 +414,14 @@ export function InstallCLI(): $CancellablePromise<$models.CLI> {
 }
 
 /**
+ * KillProcess kills process pid and what it started, if it runs under
+ * one of the tab's shells, and reports whether it did.
+ */
+export function KillProcess(pid: number): $CancellablePromise<boolean> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.KillProcess", pid);
+}
+
+/**
  * KillShell ends the shell the running block runs in, at once, for a
  * block that Stop didn't stop, once the user has said to. What blocks
  * set in that shell is gone. It reports whether a block was running.
@@ -638,6 +649,14 @@ export function Pin(file: string, pin: boolean): $CancellablePromise<void> {
  */
 export function PlanMove(i: number, dir: number, byBlock: boolean): $CancellablePromise<notebook$0.Move> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.PlanMove", i, dir, byBlock);
+}
+
+/**
+ * Processes lists the tab's shells, each with the processes under it,
+ * for the Console's Processes tab. It is empty when no shell runs.
+ */
+export function Processes(): $CancellablePromise<env$0.ShellProcs[] | null> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Processes");
 }
 
 /**

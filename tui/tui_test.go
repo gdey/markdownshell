@@ -1534,3 +1534,47 @@ func TestSavedOutputWithoutHistory(t *testing.T) {
 		t.Errorf("view:\n%s", v)
 	}
 }
+
+// P lists what runs under the shells, with how long it has run, and x
+// kills the process picked.
+func TestProcessesPanel(t *testing.T) {
+	src := "```sh {#bg background}\nsleep 60\n```\n\n```sh {#left}\nsleep 61 &\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	press(m, "j", "enter")
+	pump(t, m)
+	press(m, "P")
+	v := m.View()
+	for _, want := range []string{"Processes", "shell", "◐ bg", "sleep 61", "x kill"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("panel doesn't show %q:\n%s", want, v)
+		}
+	}
+	at := -1
+	for i, r := range m.procs {
+		if strings.Contains(r.text, "sleep 61") {
+			at = i
+		}
+	}
+	if at < 0 {
+		t.Fatal("no sleep 61 row")
+	}
+	m.procsAt = at
+	press(m, "x")
+	if !strings.Contains(m.status, "killed") {
+		t.Errorf("status after x = %q", m.status)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for strings.Contains(m.View(), "sleep 61") {
+		if time.Now().After(deadline) {
+			t.Fatalf("sleep 61 still listed:\n%s", m.View())
+		}
+		time.Sleep(50 * time.Millisecond)
+		m.readProcs()
+	}
+	press(m, "esc")
+	if m.procsOpen {
+		t.Error("esc didn't close the panel")
+	}
+}

@@ -4,6 +4,7 @@ export type { ConsoleEntry, Doc, OutsideFiles, ReportStart, Start, Tab, Tabs } f
 export type { AuditEvent, Cell, Deleted, EarlierRun, Fold, FrontMatter, HTTPCell, Move, Names, Problem, Report, RunOptions, SourceBlock } from "./bindings/github.com/gdey/markdownshell/notebook/models.js";
 export type { Settings } from "./bindings/github.com/gdey/markdownshell/settings/models.js";
 export type { File } from "./bindings/github.com/gdey/markdownshell/library/models.js";
+export type { Proc, ShellProcs } from "./bindings/github.com/gdey/markdownshell/env/models.js";
 export { Format } from "./bindings/github.com/gdey/markdownshell/report/models.js";
 export { AttrKind } from "./bindings/github.com/gdey/markdownshell/doc/models.js";
 export type { AttrSpec } from "./bindings/github.com/gdey/markdownshell/doc/models.js";

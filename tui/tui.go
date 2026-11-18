@@ -198,6 +198,11 @@ type Model struct {
 	// help until the next key.
 	notice string
 
+	// procsOpen is set while the processes panel P opens is up, procs
+	// are its lines and procsAt the one picked.
+	procsOpen bool
+	procs     []procRow
+	procsAt   int
 	// helping is set while the help panel ? opens is up, and helpAt is
 	// the key picked in it.
 	helping bool
@@ -503,6 +508,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refresh()
 		}
 		return m, m.check()
+	case procsMsg:
+		if msg.m != m || !m.procsOpen {
+			return m, nil
+		}
+		m.readProcs()
+		m.refresh()
+		return m, m.procsTick()
 	case clockMsg:
 		if msg.m != m {
 			return m, nil
@@ -537,7 +549,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.reply <- run.Skip
 		} else {
 			m.prompt = &msg
-			m.helping = false
+			m.helping, m.procsOpen = false, false
 			m.moveTo(i)
 		}
 		m.refresh()
@@ -556,7 +568,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.pane.take(i)
 		m.termBlock = i
-		m.helping = false
+		m.helping, m.procsOpen = false, false
 		close(msg.reply)
 		if inFile {
 			m.moveTo(i)
@@ -711,6 +723,9 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.helping {
 		return m.helped(k)
+	}
+	if m.procsOpen {
+		return m.procsKey(k)
 	}
 	if m.typing {
 		return m, m.typed(k)
@@ -885,6 +900,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.toggle(&m.shown.HideOutput)
 	case "?":
 		m.openHelp()
+	case "P":
+		cmd := m.openProcs()
+		m.refresh()
+		return m, cmd
 	case "V":
 		if why := m.selectHistory(); why != "" {
 			m.status = why
@@ -1582,6 +1601,8 @@ func (m *Model) View() string {
 	}
 	if m.helping {
 		view = m.helpView(m.width, m.vp.Height)
+	} else if m.procsOpen {
+		view = m.procsView(m.width, m.vp.Height)
 	} else if m.showOutline() {
 		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
 		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
@@ -1646,6 +1667,8 @@ func (m *Model) footer() string {
 	switch {
 	case m.helping:
 		help = helpStyle.Render("↑/↓ pick · enter do it · esc close")
+	case m.procsOpen:
+		help = helpStyle.Render("↑/↓ pick · x kill it and what it started · esc close")
 	case m.termBlock != -1 && m.hist.running:
 		help = promptStyle.Render("The command runs in History:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.termBlock >= 0:
@@ -1673,7 +1696,7 @@ func (m *Model) footer() string {
 	case m.hist.focus:
 		help = helpStyle.Render("shift+↑ select lines · enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
 	case len(m.nav) > 0 && m.bg[m.cur()]:
-		help = helpStyle.Render("? keys · j/k move · enter stop this background block")
+		help = helpStyle.Render("? keys · j/k move · enter stop this background block · P processes")
 		if m.running {
 			help = helpStyle.Render("? keys · j/k move · enter stop this background block · ctrl+c stop the run")
 		}
@@ -1682,7 +1705,7 @@ func (m *Model) footer() string {
 	case m.notice != "":
 		help = promptStyle.Render(m.notice)
 	default:
-		help = helpStyle.Render("? keys · j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · h history · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
+		help = helpStyle.Render("? keys · j/k move · J/K reorder · u undo · enter run · a from here · s section · i new · h history · P processes · e edit · E edit file · v view · p report · , run options · o outline · C code · O output · w save · W save as · ]/[ tabs · ctrl+t new tab · q " + m.quitWord("q"))
 	}
 	return truncate(line1, m.width) + "\n" + truncate(help, m.width)
 }

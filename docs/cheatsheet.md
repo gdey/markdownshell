@@ -256,11 +256,12 @@ env starts in the document's folder.
 | `g`/`G` | First or last block |
 | space, pgdn / pgup, ctrl+b | Page down / up |
 | ctrl+d / ctrl+u | Half a page down / up |
-| enter, `r` | Run the block |
+| enter, `r` | Run the block; on a block running in the background, stop it |
 | `a` | Run from this block to the end |
 | `s` | Run the section the block is in |
 | `i`, `:` | Type a new `sh` block and run it; esc cancels |
 | `h` | History: a shell along the bottom whose commands are added to the file as `#history-N skip links` blocks |
+| `P` | Processes: what runs under the file's shells, as a tree, with how long each has run; `x` kills one and what it started |
 | `,` | Run options: arguments, `--only`, step, stop on error |
 | ctrl+c | Stop the run, keeping the shells; again kills the shell of a block that won't stop. Quits when nothing runs |
 | ctrl+] | Stop a `tty` block running in its card |

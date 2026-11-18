@@ -32,6 +32,19 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh-gui with the setting on: kubectl get pods typed twice in History ran history-1 again, which now reads skip links history and shows 1 earlier run under its output, while date, typed between, is history-2](docs/changelog/history-reuse.png)
 
+- A view of what runs under a file's shells, to find and end a process
+  that was left running: the block running, background blocks, and
+  whatever a block or the History pane started with `&`. mdsh-gui shows
+  it in the Console's new Processes tab, and `mdsh -i` in a panel `P`
+  opens. Each shell's processes show as a tree, with how long each has
+  run, and each has a Kill (`x` in `mdsh -i`) that ends it and what it
+  started. A background block's process is named by its block, and
+  killing it stops the block.
+
+  ![mdsh-gui's Console, Processes tab: the shell, the server background block's subshell with sleep 3600 under it, and a watcher loop, each with how long it has run and a Kill button](docs/changelog/processes.png)
+
+  ![mdsh -i: the Processes panel, the same tree with run times, the last process picked, and the footer x kill it and what it started](docs/changelog/processes-tui.png)
+
 - Each block's output says how long ago the run that made it started,
   from its `at=`: "42 secs ago" under a minute, then minutes, hours,
   days, weeks, months and years. mdsh-gui shows it on the output's

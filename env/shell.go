@@ -462,6 +462,14 @@ func (s *Shell) ExitStatus() int {
 	return s.exit
 }
 
+// PID is the shell's process ID.
+func (s *Shell) PID() int {
+	if s.cmd == nil || s.cmd.Process == nil {
+		return 0
+	}
+	return s.cmd.Process.Pid
+}
+
 // Exited reports whether the shell has ended, by a block calling exit or
 // by being killed.
 func (s *Shell) Exited() bool {
