@@ -21,8 +21,12 @@ lede: "mdsh runs the code in a markdown file; that is what it is for. Running a 
   draws blocks that a printout would leave out, with a badge, and opens
   any folded section that holds one.
 - **It can't reach the network to be drawn.** The desktop app loads no
-  remote images and runs under a Content Security Policy; SVG pictures
-  are shown as images, so their scripts don't run.
+  remote image by itself and runs under a Content Security Policy; an
+  image from another site, or outside the document's folder, is fetched
+  only when you click its Load image button, and only for that
+  document. HTML in the markdown is cleaned of scripts, styles, event
+  handlers, forms and frames before it is drawn, and SVG pictures are
+  shown as images, so their scripts don't run.
 - **It can't widen what a block sees.** Sub-envs get only the variables
   `share=` names, and the front matter's `env.share` can narrow a whole
   file. A file gets your whole environment only when its front matter
@@ -41,9 +45,13 @@ shared packages and one of the desktop app, both starting from the
 case that matters: you open a file you did not write. They are public:
 [CLI review](https://github.com/gdey/markdownshell/blob/main/docs/security/cli-v1.2.1.md),
 [desktop app review](https://github.com/gdey/markdownshell/blob/main/docs/security/gui-v1.2.1.md).
-All four High findings are fixed in 1.3, and the
-[changelog]({{< relref "changelog" >}}) lists each fix under a Security
-heading.
+All four High findings are fixed in 1.3. Each minor release from 1.4 on has
+had a review of what changed: the latest is the
+[v1.7.0 review](https://github.com/gdey/markdownshell/blob/main/docs/security/v1.7.0.md),
+and the others are in
+[docs/security](https://github.com/gdey/markdownshell/tree/main/docs/security).
+The [changelog]({{< relref "changelog" >}}) lists each fix under a
+Security heading.
 
 ## What it is suited for today
 

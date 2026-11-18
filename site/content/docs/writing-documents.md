@@ -79,6 +79,7 @@ hello from a sub-env
 | `out=recording:path` | With `tty`, where the cast goes; a path ending in `.gif` links an animated GIF too |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
 | `raw` | On an `http` block, save the response body as it came instead of pretty-printing JSON |
+| `history[=N]` | Keep the block's N earlier runs under its output, newest first; bare `history` keeps the front matter's `history:`, else 10. See [Earlier runs](#earlier-runs) |
 
 Blocks marked `<include` take their own attributes; see [Including files](#including-files).
 
@@ -117,6 +118,83 @@ run this session, after the block's time in its header.
 
 An `http` block's output is the response it got; see
 [HTTP requests]({{< relref "http" >}}).
+
+### Earlier runs
+
+A block marked `history=N` keeps the outputs of its earlier runs, up to
+N of them, under its current one. Each run moves the output the file
+held down a place, and drops the ones past N:
+
+````markdown
+```sh {#roll history=3}
+n=$(( $(od -An -N1 -tu1 /dev/urandom) % 6 + 1 ))
+echo "rolled a $n"
+[ "$n" -ne 1 ] || { echo "a one: try again" >&2; exit 1; }
+```
+
+```output {for=roll exit=0 at=2026-11-18T07:10:04Z}
+rolled a 3
+```
+
+```output {for=roll exit=1 at=2026-11-17T16:21:40Z history=1}
+rolled a 1
+```
+
+```output {for=roll stream=stderr history=1}
+a one: try again
+```
+
+```output {for=roll exit=0 at=2026-11-13T19:08:00Z history=2}
+rolled a 5
+```
+````
+
+`history=K` on an output fence is how many runs back it is, 1 for the
+run just before the current one. Every run counts, even one with the
+same output, and one that prints nothing is kept as an empty output
+with its time. A run's stderr, image, screenshot or recording comes
+along with it; an image moved down is renamed with its run's time,
+`roll.2026-11-17T162140Z.svg`, and its link follows, while the current
+one keeps its path. The earlier runs belong to the block: moving,
+deleting or renaming it carries them along, and Clear output removes
+them. Saving holds them to N, so lowering N, or taking `history=` off,
+trims them and deletes the files of the runs it drops. A bare
+`history` keeps `history:` under `mdsh:` in the front matter, else 10.
+
+Printing, `--pdf` and `--html` show the current output only, unless
+`--history` asks for the earlier runs too, each under a line such as
+*Run 1 back, 2026-11-17 16:21 UTC, exit 1*. mdsh-gui shows them under
+the output, behind a line that says how many there are, each with its
+time and exit status and a button to copy or delete it; `mdsh -i` shows
+them with `b`. [examples/earlier-runs.md](https://github.com/gdey/markdownshell/blob/main/examples/earlier-runs.md)
+has a block to try.
+
+mdsh 1.6.0 and older read the earlier runs as copies of the output,
+and `-w` there overwrites them all with the current one.
+
+### HTML in a document
+
+HTML written in the markdown draws in mdsh-gui and in `--html`
+reports, as it does on GitHub: `<a href>`, `<kbd>`, `<sub>`, `<sup>`,
+`<p align="center">`, `<img>` (loaded by a markdown image's rules) and
+image maps. Markdown between an element's opening and closing tags,
+with blank lines around it, renders inside the element, so a
+`<details>` folds what it holds:
+
+```markdown
+<details>
+<summary>Troubleshooting</summary>
+
+- Is the server up? Run `status` above.
+- Is the token set?
+
+</details>
+```
+
+HTML is cleaned first: scripts, styles, event handlers, forms, frames,
+`id` and `class` attributes, and links other than http:, https:,
+mailto: and relative ones are taken out. A PDF leaves HTML out, and
+`mdsh`'s printout keeps it as written.
 
 ### Output copies
 

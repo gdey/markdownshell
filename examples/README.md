@@ -244,6 +244,23 @@ behind, and is there to add to.
 mdsh --hide-code history.md
 ```
 
+A line typed there as ``# ```sh {#name}`` opens a block instead: the
+prompt becomes ```` ```sh> ````, the lines typed are kept rather than
+run, and a line of ```` ``` ```` adds the block to the end of the file,
+as it was typed, without running it. The pane's rule shows the shell's
+working directory, and `Z` in `mdsh -i`, or the button beside the
+pane's close button in mdsh-gui, lets it fill the screen.
+
+**[earlier-runs.md](earlier-runs.md)** keeps a block's earlier runs
+with `history=3`: each run moves the output before it down under the
+new one, with its time and exit status, and keeps three. mdsh-gui and
+`mdsh -i` (with `b`) show them under the output, and `--history` prints
+them:
+
+```sh {#try-earlier-runs skip}
+mdsh -n --history --hide-code earlier-runs.md
+```
+
 Open any example in the terminal UI to see the rest of it: `a` runs
 from the block under the cursor, `s` runs its section, `e` edits a block
 in your editor, `i` types a new block at a prompt, `p` creates a report,
@@ -308,6 +325,7 @@ mdsh --yes --hide-code runbooks/deploy.md
 | Front matter: `http.secret_headers` | [http.md](http.md) |
 | `--pdf`, `--html`, `--hide-code` | [report.md](report.md), [pdf/](pdf), [runbooks/onboarding.md](runbooks/onboarding.md) |
 | `#history-N` blocks from the History pane | [history.md](history.md) |
+| `history=N`, earlier runs, `--history` | [earlier-runs.md](earlier-runs.md) |
 | Front matter: `on_error`, `title` | [guardrails.md](guardrails.md), [runbooks/](runbooks) |
 | Blocks inside lists and block quotes | [runbooks/release-checklist.md](runbooks/release-checklist.md), [runbooks/linux-triage_linux.md](runbooks/linux-triage_linux.md) |
 
@@ -335,5 +353,6 @@ report.md             8. a document written as a report
 report.md.assets/     its screenshot
 pdf/                  PDFs of hello, include, terminal, report and the test coverage runbook
 history.md            9. what a History session leaves behind
+earlier-runs.md       9. a block that keeps its earlier runs with history=N
 runbooks/             10. complete runbooks: deploy, release, onboarding, reports, triage
 ```

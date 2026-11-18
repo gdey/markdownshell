@@ -68,3 +68,21 @@ History blocks are ordinary blocks: `mdsh history.md` runs them from
 the top, `mdsh -w` refreshes their output, and they can be renamed,
 moved or deleted like any other. A block that is moved out of the run
 of history blocks gets an id of its own.
+
+A whole block can be typed in the pane too, to keep a step for later
+rather than run it now. A line such as ``# ```sh {#count-runbooks}``
+opens it, and the `#` makes it a comment should it reach the shell. The
+prompt becomes ```` ```sh> ```` while the block is open, the lines typed
+are kept rather than run, and a line of ```` ``` ```` adds the block to
+the end of the file just as it was typed, without running it. ctrl+c
+drops it partway through. This one was typed that way:
+
+```sh {#count-runbooks}
+ls *.md | wc -l
+```
+
+The rule over the pane's input shows the shell's working directory,
+here `runbooks` after the `cd` above, and follows each `cd`. In
+`mdsh -i`, `Z` has the pane fill the screen and esc gives the document
+its place back; mdsh-gui has a button for it beside the one that closes
+the pane.

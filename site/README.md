@@ -59,7 +59,15 @@ WebKitGTK 6) and run under Xvfb at 2x scale, driven with `xdotool`, on a
 copy of `examples/`, with the GTK menu bar cropped off; and `mdsh -i` in
 an xterm. The 1.4 additions (`secrets-*`, `front-matter-*`,
 `hero-bubblegum*`) were taken the same way, from a build of `main` for
-1.4, with GTK animations off (reduced motion). Each picture has a light and, where it matters, a dark file
+1.4, with GTK animations off (reduced motion). The looks band's `hero-witchcraft*`, `hero-coffee*` and
+`hero-greentea*` were taken for 1.7 from `mdsh --serve` (an mdsh built
+with `-tags serve`) in Chromium at 1280×795 and 2x, with the look and
+theme set in a scratch `gui.json`, Run all stopped at `ship`, and
+quantized to 256 colors. The Teletype (`-paper`, `-phosphor`)
+pictures of the form, HTTP, earlier runs, secrets and front matter
+shots were taken the same way for 1.7, on sample files written to match
+the plain ones; a `shot` takes them as `paper=` and `phosphor=` beside
+`src=` and `dark=`. Each picture has a light and, where it matters, a dark file
 (`-dark`, or `paper` and `phosphor` for the Teletype look); pages show
 them with the `shot` shortcode or partial, which puts them in a window
 frame and swaps to the dark one with the OS. Give it `name=` instead of

@@ -11,7 +11,7 @@ as a control you type in or pick from, and writes what you enter back into
 the fence. Everywhere else, including GitHub and `mdsh -i`, it shows as a
 code block, and its value is whatever the body says.
 
-{{< shot src="form-light.png" dark="form-dark.png" title="deploy-form.md" >}}A textbox, a dropdown, radio buttons and checkboxes, and a block that reads them.{{< /shot >}}
+{{< shot src="form-light.png" dark="form-dark.png" paper="form-paper.png" phosphor="form-phosphor.png" title="deploy-form.md" >}}A textbox, a dropdown, radio buttons and checkboxes, and a block that reads them.{{< /shot >}}
 
 That window is this file:
 
@@ -42,7 +42,7 @@ printf '%s\n' "$MDSH_VAR_checks" | sed 's/^/  then check: /'
 ```
 ````
 
-{{< shot src="form-source-light.png" dark="form-source-dark.png" title="deploy-form.md · source and rendered" >}}The same file with the source view open: each control is a fence.{{< /shot >}}
+{{< shot src="form-source-light.png" dark="form-source-dark.png" paper="form-source-paper.png" phosphor="form-source-phosphor.png" title="deploy-form.md · source and rendered" >}}The same file with the source view open: each control is a fence.{{< /shot >}}
 
 ## Textboxes
 

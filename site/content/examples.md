@@ -45,7 +45,7 @@ mdsh --pdf hello.pdf hello.md # the run, as a PDF
 | 6 | `fifo/` | `background` blocks handing data through a named pipe, and a `timeout=` that saves a hung run |
 | 7 | `http.md` | `http` blocks: a request as it goes over the wire, checks in Hurl's words, a captured token sent back in the next request, and masked secrets |
 | 8 | `report.md` | A document written to be read as a PDF or HTML report |
-| 9 | `history.md` | What a History session leaves behind |
+| 9 | `history.md`, `earlier-runs.md` | What a History session leaves behind, a block typed in the pane, and a block that keeps its earlier runs with `history=N` |
 | 10 | `runbooks/` | Whole runbooks: deploy, release, onboarding, disk and system reports, triage, test coverage |
 
 ## Things to try
@@ -67,6 +67,15 @@ first.
 **Fill in a form.** `inputs.md` has a host name, an environment and a
 set of checks. Change them in the app and run the section: the blocks
 below follow what you picked, and the file keeps it.
+
+**Call a web service.** `http.md` starts a small API of its own in a
+`background` block, logs in, and sends the token back in the next
+request. One check fails on purpose, so you can see what a failure
+looks like.
+
+**Keep the runs before.** Run the `roll` block in `earlier-runs.md` a
+few times and save: each run moves the last one down, with its time and
+exit status, and the file keeps three.
 
 **Make a report.** File › Create Report… on `report.md`, or from a
 terminal:

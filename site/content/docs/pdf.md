@@ -25,7 +25,8 @@ well, and the PDF still shows the printed view.
 
 `--html FILE` works the same way and writes a standalone HTML page, styled
 like the PDF, with local images inside it so the file can be sent on its
-own. Raw HTML in the document is left out of the page.
+own. HTML written in the document draws in the page, cleaned of
+scripts, styles and the like; the PDF leaves it out.
 
 ## Stepping through a run
 

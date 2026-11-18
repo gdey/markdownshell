@@ -371,6 +371,14 @@ Each file opens in a tab of its own, with its own shells.
   then minutes, hours, days, weeks, months and years. It keeps counting
   while the window is open, and its tooltip has the exact time and the
   `at=` the file holds. Output saved without an `at=` shows none.
+- **Earlier runs:** a block with `history=N` shows the runs before its
+  current output under it: a line says how many there are, and opens to
+  each run's output under its time ("yesterday 16:21") and exit status,
+  newest first. Each has a copy button and a trash, which deletes that
+  run; Clear earlier runs, beside the output's trash, takes them all and
+  keeps the current output. Undo puts them back, and saving deletes the
+  image files of the runs they took. Create Report's Earlier runs
+  switch puts them in the report.
 - **Secrets:** a block marked `secret` has its code and output blurred
   until you press the eye on its card; they blur again after a minute
   (Settings › Editing › Show secrets for) or when the window loses
