@@ -309,3 +309,49 @@ func TestHistorySelectCopy(t *testing.T) {
 		t.Errorf("V with History closed: sel %v, status %q", m.hist.sel, m.status)
 	}
 }
+
+func TestHistoryFillsScreenAndShowsDir(t *testing.T) {
+	src := "# Log\n\n```sh\necho hi\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	pump(t, m)
+	// Z opens the pane over the whole screen, with the keys in it.
+	press(m, "Z")
+	if !m.hist.open || !m.hist.full || !m.hist.focus {
+		t.Fatalf("open %v, full %v, focus %v", m.hist.open, m.hist.full, m.hist.focus)
+	}
+	if h := m.histHeight(); h != m.height-footerLines-m.bannerLines() {
+		t.Errorf("pane height %d of %d", h, m.height)
+	}
+	v := m.View()
+	if strings.Contains(v, "Log") || strings.Contains(v, "echo hi") {
+		t.Errorf("the file shows under the full pane:\n%s", v)
+	}
+	// The rule names the shell's directory, and follows a cd.
+	typeLine(m, "cd /")
+	pump(t, m)
+	if m.hist.prompt.Dir != "/" {
+		t.Errorf("dir after cd / = %q", m.hist.prompt.Dir)
+	}
+	if v := m.View(); !strings.Contains(v, "── History / ──") {
+		t.Errorf("the rule doesn't show the directory:\n%s", v)
+	}
+	// esc gives the file its place back.
+	press(m, "esc")
+	if m.hist.full || !m.hist.open {
+		t.Errorf("after esc: full %v, open %v", m.hist.full, m.hist.open)
+	}
+	if h := m.vpHeight(); h < 10 {
+		t.Errorf("the file has %d lines again", h)
+	}
+	// Z twice from the file fills the screen and gives it back.
+	press(m, "esc", "Z")
+	if !m.hist.full {
+		t.Error("Z with the pane open didn't fill the screen")
+	}
+	m.hist.focus = false
+	press(m, "Z")
+	if m.hist.full {
+		t.Error("Z again didn't give the file its place back")
+	}
+}

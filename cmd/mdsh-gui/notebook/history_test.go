@@ -257,6 +257,10 @@ func TestPrompt(t *testing.T) {
 			if p.PS1 != tc.ps1 || p.PS2 != tc.ps2 {
 				t.Errorf("prompt %q, %q; want %q, %q", p.PS1, p.PS2, tc.ps1, tc.ps2)
 			}
+			// The block's cd shows as the pane's directory.
+			if p.Dir != "/" {
+				t.Errorf("dir %q, want /", p.Dir)
+			}
 			// The hooks ran in a subshell, so asking again is the same.
 			if again, _ := n.Prompt(); again != p {
 				t.Errorf("again: %q", again)

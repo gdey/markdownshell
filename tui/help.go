@@ -117,6 +117,12 @@ var helpItems = []helpItem{
 	{group: "View", keys: "b", key: runeKey("b"), what: says("show or hide the block's earlier runs, kept by history=N"), off: noEarlier},
 	{group: "View", keys: "C", key: runeKey("C"), what: says("show or hide code")},
 	{group: "View", keys: "O", key: runeKey("O"), what: says("show or hide output")},
+	{group: "View", keys: "Z", key: runeKey("Z"), what: says("History fills the screen (esc: the file again)"), off: func(m *Model) string {
+		if m.running && !m.hist.open {
+			return "a block is running"
+		}
+		return ""
+	}},
 	{group: "View", keys: "?", key: runeKey("?"), what: says("this help")},
 
 	{group: "Tabs", keys: "]/[", key: runeKey("]"), what: says("next tab ([: the one before)"), off: func(m *Model) string {

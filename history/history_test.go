@@ -115,6 +115,10 @@ func TestAskPrompt(t *testing.T) {
 			if p.PS1 != tc.ps1 || p.PS2 != tc.ps2 {
 				t.Errorf("prompt %q, %q; want %q, %q", p.PS1, p.PS2, tc.ps1, tc.ps2)
 			}
+			// The block's cd shows as the pane's directory.
+			if p.Dir != "/" {
+				t.Errorf("dir %q, want /", p.Dir)
+			}
 			if again, _ := history.AskPrompt(context.Background(), s, zsh); again != p {
 				t.Errorf("again: %q", again)
 			}
@@ -208,5 +212,21 @@ func TestNextID(t *testing.T) {
 func TestRCScript(t *testing.T) {
 	if got := history.RCScript("~/.zshrc"); !strings.Contains(got, `"$HOME"/'.zshrc'`) {
 		t.Errorf("RCScript = %q", got)
+	}
+}
+
+func TestTilde(t *testing.T) {
+	t.Setenv("HOME", "/home/me")
+	for dir, want := range map[string]string{
+		"/home/me":       "~",
+		"/home/me/":      "~/",
+		"/home/me/src/x": "~/src/x",
+		"/home/meg":      "/home/meg",
+		"/tmp":           "/tmp",
+		"":               "",
+	} {
+		if got := history.Tilde(dir); got != want {
+			t.Errorf("Tilde(%q) = %q, want %q", dir, got, want)
+		}
 	}
 }

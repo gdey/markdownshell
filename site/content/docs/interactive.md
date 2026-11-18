@@ -76,6 +76,7 @@ with the reason.
 | `x` | show or hide a `secret` block's code and output |
 | `F` | fix front matter that doesn't parse, when mdsh can |
 | `V` | select lines of History's output; `y` copies them |
+| `Z` | History fills the screen; esc gives the file its place back |
 | `J`/`K`, alt+↓/↑ | move the block down or up |
 | `u` | undo the last move |
 | `w`, ctrl+s / `W` | save / save as |

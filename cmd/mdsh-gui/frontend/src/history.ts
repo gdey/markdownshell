@@ -33,6 +33,7 @@ let ps2 = "";
 let asking = false; // a prompt is being asked for
 let at = 0; // where up and down are in typed
 let promptCols = 0; // the width the prompt was last asked at
+let full = false; // the pane fills the tab, up to the tab bar
 
 export interface HistoryHooks {
   // canRun says whether a run may start, which it can't while one goes.
@@ -165,8 +166,9 @@ export function fitHistory() {
   if (!term || !isOpen()) return;
   const c = cols();
   if (rows > maxRows()) rows = maxRows();
-  if (c !== term.cols || rows !== term.rows) term.resize(c, rows);
-  App.SetTerminalSize(c, rows).catch(() => {});
+  const r = full ? fullRows() : rows;
+  if (c !== term.cols || r !== term.rows) term.resize(c, r);
+  App.SetTerminalSize(c, r).catch(() => {});
   // A prompt drawn to fit the width is asked for again at the new one.
   // While a block runs the shell can't answer; the prompt is asked for
   // when it ends.
@@ -184,6 +186,28 @@ function cellHeight(): number {
 // the window above it.
 function maxRows(): number {
   return Math.max(1, Math.floor((window.innerHeight - 160) / cellHeight()));
+}
+
+// fullRows is how many lines fit in the transcript while the pane fills
+// the tab: as many as its height takes, under its padding.
+function fullRows(): number {
+  const body = $("history-term");
+  const css = getComputedStyle(body);
+  const room = $("history-body").clientHeight - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom);
+  return Math.max(1, Math.floor(room / cellHeight()));
+}
+
+// setFull has the pane fill the tab, up to the tab bar, or gives the
+// document its place back. The height dragged to stays for after.
+function setFull(on: boolean) {
+  if (on === full) return;
+  full = on;
+  document.body.classList.toggle("history-full", on);
+  const button = $("history-full");
+  button.setAttribute("aria-pressed", String(on));
+  button.title = on ? "Give the document its place back" : "Fill the tab with History, up to the tab bar";
+  button.setAttribute("aria-label", on ? "Give the document its place back" : "Fill the tab with History");
+  fitHistory();
 }
 
 // setRows sizes the transcript to n lines.
@@ -223,6 +247,7 @@ function slide(open: boolean) {
   const pane = $("history");
   const body = $("history-body");
   if (open === !pane.classList.contains("closed")) return;
+  if (!open) setFull(false);
   $("history-toggle").setAttribute("aria-expanded", String(open));
   const from = open ? 0 : body.offsetHeight;
   pane.classList.toggle("closed", !open);
@@ -243,6 +268,7 @@ function slide(open: boolean) {
 // It asks the shell for its prompt unless told not to, as when
 // showHistory is about to start the shells again and ask itself.
 export function showBar(on: boolean, prompt = true) {
+  if (!on) setFull(false);
   $("history").hidden = !on;
   if (on && prompt) void updatePrompt();
 }
@@ -313,6 +339,7 @@ export async function updatePrompt() {
     ps1 = p.ps1;
     ps2 = p.ps2;
     promptCols = cols;
+    showDir(p.dir ?? "");
   } catch {
     return;
   } finally {
@@ -330,6 +357,12 @@ export async function updatePrompt() {
   prompt.classList.toggle("custom", ps1 !== "");
   if (ps1) prompt.replaceChildren(...ansi.write(ps1.slice(at + 1)));
   else prompt.textContent = "$";
+}
+
+// showDir puts the shell's directory on the separator, over the input.
+function showDir(dir: string) {
+  $("history-dir-text").textContent = dir;
+  $("history-dir").hidden = dir === "";
 }
 
 // say writes a line to the transcript, on a line of its own even after
@@ -489,6 +522,8 @@ function placeCursor() {
   mirror.style.letterSpacing = css.letterSpacing;
   mirror.style.tabSize = css.tabSize;
   mirror.style.width = `${box.clientWidth}px`;
+  // The input's padding above its text moves the caret's line down.
+  mirror.style.paddingTop = css.paddingTop;
   const at = box.selectionStart;
   const next = box.value.codePointAt(at);
   // The character under the block: the one at the caret, the
@@ -727,6 +762,7 @@ export function initHistory(h: HistoryHooks) {
     setRows(rows + dir);
   };
   $("history-toggle").onclick = () => hooks.toggle();
+  $("history-full").onclick = () => setFull(!full);
   // A command typed here gets ctrl+c, as in a terminal, so the shell
   // and what blocks set in it live on; anything else stops as Run ›
   // Stop does.

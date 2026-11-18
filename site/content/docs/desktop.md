@@ -166,7 +166,9 @@ This page is the reference.
   becomes ```` ```sh> ````, the lines typed are kept rather than run,
   and a ```` ``` ```` line adds the block to the end of the file without
   running it (ctrl+c drops it). A history block deletes without asking, and becomes a plain
-  block once moved.
+  block once moved. The separator over the input shows the shell's
+  working directory, and the button with the two arrows has the pane
+  fill the tab, up to the tab bar, until it is pressed again.
 - **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from
   the app, with a count on the toolbar; a line about a place in a file
   jumps to it. A warning an edit fixed is struck out, and one with a

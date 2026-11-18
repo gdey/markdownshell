@@ -669,6 +669,12 @@ export interface Problem {
 export interface Prompt {
     "ps1": string;
     "ps2": string;
+
+    /**
+     * Dir is the shell's working directory, with the home folder as ~,
+     * shown on the pane's separator.
+     */
+    "dir": string;
 }
 
 /**
