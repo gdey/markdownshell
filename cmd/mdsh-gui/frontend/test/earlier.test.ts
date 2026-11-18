@@ -1,7 +1,7 @@
 // runTime says when an earlier run was the way a person would, in local
-// time. internal/build's tests bundle and run it with node.
+// time, and timeAgo how long before now. internal/build's tests bundle and run it with node.
 
-import { earlierLabel, runTime } from "../src/earlier.js";
+import { earlierLabel, runTime, timeAgo } from "../src/earlier.js";
 
 const fail = (msg: string) => {
   throw new Error(msg);
@@ -24,4 +24,33 @@ for (const [at, want] of cases) {
   if (got !== want) fail(`runTime(${at}) = ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 }
 if (earlierLabel(1) !== "1 earlier run" || earlierLabel(3) !== "3 earlier runs") fail("earlierLabel");
+
+// timeAgo counts back from now in the largest whole unit that fits.
+const back = (secs: number) => new Date(now.getTime() - secs * 1000).toISOString();
+const min = 60, hour = 3600, day = 86400;
+const agoCases: [string, string][] = [
+  [back(-5), "just now"],
+  [back(0), "just now"],
+  [back(1), "1 sec ago"],
+  [back(42), "42 secs ago"],
+  [back(59), "59 secs ago"],
+  [back(min), "1 min ago"],
+  [back(3 * min + 10), "3 mins ago"],
+  [back(59 * min + 59), "59 mins ago"],
+  [back(hour), "1 hour ago"],
+  [back(23 * hour + 59 * min), "23 hours ago"],
+  [back(day), "1 day ago"],
+  [back(6 * day), "6 days ago"],
+  [back(7 * day), "1 week ago"],
+  [back(29 * day), "4 weeks ago"],
+  [back(30 * day), "1 month ago"],
+  [back(364 * day), "11 months ago"],
+  [back(365 * day), "1 year ago"],
+  [back(800 * day), "2 years ago"],
+  ["not a time", ""],
+];
+for (const [at, want] of agoCases) {
+  const got = timeAgo(at, now);
+  if (got !== want) fail(`timeAgo(${at}) = ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+}
 console.log("ok");

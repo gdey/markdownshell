@@ -360,6 +360,7 @@ th { background: var(--code-bg); }
    beside the copy button for a moment after it copies. */
 .block .output-tools { position: absolute; top: 2px; right: 6px; z-index: 1; display: flex; align-items: center; gap: 2px; }
 .block .output-tools > button { background: var(--bg); }
+.block .output-tools > .output-at { padding: 0 6px; color: var(--muted); font: calc(11px * var(--text-scale)) var(--font-ui); white-space: nowrap; background: var(--bg); }
 .block .output-tools > button.clear-output { display: none; }
 .block.selected .output-tools > button.clear-output, .block.history .output-tools > button.clear-output { display: inline-block; }
 .block .output-tools > button.copy-output { opacity: 0; display: inline-flex; align-items: center; gap: 4px; }

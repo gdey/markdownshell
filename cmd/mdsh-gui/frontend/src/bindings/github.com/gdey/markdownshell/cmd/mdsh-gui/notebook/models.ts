@@ -110,6 +110,13 @@ export interface Cell {
     "output"?: string;
 
     /**
+     * At is when the run that made Output started (RFC 3339, in UTC):
+     * this session's run, or the at= saved with the output. Empty when
+     * there is no output or it was saved without a time.
+     */
+    "at"?: string;
+
+    /**
      * Earlier are the block's earlier runs, kept by history=N, newest
      * first.
      */

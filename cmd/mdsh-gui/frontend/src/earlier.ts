@@ -99,9 +99,30 @@ export function runTime(at: string, now: Date): string {
   return date + " " + clock;
 }
 
+// timeAgo says how long before now a run at at (RFC 3339) was: "42 secs
+// ago" under a minute, then in whole minutes, hours, days, weeks, months
+// and years, the largest unit that fits. A time not yet past, as a
+// clock set a little ahead can give, is "just now".
+export function timeAgo(at: string, now: Date): string {
+  const t = new Date(at).getTime();
+  if (isNaN(t)) return "";
+  const s = Math.floor((now.getTime() - t) / 1000);
+  if (s < 1) return "just now";
+  const days = Math.floor(s / 86400);
+  const [n, unit] =
+    s < 60 ? [s, "sec"]
+    : s < 3600 ? [Math.floor(s / 60), "min"]
+    : s < 86400 ? [Math.floor(s / 3600), "hour"]
+    : days < 7 ? [days, "day"]
+    : days < 30 ? [Math.floor(days / 7), "week"]
+    : days < 365 ? [Math.max(1, Math.floor(days / 30.4375)), "month"]
+    : [Math.max(1, Math.floor(days / 365.25)), "year"];
+  return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+}
+
 // fullTime is a run's time for its tooltip: the local date and time to
 // the second, and the at= the file holds.
-function fullTime(at: string): string {
+export function fullTime(at: string): string {
   const t = new Date(at);
   if (isNaN(t.getTime())) return at;
   return t.toLocaleString([], { dateStyle: "full", timeStyle: "medium" }) + "\n" + at;

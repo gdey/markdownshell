@@ -56,6 +56,10 @@ type Cell struct {
 	Depends []string `json:"depends,omitempty"`
 	// Output is the block's output, saved or from this session, rendered.
 	Output string `json:"output,omitempty"`
+	// At is when the run that made Output started (RFC 3339, in UTC):
+	// this session's run, or the at= saved with the output. Empty when
+	// there is no output or it was saved without a time.
+	At string `json:"at,omitempty"`
 	// Earlier are the block's earlier runs, kept by history=N, newest
 	// first.
 	Earlier []EarlierRun `json:"earlier,omitempty"`
