@@ -109,6 +109,15 @@ This page is the reference.
   toolbar, and a run returns focus to the block it started from. Run › Clear All
   Outputs (cmd/ctrl+alt+K, or the eraser in the toolbar) takes all
   output out of the document, as if nothing had run.
+- **When it ran, and the runs before.** An output's title bar says how
+  long ago the run that made it started, "6 mins ago", kept current,
+  with the exact time in its tooltip. A block with `history=N` shows
+  its earlier runs under its output: a line says how many there are and
+  opens to each run's output under its time ("yesterday 16:21") and
+  exit status, newest first. Each has a copy button and a trash, and
+  Clear earlier runs, beside the output's trash, takes them all; undo
+  puts them back. See
+  [Earlier runs]({{< relref "writing-documents#earlier-runs" >}}).
 - **Copying.** Each block's card has a copy button for its code (or
   press `c`), its output has one in its top right corner, and other
   fenced code shows one on hover. Output is copied as text, without
@@ -202,7 +211,8 @@ This page is the reference.
   the network for an image nobody loaded.
 - **Reports.** Save writes the output into the file, and File › Create
   Report… makes a PDF, HTML or markdown report, and shows the `mdsh`
-  command that makes the same one.
+  command that makes the same one. Its Earlier runs switch adds the
+  earlier runs of blocks with `history=N`, as `--history` does.
 - **Cheat sheet and changelog.** Help › Cheat Sheet opens the
   [cheat sheet]({{< relref "cheatsheet" >}}) in a read-only tab, and
   Help › Changelog the changelog of the build you're running, with its

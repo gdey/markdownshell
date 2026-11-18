@@ -1,7 +1,7 @@
 # Adding a look
 
 A look is the desktop app's paint: Plain, Teletype, Blueprint, Bubble
-Gum, Witchcraft, Coffee, and one more each minor release. Each look is one
+Gum, Witchcraft, Coffee, Green Tea, and one more each minor release. Each look is one
 file, `look.css`, in its own folder in
 [`web/looks`](../web/looks). Its
 first comment opens with the look's **front matter**, TOML between

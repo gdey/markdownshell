@@ -45,9 +45,35 @@ and a timer counts up beside it, against its `timeout=` if it has one.
 A `confirm` block asks in its card, with Run, Skip and Stop. A block's
 `depends=` runs what it needs first and is drawn as colored lines in
 the margin, which you can drag to change. Run › Clear All Outputs
-starts over, as if nothing had run.
+starts over, as if nothing had run. A `background` block that outlives
+its run keeps a Stop on its card, and the Console's Processes tab shows
+everything still running under the file's shells, as a tree, each with
+how long it has run and a Kill.
 
 {{< shot name="depends" title="guardrails.md" >}}The selected block's dependencies, drawn in the margin.{{< /shot >}}
+
+## Keep the runs before
+
+Each output says on its title bar how long ago the run that made it
+started, and keeps counting. Mark a block `history=N` and the file
+keeps its N runs before that one too, under the current output: a line
+says how many, and opens to each run's output with its time and exit
+status. Copy one, delete one, or clear them all; Create Report's
+Earlier runs switch prints them. See
+[Earlier runs]({{< relref "docs/writing-documents#earlier-runs" >}}).
+
+{{< shot src="earlier-runs.png" paper="earlier-runs-paper.png" phosphor="earlier-runs-phosphor.png" title="health.md" >}}A block with `history=3`: today's output, then three earlier runs, one of them a failure from yesterday.{{< /shot >}}
+
+## Talk to web services
+
+An `http` block makes one request, written the way it goes over the
+wire, and checks the response in Hurl's words. Its card shows the
+status, the body and the headers in tabs, with a tick or a cross by
+each check, and the body folds on its own. Captured values, such as a
+token, reach the prose and the next request, and credentials are saved
+masked. See [HTTP requests]({{< relref "docs/http" >}}).
+
+{{< shot src="http-gui.png" paper="http-gui-paper.png" phosphor="http-gui-phosphor.png" title="api.md" >}}An http block whose check failed, with the body it got and the value the check wanted.{{< /shot >}}
 
 ## Keep secrets out of the file
 
@@ -58,7 +84,7 @@ choice `nosave` and it works as usual, but what it holds stays in the
 session: saving leaves the file as it was, and the card says *session
 only*.
 
-{{< shot src="secrets-light.png" dark="secrets-dark.png" title="rotate.md · running" >}}A `secret` key, a `nosave` pod list, and a rollout timing itself against its one-minute timeout.{{< /shot >}}
+{{< shot src="secrets-light.png" dark="secrets-dark.png" paper="secrets-paper.png" phosphor="secrets-phosphor.png" title="rotate.md · running" >}}A `secret` key, a `nosave` pod list, and a rollout timing itself against its one-minute timeout.{{< /shot >}}
 
 ## Work in the History pane
 
@@ -67,7 +93,13 @@ prompt and completion. Each command you type is added to the file as a
 block, with its output; a line starting with `#` becomes a note, and
 ``# ```sh`` starts a block that is added, unrun, when a line of
 ```` ``` ```` ends it. It is
-how a document starts when you don't know yet what it will say.
+how a document starts when you don't know yet what it will say. The
+pane shows the shell's working directory, and a button beside its close
+button has it fill the tab. The record button, a dot beside Stop, turns
+recording off: commands still run in the file's shell, so a `cd`
+carries over, but aren't added to the file. With Settings › Shell › Run
+a repeated History command in its block on, typing a command again
+reruns its block and keeps the output before as an earlier run.
 
 {{< shot name="history" title="2026-11-02.md · History" >}}A session: the commands typed below became the blocks above.{{< /shot >}}
 
@@ -77,8 +109,10 @@ how a document starts when you don't know yet what it will say.
 and checkboxes; what you pick is saved in the file and reaches the
 blocks as `$MDSH_VAR_` variables ([Inputs]({{< relref "docs/inputs" >}})). `d2` fences draw diagrams and `svg`
 fences pictures. `out=markdown` output is drawn as markdown, images and
-terminal recordings show in the block, and nothing is loaded from the
-network.
+terminal recordings show in the block. An image from another site, or
+from outside the document's folder, waits behind a Load image button,
+and the document remembers the ones you load. HTML in the markdown, such
+as `<details>` or `<kbd>`, is drawn, cleaned of scripts.
 
 {{< shot name="inputs" title="inputs.md" >}}A form written in markdown.{{< /shot >}}
 
@@ -91,7 +125,7 @@ title, description and tags, its `mdsh:` options, and the variables and
 files its shells get. Each change is written to the file as one edit,
 and Undo takes it back.
 
-{{< shot src="front-matter-light.png" dark="front-matter-dark.png" title="rotate.md · Front matter" >}}The form over the top of the page.{{< /shot >}}
+{{< shot src="front-matter-light.png" dark="front-matter-dark.png" paper="front-matter-paper.png" phosphor="front-matter-phosphor.png" title="rotate.md · Front matter" >}}The form over the top of the page.{{< /shot >}}
 
 ## Reports with one click
 
@@ -113,7 +147,7 @@ changed in the build you're running, in a tab of its own.
 
 {{< shot src="settings-look-paper.png" title="Settings" >}}Settings › Look, in the Teletype look.{{< /shot >}}
 
-{{< shot src="hero-bubblegum.png" dark="hero-bubblegum-dark.png" title="deploy.md · Bubble Gum" >}}The deploy runbook in the Bubble Gum look, new in 1.4.{{< /shot >}}
+{{< shot src="hero-greentea.png" dark="hero-greentea-dark.png" title="deploy.md · Green Tea" >}}The deploy runbook in the Green Tea look, new in 1.7.{{< /shot >}}
 
 Every button, pane and tab has a name for a screen reader and a key for
 the keyboard; the app was checked with VoiceOver for 1.3. The full list

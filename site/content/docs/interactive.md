@@ -34,7 +34,8 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   ``# ```sh`` opens a block typed line by line, added to the file when a
   ```` ``` ```` line ends it. ctrl+o in the pane turns recording off,
   so commands run in the shell without being added to the file, until
-  ctrl+o again or the pane closes. Shift+↑ in
+  ctrl+o again or the pane closes. The pane's rule shows the shell's
+  working directory, and `Z` has the pane fill the screen. Shift+↑ in
   the pane, or `V`, selects lines of its output, and `y` copies them.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
@@ -45,8 +46,15 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
 - **HTTP requests.** An [`http` block]({{< relref "http" >}}) shows
   its response's status, body and checks under it; `H` switches to the
   headers and `Y` copies the request as `curl`.
+- **When it ran.** A saved output's label says how long ago it ran,
+  "saved output, 3 mins ago:", and a block run this session has it
+  after its time in the header. A block with `history=N` says under its
+  output how many earlier runs it keeps, and `b` shows each one with
+  how far back it is, its exit status and when it ran. Running such a
+  block several times before saving keeps every run.
 - **Reports**, with `p`: a PDF, HTML or markdown copy, as the desktop
-  app's Create Report makes.
+  app's Create Report makes; its Earlier runs switch adds the runs kept
+  by `history=N`.
 - **Save** with `w`, Save As with `W`. If the file changes on disk, a
   banner says so, and `R` reloads it or `M` keeps yours.
 

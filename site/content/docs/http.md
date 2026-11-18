@@ -276,9 +276,9 @@ the request as a `curl` command, placeholders filled in, for a shell.
 Insert › http Request in the source view, and the markdown bar's block
 button, start a new one.
 
-{{< shot src="http-gui.png" title="api.md" >}}An http block whose check failed: 200 OK and exit 1 in its head, the JSON body under the Body tab, and a cross by `jsonpath $.user == "j"` with `got "guest"`.{{< /shot >}}
+{{< shot src="http-gui.png" paper="http-gui-paper.png" phosphor="http-gui-phosphor.png" title="api.md" >}}An http block whose check failed: 200 OK and exit 1 in its head, the JSON body under the Body tab, and a cross by `jsonpath $.user == "j"` with `got "guest"`.{{< /shot >}}
 
-{{< shot src="http-gui-headers.png" title="api.md · Headers" >}}The same card's Headers tab, with every check ticked.{{< /shot >}}
+{{< shot src="http-gui-headers.png" paper="http-gui-headers-paper.png" phosphor="http-gui-headers-phosphor.png" title="api.md · Headers" >}}The same card's Headers tab, with every check ticked.{{< /shot >}}
 
 The card folds at two levels. The fold button on the output, or
 `collapse-output` on the fence, folds the whole response to its status
@@ -287,9 +287,9 @@ file as any fold is. The chevron beside the Body tab folds just the
 body, to its first line and a count, keeping the status and the checks
 in view; that fold lasts while the app is open and isn't saved.
 
-{{< shot src="http-fold.png" title="api.md · output folded" >}}The whole response folded: `HTTP/1.1 200 OK … 10 more lines`.{{< /shot >}}
+{{< shot src="http-fold.png" paper="http-fold-paper.png" phosphor="http-fold-phosphor.png" title="api.md · output folded" >}}The whole response folded: `HTTP/1.1 200 OK … 10 more lines`.{{< /shot >}}
 
-{{< shot src="http-body-fold.png" title="api.md · body folded" >}}The body folded to `{ … 6 more lines`, with the three checks still showing.{{< /shot >}}
+{{< shot src="http-body-fold.png" paper="http-body-fold-paper.png" phosphor="http-body-fold-phosphor.png" title="api.md · body folded" >}}The body folded to `{ … 6 more lines`, with the three checks still showing.{{< /shot >}}
 
 `mdsh -i` shows the same under the block: the status, the body, and
 the checks. `H` switches between the body and the headers, and `Y`

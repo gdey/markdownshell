@@ -7,6 +7,11 @@ description = "Witchcraft writes the document on a scroll of speckled kraft pape
 tagline = "for a purple grimoire under the moon"
 tokens = "--witch-"
 
+[hero]
+light = "hero-witchcraft.png"
+dark = "hero-witchcraft-dark.png"
+alt = "The Witchcraft look: a kraft-paper scroll framed in a double line against a sky of stars and crescent moons"
+
 [texture]
 label = "Grimoire"
 rules = "Stars and moons"

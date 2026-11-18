@@ -7,6 +7,11 @@ description = "Coffee writes the document on a sheet of old cream paper, splashe
 tagline = "for notes by the cup, stains and all"
 tokens = "--coffee-"
 
+[hero]
+light = "hero-coffee.png"
+dark = "hero-coffee-dark.png"
+alt = "The Coffee look: a coffee-stained sheet of cream paper on a wooden table, with a cup by its corner"
+
 [texture]
 label = "Café table"
 sprockets = "Cup and saucer"

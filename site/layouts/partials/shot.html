@@ -5,8 +5,16 @@
    Or name instead of src and dark: the picture in both of the app's
    looks that match the site's skins, name-light and name-dark for the
    plain skin, name-paper and name-phosphor (the Teletype look) for the
-   tty skin; the skin switch shows one. */ -}}
-{{- if .name -}}
+   tty skin; the skin switch shows one.
+
+   Or src and dark with paper and phosphor: src and dark under the plain
+   skin, paper and phosphor (the Teletype look) under the tty one. */ -}}
+{{- if and (not .name) .paper -}}
+{{- $plain := merge . (dict "paper" "" "phosphor" "") -}}
+{{- $tty := merge . (dict "paper" "" "phosphor" "" "src" .paper "dark" (.phosphor | default .paper)) -}}
+<div class="only-tty">{{ partial "shot.html" $tty }}</div>
+<div class="only-plain">{{ partial "shot.html" $plain }}</div>
+{{- else if .name -}}
 {{- $plain := merge . (dict "name" "" "src" (printf "%s-light.png" .name) "dark" (printf "%s-dark.png" .name)) -}}
 {{- $tty := merge . (dict "name" "" "src" (printf "%s-paper.png" .name) "dark" (printf "%s-phosphor.png" .name)) -}}
 <div class="only-tty">{{ partial "shot.html" $tty }}</div>

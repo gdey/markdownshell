@@ -45,15 +45,27 @@
   name = "Witchcraft"
   since = "1.5"
   tagline = "for a purple grimoire under the moon"
+  [looks.hero]
+    light = "hero-witchcraft.png"
+    dark = "hero-witchcraft-dark.png"
+    alt = "The Witchcraft look: a kraft-paper scroll framed in a double line against a sky of stars and crescent moons"
 
 [[looks]]
   id = "coffee"
   name = "Coffee"
   since = "1.6"
   tagline = "for notes by the cup, stains and all"
+  [looks.hero]
+    light = "hero-coffee.png"
+    dark = "hero-coffee-dark.png"
+    alt = "The Coffee look: a coffee-stained sheet of cream paper on a wooden table, with a cup by its corner"
 
 [[looks]]
   id = "greentea"
   name = "Green Tea"
   since = "1.7"
   tagline = "for a quiet hour in the tea room"
+  [looks.hero]
+    light = "hero-greentea.png"
+    dark = "hero-greentea-dark.png"
+    alt = "The Green Tea look: washi on a tatami mat, a bowl of matcha and a whisk by its corner, ink sketches of tea things in the margins"

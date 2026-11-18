@@ -17,6 +17,7 @@ mdsh:
   step: false
   interpolate: true
   show_stderr: false
+  history: 10
   terminal:
     cols: 100
     rows: 30
@@ -41,6 +42,7 @@ closing line, the `---` is just a thematic break.
 | `step` | `true`, `false` | `false` | Ask before running each block, as if every block were marked `confirm` |
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
+| `history` | a whole number | 10 | How many earlier runs a bare `history` on a block keeps |
 | `terminal.cols`, `terminal.rows` | cells | fit the window, 24 | In mdsh-gui, the size of the terminal `tty` blocks run on |
 | `http.secret_headers` | list of header names | none | Response headers, besides the built-in five, whose values `http` blocks save as `(secret)` |
 | `env.share` | list of variable names, `...`, `-NAME` | the base set | Variables passed from mdsh's environment into the shell, besides the base set (`PATH`, `HOME`, `USER`, ...), and the default `share=` for sub-envs |
@@ -117,6 +119,13 @@ When unset, a block's stderr is shown only when the block fails.
 `show_stderr: true` shows every block's stderr; `show_stderr: false` hides
 it even for failed blocks. A block's own `show-stderr` attribute overrides
 this.
+
+### `history`
+
+How many earlier runs a block marked with a bare `history` keeps, 10
+when unset. A block's own `history=N` overrides it, and a block without
+`history` keeps none. See
+[Earlier runs]({{< relref "writing-documents#earlier-runs" >}}).
 
 ### `env.share`
 

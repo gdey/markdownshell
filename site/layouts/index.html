@@ -22,16 +22,17 @@
 
 <section class="band">
   <div class="wrap">
-    <h2>New in 1.4</h2>
+    <h2>New in 1.7</h2>
     <ul class="news">
-      <li><strong><code>secret</code> and <code>nosave</code>.</strong> Blur a block until you look, and keep output, typed values and picks out of the file.</li>
-      <li><strong>Run timers.</strong> A running block counts up against its <code>timeout=</code>, in the app and in <code>mdsh -i</code>, and keeps how long it took.</li>
-      <li><strong>Copy buttons.</strong> On a block's code, its output, any fence in the prose, and lines of the History pane.</li>
-      <li><strong>A front matter form.</strong> Title, tags, <code>mdsh:</code> options and <code>env:</code>, edited from the page, with Undo.</li>
-      <li><strong>Terminal recordings as casts.</strong> <code>tty</code> blocks play in the card, with a scrubber, frame steps and text you can select.</li>
-      <li><strong>A smaller default environment.</strong> Blocks get a base set of variables unless the file asks for more with <code>env.share</code>.</li>
+      <li><strong>Earlier runs.</strong> Mark a block <code>history=N</code> and the file keeps the runs before the last one under it, each with its time and exit status. The app and <code>mdsh -i</code> show them, and <code>--history</code> puts them in a report.</li>
+      <li><strong>When it ran.</strong> Every output says how long ago its run started, "6 mins ago", kept current, with the exact time a hover away.</li>
+      <li><strong>A History pane that keeps up.</strong> It shows the shell's working directory, fills the tab at a click (or <code>Z</code>), and takes a whole block typed into it, from <code>#&nbsp;```sh</code> to <code>```</code>, added to the file without running. Its record button turns recording off, so commands run without landing in the file.</li>
+      <li><strong>What's still running.</strong> The Console's Processes tab, and <code>P</code> in <code>mdsh -i</code>, show every process under the file's shells, with how long it has run and a Kill. A background block that outlives its run can be stopped from its card.</li>
+      <li><strong>Load image.</strong> An image from another site, or outside the document's folder, waits behind a button; one click loads it, and the document remembers.</li>
+      <li><strong>Green Tea.</strong> A sheet of washi on a tatami mat beside a bowl of matcha, in light and at evening.</li>
+      <li><strong>HTTP docs and a body fold.</strong> A docs page and a seventh part of the tour for <code>http</code> blocks, and a response body that folds on its own.</li>
     </ul>
-    <p class="caption">Plus a macOS app signed with a Developer ID and notarized that carries <code>mdsh</code> inside it (one download gives you both), the Bubble Gum look, the changelog in Help › Changelog, stale and <code>always</code> dependencies, and a Console that offers fixes. Every change is in the <a href="{{ "changelog/" | relURL }}">changelog</a>.</p>
+    <p class="caption">Plus fixes from the 1.7 security review, a <code>&lt;details&gt;</code> that folds the markdown inside it, and <code>mdsh --serve</code> in an mdsh built with <code>-tags serve</code>. 1.6 brought <code>http</code> blocks, <code>mdsh ctl ask</code> and <code>confirm</code>, HTML drawn from your markdown, and the Coffee look; 1.5 settings and the cheat sheet in tabs, front matter that opens even when it doesn't parse, and Witchcraft. Every change is in the <a href="{{ "changelog/" | relURL }}">changelog</a>.</p>
   </div>
 </section>
 
@@ -88,7 +89,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
           <p>Mark a block <code>secret</code> and the app blurs its code and output until you press the eye, then masks them again after a minute. Mark it <code>nosave</code> and it runs as usual, but its output is never written to the file, so it never reaches git.</p>
           <p>A running block counts up against its <code>timeout=</code>, and every block keeps how long it took.</p>
         </div>
-        {{ partial "shot.html" (dict "src" "secrets-light.png" "dark" "secrets-dark.png" "title" "rotate.md · running" "alt" "A secret block blurred with a session only badge, a nosave block with its output and a session only badge, and a rollout block running with a timer reading 9.5s / 1m") }}
+        {{ partial "shot.html" (dict "src" "secrets-light.png" "dark" "secrets-dark.png" "paper" "secrets-paper.png" "phosphor" "secrets-phosphor.png" "title" "rotate.md · running" "alt" "A secret block blurred with a session only badge, a nosave block with its output and a session only badge, and a rollout block running with a timer reading 9.5s / 1m") }}
       </div>
       <div class="wow">
         <div class="wow-text">
@@ -126,6 +127,24 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
         </div>
         {{ partial "shot.html" (dict "name" "report" "title" "report.md · Create report" "alt" "The Create report dialog: PDF, HTML or Markdown; show code blocks and output; output from this tab's run, a fresh run or the saved file; and the equivalent mdsh command") }}
       </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">08</span>
+          <h3>Call the API. Check what it said.</h3>
+          <p>An <code>http</code> block is a request written the way it goes over the wire. Under it, checks in Hurl's words say what the response must hold, and captures pull out a token or an id for the prose and the next request. The app shows the body and headers in tabs beside the checks.</p>
+          <p>Credential headers and secret captures are saved masked, so the file can go in git.</p>
+        </div>
+        {{ partial "shot.html" (dict "src" "http-gui.png" "paper" "http-gui-paper.png" "phosphor" "http-gui-phosphor.png" "title" "api.md" "alt" "An http block whose check failed: 200 OK and exit 1 in its head, the JSON body under the Body tab, and a cross by a jsonpath check with the value it got") }}
+      </div>
+      <div class="wow">
+        <div class="wow-text">
+          <span class="num">09</span>
+          <h3>What did it say last week?</h3>
+          <p>Mark a block <code>history=N</code> and each run moves the one before it down, so the file keeps the last N runs under the current output, each with when it ran and how it exited. Every output says how long ago it ran.</p>
+          <p>A failure from Friday stays in the file, next to today's success, and in git.</p>
+        </div>
+        {{ partial "shot.html" (dict "src" "earlier-runs.png" "paper" "earlier-runs-paper.png" "phosphor" "earlier-runs-phosphor.png" "title" "health.md" "alt" "A block with history=3: its current output, then 3 earlier runs opened to a run from today, one from yesterday that failed with exit 7 and a curl error, and one from Friday") }}
+      </div>
     </div>
   </div>
 </section>
@@ -161,7 +180,7 @@ mdsh --pdf run.pdf deploy.md   # the run, as a PDF
   <div class="wrap cols">
     <div>
       <h2>Start with the examples.</h2>
-      <p class="sub">The repo's <code>examples/</code> folder is a guided tour in nine parts, from a two-block hello to whole runbooks. The app shows it as collections on its start screen, and every part has a Try it block that runs the example it describes.</p>
+      <p class="sub">The repo's <code>examples/</code> folder is a guided tour in ten parts, from a two-block hello to whole runbooks. The app shows it as collections on its start screen, and every part has a Try it block that runs the example it describes.</p>
       <ol class="steps">
         <li><div>Get the code and the tour.
 {{ highlight `git clone https://github.com/gdey/markdownshell
@@ -179,11 +198,11 @@ cd markdownshell/examples` "sh" "" }}</div></li>
 <section class="band">
   <div class="wrap">
     <h2>One file, four ways to run it.</h2>
-    <p class="sub">The desktop app, the browser, the terminal UI and the command line share one engine, so a document runs the same in all four and saves the same bytes.</p>
+    <p class="sub">The desktop app, the terminal UI, the command line and the browser share one engine, so a document runs the same in all four and saves the same bytes.</p>
     <ul class="fronts">
       <li><span class="tag">Shipping</span><h3>Desktop app</h3><p>Tabs, the start screen with collections and pins, source beside rendered, History, Console, outline, diagrams. macOS and Linux.</p>
 {{ highlight `mdsh-gui runbooks/` "sh" "" }}</li>
-      <li><span class="tag">New</span><h3>Browser</h3><p>The desktop app's notebook in a web browser, on this machine by default and behind a token. See <a href="{{ "docs/browser/" | relURL }}">Browser</a>.</p>
+      <li><span class="tag">Experimental</span><h3>Browser</h3><p>The desktop app's notebook in a web browser, on this machine by default and behind a token. Only in an mdsh built with <code>-tags serve</code>; release builds leave it out. See <a href="{{ "docs/browser/" | relURL }}">Browser</a>.</p>
 {{ highlight `mdsh --serve deploy.md` "sh" "" }}</li>
       <li><span class="tag">Shipping</span><h3>Terminal UI</h3><p>The same notebook over SSH: outline, block moves with undo, reports, tabs, and a History pane with your shell's prompt.</p>
 {{ highlight `mdsh -i deploy.md` "sh" "" }}</li>
@@ -205,7 +224,7 @@ brew install gdey/tap/mdsh          # or just mdsh and mdsh -i` "sh" "" }}
     </div>
     <div>
       <h2>Safe to open</h2>
-      <p>Opening a file runs nothing. A document reads only the environment variables you expose, never loads images from the network, and can't hide code from the question that asks to run it. The security reviews are public, and every High finding in them is fixed.</p>
+      <p>Opening a file runs nothing. A document reads only the environment variables you expose, never reaches the network for an image you didn't click to load, and can't hide code from the question that asks to run it. The security reviews are public, and every High finding in them is fixed.</p>
       <p><a href="{{ "security/" | relURL }}">How mdsh keeps a file in its lane →</a></p>
     </div>
   </div>
