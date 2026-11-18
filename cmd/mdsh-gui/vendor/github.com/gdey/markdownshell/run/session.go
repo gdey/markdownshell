@@ -878,6 +878,54 @@ func (s *Session) RunTyped(ctx context.Context, i int) (r *Result, fullScreen bo
 	return r, true, ctx.Err()
 }
 
+// Unrecorded is the id an unrecorded command runs as: its $MDSH_BLOCK,
+// and the block the audit log names.
+const Unrecorded = "unrecorded"
+
+// RunUnrecorded runs body, in the language lang, on Terminal as
+// RunTyped runs a block, but as a block that isn't in the document: as
+// the History pane runs a command while recording is off. It runs in
+// the document's main shell, so what it changes there, such as the
+// directory or a variable, is there for the blocks that run after it,
+// but no result is kept and no event is sent. It reports whether the
+// command took over the screen, and r's Stdout is the text it showed
+// when it didn't.
+func (s *Session) RunUnrecorded(ctx context.Context, lang, body string) (r *Result, fullScreen bool, err error) {
+	if err := s.checkFrontMatter(); err != nil {
+		return nil, false, err
+	}
+	if s.opts.Terminal == nil {
+		return nil, false, ErrNoTTY
+	}
+	b := &doc.Block{ID: Unrecorded, Lang: lang, Info: lang, Body: body, Attrs: doc.Attrs{}}
+	s.Reap()
+	r = &Result{Block: b, Ran: true, Start: s.now()}
+	e, err := envFor(ctx, s.stack, s.d, b)
+	if err != nil {
+		r.Err = err
+		return r, false, nil
+	}
+	t := *s.opts.Terminal
+	t.JobControl = true
+	rec := termrec.NewRecorder(t.Dims())
+	pre, revoke := s.issue(b)
+	s.logStart(b)
+	defer s.logEnd(b, r, time.Now())
+	giveBack := takeTTY(b, s.opts)
+	r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, pre+body, t, rec)
+	giveBack()
+	revoke()
+	if err != nil && !errors.Is(err, env.ErrExited) {
+		r.Err = err
+	}
+	shown := rec.Recording()
+	if shown.FullScreen() {
+		return r, true, ctx.Err()
+	}
+	r.Stdout = []byte(shown.Text())
+	return r, false, ctx.Err()
+}
+
 func (s *Session) confirm(b *doc.Block) (Answer, error) {
 	if s.opts.Confirm == nil {
 		return Stop, fmt.Errorf("%w: %s", ErrNoConfirm, s.d.Label(b))

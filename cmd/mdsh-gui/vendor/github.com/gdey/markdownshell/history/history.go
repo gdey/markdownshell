@@ -314,3 +314,36 @@ func openHeredoc(input string) bool {
 	}
 	return false
 }
+
+// Reuse is the #history-N block in d that a command, body typed in
+// lang, repeats: the last whose language and code are body's, and that
+// runs in the background only if bg says the command does. It is nil
+// for a command not typed before. With History's reuse setting on, the
+// command runs that block again rather than adding another.
+func Reuse(d *doc.Document, lang, body string, bg bool) *doc.Block {
+	if !strings.HasSuffix(body, "\n") {
+		body += "\n"
+	}
+	for i := len(d.Blocks) - 1; i >= 0; i-- {
+		b := d.Blocks[i]
+		if historyID.MatchString(b.ID) && b.Lang == lang && b.Body == body && b.Attrs.Has("background") == bg {
+			return b
+		}
+	}
+	return nil
+}
+
+// KeepRuns adds history to b's attributes, unless it has history=
+// already, so that running it again keeps the output it has as an
+// earlier run, as many as the front matter's history: says, else 10.
+func KeepRuns(d *doc.Document, b *doc.Block) error {
+	if b.Attrs.Has("history") {
+		return nil
+	}
+	info := strings.TrimRight(b.Info, " \t")
+	if !strings.HasSuffix(info, "}") {
+		return errors.New("can't keep the earlier runs of #" + b.ID + ": its attributes aren't in { }")
+	}
+	text := b.Fence + strings.TrimSuffix(info, "}") + " history}\n" + b.Body + b.Fence + "\n"
+	return d.SetBlock(b, text)
+}

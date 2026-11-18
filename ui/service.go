@@ -576,8 +576,10 @@ func (a *App) SetHistory(ctx context.Context, on, restart bool) (bool, error) {
 }
 
 // HistoryEnter takes what was typed in the History pane: a note is added
-// to the file as prose, and a command is added as a block and run.
-func (a *App) HistoryEnter(ctx context.Context, input string) error {
+// to the file as prose, and a command is added as a block and run. With
+// record false, as the pane's Record switch sets, a command runs without
+// being added.
+func (a *App) HistoryEnter(ctx context.Context, input string, record bool) error {
 	t, n, err := a.notebook(ctx)
 	if err != nil {
 		return err
@@ -585,7 +587,13 @@ func (a *App) HistoryEnter(ctx context.Context, input string) error {
 	if err := a.beforeRun(t, n); err != nil {
 		return err
 	}
-	err = t.run(func() error { return n.Enter(input) })
+	n.SetHistoryReuse(a.settings.Get().HistoryReuse)
+	err = t.run(func() error {
+		if !record {
+			return n.EnterUnrecorded(input)
+		}
+		return n.Enter(input)
+	})
 	a.afterRun(t, n)
 	return err
 }
@@ -711,7 +719,7 @@ func (a *App) SetSettings(s settings.Settings) error {
 
 // edited copies into cur what Settings edits from s:
 // autosave, Vim mode, spell checking, theme, the look and its options,
-// shell, the History pane's rc file, the view files open in, the start
+// shell, the History pane's rc file and reuse switch, the view files open in, the start
 // folder, the templates folder, the sessions folder and template, and the
 // file types links open with the system's app. The rest, such as Recent, stays as
 // it is. Values the window can't have sent are dropped.
@@ -721,6 +729,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 	cur.SessionFolder, cur.SessionTemplate = strings.TrimSpace(s.SessionFolder), strings.TrimSpace(s.SessionTemplate)
 	cur.OpenTypes = settings.CleanTypes(s.OpenTypes)
 	cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
+	cur.HistoryReuse = s.HistoryReuse
 	cur.Neovim, cur.NeovimPath, cur.NeovimClean = s.Neovim, strings.TrimSpace(s.NeovimPath), s.NeovimClean
 	cur.NeovimOwnColors = s.NeovimOwnColors
 	cur.Theme = ""

@@ -32,7 +32,9 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   prompt, completion and emacs line keys. Each command is added to the file as a block,
   with its output; a line starting with `#` becomes prose, and
   ``# ```sh`` opens a block typed line by line, added to the file when a
-  ```` ``` ```` line ends it. Shift+↑ in
+  ```` ``` ```` line ends it. ctrl+o in the pane turns recording off,
+  so commands run in the shell without being added to the file, until
+  ctrl+o again or the pane closes. Shift+↑ in
   the pane, or `V`, selects lines of its output, and `y` copies them.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
@@ -110,5 +112,7 @@ when mdsh recognizes the terminal, and in half blocks otherwise.
 ## Saving
 
 With `--autosave`, output is saved after every block that runs;
-otherwise `w` saves. A read-only file is refused before any block
+otherwise `w` saves. With `--history-reuse`, a command typed in History
+again runs its `#history-N` block again, keeping the run before under
+it as an earlier run, rather than adding another block. A read-only file is refused before any block
 runs, so nothing is lost.

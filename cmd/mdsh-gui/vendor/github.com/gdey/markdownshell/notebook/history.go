@@ -84,6 +84,16 @@ func (n *Notebook) shellEnv() []string {
 	return append(env, "TERM=xterm-256color")
 }
 
+// SetHistoryReuse sets whether a command typed in the History pane that
+// was typed before, and so has a #history-N block, runs that block
+// again, keeping its last output as an earlier run, rather than adding
+// another block. It is off unless set.
+func (n *Notebook) SetHistoryReuse(on bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.reuse = on
+}
+
 // SetHistoryRC sets the file the shells read while the History pane is
 // on, from the next time it is turned on.
 func (n *Notebook) SetHistoryRC(path string) {
@@ -236,7 +246,17 @@ func (n *Notebook) History() bool {
 // its exit status. A block, from a line such as # ```bash to a line of
 // ```, is added to the end of the document as it was typed, without
 // running.
-func (n *Notebook) Enter(input string) error {
+func (n *Notebook) Enter(input string) error { return n.enter(input, true) }
+
+// EnterUnrecorded is Enter with recording off: a command runs on the
+// terminal pane, in the shell blocks run in, but isn't added to the
+// document, so nothing it does there is kept but what it changed in the
+// shell. A command ending in a lone & runs in the shell's background,
+// as a shell would run it. A note or a block is still added, since it
+// is typed to be.
+func (n *Notebook) EnterUnrecorded(input string) error { return n.enter(input, false) }
+
+func (n *Notebook) enter(input string, record bool) error {
 	input = strings.TrimRight(input, "\n")
 	if strings.TrimSpace(input) == "" {
 		return nil
@@ -253,11 +273,24 @@ func (n *Notebook) Enter(input string) error {
 	if !on {
 		return ErrHistoryOff
 	}
+	if !record {
+		return n.runUnrecorded(input)
+	}
 	body, bg := backgrounded(input)
 	return n.start(func(ctx context.Context) error {
 		n.mu.Lock()
-		info := history.Info(n.lang(), n.nextHistoryID(), bg)
-		b, err := n.d.AppendBlock(info, body)
+		var b *doc.Block
+		var err error
+		if n.reuse {
+			// The command typed before runs again, keeping its last run.
+			if b = history.Reuse(n.d, n.lang(), body, bg); b != nil {
+				err = history.KeepRuns(n.d, b)
+				n.dirty = true
+			}
+		}
+		if b == nil {
+			b, err = n.d.AppendBlock(history.Info(n.lang(), n.nextHistoryID(), bg), body)
+		}
 		if err == nil {
 			err = n.sync()
 		}
@@ -290,11 +323,38 @@ func (n *Notebook) Enter(input string) error {
 		}
 		n.mu.Lock()
 		defer n.mu.Unlock()
+		if b.Attrs.Has("tty") {
+			return err
+		}
 		text := b.Fence + strings.TrimSuffix(b.Info, "}") + " tty}\n" + b.Body + b.Fence + "\n"
 		if serr := n.d.SetBlock(b, text); serr != nil {
 			return errors.Join(err, serr)
 		}
 		return errors.Join(err, n.sync())
+	})
+}
+
+// runUnrecorded runs input on the terminal pane, as Enter runs a
+// command, without adding it to the document.
+func (n *Notebook) runUnrecorded(input string) error {
+	return n.start(func(ctx context.Context) error {
+		n.mu.Lock()
+		lang := n.lang()
+		n.noteEnd = -1
+		n.term.mu.Lock()
+		n.term.history = true
+		n.term.mu.Unlock()
+		n.mu.Unlock()
+		defer func() {
+			n.term.mu.Lock()
+			n.term.history = false
+			n.term.mu.Unlock()
+		}()
+		r, _, err := n.sess.RunUnrecorded(ctx, lang, input)
+		if err == nil && r != nil {
+			err = r.Err
+		}
+		return err
 	})
 }
 

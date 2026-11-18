@@ -165,7 +165,9 @@ This page is the reference.
   notes. A line such as ``# ```sh {#rollout}`` opens a block: the prompt
   becomes ```` ```sh> ````, the lines typed are kept rather than run,
   and a ```` ``` ```` line adds the block to the end of the file without
-  running it (ctrl+c drops it). A history block deletes without asking, and becomes a plain
+  running it (ctrl+c drops it). The record button, a dot, turns
+  recording off: commands still run in the file's shell but aren't
+  added to the file, until it is pressed again or the pane closes. A history block deletes without asking, and becomes a plain
   block once moved. The separator over the input shows the shell's
   working directory, and the button with the two arrows has the pane
   fill the tab, up to the tab bar, until it is pressed again.
@@ -213,7 +215,7 @@ six tabs:
 | General | the view a file opens in, the start folder |
 | Look | {{< looks >}}; light, dark or the system's; text size, fonts (any installed), line spacing, accent, the History pane's colors, and each look's own textures, such as the Teletype paper's sprockets, rules and shadows |
 | Editing | autosave after each run, Vim keys, spell checking, how long a secret stays shown, the Neovim pane (experimental) |
-| Shell | a shell for every file, the file the History shell reads, a switch that gives blocks your shell's aliases and functions and turns on tab completion, Install for the command line tool, and serving notebooks to a browser or another program (experimental: File › Serve in Browser, `--serve=stdio`) |
+| Shell | a shell for every file, the file the History shell reads, a switch that runs a command typed in History again in its `#history-N` block, keeping earlier runs, rather than adding another, a switch that gives blocks your shell's aliases and functions and turns on tab completion, Install for the command line tool, and serving notebooks to a browser or another program (experimental: File › Serve in Browser, `--serve=stdio`) |
 | Files | the templates folder for New File…, the sessions folder and template, and the file types a link opens in their app (any other linked file is shown in the file manager) |
 | About | the build, the paths it uses and the tools on your `PATH`, with Copy for a bug report, and a link to the changelog |
 

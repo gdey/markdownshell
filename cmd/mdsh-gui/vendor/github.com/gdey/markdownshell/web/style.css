@@ -787,6 +787,15 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-full .shrink, body.history-full #history-full .grow { display: none; }
 body.history-full #history-full .shrink { display: inline; }
 #history.closed #history-full { display: none; }
+/* Record: a filled dot while commands are added to the file, a hollow
+   ring while they aren't. */
+#history-record .ring { fill: none; stroke: currentColor; stroke-width: 1.4; }
+#history-record .dot { fill: var(--bad); }
+#history-record[aria-pressed="false"] .dot { display: none; }
+#history-record[aria-pressed="false"] { color: var(--muted); }
+#history.closed #history-record { display: none; }
+#history-unrecorded { display: none; align-self: center; padding: 0 4px 0 6px; color: var(--muted); font: calc(11px * var(--text-scale))/16px var(--font-code); white-space: nowrap; }
+#history.unrecorded:not(.closed) #history-unrecorded { display: inline; }
 body.history-full :is(#toolbar, #workspace, #console, #start) { display: none !important; }
 body.history-full #history { flex: 1; min-height: 0; }
 body.history-full #history-body { flex: 1; min-height: 0; height: auto !important; }

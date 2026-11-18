@@ -8,6 +8,30 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The History pane can stop recording. Its record button, a dot beside
+  Stop in mdsh-gui and ctrl+o in `mdsh -i`, turns recording off: a
+  command typed then still runs in the document's shell, so a `cd` or a
+  variable it sets carries over to what runs next, but isn't added to
+  the document as a `#history-N` block. Notes and typed blocks are
+  still added. The pane says "not recording" while it is off, and
+  closing the pane turns recording back on.
+
+  ![mdsh-gui's History pane with recording off: echo recorded became the block history-2, while ls / | head -3, typed after the record button was pressed, ran in the pane without being added, and the pane's controls read not recording beside a hollow record button](docs/changelog/history-record.png)
+
+  ![mdsh -i's History pane with recording off after ctrl+o: its rule reads History not recording in red, and ls / | head -3 ran in the pane while the file shows only history-1 and history-2](docs/changelog/history-record-tui.png)
+
+- A setting, off by default, runs a command typed in the History pane
+  again in its `#history-N` block rather than adding another: Settings ›
+  Shell › Run a repeated History command in its block in mdsh-gui, and
+  `--history-reuse` with `mdsh -i`. The block gains `history`, so the
+  output it had is kept under the new one as an earlier run, as
+  `history=N` keeps them (the front matter's `history:`, else 10).
+  The command must match the block's code exactly, in the same
+  language, and the last such block is the one that runs. The block
+  stays where it is in the document.
+
+  ![mdsh-gui with the setting on: kubectl get pods typed twice in History ran history-1 again, which now reads skip links history and shows 1 earlier run under its output, while date, typed between, is history-2](docs/changelog/history-reuse.png)
+
 - Each block's output says how long ago the run that made it started,
   from its `at=`: "42 secs ago" under a minute, then minutes, hours,
   days, weeks, months and years. mdsh-gui shows it on the output's

@@ -529,3 +529,112 @@ function cd() { __zoxide_doctor; builtin cd "$@"; }
 		t.Errorf("text = %s", text)
 	}
 }
+
+// TestHistoryUnrecorded checks that a command typed with recording off
+// runs in the shell blocks run in, on the History pane, but isn't added
+// to the document, while a note still is.
+func TestHistoryUnrecorded(t *testing.T) {
+	dir := t.TempDir()
+	file := write(t, "# Log\n")
+	var (
+		mu     sync.Mutex
+		panes  []string
+		blocks []int
+		shown  strings.Builder
+	)
+	n, err := Open(file, Options{OnEvent: func(e Event) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch e.Kind {
+		case "terminal":
+			panes = append(panes, e.Data)
+			blocks = append(blocks, e.Block)
+		case "tty":
+			shown.Write(e.Bytes)
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if err := n.EnterUnrecorded("true"); !errors.Is(err, ErrHistoryOff) {
+		t.Fatalf("EnterUnrecorded with the pane off: %v", err)
+	}
+	if _, err := n.SetHistory(true, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []string{"X=kept; cd " + dir, "echo \"unseen $X\"", "# a note", "false"} {
+		if err := n.EnterUnrecorded(in); err != nil {
+			t.Fatalf("EnterUnrecorded(%q): %v", in, err)
+		}
+	}
+	if got, want := n.Text(), "# Log\n\na note\n"; got != want {
+		t.Errorf("text = %q, want %q", got, want)
+	}
+	mu.Lock()
+	if got := strings.Join(panes, ","); got != "history,history,history" {
+		t.Errorf("terminal events said %q", got)
+	}
+	for _, b := range blocks {
+		if b != Unrecorded {
+			t.Errorf("terminal event for block %d, want %d", b, Unrecorded)
+		}
+	}
+	if !strings.Contains(shown.String(), "unseen kept") {
+		t.Errorf("the pane showed %q", shown.String())
+	}
+	mu.Unlock()
+	// What it set is there for the next command, which is recorded, and
+	// numbered as if the others weren't typed.
+	if err := n.Enter("echo \"$X $PWD\""); err != nil {
+		t.Fatal(err)
+	}
+	got := noAt(n.Text())
+	if !strings.Contains(got, "{#history-1 skip links}") || !strings.Contains(got, "kept "+dir) {
+		t.Errorf("text =\n%s", got)
+	}
+}
+
+// TestHistoryReuse checks that, with the reuse setting on, a command
+// typed again runs its #history-N block again, which keeps the run
+// before as an earlier run, rather than adding another block; and that
+// with it off, as it starts, a new block is added.
+func TestHistoryReuse(t *testing.T) {
+	file := write(t, "# Log\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if _, err := n.SetHistory(true, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []string{"echo one", "echo one"} {
+		if err := n.Enter(in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := noAt(n.Text()); !strings.Contains(got, "{#history-2 skip links}") {
+		t.Fatalf("with reuse off, the command wasn't added again:\n%s", got)
+	}
+	n.SetHistoryReuse(true)
+	for _, in := range []string{"echo two", "echo two", "echo one", "echo three"} {
+		if err := n.Enter(in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := "# Log\n\n" +
+		"```sh {#history-1 skip links}\necho one\n```\n\n" +
+		"```output {for=history-1 exit=0}\none\n```\n\n" +
+		"```sh {#history-2 skip links history}\necho one\n```\n\n" +
+		"```output {for=history-2 exit=0}\none\n```\n\n" +
+		"```output {for=history-2 exit=0 history=1}\none\n```\n\n" +
+		"```sh {#history-3 skip links history}\necho two\n```\n\n" +
+		"```output {for=history-3 exit=0}\ntwo\n```\n\n" +
+		"```output {for=history-3 exit=0 history=1}\ntwo\n```\n\n" +
+		"```sh {#history-4 skip links}\necho three\n```\n\n" +
+		"```output {for=history-4 exit=0}\nthree\n```\n"
+	if got := noAt(n.Text()); got != want {
+		t.Errorf("text =\n%s\nwant\n%s", got, want)
+	}
+}

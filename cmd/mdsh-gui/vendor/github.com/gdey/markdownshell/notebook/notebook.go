@@ -263,8 +263,10 @@ type Notebook struct {
 	// -1.
 	history bool
 	noteEnd int
-	idle    *sync.Cond
-	quit    chan struct{}
+	// reuse is History's reuse setting: see SetHistoryReuse.
+	reuse bool
+	idle  *sync.Cond
+	quit  chan struct{}
 	// undo and redo are the rendered view's edits, for Undo and Redo.
 	undo, redo []change
 	// lines is the text's changes as line events, for Edit.

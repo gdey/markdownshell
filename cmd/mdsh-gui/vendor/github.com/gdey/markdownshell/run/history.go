@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 )
@@ -22,12 +23,17 @@ func (r *Result) At() string {
 }
 
 // historyStamp is how an earlier run's time goes in its file's name:
-// the at= with its colons dropped, or "earlier" when it has none.
+// the at= as a UTC time with its colons dropped, or "earlier" when it
+// has none. The at= is read from the document, so it is parsed as the
+// RFC 3339 time mdsh writes, and anything else is "earlier" too: a name
+// built from the text as written could leave the folder (finding 1 of
+// the v1.7.0 security review).
 func historyStamp(at string) string {
-	if at == "" {
+	t, err := time.Parse(time.RFC3339, at)
+	if err != nil {
 		return "earlier"
 	}
-	return strings.ReplaceAll(at, ":", "")
+	return t.UTC().Format("2006-01-02T150405Z")
 }
 
 // HistoryAssetName is the name an earlier run's file takes when
@@ -163,6 +169,9 @@ func (s *Session) rotateAssets(b *doc.Block) {
 		}
 		from := filepath.Join(s.opts.Dir, filepath.FromSlash(f))
 		to := HistoryAssetName(from, at)
+		if filepath.Dir(to) != filepath.Dir(from) {
+			continue // never out of the file's own folder
+		}
 		if info, err := os.Lstat(from); err != nil || !info.Mode().IsRegular() {
 			continue
 		}

@@ -148,7 +148,12 @@ Each file opens in a tab of its own, with its own shells.
   by character or word, ctrl+w, alt+backspace, alt+d, ctrl+u and ctrl+k
   to kill, ctrl+y to yank it back, ctrl+d to delete (or close the pane
   when nothing is typed), ctrl+p/n for earlier commands and ctrl+l to
-  clear the transcript. Tab completes a command, a
+  clear the transcript. The record button, a dot beside Stop, turns
+  recording off: commands typed then still run in the document's shell,
+  so a `cd` or a variable carries over, but aren't added to the file.
+  Notes and typed blocks are still added. The ring without its dot
+  says recording is off; pressing it again, or closing the pane, turns
+  it back on. Tab completes a command, a
   file or a `$` variable, as the shell sees them: in its directory,
   with what blocks set. The prompt is the shell's own `PS1`, expanded
   as the shell would (zsh's `%` escapes and `precmd` hooks, bash's `\`
@@ -166,7 +171,11 @@ Each file opens in a tab of its own, with its own shells.
   The shells aren't interactive, so they don't read your rc file
   themselves: name it, such as `~/.zshrc`, in Settings › File the
   History pane's shell reads, and the shells read it when History is
-  turned on, for your aliases, functions and prompt. ctrl+Z stops a
+  turned on, for your aliases, functions and prompt. With Settings ›
+  Run a repeated History command in its block on (it's off by
+  default), a command that has a `#history-N` block already runs that
+  block again, which gains `history` and keeps its last output as an
+  earlier run, rather than adding another block. ctrl+Z stops a
   command and ends its block with the stop status; `jobs`, `fg` and `bg`
   then work as in a terminal, in shells that allow it, such as dash, the
   `sh` of Debian and Ubuntu (bash and zsh have no job control unless

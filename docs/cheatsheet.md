@@ -31,7 +31,7 @@ behaves.
 | `mdsh --html doc.html doc.md` | The same as a standalone HTML page; not with `--pdf` |
 | `mdsh --show-secrets --pdf out.pdf doc.md` | Put `secret` blocks' code and output in the report; without it they read `(secret)` |
 | `mdsh --color=never doc.md` | No styling on a terminal; `--no-color` and `NO_COLOR` too (`auto`, `always`, `never`) |
-| `mdsh -i doc.md` | The terminal UI; `--autosave` saves after every block that runs |
+| `mdsh -i doc.md` | The terminal UI; `--autosave` saves after every block that runs; `--history-reuse` runs a command typed in History again in its `#history-N` block, keeping earlier runs |
 | `mdsh -i [folder]` | A start screen listing the markdown files under this folder, or that one |
 | `mdsh --serve [doc.md \| folder]` | The desktop app's notebook in a web browser, at 127.0.0.1:8080; `--serve=host:port` listens elsewhere. Anyone with the printed address can run commands as you. Only in an mdsh built with `-tags serve` |
 | `mdsh --serve=stdio doc.md` | The same notebook to the program that started mdsh, such as an editor plugin, as JSON lines on stdin and stdout |
@@ -290,7 +290,9 @@ env starts in the document's folder.
 
 In the History pane: tab completes, ↑/↓ or ctrl+p/n recall, ctrl+a/e,
 ctrl+b/f, alt+b/f, ctrl+w, alt+d, ctrl+u/k, ctrl+y edit, ctrl+l clears,
-esc goes back to the document, ctrl+d closes the pane. ``# ```sh`` starts
+ctrl+o turns recording off (commands run but aren't added to the file)
+and on again, esc goes back to the document, ctrl+d closes the pane and
+turns recording back on. ``# ```sh`` starts
 a block, added without running when a line of ```` ``` ```` ends it;
 ctrl+c drops it. On the start
 screen: type to filter, ↑/↓ or tab pick, enter opens, esc goes back,
@@ -332,7 +334,9 @@ In the outline ↑/↓ move between entries and ←/→ fold and unfold a
 section; the window's tabs take the arrows, enter and delete. The
 History pane takes the same line keys as `mdsh -i`'s, shift+enter for
 another line, ctrl+c to stop a command (or copy selected lines),
-ctrl+z to stop and keep the job, ctrl+d to close. With Vim keys on, `:w`
+ctrl+z to stop and keep the job, ctrl+d to close. Its record button
+(the dot) turns recording off, so commands run without being added to
+the file; closing the pane turns it back on. With Vim keys on, `:w`
 saves and `:RunBlock` and `:RunSection` run; in the Neovim pane `K`
 explains an attribute and `zc`/`zo` fold.
 

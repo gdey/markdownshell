@@ -149,6 +149,14 @@ export interface Settings {
     "historyRC": string;
 
     /**
+     * HistoryReuse has a command typed in the History pane that was
+     * typed before, and so has a #history-N block, run that block again,
+     * keeping its last output as an earlier run, rather than add another
+     * block. Off adds a block for every command.
+     */
+    "historyReuse": boolean;
+
+    /**
      * View is how a file opens: "rendered", "source" or "both".
      * Empty opens a file as it was last shown (see FileViews), and a
      * file not shown before in the rendered view.

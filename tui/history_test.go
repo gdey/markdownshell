@@ -355,3 +355,54 @@ func TestHistoryFillsScreenAndShowsDir(t *testing.T) {
 		t.Error("Z again didn't give the file its place back")
 	}
 }
+
+// TestHistoryUnrecorded checks that ctrl+o turns recording off, so a
+// command runs, with what it sets kept in the shell, but isn't added to
+// the file, and that closing the pane turns it on again.
+func TestHistoryUnrecorded(t *testing.T) {
+	src := "# Log\n"
+	m, file := newModel(t, src, Options{AutoSave: true})
+	press(m, "h")
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	if !m.hist.unrecorded || !strings.Contains(m.View(), "not recording") {
+		t.Fatalf("ctrl+o didn't turn recording off:\n%s", m.View())
+	}
+	typeLine(m, "Y=kept; echo unseen")
+	pump(t, m)
+	typeLine(m, "false")
+	pump(t, m)
+	if text := read(t, file); strings.Contains(text, "history-") {
+		t.Errorf("an unrecorded command was added:\n%s", text)
+	}
+	log := strings.Join(m.hist.log, "\n")
+	if !strings.Contains(log, "unseen") || !strings.Contains(log, "[exit 1]") {
+		t.Errorf("log = %q", log)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	typeLine(m, "echo got$Y")
+	pump(t, m)
+	if text := read(t, file); !strings.Contains(text, "{#history-1 skip links}") || !strings.Contains(text, "gotkept") {
+		t.Errorf("file:\n%s", text)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	press(m, "h")
+	if m.hist.unrecorded {
+		t.Error("closing the pane didn't turn recording on again")
+	}
+}
+
+// TestHistoryReuse checks that with HistoryReuse a command typed again
+// runs its #history-N block again, which keeps the run before under it.
+func TestHistoryReuse(t *testing.T) {
+	m, file := newModel(t, "# Log\n", Options{AutoSave: true, HistoryReuse: true})
+	press(m, "h")
+	for _, in := range []string{"echo again", "echo other", "echo again"} {
+		typeLine(m, in)
+		pump(t, m)
+	}
+	text := read(t, file)
+	if strings.Count(text, "echo again\n```") != 1 || !strings.Contains(text, "{#history-1 skip links history}") || !strings.Contains(text, "history=1") || strings.Contains(text, "history-3") {
+		t.Errorf("file:\n%s", text)
+	}
+}

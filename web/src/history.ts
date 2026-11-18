@@ -24,7 +24,7 @@ let rows = 12;
 const rowsKey = "mdsh.historyRows";
 
 let term: Terminal | null = null;
-let block = -1; // the command running in the pane, or -1
+let block = -1; // the command running in the pane, or -1; -2 is one not recorded
 let last = -1; // the last command that ran in the pane
 let entering = false; // a command entered here is running
 let typed: string[] = []; // what was entered, for up and down
@@ -34,6 +34,7 @@ let asking = false; // a prompt is being asked for
 let at = 0; // where up and down are in typed
 let promptCols = 0; // the width the prompt was last asked at
 let full = false; // the pane fills the tab, up to the tab bar
+let record = true; // commands typed here are added to the file
 
 export interface HistoryHooks {
   // canRun says whether a run may start, which it can't while one goes.
@@ -112,7 +113,7 @@ function ensureTerm(): Terminal {
   // What commands typed here print comes with links, as their blocks do.
   terminalLinks(term, (msg) => say(`\x1b[31m${msg}\x1b[0m`));
   term.onData((keys) => {
-    if (block >= 0) typeKeys(keys);
+    if (block !== -1) typeKeys(keys);
   });
   // With lines selected, cmd/ctrl+c copies them rather than reaching a
   // command that runs, as in most terminals.
@@ -172,7 +173,7 @@ export function fitHistory() {
   // A prompt drawn to fit the width is asked for again at the new one.
   // While a block runs the shell can't answer; the prompt is asked for
   // when it ends.
-  if (c !== promptCols && block < 0) void updatePrompt();
+  if (c !== promptCols && block === -1) void updatePrompt();
 }
 
 // cellHeight is the height of a line of the transcript, in pixels.
@@ -248,6 +249,8 @@ function slide(open: boolean) {
   const body = $("history-body");
   if (open === !pane.classList.contains("closed")) return;
   if (!open) setFull(false);
+  // Closing it records again.
+  if (!open && !record) setRecord(true, true);
   $("history-toggle").setAttribute("aria-expanded", String(open));
   const from = open ? 0 : body.offsetHeight;
   pane.classList.toggle("closed", !open);
@@ -269,6 +272,7 @@ function slide(open: boolean) {
 // showHistory is about to start the shells again and ask itself.
 export function showBar(on: boolean, prompt = true) {
   if (!on) setFull(false);
+  if (!on && !record) setRecord(true, true);
   $("history").hidden = !on;
   if (on && prompt) void updatePrompt();
 }
@@ -446,7 +450,7 @@ async function submit(entered: string) {
   try {
     await hooks.enter(async () => {
       try {
-        await App.HistoryEnter(text);
+        await App.HistoryEnter(text, record);
         if (block) say("\x1b[2m(added to the end of the file; it hasn't run)\x1b[0m");
       } catch (err) {
         say(`\x1b[31m${message(err)}\x1b[0m`);
@@ -457,8 +461,8 @@ async function submit(entered: string) {
     stopClock();
   }
   // A lone & at the end runs it as a background block, as Go decides.
-  if (last < 0 && /(^|[^&|<>\\])&\s*$/.test(text)) say("\x1b[2m(running in the background; its output goes to its block when it ends)\x1b[0m");
-  const status = last >= 0 ? hooks.status(last) : undefined;
+  if (record && last < 0 && /(^|[^&|<>\\])&\s*$/.test(text)) say("\x1b[2m(running in the background; its output goes to its block when it ends)\x1b[0m");
+  const status = last >= 0 && record ? hooks.status(last) : undefined;
   // 128 + SIGTSTP, 20 on Linux and 18 on macOS, is the status of a
   // command ctrl+z stopped.
   if (status === 148 || status === 146) say("\x1b[2m(stopped: fg brings it back, bg runs it in the background, jobs lists them)\x1b[0m");
@@ -466,6 +470,25 @@ async function submit(entered: string) {
   await updatePrompt();
   input().focus();
 }
+
+// setRecord turns recording on or off: off, a command typed here runs,
+// in the shell blocks run in, but isn't added to the file. A note or a
+// block still is. It starts on, and closing the pane turns it on
+// again; quiet leaves the transcript be.
+function setRecord(on: boolean, quiet = false) {
+  record = on;
+  const button = $("history-record");
+  button.setAttribute("aria-pressed", String(on));
+  button.title = on ? recordOnTitle : recordOffTitle;
+  $("history").classList.toggle("unrecorded", !on);
+  const box = input();
+  box.placeholder = on ? "A command to run and add to the file, or # a note" : "A command to run, not added to the file, or # a note";
+  if (inBlock(box.value) === null) box.setAttribute("aria-label", commandLabel());
+  if (term && !quiet) say(on ? "\x1b[2m(recording on: commands typed here are added to the file)\x1b[0m" : "\x1b[2m(recording off: commands typed here run but aren't added to the file)\x1b[0m");
+}
+
+const recordOnTitle = "Recording: commands typed here are added to the file. Click to stop recording";
+const recordOffTitle = "Not recording: commands typed here run but aren't added to the file. Click to record";
 
 // grow fits the input to its lines, up to a few. While they are a block
 // being typed, its prompt takes PS1's place, so it is plain they are
@@ -477,13 +500,13 @@ function grow() {
   const pane = $("history");
   if ((info !== null) !== pane.classList.contains("block")) {
     pane.classList.toggle("block", info !== null);
-    box.setAttribute("aria-label", info !== null ? blockLabel : commandLabel);
+    box.setAttribute("aria-label", info !== null ? blockLabel : commandLabel());
   }
   if (info !== null) $("history-block-prompt").textContent = blockPrompt(info);
   placeCursor();
 }
 
-const commandLabel = "Command to run and add to the file, or a note starting with #";
+const commandLabel = () => (record ? "Command to run and add to the file, or a note starting with #" : "Command to run without adding it to the file, or a note starting with #");
 const blockLabel = "Block to add to the file, without running it: a line of ``` ends it, ctrl+c drops it";
 
 // The block cursor, for Settings › Look › History prompt focus set to
@@ -732,7 +755,7 @@ export function historyStatus(text: string) {
 // would drop the keys onto the page, and the rendered view, until the
 // command ended.
 export function historyBusy(on: boolean) {
-  input().disabled = on && block < 0 && !entering;
+  input().disabled = on && block === -1 && !entering;
   placeCursor();
   $<HTMLButtonElement>("history-stop").disabled = !on;
   $<HTMLButtonElement>("history-restart").disabled = on;
@@ -763,10 +786,11 @@ export function initHistory(h: HistoryHooks) {
   };
   $("history-toggle").onclick = () => hooks.toggle();
   $("history-full").onclick = () => setFull(!full);
+  $("history-record").onclick = () => setRecord(!record);
   // A command typed here gets ctrl+c, as in a terminal, so the shell
   // and what blocks set in it live on; anything else stops as Run ›
   // Stop does.
-  $("history-stop").onclick = () => (block >= 0 ? typeKeys("\x03") : hooks.stop());
+  $("history-stop").onclick = () => (block !== -1 ? typeKeys("\x03") : hooks.stop());
   $("history-restart").onclick = async () => {
     if (!(await hooks.restart())) return;
     if (term) say("\x1b[2m(The shells started again, so variables that blocks set are gone.)\x1b[0m");
@@ -785,7 +809,7 @@ export function initHistory(h: HistoryHooks) {
     if (at.closest("button, textarea, a, #history-grip")) return;
     // Dragging over the prompt's lines selects them; leave that be.
     if (!$("history-term").contains(at) && !document.getSelection()?.isCollapsed) return;
-    if (block < 0) input().focus();
+    if (block === -1) input().focus();
     else if (!$("history-term").contains(at)) term?.focus();
   });
   // Edit › Copy, or the copy key where the menu takes it first, copies

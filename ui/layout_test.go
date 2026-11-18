@@ -145,7 +145,7 @@ func TestHistoryInputStaysWhileRunning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(src), "input().disabled = on && block < 0 && !entering;") {
+	if !strings.Contains(string(src), "input().disabled = on && block === -1 && !entering;") {
 		t.Error("history.ts: historyBusy disables the input for a command the pane started, which blurs it")
 	}
 }

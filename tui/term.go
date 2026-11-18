@@ -125,7 +125,7 @@ func (p *pane) running() int {
 // typeKey sends k to the block running in the pane.
 func (p *pane) typeKey(k tea.KeyMsg) {
 	b := keyBytes(k)
-	if len(b) == 0 || p.running() < 0 {
+	if len(b) == 0 || p.running() == -1 {
 		return
 	}
 	select {
@@ -307,6 +307,10 @@ func (m *Model) watchPane() tea.Msg {
 		return nil
 	}
 }
+
+// unrecordedBlock is termBlock, and the pane's block, while a command
+// typed in History with recording off runs: it has no card.
+const unrecordedBlock = -2
 
 // takeTTY is run's TakeTTY: the block runs in its card. It returns once
 // the TUI shows the pane.
