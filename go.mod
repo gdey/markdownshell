@@ -18,9 +18,9 @@ require (
 	github.com/neovim/go-client v1.2.1
 	github.com/yuin/goldmark v1.7.8
 	golang.org/x/image v0.25.0
-	golang.org/x/net v0.62.0
-	golang.org/x/sys v0.49.0
-	golang.org/x/term v0.47.0
+	golang.org/x/net v0.63.0
+	golang.org/x/sys v0.50.0
+	golang.org/x/term v0.48.0
 	gopkg.in/yaml.v3 v3.0.1
 	oss.terrastruct.com/d2 v0.7.2
 )
@@ -56,8 +56,8 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	oss.terrastruct.com/util-go v0.0.0-20250213174338-243d8661088a // indirect
 )
