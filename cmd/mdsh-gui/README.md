@@ -156,7 +156,13 @@ Each file opens in a tab of its own, with its own shells.
   Drag over the transcript to select lines and press cmd+c (ctrl+c on
   Linux and Windows), or right-click for Copy and Select All: they are
   copied as text, without colors. With lines selected, ctrl+c copies
-  them rather than reaching a command that runs in the pane.
+  them rather than reaching a command that runs in the pane. The
+  separator over the input shows the shell's working directory (`~`
+  for your home folder), asked for with the prompt, so it follows a
+  `cd` in the pane or in a block. The button with the two arrows, beside
+  the one that closes the pane, has the pane fill the tab, up to the
+  tab bar, in place of the toolbar and the document; it gives them
+  their place back when pressed again or when the pane closes.
   The shells aren't interactive, so they don't read your rc file
   themselves: name it, such as `~/.zshrc`, in Settings › File the
   History pane's shell reads, and the shells read it when History is

@@ -20,6 +20,19 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh -i: the build block's header reads ✓ 0.0s · 4 secs ago, and the saved outputs below it read saved output, 2 hours ago and saved output, 1 year ago](docs/changelog/output-ago-tui.png)
 
+- The History pane shows the shell's working directory, `~` for your
+  home folder, on the separator over its input in mdsh-gui and on its
+  rule in `mdsh -i`. It is asked for with the prompt, so it follows a
+  `cd` typed in the pane or run in a block. A button beside the one
+  that closes the pane has it fill the tab, up to the tab bar, in place
+  of the toolbar and the document, until it is pressed again or the
+  pane closes; in `mdsh -i`, `Z` has it fill the screen, and esc gives
+  the document its place back.
+
+  ![mdsh-gui's History pane filling the tab, with ~/proj/src/app on the separator over the input and the button that gives the document its place back](docs/changelog/history-fill.png)
+
+  ![mdsh -i with Z pressed: the History pane over the whole screen, its rule reading History ~/proj/src/app](docs/changelog/history-fill-tui.png)
+
 - The site's docs have an [HTTP requests](site/content/docs/http.md)
   page: how to write an `http` block, its checks and captures, the
   placeholders that read a response, what is saved and what is masked,

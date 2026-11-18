@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -67,10 +68,17 @@ func RCScript(path string) string {
 type Prompt struct {
 	PS1 string `json:"ps1"`
 	PS2 string `json:"ps2"`
+	// Dir is the shell's working directory, with the home folder as ~,
+	// shown on the pane's separator.
+	Dir string `json:"dir"`
 }
 
-// promptMark divides PS1 from PS2 in what promptScript prints.
-const promptMark = "\n--mdsh-ps2--\n"
+// promptMark divides PS1 from PS2 in what promptScript prints, and
+// dirMark PS2 from the working directory.
+const (
+	promptMark = "\n--mdsh-ps2--\n"
+	dirMark    = "\n--mdsh-dir--\n"
+)
 
 // promptScript prints PS1 and PS2, expanded. zsh runs its precmd hooks
 // first, as many prompt themes need, and expands % escapes, and $(…)
@@ -81,7 +89,7 @@ func promptScript(zsh bool) string {
 		return `(for f in precmd $precmd_functions; do (( $+functions[$f] )) && $f >/dev/null 2>&1 </dev/null; done
 p1=$PS1 p2=$PS2
 if [[ -o promptsubst ]]; then p1=${(e)p1} p2=${(e)p2}; fi 2>/dev/null
-print -rn -- "${(%)p1}"$'` + strings.ReplaceAll(promptMark, "\n", `\n`) + `'"${(%)p2}")`
+print -rn -- "${(%)p1}"$'` + strings.ReplaceAll(promptMark, "\n", `\n`) + `'"${(%)p2}"$'` + strings.ReplaceAll(dirMark, "\n", `\n`) + `'"$PWD")`
 	}
 	// ${PS1@P} needs bash 4.4; macOS's sh is bash 3.2, where it is an
 	// error that ends the subshell, so older shells expand only the
@@ -93,7 +101,7 @@ case ${BASH_VERSION-} in
 	x=$(eval "printf '%s' \"$p2\"" 2>/dev/null) && p2=$x ;;
 *) eval 'p1=${PS1@P} p2=${PS2@P}' ;;
 esac
-printf '%s\n%s\n%s' "$p1" '--mdsh-ps2--' "$p2")`
+printf '%s\n%s\n%s\n%s\n%s' "$p1" '--mdsh-ps2--' "$p2" '--mdsh-dir--' "${PWD:-$(pwd)}")`
 }
 
 // AskPrompt asks the shell for its prompts. zsh says the shell is zsh.
@@ -102,10 +110,33 @@ func AskPrompt(ctx context.Context, a Asker, zsh bool) (Prompt, error) {
 	if err != nil {
 		return Prompt{}, err
 	}
-	ps1, ps2, _ := strings.Cut(out, promptMark)
-	// bash's \[ and \] mark where escapes start and end.
+	return ParsePrompt(out), nil
+}
+
+// ParsePrompt reads what a prompt script printed: PS1, then PS2 and the
+// working directory, each after its mark. bash's \[ and \], which mark
+// where escapes start and end, are taken out.
+func ParsePrompt(out string) Prompt {
+	ps1, rest, _ := strings.Cut(out, promptMark)
+	ps2, dir, _ := strings.Cut(rest, dirMark)
 	clean := strings.NewReplacer("\x01", "", "\x02", "")
-	return Prompt{PS1: clean.Replace(ps1), PS2: clean.Replace(ps2)}, nil
+	return Prompt{PS1: clean.Replace(ps1), PS2: clean.Replace(ps2), Dir: Tilde(dir)}
+}
+
+// Tilde is dir with the home folder at its start written as ~.
+func Tilde(dir string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || home == "/" {
+		return dir
+	}
+	home = strings.TrimSuffix(home, "/")
+	if dir == home {
+		return "~"
+	}
+	if rest, ok := strings.CutPrefix(dir, home+"/"); ok {
+		return "~/" + rest
+	}
+	return dir
 }
 
 // Background reports whether input ends in a lone &, as a command run in

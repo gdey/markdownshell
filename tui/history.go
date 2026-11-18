@@ -29,6 +29,9 @@ import (
 // hist is the History pane's state.
 type hist struct {
 	open bool
+	// full is set while the pane fills the screen, over the file, as Z
+	// has it.
+	full bool
 	// focus is set while keys go to the pane.
 	focus bool
 	input textinput.Model
@@ -71,6 +74,9 @@ type histDone struct {
 func (m *Model) histHeight() int {
 	if !m.hist.open {
 		return 0
+	}
+	if m.hist.full {
+		return max(m.height-footerLines-m.bannerLines(), 2)
 	}
 	return min(max(m.height/3, minPaneRows+3), max(m.height-footerLines-3, 2))
 }
@@ -142,10 +148,27 @@ func (m *Model) openHistory() tea.Cmd {
 	return m.hist.input.Focus()
 }
 
+// fillHistory has the pane fill the screen, over the file, opening it
+// first if need be, or gives the file its place back.
+func (m *Model) fillHistory() tea.Cmd {
+	if m.hist.open && m.hist.full {
+		m.hist.full = false
+		m.resize(m.width, m.height)
+		return nil
+	}
+	cmd := m.openHistory()
+	if !m.hist.open {
+		return cmd
+	}
+	m.hist.full = true
+	m.resize(m.width, m.height)
+	return cmd
+}
+
 // closeHistory closes the pane. The shells keep their terminals.
 func (m *Model) closeHistory() {
 	m.hist.sel = nil
-	m.hist.open, m.hist.focus = false, false
+	m.hist.open, m.hist.focus, m.hist.full = false, false, false
 	m.hist.lines = nil
 	m.hist.input.Reset()
 	m.hist.input.Blur()
@@ -245,6 +268,11 @@ func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 	case "esc":
 		h.focus = false
 		h.input.Blur()
+		// Filling the screen, it gives the file its place back too.
+		if h.full {
+			h.full = false
+			m.resize(m.width, m.height)
+		}
 		return nil
 	case "ctrl+d":
 		// With nothing typed it closes the pane, as it ends a shell;
@@ -569,7 +597,10 @@ func columns(items []string, w int) string {
 	return out.String()
 }
 
-var histRule = lipgloss.NewStyle().Foreground(dimCol)
+var (
+	histRule = lipgloss.NewStyle().Foreground(dimCol)
+	histDir  = lipgloss.NewStyle().Bold(true)
+)
 
 // histView draws the pane: a rule, then the terminal while a command
 // typed there runs, else the end of the log and the prompt.
@@ -589,8 +620,23 @@ func (m *Model) histView() string {
 	if m.hist.sel != nil {
 		hint = " ↑/↓ select · y copy · esc cancel "
 	}
-	fill := max(m.width-lipgloss.Width(title)-lipgloss.Width(hint)-2, 1)
-	rule := histRule.Render("──"+title+strings.Repeat("─", fill)) + helpStyle.Render(hint)
+	// The shell's directory follows the title; a long one loses its
+	// start.
+	dir := ""
+	if d := m.hist.prompt.Dir; d != "" {
+		room := m.width - lipgloss.Width(title) - lipgloss.Width(hint) - 6
+		if r := []rune(d); len(r) > room {
+			d = ""
+			if room > 1 {
+				d = "…" + string(r[len(r)-room+1:])
+			}
+		}
+		if d != "" {
+			dir = histDir.Render(d) + " "
+		}
+	}
+	fill := max(m.width-lipgloss.Width(title)-lipgloss.Width(dir)-lipgloss.Width(hint)-2, 1)
+	rule := histRule.Render("──"+title) + dir + histRule.Render(strings.Repeat("─", fill)) + helpStyle.Render(hint)
 	var lines []string
 	if m.hist.sel != nil {
 		lines = m.selView(rows)

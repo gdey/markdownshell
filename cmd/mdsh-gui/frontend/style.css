@@ -768,17 +768,32 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history-foot { position: relative; }
 #history:not(.closed) #history-foot { border-top: 1px solid var(--border); }
 #history:not(.closed) .history-controls { position: absolute; z-index: 4; top: -0.5px; right: 8px; transform: translateY(-50%); margin: 0; padding: 1px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); }
-#history:not(.closed) #history-prompt-head, #history:not(.closed):has(#history-prompt-head[hidden]) #history-input { padding-right: 80px; }
+#history:not(.closed) #history-prompt-head, #history:not(.closed):has(#history-prompt-head[hidden]) #history-input { padding-right: 104px; }
 #history .history-controls button.icon { color: var(--fg); background: none; padding: 2px 4px; }
 #history .history-controls button.icon:hover:not(:disabled) { background: var(--hover); }
 #history .history-controls button.icon:disabled { opacity: 0.35; }
 #history .history-controls svg { width: 13px; height: 13px; fill: currentColor; }
+/* The shell's directory sits on the left of the separator, as the
+   buttons sit on its right; a long one loses its start, not its end. */
+#history-dir { position: absolute; z-index: 4; top: -0.5px; left: 8px; max-width: calc(100% - 140px); transform: translateY(-50%); padding: 0 6px; background: var(--bg); color: var(--muted); font: calc(11px * var(--text-scale))/16px var(--font-code); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+#history-dir-text { direction: ltr; unicode-bidi: isolate; }
+#history.closed #history-dir { display: none; }
+/* Filling the tab, the pane takes the place of the toolbar, the document
+   and the console, up to the tab bar; the banners stay. */
+#history-full .shrink, body.history-full #history-full .grow { display: none; }
+body.history-full #history-full .shrink { display: inline; }
+#history.closed #history-full { display: none; }
+body.history-full :is(#toolbar, #workspace, #console, #start) { display: none !important; }
+body.history-full #history { flex: 1; min-height: 0; }
+body.history-full #history-body { flex: 1; min-height: 0; height: auto !important; }
+body.history-full #history-grip { display: none; }
 #history-toggle svg { transition: transform 0.18s; }
 #history:not(.closed) #history-toggle svg { transform: rotate(180deg); }
 #history.closed .history-line { padding-top: 3px; padding-bottom: 3px; }
+#history.closed .prompt { padding-top: 0; }
 #history-term :is(.xterm, .xterm-viewport, .xterm-screen) { background: var(--bg) !important; }
 #history .history-line { display: flex; align-items: flex-start; gap: 6px; padding: 4px 8px 6px; font: calc(13px * var(--text-scale)) var(--font-code); }
-#history .prompt { flex: none; color: var(--ok); font-weight: 700; line-height: 18px; }
+#history .prompt { flex: none; padding-top: 3px; color: var(--ok); font-weight: 700; line-height: 18px; }
 /* The shell's own PS1, in its colors. It ends with its own space, and
    all but its last line goes above the input. */
 #history .prompt.custom { color: var(--fg); font-weight: normal; white-space: pre; }
@@ -793,7 +808,9 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history.block #history-block-prompt { display: inline; color: var(--accent); white-space: pre; }
 #history.block .history-line { gap: 0; }
 #history:has(#history-prompt-head:not([hidden])):not(.closed) .history-line { padding-top: 0; }
-#history-input { flex: 1; resize: none; border: 0; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
+/* The input has 3px above its text and 1px below, inside its focus
+   ring; the prompt and the clock sit 3px down to stay level with it. */
+#history-input { flex: 1; resize: none; border: 0; padding: 3px 0 1px; background: transparent; color: var(--fg); font: inherit; line-height: 18px; }
 #history-input::placeholder { color: var(--muted); }
 #history-input:disabled { opacity: 0.5; }
 /* While a command typed here runs, the prompt dims and a clock of how
@@ -803,7 +820,7 @@ body.resizing-rows { cursor: ns-resize; user-select: none; }
 #history.running :is(.prompt, #history-prompt-head) { opacity: 0.4; }
 #history.running #history-input { order: 1; }
 #history.running #history-input::placeholder { color: transparent; }
-#history-timer { flex: none; margin-right: 1ch; line-height: 18px; color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
+#history-timer { flex: none; padding-top: 3px; margin-right: 1ch; line-height: 18px; color: var(--fg); white-space: nowrap; font-variant-numeric: tabular-nums; }
 #history-timer[hidden], #history.closed #history-timer { display: none; }
 #history-timer .label { color: var(--muted); }
 /* Settings › Look › History prompt focus can show the prompt's focus as

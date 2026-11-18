@@ -801,6 +801,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "H":
 		m.toggleHeaders()
+	case "Z":
+		cmd := m.fillHistory()
+		m.refresh()
+		return m, cmd
 	case "b":
 		m.toggleEarlier()
 	case "v":
@@ -1523,16 +1527,19 @@ func (m *Model) resize(w, h int) {
 // vpHeight is the height left for the document, under the banner, if
 // one shows, and over the footer.
 func (m *Model) vpHeight() int {
-	h := m.height - footerLines - m.histHeight()
+	return max(m.height-footerLines-m.histHeight()-m.bannerLines(), 1)
+}
+
+// bannerLines is how many lines the banners over the document take.
+func (m *Model) bannerLines() int {
+	n := len(m.fmBanner()) + len(m.srcBanner())
 	if m.changed {
-		h--
+		n++
 	}
 	if m.envBanner() != "" {
-		h--
+		n++
 	}
-	h -= len(m.fmBanner())
-	h -= len(m.srcBanner())
-	return max(h, 1)
+	return n
 }
 
 // View draws the document above a status line and a key help line.
@@ -1550,7 +1557,10 @@ func (m *Model) View() string {
 		sep := lipgloss.NewStyle().Foreground(dimCol).Render(strings.TrimSuffix(strings.Repeat("│\n", m.vp.Height), "\n"))
 		view = lipgloss.JoinHorizontal(lipgloss.Top, m.outline(m.vp.Height), sep, view)
 	}
-	if m.hist.open {
+	if m.hist.open && m.hist.full {
+		// History fills the screen, over the file.
+		view = m.histView()
+	} else if m.hist.open {
 		view += "\n" + m.histView()
 	}
 	view += "\n" + m.footer()
