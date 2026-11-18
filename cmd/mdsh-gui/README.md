@@ -171,7 +171,11 @@ Each file opens in a tab of its own, with its own shells.
   The shells aren't interactive, so they don't read your rc file
   themselves: name it, such as `~/.zshrc`, in Settings › File the
   History pane's shell reads, and the shells read it when History is
-  turned on, for your aliases, functions and prompt. ctrl+Z stops a
+  turned on, for your aliases, functions and prompt. With Settings ›
+  Run a repeated History command in its block on (it's off by
+  default), a command that has a `#history-N` block already runs that
+  block again, which gains `history` and keeps its last output as an
+  earlier run, rather than adding another block. ctrl+Z stops a
   command and ends its block with the stop status; `jobs`, `fg` and `bg`
   then work as in a terminal, in shells that allow it, such as dash, the
   `sh` of Debian and Ubuntu (bash and zsh have no job control unless

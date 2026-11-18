@@ -587,6 +587,7 @@ func (a *App) HistoryEnter(ctx context.Context, input string, record bool) error
 	if err := a.beforeRun(t, n); err != nil {
 		return err
 	}
+	n.SetHistoryReuse(a.settings.Get().HistoryReuse)
 	err = t.run(func() error {
 		if !record {
 			return n.EnterUnrecorded(input)
@@ -718,7 +719,7 @@ func (a *App) SetSettings(s settings.Settings) error {
 
 // edited copies into cur what Settings edits from s:
 // autosave, Vim mode, spell checking, theme, the look and its options,
-// shell, the History pane's rc file, the view files open in, the start
+// shell, the History pane's rc file and reuse switch, the view files open in, the start
 // folder, the templates folder, the sessions folder and template, and the
 // file types links open with the system's app. The rest, such as Recent, stays as
 // it is. Values the window can't have sent are dropped.
@@ -728,6 +729,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 	cur.SessionFolder, cur.SessionTemplate = strings.TrimSpace(s.SessionFolder), strings.TrimSpace(s.SessionTemplate)
 	cur.OpenTypes = settings.CleanTypes(s.OpenTypes)
 	cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
+	cur.HistoryReuse = s.HistoryReuse
 	cur.Neovim, cur.NeovimPath, cur.NeovimClean = s.Neovim, strings.TrimSpace(s.NeovimPath), s.NeovimClean
 	cur.NeovimOwnColors = s.NeovimOwnColors
 	cur.Theme = ""

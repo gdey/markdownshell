@@ -112,5 +112,7 @@ when mdsh recognizes the terminal, and in half blocks otherwise.
 ## Saving
 
 With `--autosave`, output is saved after every block that runs;
-otherwise `w` saves. A read-only file is refused before any block
+otherwise `w` saves. With `--history-reuse`, a command typed in History
+again runs its `#history-N` block again, keeping the run before under
+it as an earlier run, rather than adding another block. A read-only file is refused before any block
 runs, so nothing is lost.

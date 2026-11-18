@@ -172,6 +172,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	noColor := fs.Bool("no-color", false, "same as --color=never")
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
+	historyReuse := fs.Bool("history-reuse", false, "with -i, a command typed in History again runs its #history-N block again, keeping the last run under it, rather than adding another")
 	serveOn := addServeFlag(fs)
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	allowOutside := fs.Bool("allow-outside", false, "let include blocks, out= files and report images reach outside the document's folder, or hidden files (.env, .git) in it; only for documents you trust")
@@ -215,7 +216,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	set := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	if serveOn.on {
-		for _, name := range []string{"i", "autosave", "w", "o", "pdf", "html", "show-secrets", "no-run", "n", "only", "hide-code", "hide-output", "history", "stop-on-error", "yes", "step", "audit"} {
+		for _, name := range []string{"i", "autosave", "history-reuse", "w", "o", "pdf", "html", "show-secrets", "no-run", "n", "only", "hide-code", "hide-output", "history", "stop-on-error", "yes", "step", "audit"} {
 			if set[name] {
 				return fmt.Errorf("-%s can't be used with --serve", name)
 			}
@@ -236,7 +237,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		if fs.NArg() > 1 {
 			args = fs.Args()[1:]
 		}
-		return interactiveCmd(fs.Arg(0), args, sources.String(), expose, *stop, *step, *yes, *autosave, *allowOutside, stdin, stdout)
+		return interactiveCmd(fs.Arg(0), args, sources.String(), expose, *stop, *step, *yes, *autosave, *historyReuse, *allowOutside, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -734,7 +735,7 @@ func (s *streamer) finish(results []*run.Result) error {
 // TUI starts with a list of the markdown files under it to pick from.
 // Output is saved when asked, or with autosave after every block that
 // runs.
-func interactiveCmd(file string, args []string, source string, expose []string, stop, step, yes, autosave, allowOutside bool, stdin io.Reader, stdout io.Writer) error {
+func interactiveCmd(file string, args []string, source string, expose []string, stop, step, yes, autosave, historyReuse, allowOutside bool, stdin io.Reader, stdout io.Writer) error {
 	if file == "-" {
 		return errors.New("-i needs a file, not stdin")
 	}
@@ -790,13 +791,14 @@ func interactiveCmd(file string, args []string, source string, expose []string, 
 				Step:         step,
 				Mode:         run.ModeInteractive,
 			},
-			Yes:      yes,
-			Save:     func(file string, out []byte) error { return writeFile(file, out, 0o644) },
-			AutoSave: autosave,
-			Style:    style,
-			Images:   style != "notty",
-			Protocol: protocol,
-			Trust:    approvals,
+			Yes:          yes,
+			Save:         func(file string, out []byte) error { return writeFile(file, out, 0o644) },
+			AutoSave:     autosave,
+			HistoryReuse: historyReuse,
+			Style:        style,
+			Images:       style != "notty",
+			Protocol:     protocol,
+			Trust:        approvals,
 		}, nil
 	}
 	return tui.Run(c)

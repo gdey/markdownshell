@@ -84,6 +84,16 @@ func (n *Notebook) shellEnv() []string {
 	return append(env, "TERM=xterm-256color")
 }
 
+// SetHistoryReuse sets whether a command typed in the History pane that
+// was typed before, and so has a #history-N block, runs that block
+// again, keeping its last output as an earlier run, rather than adding
+// another block. It is off unless set.
+func (n *Notebook) SetHistoryReuse(on bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.reuse = on
+}
+
 // SetHistoryRC sets the file the shells read while the History pane is
 // on, from the next time it is turned on.
 func (n *Notebook) SetHistoryRC(path string) {
@@ -269,8 +279,18 @@ func (n *Notebook) enter(input string, record bool) error {
 	body, bg := backgrounded(input)
 	return n.start(func(ctx context.Context) error {
 		n.mu.Lock()
-		info := history.Info(n.lang(), n.nextHistoryID(), bg)
-		b, err := n.d.AppendBlock(info, body)
+		var b *doc.Block
+		var err error
+		if n.reuse {
+			// The command typed before runs again, keeping its last run.
+			if b = history.Reuse(n.d, n.lang(), body, bg); b != nil {
+				err = history.KeepRuns(n.d, b)
+				n.dirty = true
+			}
+		}
+		if b == nil {
+			b, err = n.d.AppendBlock(history.Info(n.lang(), n.nextHistoryID(), bg), body)
+		}
 		if err == nil {
 			err = n.sync()
 		}
@@ -303,6 +323,9 @@ func (n *Notebook) enter(input string, record bool) error {
 		}
 		n.mu.Lock()
 		defer n.mu.Unlock()
+		if b.Attrs.Has("tty") {
+			return err
+		}
 		text := b.Fence + strings.TrimSuffix(b.Info, "}") + " tty}\n" + b.Body + b.Fence + "\n"
 		if serr := n.d.SetBlock(b, text); serr != nil {
 			return errors.Join(err, serr)

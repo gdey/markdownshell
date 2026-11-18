@@ -243,6 +243,10 @@ Printed markdown is styled when stdout is a terminal; `--color=never`,
 and each block in a box. Pick a block and run it; its output streams in
 under it. A • in the status line marks output that isn't saved; `w`
 saves it, and `--autosave` saves after every block that runs.
+With `--history-reuse`, a command typed in the History pane that has a
+`#history-N` block already runs that block again, keeping its last
+output under it as an earlier run (`history`), rather than adding
+another block.
 If the file is read-only, `w` opens save as instead; with `--autosave`,
 save as opens before the first run, and `esc` there lets the next run
 go ahead without saving. mdsh-gui does the same with its Save dialog.

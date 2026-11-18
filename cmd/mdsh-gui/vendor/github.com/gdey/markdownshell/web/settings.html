@@ -238,6 +238,13 @@
       <div class="setting path">
         <input id="history-rc" type="text" spellcheck="false" placeholder="None, or a file such as ~/.zshrc">
       </div>
+      <div class="setting">
+        <div class="text">
+          <label for="history-reuse">Run a repeated History command in its block</label>
+          <p class="muted">A command typed in the History pane that has a <code>#history-N</code> block already runs that block again, which keeps its last output as an earlier run (<code>history</code>), rather than adding another block. Off by default.</p>
+        </div>
+        <input id="history-reuse" type="checkbox">
+      </div>
       <div class="setting" id="cli-row" hidden>
         <div class="text">
           <span class="label-text" id="cli-label">Command line tool</span>

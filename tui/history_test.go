@@ -391,3 +391,18 @@ func TestHistoryUnrecorded(t *testing.T) {
 		t.Error("closing the pane didn't turn recording on again")
 	}
 }
+
+// TestHistoryReuse checks that with HistoryReuse a command typed again
+// runs its #history-N block again, which keeps the run before under it.
+func TestHistoryReuse(t *testing.T) {
+	m, file := newModel(t, "# Log\n", Options{AutoSave: true, HistoryReuse: true})
+	press(m, "h")
+	for _, in := range []string{"echo again", "echo other", "echo again"} {
+		typeLine(m, in)
+		pump(t, m)
+	}
+	text := read(t, file)
+	if strings.Count(text, "echo again\n```") != 1 || !strings.Contains(text, "{#history-1 skip links history}") || !strings.Contains(text, "history=1") || strings.Contains(text, "history-3") {
+		t.Errorf("file:\n%s", text)
+	}
+}

@@ -31,7 +31,7 @@ behaves.
 | `mdsh --html doc.html doc.md` | The same as a standalone HTML page; not with `--pdf` |
 | `mdsh --show-secrets --pdf out.pdf doc.md` | Put `secret` blocks' code and output in the report; without it they read `(secret)` |
 | `mdsh --color=never doc.md` | No styling on a terminal; `--no-color` and `NO_COLOR` too (`auto`, `always`, `never`) |
-| `mdsh -i doc.md` | The terminal UI; `--autosave` saves after every block that runs |
+| `mdsh -i doc.md` | The terminal UI; `--autosave` saves after every block that runs; `--history-reuse` runs a command typed in History again in its `#history-N` block, keeping earlier runs |
 | `mdsh -i [folder]` | A start screen listing the markdown files under this folder, or that one |
 | `mdsh --serve [doc.md \| folder]` | The desktop app's notebook in a web browser, at 127.0.0.1:8080; `--serve=host:port` listens elsewhere. Anyone with the printed address can run commands as you. Only in an mdsh built with `-tags serve` |
 | `mdsh --serve=stdio doc.md` | The same notebook to the program that started mdsh, such as an editor plugin, as JSON lines on stdin and stdout |

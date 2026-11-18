@@ -104,6 +104,11 @@ type Settings struct {
 	// HistoryRC is a file, such as ~/.zshrc, the shells read while the
 	// History pane is on. Empty reads none.
 	HistoryRC string `json:"historyRC"`
+	// HistoryReuse has a command typed in the History pane that was
+	// typed before, and so has a #history-N block, run that block again,
+	// keeping its last output as an earlier run, rather than add another
+	// block. Off adds a block for every command.
+	HistoryReuse bool `json:"historyReuse"`
 	// View is how a file opens: "rendered", "source" or "both".
 	// Empty opens a file as it was last shown (see FileViews), and a
 	// file not shown before in the rendered view.

@@ -46,6 +46,10 @@ type Options struct {
 	// Save writes the document's new contents to file: Run.File, or
 	// the file picked by save as.
 	Save func(file string, out []byte) error
+	// HistoryReuse has a command typed in History that has a
+	// #history-N block already run that block again, keeping its last
+	// output as an earlier run, rather than add another block.
+	HistoryReuse bool
 	// AutoSave saves after every block that runs. Otherwise output is
 	// saved when w or ctrl+s is pressed.
 	AutoSave bool

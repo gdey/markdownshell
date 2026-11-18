@@ -594,3 +594,47 @@ func TestHistoryUnrecorded(t *testing.T) {
 		t.Errorf("text =\n%s", got)
 	}
 }
+
+// TestHistoryReuse checks that, with the reuse setting on, a command
+// typed again runs its #history-N block again, which keeps the run
+// before as an earlier run, rather than adding another block; and that
+// with it off, as it starts, a new block is added.
+func TestHistoryReuse(t *testing.T) {
+	file := write(t, "# Log\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	if _, err := n.SetHistory(true, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []string{"echo one", "echo one"} {
+		if err := n.Enter(in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := noAt(n.Text()); !strings.Contains(got, "{#history-2 skip links}") {
+		t.Fatalf("with reuse off, the command wasn't added again:\n%s", got)
+	}
+	n.SetHistoryReuse(true)
+	for _, in := range []string{"echo two", "echo two", "echo one", "echo three"} {
+		if err := n.Enter(in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := "# Log\n\n" +
+		"```sh {#history-1 skip links}\necho one\n```\n\n" +
+		"```output {for=history-1 exit=0}\none\n```\n\n" +
+		"```sh {#history-2 skip links history}\necho one\n```\n\n" +
+		"```output {for=history-2 exit=0}\none\n```\n\n" +
+		"```output {for=history-2 exit=0 history=1}\none\n```\n\n" +
+		"```sh {#history-3 skip links history}\necho two\n```\n\n" +
+		"```output {for=history-3 exit=0}\ntwo\n```\n\n" +
+		"```output {for=history-3 exit=0 history=1}\ntwo\n```\n\n" +
+		"```sh {#history-4 skip links}\necho three\n```\n\n" +
+		"```output {for=history-4 exit=0}\nthree\n```\n"
+	if got := noAt(n.Text()); got != want {
+		t.Errorf("text =\n%s\nwant\n%s", got, want)
+	}
+}

@@ -507,8 +507,27 @@ func (m *Model) runTyped(text string) {
 		return
 	}
 	body, bg := history.Background(text)
-	info := history.Info(history.Lang(m.shellPath()), history.NextID(m.d), bg)
-	b, err := m.d.AppendBlock(info, body)
+	lang := history.Lang(m.shellPath())
+	var b *doc.Block
+	var err error
+	if m.opts.HistoryReuse {
+		// The command typed before runs again, keeping its last run.
+		if b = history.Reuse(m.d, lang, body, bg); b != nil {
+			id := b.ID
+			if err = history.KeepRuns(m.d, b); err == nil {
+				err = m.syncSession()
+			}
+			if err == nil {
+				// Its run this session, not in the file yet, goes in as
+				// the output the next run keeps.
+				m.foldRuns()
+				b = m.d.Block(id)
+			}
+		}
+	}
+	if b == nil {
+		b, err = m.d.AppendBlock(history.Info(lang, history.NextID(m.d), bg), body)
+	}
 	if err == nil {
 		err = m.sess.Sync()
 	}
@@ -562,7 +581,7 @@ func (m *Model) typedDone(d *histDone) {
 		}
 		return
 	}
-	if d.fullScreen {
+	if d.fullScreen && !b.Attrs.Has("tty") {
 		text := b.Fence + strings.TrimSuffix(b.Info, "}") + " tty}\n" + b.Body + b.Fence + "\n"
 		if err := m.d.SetBlock(b, text); err != nil {
 			m.histLog(stderrStyle.Render(err.Error()))
