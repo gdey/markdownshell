@@ -29,8 +29,6 @@
   </g>
 
   <text x="320" y="54" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', Inter, 'Helvetica Neue', sans-serif" font-size="22" font-weight="600" fill="#1f2937">Drag mdsh to Applications to install</text>
-  <text x="320" y="80" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', Inter, 'Helvetica Neue', sans-serif" font-size="13" fill="#6b7280">Blocked the first time? Open Anyway in System Settings › Privacy &amp; Security.</text>
-  <text x="320" y="104" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', Inter, 'Helvetica Neue', sans-serif" font-size="13" fill="#6b7280">Or in Terminal: <tspan font-family="Menlo, 'JetBrains Mono', monospace" font-size="12" fill="#374151">xattr -dr com.apple.quarantine /Applications/mdsh.app</tspan></text>
 
   <!-- The arrow, from the app to Applications. -->
   <path d="M 250 196 Q 320 160 390 196" fill="none" stroke="url(#arrow)" stroke-width="6" stroke-linecap="round"/>

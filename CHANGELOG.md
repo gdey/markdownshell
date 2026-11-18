@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The `.dmg` window no longer says to choose Open Anyway or run `xattr`
+  to clear the quarantine flag. The app has been signed and notarized
+  since 1.4, so macOS opens it without either.
+
 ## [1.7.0] - 2026-11-18
 
 mdsh now keeps a block's earlier runs. With `history=N`, each run moves
