@@ -6,6 +6,26 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A `background` block can be `tty` too. In mdsh-gui, `mdsh -i` and
+  `mdsh --serve` it runs on a terminal of its own, in its card, while
+  other blocks run, so an editor can stay open on a script that the
+  next block runs, as often as you like. It takes the keys as it
+  starts; in mdsh-gui a click in its terminal gives them back to it,
+  and in `mdsh -i` ctrl+g leaves it running and `t` on its card goes
+  back to it. It isn't stopped at the end of a run, Stop and Processes
+  reach it as any background block, and its card shows the recording
+  once it ends. It runs in a new shell of its env's kind, in a session
+  of its own, that first takes on the shell's variables, working
+  directory and options, and in bash and zsh its functions and aliases.
+  `mdsh` on the command line, with nobody at a terminal, fails it, as
+  before.
+
+  ![mdsh-gui: the edit block runs nvim on hello.sh in its card, in the background, and the run block below printed the line just edited](docs/changelog/background-tty.png)
+
+  ![mdsh -i: the same file, nvim in the edit block's card and the run block's output under it](docs/changelog/background-tty-tui.png)
+
 ### Changed
 
 - The `.dmg` window shows the newest look, Green Tea, in the app rising

@@ -125,6 +125,7 @@ func (n *Notebook) cells() []Cell {
 			Stale:           stale[i],
 			NoSave:          b.NoSave(),
 			Running:         n.bg[b],
+			Terminal:        n.bg[b] && n.bgTerms[i] != nil,
 			Ms:              r.Duration.Milliseconds(),
 			TimedOut:        r.TimedOut,
 			Timeout:         timeoutMs(b),

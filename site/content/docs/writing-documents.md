@@ -362,8 +362,10 @@ curl -fsS localhost:8000/ >/dev/null && echo up
 - `timeout=` kills just that block and what it started, and the run goes
   on. After the last block, mdsh waits for background blocks still
   running until their `timeout=`, or 5 seconds, and then kills them.
-- A background block that fails doesn't stop the run, and it can't be
-  `tty`, since nobody is at its terminal.
+- A background block that fails doesn't stop the run.
+- Marked `tty` too, it runs on a terminal of its own in its card, in
+  mdsh-gui, `mdsh -i` and `mdsh --serve`, while other blocks run: see
+  [Terminal blocks](#terminal-blocks).
 - In mdsh-gui and `mdsh -i` a background block can outlive the run
   that started it. Its play button turns into Stop while it runs (in
   `mdsh -i`, enter on it), which kills it and what it started.
@@ -442,6 +444,36 @@ these, with the recordings they make.
 
 With no terminal (cron, CI) or with mdsh in the background, a `tty` block
 without a tape fails with an error instead of hanging.
+
+### A terminal in the background
+
+A `tty` block can run in the `background` too, in mdsh-gui, `mdsh -i`
+and `mdsh --serve`: it gets a terminal of its own, in its card, and
+other blocks run while it does. Keep an editor open on a script and run
+the script from the next block, as often as you like:
+
+````markdown
+```sh {#edit background tty}
+nvim deploy.sh
+```
+
+```sh {#try}
+sh deploy.sh --dry-run
+```
+````
+
+- It takes your keys as it starts. In mdsh-gui click its terminal to
+  type in it again. In `mdsh -i`, ctrl+g leaves it running and gives
+  the keys back to the file, and `t` on its card hands them to it again.
+- It isn't waited for at the end of a run: it runs until it ends, you
+  stop it, its `timeout=` passes, or the file closes. Then its card
+  shows the recording.
+- It runs in a new shell of its env's kind, which first takes on that
+  shell's variables, working directory and options, and, in bash and
+  zsh, its functions and aliases. So `$MDSH_BG_<id>` holds its process
+  ID for `kill`, not for `wait`.
+- A tape can't type for it, and `mdsh` on the command line fails it,
+  since nobody is at a terminal there.
 
 ## Including files
 

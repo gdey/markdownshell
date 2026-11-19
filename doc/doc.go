@@ -375,16 +375,19 @@ func Parse(src []byte) (*Document, error) {
 			}
 		}
 	}
-	for _, b := range d.Blocks {
-		if b.Attrs.Has("background") && b.Attrs.Has("tty") {
-			return nil, fmt.Errorf("line %d: block %s: a background block can't be tty, since nobody is at its terminal", lineNo(src, b.Span.Start), b.ID)
-		}
-	}
 	if err := checkHTTP(d); err != nil {
 		return nil, err
 	}
 	if err := checkTapes(d); err != nil {
 		return nil, err
+	}
+	// A background tty block runs on a terminal of its own that someone
+	// types at while other blocks run; a tape would type for it on the
+	// shell's terminal, which other blocks use meanwhile.
+	for _, b := range d.Blocks {
+		if b.Attrs.Has("background") && b.Attrs.Has("tty") && d.Tape(b) != nil {
+			return nil, fmt.Errorf("line %d: block %s: a tape can't type for a background block", lineNo(src, b.Span.Start), b.ID)
+		}
 	}
 	if err := checkDepends(d); err != nil {
 		return nil, err

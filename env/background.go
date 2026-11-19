@@ -28,6 +28,8 @@ type Job struct {
 	// done is set once the job's status is known.
 	done   bool
 	status int
+	// term is set for a job BackgroundTerminal started.
+	term *termJob
 }
 
 // Background starts script as a background job of the shell, the way
@@ -102,6 +104,9 @@ var ErrKilled = errors.New("killed")
 // Done reports whether the job has ended, and its exit status. A job
 // that was killed, or whose shell ended, has status -1 and ErrKilled.
 func (j *Job) Done() (status int, done bool, err error) {
+	if j.term != nil {
+		return j.termDone()
+	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if !j.done {
@@ -137,6 +142,18 @@ func (j *Job) Output() (stdout, stderr []byte) {
 
 // Kill ends the job and every process it started, unless it is done.
 func (j *Job) Kill() {
+	if j.term != nil {
+		select {
+		case <-j.term.ended:
+			return
+		default:
+		}
+		j.mu.Lock()
+		j.killed = true
+		j.mu.Unlock()
+		killSession(j.PID)
+		return
+	}
 	if _, done, _ := j.Done(); done {
 		return
 	}
@@ -144,6 +161,35 @@ func (j *Job) Kill() {
 	defer j.mu.Unlock()
 	j.killed = true
 	killTree(j.PID)
+}
+
+// termDone is Done for a job BackgroundTerminal started, which is done
+// once its process has ended and what it wrote has been read.
+func (j *Job) termDone() (status int, done bool, err error) {
+	select {
+	case <-j.term.ended:
+	default:
+		if j.sh.Exited() {
+			j.Kill()
+		}
+		return 0, false, nil
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.done && !j.killed {
+		return j.status, true, nil
+	}
+	return -1, true, ErrKilled
+}
+
+// Ended is closed once a job BackgroundTerminal started has ended and
+// all it wrote to its terminal has been shown. It is nil for other
+// jobs.
+func (j *Job) Ended() <-chan struct{} {
+	if j.term == nil {
+		return nil
+	}
+	return j.term.ended
 }
 
 // closeBraceHint follows zsh's error for a lone } anywhere on a line,

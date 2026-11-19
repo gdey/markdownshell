@@ -104,7 +104,7 @@ func TestHelpCoversKeys(t *testing.T) {
 	for _, it := range helpItems {
 		all.WriteString(" " + it.keys + " " + it.what(&Model{}))
 	}
-	for _, k := range []string{"j", "k", "g", "G", "pgup", "ctrl+b", "ctrl+d", "ctrl+u", "enter", "r", "a", "s", "i", ":", "ctrl+c", "ctrl+]", ",", "e", "E", "J", "K", "u", "w", "ctrl+s", "W", "R", "M", "p", "q", "ctrl+w", "v", "o", "C", "O", "?", "]", "[", "ctrl+t"} {
+	for _, k := range []string{"j", "k", "g", "G", "pgup", "ctrl+b", "ctrl+d", "ctrl+u", "enter", "r", "a", "s", "i", ":", "ctrl+c", "ctrl+]", "t", "ctrl+g", ",", "e", "E", "J", "K", "u", "w", "ctrl+s", "W", "R", "M", "p", "q", "ctrl+w", "v", "o", "C", "O", "?", "]", "[", "ctrl+t"} {
 		if !strings.Contains(all.String(), k) {
 			t.Errorf("%s isn't in the help panel", k)
 		}

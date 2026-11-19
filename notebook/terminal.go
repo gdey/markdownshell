@@ -2,6 +2,7 @@ package notebook
 
 import (
 	"sync"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
@@ -18,6 +19,9 @@ type terminal struct {
 	cols, rows int
 	block      int  // the block using it, Unrecorded, or -1
 	history    bool // the block was typed in the History pane
+	// background is set on the terminal of a background block, whose
+	// events say so in their Data.
+	background bool
 }
 
 func newTerminal() *terminal {
@@ -53,9 +57,12 @@ type termOut struct {
 
 func (o termOut) Write(p []byte) (int, error) {
 	o.t.mu.Lock()
-	i := o.t.block
+	i, data := o.t.block, ""
+	if o.t.background {
+		data = "background"
+	}
 	o.t.mu.Unlock()
-	o.emit(Event{Kind: "tty", Block: i, Bytes: append([]byte(nil), p...)})
+	o.emit(Event{Kind: "tty", Block: i, Data: data, Bytes: append([]byte(nil), p...)})
 	return len(p), nil
 }
 
@@ -154,16 +161,36 @@ func (n *Notebook) SetTerminalSize(cols, rows int) {
 	if cols <= 0 || rows <= 0 {
 		return
 	}
-	t := n.term
+	n.term.setSize(cols, rows)
+}
+
+// SetBackgroundTerminalSize sets the size, in cells, of the terminals
+// in the cards of background tty blocks, which the window works out
+// from the cards' width; the blocks running on them follow it.
+func (n *Notebook) SetBackgroundTerminalSize(cols, rows int) {
+	if cols <= 0 || rows <= 0 {
+		return
+	}
+	n.mu.Lock()
+	n.bgCols, n.bgRows = cols, rows
+	terms := make([]*terminal, 0, len(n.bgTerms))
+	for _, t := range n.bgTerms {
+		terms = append(terms, t)
+	}
+	n.mu.Unlock()
+	for _, t := range terms {
+		t.setSize(cols, rows)
+	}
+}
+
+// setSize sizes t, telling the block running on it if that changed.
+func (t *terminal) setSize(cols, rows int) {
 	t.mu.Lock()
 	changed := t.cols != cols || t.rows != rows
 	t.cols, t.rows = cols, rows
 	t.mu.Unlock()
 	if changed {
-		select {
-		case t.resized <- struct{}{}:
-		default:
-		}
+		t.resize()
 	}
 }
 
@@ -181,5 +208,84 @@ func (n *Notebook) takeTTY(b *doc.Block) func() {
 func (n *Notebook) emit(e Event) {
 	if n.opts.OnEvent != nil {
 		n.opts.OnEvent(e)
+	}
+}
+
+// backgroundTerminal is run's BackgroundTerminal: a terminal of its own
+// for background block b, as wide as the pane, drawn in its card. Its
+// events say Data "background", since it stays open while other blocks
+// run, and the pane, too, may open.
+func (n *Notebook) backgroundTerminal(b *doc.Block) (*env.Terminal, func()) {
+	n.mu.Lock()
+	i, ok := n.index[b]
+	if !ok {
+		i = Unrecorded
+	}
+	t := newTerminal()
+	if n.bgCols > 0 {
+		t.cols, t.rows = n.bgCols, n.bgRows
+	} else {
+		t.cols, t.rows = n.term.size()
+	}
+	t.block, t.background = i, true
+	if ok {
+		n.bgTerms[i] = t
+	}
+	n.mu.Unlock()
+	n.emit(Event{Kind: "terminal", Block: i, Data: "background"})
+	return t.env(n.emit), func() {
+		n.mu.Lock()
+		if n.bgTerms[i] == t {
+			delete(n.bgTerms, i)
+		}
+		n.mu.Unlock()
+		n.emit(Event{Kind: "terminal-end", Block: i, Data: "background"})
+	}
+}
+
+// TypeBackground sends what was typed in block i's card to the block,
+// which runs in the background on a terminal of its own. It is dropped
+// if the block isn't running so.
+func (n *Notebook) TypeBackground(i int, keys string) {
+	n.mu.Lock()
+	t := n.bgTerms[i]
+	n.mu.Unlock()
+	if t == nil || keys == "" {
+		return
+	}
+	select {
+	case t.keys <- []byte(keys):
+	default:
+	}
+}
+
+// RedrawBackground has the program on background block i's terminal
+// draw its screen again, as a page that shows the card afresh needs:
+// the terminal shrinks by a row and grows back, which full-screen
+// programs such as vim answer by drawing everything.
+func (n *Notebook) RedrawBackground(i int) {
+	n.mu.Lock()
+	t := n.bgTerms[i]
+	n.mu.Unlock()
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	rows := t.rows
+	t.rows = max(rows-1, 1)
+	t.mu.Unlock()
+	t.resize()
+	time.Sleep(50 * time.Millisecond)
+	t.mu.Lock()
+	t.rows = rows
+	t.mu.Unlock()
+	t.resize()
+}
+
+// resize tells the block running on t that its size changed.
+func (t *terminal) resize() {
+	select {
+	case t.resized <- struct{}{}:
+	default:
 	}
 }

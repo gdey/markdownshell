@@ -667,6 +667,14 @@ export function Redo(): $CancellablePromise<string> {
 }
 
 /**
+ * RedrawBackground has the program on background block's terminal draw
+ * its screen again, for a card the window shows afresh.
+ */
+export function RedrawBackground(block: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.RedrawBackground", block);
+}
+
+/**
  * Reload reads the file from disk again, dropping output not saved.
  * The shells keep what blocks set in them, unless the front matter
  * changed the shell, env.share or env.source.
@@ -781,6 +789,15 @@ export function SaveAs(): $CancellablePromise<boolean> {
  */
 export function SelectTab(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.SelectTab", id);
+}
+
+/**
+ * SetBackgroundTerminalSize sets the size in cells of the terminals in
+ * background tty blocks' cards, which the window works out from its
+ * width.
+ */
+export function SetBackgroundTerminalSize(cols: number, rows: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetBackgroundTerminalSize", cols, rows);
 }
 
 /**
@@ -1016,6 +1033,14 @@ export function TextAt(): $CancellablePromise<$models.SourceText> {
  */
 export function Type(keys: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.Type", keys);
+}
+
+/**
+ * TypeBackground sends keys typed in block's card to the block, which
+ * runs in the background on a terminal of its own.
+ */
+export function TypeBackground(block: number, keys: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.TypeBackground", block, keys);
 }
 
 /**

@@ -96,7 +96,7 @@ other languages are left alone. Unknown attributes are kept as written.
 | `always` | As a dependency, run again each time a block that depends on it runs |
 | `confirm[="Question?"]` | Ask before running, with this question if given |
 | `timeout=30s` | Interrupt the block after this long and stop the run; its shell stays. A `background` block is killed alone |
-| `background` | Start the block and go on to the next; the run waits for it at the end. `$MDSH_BG_<id>` holds its PID for `wait` |
+| `background` | Start the block and go on to the next; the run waits for it at the end. `$MDSH_BG_<id>` holds its PID for `wait`. With `tty`, it runs on a terminal of its own in its card (mdsh-gui, `mdsh -i`, `--serve`), such as an editor open while other blocks run, and isn't waited for |
 | `tty` | Run on a terminal, for `docker run -it`, `ssh`, an editor; the session is saved as an asciinema cast |
 | `frame=N` | With `tty`, or on a `cast` fence, the frame still views show and the player opens at, from 1 |
 | `out=text` | Output goes in an `output` fence (the default) |
@@ -269,6 +269,7 @@ env starts in the document's folder.
 | `,` | Run options: arguments, `--only`, step, stop on error |
 | ctrl+c | Stop the run, keeping the shells; again kills the shell of a block that won't stop. Quits when nothing runs |
 | ctrl+] | Stop a `tty` block running in its card |
+| `t` | Type in a `background tty` block's terminal; ctrl+g gives the keys back, leaving it running |
 | `e` | Edit the block in `$VISUAL`, `$EDITOR` or `vi`; enter runs it |
 | `E` | Edit the whole file the same way, at the block |
 | `F` | Fix front matter that doesn't parse, when mdsh can: quote a value with a `: ` in it |

@@ -30,7 +30,7 @@ import { drawHTTP, statusBadge } from "./http.js";
 import { drawEarlier, fullTime, timeAgo } from "./earlier.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
-import { closeTerminal, endTerminal, openTerminal, sizeTerminal, wantTerminalSize, writeTerminal } from "./terminal.js";
+import { adoptBackground, closeBackgrounds, closeTerminal, endBackground, endTerminal, openBackground, openTerminal, sizeTerminal, wantTerminalSize, writeBackground, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 
@@ -148,6 +148,8 @@ async function refresh() {
   // file's own view. A session opens with the History pane open, to
   // type in.
   const opened = doc.file !== "" && doc.file !== viewFile;
+  // Another file's background terminals aren't this one's.
+  if (opened || !doc.file) closeBackgrounds();
   if (!doc.file) viewFile = "";
   else if (opened) fileView();
   else if (doc.openHistory) view = { ...view, history: true };
@@ -1319,6 +1321,8 @@ function drawBlock(c: Cell): HTMLElement {
   );
   // The output's buttons sit in its top right corner: copy, and on the
   // selected card the trash.
+  // A background tty block that is running shows its terminal.
+  if (c.terminal) adoptBackground(c.block, block.querySelector<HTMLElement>(".output")!);
   const tools = el("div", { className: "output-tools" }, el("span", { className: "output-at" }), copyOutputButton(block, c));
   if (c.movable && c.earlier?.length) tools.append(clearEarlierButton(c));
   if (c.movable) tools.append(clearOutputButton(c));
@@ -4552,6 +4556,9 @@ function limitTime(ms: number): string {
 const liveColors = new WeakMap<HTMLElement, Record<string, Ansi>>();
 
 function onBlock(e: BlockEvent) {
+  // A background block marked tty has a terminal of its own in its
+  // card, apart from the pane a tty block runs in.
+  if (e.data === "background" && (e.kind === "terminal" || e.kind === "tty" || e.kind === "terminal-end")) return onBackgroundTerminal(e);
   // A command typed in the History pane runs there, before its card is
   // drawn.
   if (e.kind === "terminal" && historyTerminal(e.block, e.data)) return;
@@ -4623,6 +4630,25 @@ function onBlock(e: BlockEvent) {
   if (e.kind !== "stdout" && e.kind !== "stderr") {
     labelBlock(block);
     drawOutline();
+  }
+}
+
+function onBackgroundTerminal(e: BlockEvent) {
+  switch (e.kind) {
+    case "terminal": {
+      const block = blockCard(e.block);
+      if (!block) return;
+      if (!view.rendered) toggle("rendered", true);
+      openBackground(e.block);
+      follow(block);
+      labelBlock(block);
+      drawOutline();
+      return;
+    }
+    case "tty":
+      return writeBackground(e.block, e.bytes);
+    case "terminal-end":
+      return endBackground(e.block);
   }
 }
 

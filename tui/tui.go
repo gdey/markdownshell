@@ -181,6 +181,11 @@ type Model struct {
 	// it is drawn in while one runs, or -1.
 	pane      *pane
 	termBlock int
+	// bgPanes are the terminals of background tty blocks still running,
+	// by block, and bgFocus the block whose terminal has the keys, or
+	// -1 (see bgterm.go).
+	bgPanes map[int]*pane
+	bgFocus int
 
 	// form is the report or run options form, while one is up;
 	// formKind says which: "report" or "run".
@@ -317,6 +322,8 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		active:    -1,
 		pane:      newPane(),
 		termBlock: -1,
+		bgPanes:   map[int]*pane{},
+		bgFocus:   -1,
 		live:      map[int][]chunk{},
 		bg:        map[int]bool{},
 		started:   map[int]time.Time{},
@@ -354,6 +361,9 @@ func (m *Model) newSession(ro run.Options) (*run.Session, error) {
 	ro.ApproveSources = m.approveSources
 	// tty blocks run in a terminal drawn in their card.
 	ro.TTY, ro.Terminal, ro.TakeTTY = nil, m.pane.env(), m.takeTTY
+	// Background tty blocks run in terminals of their own, in their
+	// cards too.
+	ro.BackgroundTerminal = m.backgroundTerminal
 	// Commands typed in the History pane run on a terminal.
 	if m.hist.open {
 		ro.PTY, ro.Environ = true, historyEnv(ro.Environ)
@@ -586,6 +596,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.follow(m.termBlock)
 		}
 		return m, m.watchPane
+	case bgPaneMsg:
+		return m, tea.Batch(m.wait, m.bgPane(msg))
+	case bgDrawnMsg:
+		if msg.m != m {
+			return m, nil
+		}
+		return m, m.bgDrawn(msg)
 	case editedMsg:
 		m.edited(msg)
 		m.refresh()
@@ -712,6 +729,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	// So are they for a background tty block's terminal with the focus.
+	if m.bgKey(k) {
+		return m, nil
+	}
 	// Keys typed quickly can arrive together; take them one at a time.
 	if k.Type == tea.KeyRunes && len(k.Runes) > 1 && !k.Paste {
 		var cmds []tea.Cmd
@@ -821,6 +842,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.start(false)
+	case "t":
+		m.focusBg()
 	case "a":
 		m.start(true)
 	case "s":
@@ -1673,6 +1696,8 @@ func (m *Model) footer() string {
 		help = promptStyle.Render("The command runs in History:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
 	case m.termBlock >= 0:
 		help = promptStyle.Render(m.name(m.d.Blocks[m.termBlock])+" runs in its card:") + helpStyle.Render(" keys go to it · ctrl+] stops it")
+	case m.bgFocus >= 0:
+		help = promptStyle.Render(m.name(m.d.Blocks[m.bgFocus])+" runs in the background, in its card:") + helpStyle.Render(" keys go to it · ctrl+g leaves it running")
 	case m.typing:
 		help = m.input.View()
 	case m.naming:

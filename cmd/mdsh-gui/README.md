@@ -94,7 +94,12 @@ Each file opens in a tab of its own, with its own shells.
   it. A block marked `background` starts and lets other blocks run: its
   card has a dashed edge and says it is running in the background, the
   status line counts them, and its output shows when it ends. Closing
-  the window kills those still running. A running block's card has a
+  the window kills those still running. A block marked both
+  `background` and `tty` runs in a terminal in its card while other
+  blocks run, such as an editor open on a script the next block runs:
+  it takes the keys as it starts, and a click in its terminal gives
+  them back to it. It isn't stopped at the end of a run, and its card
+  shows the recording once it ends. A running block's card has a
   spinner and a timer that counts up by tenths of a second, so a long
   block plainly hasn't hung; a block with `timeout=` shows its time
   against the timeout, as `12.3s / 1m`, with a bar under its head that

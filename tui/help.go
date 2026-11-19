@@ -72,6 +72,12 @@ var helpItems = []helpItem{
 		return "quit"
 	}},
 	{group: "Run", keys: "ctrl+]", key: tea.KeyMsg{Type: tea.KeyCtrlCloseBracket}, what: says("stop a tty block running in its card"), off: says("only while a tty block runs")},
+	{group: "Run", keys: "t", key: runeKey("t"), what: says("type in the block's terminal, as it runs in the background (ctrl+g: back to the file)"), off: func(m *Model) string {
+		if len(m.nav) > 0 && m.bgPanes[m.cur()] != nil {
+			return ""
+		}
+		return "only on a background tty block that is running"
+	}},
 	{group: "Run", keys: ",", key: runeKey(","), what: says("run options: arguments, step, stop on error"), off: busy},
 
 	{group: "Edit", keys: "e", key: runeKey("e"), what: says("edit the block in $EDITOR"), off: noEdit},

@@ -215,6 +215,10 @@ func (m *Model) block(i int) string {
 	if m.termBlock == i && !m.hist.running {
 		return out + "\n" + lipgloss.NewStyle().MarginLeft(4).Render(m.paneView())
 	}
+	// So does a background tty block, while other blocks run.
+	if m.bgPanes[i] != nil {
+		return out + "\n" + lipgloss.NewStyle().MarginLeft(4).Render(m.bgPaneView(i))
+	}
 	if m.shown.HideOutput {
 		return out
 	}

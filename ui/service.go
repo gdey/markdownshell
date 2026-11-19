@@ -1404,6 +1404,31 @@ func (a *App) Type(ctx context.Context, keys string) {
 	}
 }
 
+// TypeBackground sends keys typed in block's card to the block, which
+// runs in the background on a terminal of its own.
+func (a *App) TypeBackground(ctx context.Context, block int, keys string) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.TypeBackground(block, keys)
+	}
+}
+
+// RedrawBackground has the program on background block's terminal draw
+// its screen again, for a card the window shows afresh.
+func (a *App) RedrawBackground(ctx context.Context, block int) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.RedrawBackground(block)
+	}
+}
+
+// SetBackgroundTerminalSize sets the size in cells of the terminals in
+// background tty blocks' cards, which the window works out from its
+// width.
+func (a *App) SetBackgroundTerminalSize(ctx context.Context, cols, rows int) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.SetBackgroundTerminalSize(cols, rows)
+	}
+}
+
 // SetTerminalSize sets the terminal pane's size in cells, which the
 // window works out from its width.
 func (a *App) SetTerminalSize(ctx context.Context, cols, rows int) {
