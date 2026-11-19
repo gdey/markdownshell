@@ -558,3 +558,61 @@ func TestDrainRevoked(t *testing.T) {
 		t.Errorf("got %q, want the output written before the terminal went", got.String())
 	}
 }
+
+// TestRunTerminalSelfStop: without job control, a command that stops
+// its whole process group, the shell too, as nvim does on ctrl+z on
+// macOS, is continued rather than leaving the block hung for good.
+func TestRunTerminalSelfStop(t *testing.T) {
+	for _, path := range []string{"/bin/sh", "bash", "zsh"} {
+		for _, jobs := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/jobs=%v", filepath.Base(path), jobs), func(t *testing.T) {
+				if _, err := exec.LookPath(path); err != nil {
+					t.Skip(err)
+				}
+				sh, err := Start(Config{Path: path, Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+				if err != nil {
+					t.Skip("no pseudo-terminals:", err)
+				}
+				defer sh.Close()
+				term := Terminal{JobControl: jobs}
+				if jobs {
+					var o bytes.Buffer
+					sh.RunTerminal(context.Background(), ":\n", term, io.Discard)
+					if sh.Run(context.Background(), "echo $__mdsh_jobs", &o, io.Discard); o.String() == "yes\n" {
+						t.Skip("the shell has job control here; TestRunTerminalJobs covers it")
+					}
+				}
+				var out bytes.Buffer
+				var mu sync.Mutex
+				term.Out = writerFunc(func(p []byte) (int, error) {
+					mu.Lock()
+					defer mu.Unlock()
+					return out.Write(p)
+				})
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				// SIGSTOP, unlike SIGTSTP, can't be ignored, nor is it
+				// dropped for a group with no parent in the session.
+				done := make(chan struct{})
+				var status int
+				go func() {
+					defer close(done)
+					status, _, err = sh.RunTerminal(ctx, "sh -c 'kill -STOP 0; echo resumed'\n", term, io.Discard)
+				}()
+				select {
+				case <-done:
+				case <-time.After(15 * time.Second):
+					syscall.Kill(-sh.PID(), syscall.SIGCONT)
+					<-done
+					t.Fatal("still stopped after 15s")
+				}
+				mu.Lock()
+				screen := out.String()
+				mu.Unlock()
+				if err != nil || status != 0 || !strings.Contains(screen, "resumed") {
+					t.Fatalf("status %d, err %v; screen %q", status, err, screen)
+				}
+			})
+		}
+	}
+}

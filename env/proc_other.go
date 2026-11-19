@@ -27,3 +27,6 @@ func killTree(pid int) {
 
 // psRows can't list processes here.
 func psRows() map[int]psRow { return nil }
+
+// watchStops does nothing here, where processes aren't stopped.
+func watchStops(int, <-chan struct{}) {}

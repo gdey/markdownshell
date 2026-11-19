@@ -15,6 +15,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Pressing ctrl+z in vim or nvim in the History pane, or in any block
+  run on a terminal, no longer hangs mdsh. Where the shell has no job
+  control, as zsh and bash don't when mdsh runs them, nvim's suspend
+  stopped the shell along with itself on macOS, and nothing could
+  continue them. mdsh now continues them at once, so ctrl+z is ignored
+  there, as it was meant to be, and the editor carries on. With
+  `/bin/sh` as dash, ctrl+z still stops the command for `fg`.
 - The `.dmg` window no longer says to choose Open Anyway or run `xattr`
   to clear the quarantine flag. The app has been signed and notarized
   since 1.4, so macOS opens it without either.

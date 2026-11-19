@@ -6,6 +6,55 @@ follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The `.dmg` window shows the newest look, Green Tea, in the app rising
+  from its bottom edge. `build/darwin/dmg/render.sh` takes the newest
+  look's picture from `site/data/looks.toml`, so running it again when a
+  release brings a new look is enough.
+
+### Fixed
+
+- Pressing ctrl+z in vim or nvim in the History pane, or in any block
+  run on a terminal, no longer hangs mdsh. Where the shell has no job
+  control, as zsh and bash don't when mdsh runs them, nvim's suspend
+  stopped the shell along with itself on macOS, and nothing could
+  continue them. mdsh now continues them at once, so ctrl+z is ignored
+  there, as it was meant to be, and the editor carries on. With
+  `/bin/sh` as dash, ctrl+z still stops the command for `fg`.
+- The `.dmg` window no longer says to choose Open Anyway or run `xattr`
+  to clear the quarantine flag. The app has been signed and notarized
+  since 1.4, so macOS opens it without either.
+
+## [1.7.0] - 2026-11-18
+
+mdsh now keeps a block's earlier runs. With `history=N`, each run moves
+the output before it down, up to N of them, and mdsh-gui and `mdsh -i`
+show them under the block's output, newest first, while `--history`
+prints them in text, HTML and PDF reports. Every output says how long
+ago it ran. 1.7's new look is Green Tea, a sheet of washi on a tatami
+mat beside a bowl of whisked matcha. The History pane shows the shell's
+working directory, can fill the tab, and takes a whole block typed into
+it, added to the end of the file. Its record button turns recording
+off, so commands run in the shell without being added to the file, and
+a setting, off by default, runs a repeated command again in its
+`#history-N` block, keeping the output before as an earlier run. An
+image mdsh-gui wouldn't load by itself can be loaded with a click, and
+the document remembers it. The docs gain an HTTP requests page and a
+seventh part of the examples tour, and an http block's body folds on
+its own. `mdsh --serve`, the notebook in a web browser, comes in an
+mdsh built with `-tags serve` and, experimentally, in mdsh-gui behind a
+setting; release builds leave it out. A `<details>` element with
+markdown inside now folds as one card, and mdsh-gui's Edit button with
+Neovim on lands on the right line. A `background` block that outlives
+its run can now be stopped, with Stop on its card in mdsh-gui or enter
+in `mdsh -i`. A new Processes view, the Console's Processes tab in
+mdsh-gui and `P` in `mdsh -i`, shows what runs under a file's shells,
+with a Kill for each. From the v1.7.0 security review, an earlier run's
+image can no longer be renamed outside the document's folder, and `mdsh
+-i` cleans the working directory it shows on the History pane.
+golang.org/x/net and the other golang.org/x modules are updated.
+
 ### Added
 
 - The History pane can stop recording. Its record button, a dot beside
@@ -86,6 +135,16 @@ follow [Semantic Versioning](https://semver.org/).
   ![The HTTP requests page on the site, in the teletype skin: the login block, its saved response with the token and Set-Cookie masked, and the whoami block](docs/changelog/http-docs.png)
 
   ![The same page's desktop app section in the plain dark skin: the Headers tab and a folded response](docs/changelog/http-docs-dark.png)
+
+- The docs explain earlier runs: an Earlier runs section on the site's
+  Writing documents page, with the fences `history=N` writes, the
+  `history` front matter key, how mdsh-gui and `mdsh -i` show them and
+  the Report form's switch, and a new example,
+  [examples/earlier-runs.md](examples/earlier-runs.md), in part 9 of
+  the tour. The cheat sheet, mdsh-gui's Cheat Sheet tab, adds
+  `history=N`, `--history`, `at=`, `Z` and the History pane's typed
+  blocks, and the site gains a section on HTML in a document, new in
+  1.6, with a `<details>` example.
 
 - An image mdsh-gui's rendered view doesn't load by itself, one from
   another site or a file outside the document's folder (or hidden in
@@ -175,6 +234,7 @@ follow [Semantic Versioning](https://semver.org/).
   current output only, as before.
 
   ![An HTML report made with --history: a block's current output, then its earlier runs, each under an italic line with how far back it is, its time and exit status](docs/changelog/earlier-runs-report.png)
+
 - `mdsh --serve` serves the notebook mdsh-gui shows to a web browser,
   at `127.0.0.1:8080` or the address after `=`. Anyone who can reach the
   address can run commands as you, so it listens on loopback by default,
@@ -2069,7 +2129,8 @@ the command line, and its output is printed or written back into the file.
   `examples/runbooks` (release checklist, system report, Linux and macOS
   triage, test coverage report), run as tests on the OS each is for.
 
-[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/gdey/markdownshell/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/gdey/markdownshell/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/gdey/markdownshell/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/gdey/markdownshell/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/gdey/markdownshell/compare/v1.4.0...v1.4.1
