@@ -3,10 +3,13 @@
 package env
 
 import (
+	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // ownGroup starts cmd in a process group of its own, so kill reaches
@@ -75,4 +78,37 @@ func killTree(pid int) {
 		todo = append(todo[1:], children[p]...)
 		syscall.Kill(p, syscall.SIGKILL)
 	}
+}
+
+// stopCheck is how often watchStops looks, besides when a child
+// changes state.
+const stopCheck = 500 * time.Millisecond
+
+// watchStops, until stop closes, continues the shell, process pid, and
+// its process group whenever the shell is stopped. That happens when a
+// command run without job control suspends itself, as vim and nvim do
+// on ctrl+z with kill(0, SIGTSTP): the signal reaches the whole group,
+// the shell too, ignoring it or not on some systems, such as macOS,
+// and nothing could ever continue them, so the block would hang. With
+// job control the shell's commands run in groups of their own, so a
+// stopped job isn't touched.
+func watchStops(pid int, stop <-chan struct{}) {
+	chld := make(chan os.Signal, 1)
+	signal.Notify(chld, syscall.SIGCHLD)
+	go func() {
+		defer signal.Stop(chld)
+		t := time.NewTicker(stopCheck)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-chld:
+			case <-t.C:
+			}
+			if isStopped(pid) {
+				syscall.Kill(-pid, syscall.SIGCONT)
+			}
+		}
+	}()
 }

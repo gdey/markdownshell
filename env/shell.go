@@ -73,7 +73,8 @@ type Terminal struct {
 	// in an interactive shell: ctrl+z stops a command and the shell
 	// carries on, and jobs, fg and bg work. Off, or in a shell that
 	// can't do job control without being interactive, such as bash and
-	// zsh, ctrl+z is ignored.
+	// zsh, ctrl+z is ignored: a command that stops itself, such as nvim,
+	// is continued at once.
 	JobControl bool
 }
 
@@ -262,6 +263,9 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		// commands inherit: vim and less, among others, then don't
 		// suspend. With job control (set -m), ctrl+z stops the command
 		// and the shell carries on, keeping it as a job for fg or bg.
+		// A command that stops itself anyway, as nvim does on ctrl+z by
+		// sending SIGTSTP to its whole process group, which on macOS
+		// stops the shell along with it, is continued (see watchStops).
 		//
 		// The block gets the terminal open once, for reading and
 		// writing, on all three descriptors, as a login terminal is.
@@ -301,6 +305,7 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 	var stopped error
 	stop := make(chan struct{})
 	defer close(stop)
+	watchStops(s.cmd.Process.Pid, stop)
 	done := ctx.Done()
 	ended := func() (int, bool, error) {
 		<-s.waited
