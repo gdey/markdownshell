@@ -25,6 +25,13 @@ follow [Semantic Versioning](https://semver.org/).
 - The `.dmg` window no longer says to choose Open Anyway or run `xattr`
   to clear the quarantine flag. The app has been signed and notarized
   since 1.4, so macOS opens it without either.
+- In mdsh-gui, a command typed in the History pane while it isn't
+  recording no longer scrolls the rendered view to the end of the file:
+  nothing was added there, so the view stays where it was. Drawing the
+  document again after a run also no longer nudges the view down by a
+  little, as cards out of sight now keep the height they were drawn at.
+
+  ![Before and after a command run without recording](docs/changelog/history-unrecorded-view.png)
 
 ## [1.7.0] - 2026-11-18
 

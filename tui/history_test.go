@@ -406,3 +406,30 @@ func TestHistoryReuse(t *testing.T) {
 		t.Errorf("file:\n%s", text)
 	}
 }
+
+// TestHistoryUnrecordedKeepsView checks that a command run while
+// recording is off leaves the file's view where it was, as nothing is
+// added to the end, while one recorded moves to its block.
+func TestHistoryUnrecordedKeepsView(t *testing.T) {
+	var src strings.Builder
+	src.WriteString("# Log\n\n")
+	for range 40 {
+		src.WriteString("A step.\n\n```sh\necho step\n```\n\n")
+	}
+	m, _ := newModel(t, src.String(), Options{AutoSave: true})
+	press(m, "h", "esc")
+	m.vp.SetYOffset(20)
+	press(m, "h")
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	typeLine(m, "echo unseen")
+	pump(t, m)
+	if m.vp.YOffset != 20 {
+		t.Errorf("the view moved to line %d, from 20", m.vp.YOffset)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	typeLine(m, "echo seen")
+	pump(t, m)
+	if m.vp.YOffset <= 20 {
+		t.Errorf("a recorded command left the view at line %d, not at its block", m.vp.YOffset)
+	}
+}

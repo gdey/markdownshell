@@ -17,6 +17,7 @@ behaves.
 | `mdsh -w doc.md` | Run and write the output back into the file |
 | `mdsh -o out.md doc.md` | Like `-w`, into `out.md`; `doc.md` is untouched |
 | `mdsh -n doc.md` (`--no-run`) | Print with the output saved by `-w`; nothing runs. `-n -o view.md` saves that printout |
+| `mdsh -n --history doc.md` | Also print each block's earlier runs, kept by `history=N`, under its output; `--html` and `--pdf` take it too |
 | `mdsh --hide-code doc.md` | Prose and output only |
 | `mdsh --hide-output doc.md` | Prose and code only; with `--hide-code` too, prose only and nothing runs |
 | `mdsh --only build doc.md` | Run that block, plus the earlier blocks in its env chain |
@@ -105,6 +106,7 @@ other languages are left alone. Unknown attributes are kept as written.
 | `out=recording:path` | With `tty`, where the cast goes; a path ending in `.gif` links an animated GIF too |
 | `embed=inline` | With `out=image` or `out=screenshot`, a data URI instead of a file |
 | `raw` | On an `http` block, save the response body as it came instead of pretty-printing JSON |
+| `history[=N]` | Keep the block's N earlier runs under its output, newest first; bare, the front matter's `history`, else 10 |
 
 Paths default to `<doc>.assets/<id>.<ext>`; `res://name` is `name` in
 that folder.
@@ -142,7 +144,7 @@ on save.
 
 | Fence or line | Does |
 | --- | --- |
-| ```` ```output {for=id exit=0} ```` | A block's output, right under it; elsewhere, a copy mdsh refills on every run. `stream=stderr` is its stderr; `nosave` keeps that fence out of the file |
+| ```` ```output {for=id exit=0 at=…} ```` | A block's output, right under it; elsewhere, a copy mdsh refills on every run. `at=` is when the run started, shown as "3 mins ago"; `stream=stderr` is its stderr; `history=K` marks an earlier run, K back; `nosave` keeps that fence out of the file |
 | `<!-- mdsh:output for="id" -->` … `<!-- /mdsh:output -->` | The same for `out=markdown` and image output |
 | ```` ```tape {for=id} ```` | Types the input for `tty` block `id`, in VHS commands: `Type "…"`, `Enter`, `Tab`, `Up`…, `Ctrl+X`, `Alt+X`, `Sleep 1s`, `Wait /regex/`, `Set TypingSpeed`, `WaitTimeout`, `WaitPattern`. Double-quoted `Type` takes placeholders. Can be an include |
 | ```` ```http ```` | One request: `METHOD URL`, headers, a blank line, the body; `HTTP 200`, then `[Asserts]` (`jsonpath $.id == 1`, `header X contains y`, `status`, `body`, `regex`, `duration`) and `[Captures]` (`token: secret jsonpath $.token`, read as `{{#id/env(token)}}`). `{{#id/status}}`, `{{#id/json($.x)}}` and `{{#id/header(Name)}}` read the response in prose and conditions. `[QueryStringParams]`, `[FormParams]`, `[Options]` (`insecure`, `follow`, `timeout`) and an `@file` body. `env=`, `share=`, `tty`, `background` and `out=` are errors on it |
@@ -190,6 +192,7 @@ mdsh:
   step: false
   interpolate: true
   show_stderr: false
+  history: 10
   terminal:
     cols: 100
     rows: 30
@@ -208,6 +211,7 @@ mdsh:
 | `step` | `true`, `false` | `false` | Ask before each block, as if every block were marked `confirm` |
 | `interpolate` | `true`, `false` | `true` | Fill in `{{…}}` placeholders in prose |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none; a block's `show-stderr` overrides it |
+| `history` | a whole number | 10 | How many earlier runs a bare `history` on a block keeps |
 | `terminal.cols`, `terminal.rows` | cells, up to 1000 by 500 | fit the card, 24 | The size of the terminal mdsh-gui runs `tty` blocks on |
 | `http.secret_headers` | header names | none | Response headers, besides `Set-Cookie`, `Authorization`, `Proxy-Authorization`, `WWW-Authenticate` and `X-API-Key`, that `http` blocks save as `(secret)` |
 | `env.share` | names, `...`, `-NAME` | the base set | Variables from mdsh's environment that reach the top-level shell, and the default `share=` for sub-envs |
@@ -282,6 +286,7 @@ env starts in the document's folder.
 | `x` | Show or hide the selected block's secret |
 | `H` | Show an `http` block's response headers, or its body |
 | `b` | Show or hide the block's earlier runs, kept by `history=N` |
+| `Z` | History fills the screen; esc gives the document its place back |
 | `C` / `O` | Show or hide code / output |
 | `]` / `[` | Next / previous tab |
 | ctrl+t | New tab, on the list of files |
@@ -335,9 +340,12 @@ In the outline ↑/↓ move between entries and ←/→ fold and unfold a
 section; the window's tabs take the arrows, enter and delete. The
 History pane takes the same line keys as `mdsh -i`'s, shift+enter for
 another line, ctrl+c to stop a command (or copy selected lines),
-ctrl+z to stop and keep the job, ctrl+d to close. Its record button
-(the dot) turns recording off, so commands run without being added to
-the file; closing the pane turns it back on. With Vim keys on, `:w`
+ctrl+z to stop and keep the job, ctrl+d to close; ``# ```sh`` starts a
+block as in `mdsh -i`. Its record button (the dot) turns recording
+off, so commands run without being added to the file; closing the pane
+turns it back on. A `background` block that outlives its run shows
+Stop in place of its play button. Its separator shows the shell's working
+directory, and the button beside its close button has it fill the tab. With Vim keys on, `:w`
 saves and `:RunBlock` and `:RunSection` run; in the Neovim pane `K`
 explains an attribute and `zc`/`zo` fold.
 
@@ -356,4 +364,8 @@ explains an attribute and `zc`/`zo` fold.
 Settings has six tabs: General, Look, Editing, Shell, Files and About;
 About links to this cheat sheet and the changelog, which open in
 read-only tabs. Right-clicking a recording offers Copy and Copy as GIF, and the History
-transcript Copy and Select All.
+transcript Copy and Select All. A block with `history=N` lists its earlier
+runs under its output, each with copy and delete, and Clear earlier runs;
+the Report form's Earlier runs switch prints them. An image from another
+site or outside the document's folder has a Load image button, and the
+document remembers it.
