@@ -1,11 +1,13 @@
 package notebook
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -636,5 +638,61 @@ func TestHistoryReuse(t *testing.T) {
 		"```output {for=history-4 exit=0}\nthree\n```\n"
 	if got := noAt(n.Text()); got != want {
 		t.Errorf("text =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// TestStopStuckPrompt: asking for the prompt from a shell that never
+// answers, here one that drops the marker mdsh waits for, as a prompt
+// drawn over it can, ends on Stop, and the process list shows the shell
+// meanwhile.
+func TestStopStuckPrompt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a unix shell")
+	}
+	sh := filepath.Join(t.TempDir(), "sh")
+	if err := os.WriteFile(sh, []byte("#!/bin/sh\nexec /bin/sh \"$@\" 2>/dev/null\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(write(t, "```sh\necho hi\n```\n"), Options{Run: RunOptions{Shell: sh}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	asked := make(chan error, 1)
+	go func() {
+		_, err := n.Prompt()
+		asked <- err
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for len(n.Processes()) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the process list doesn't show the starting shell")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	// A run asked for meanwhile waits for the prompt, and Stop stops it
+	// too, rather than letting it start another shell that hangs.
+	ran := make(chan error, 1)
+	go func() { ran <- n.RunBlock(0) }()
+	time.Sleep(200 * time.Millisecond)
+	n.Stop()
+	select {
+	case err := <-asked:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Prompt: %v, want it stopped", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Prompt still waiting after Stop")
+	}
+	select {
+	case err := <-ran:
+		if err != nil {
+			t.Errorf("RunBlock: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the run waiting for the prompt went on after Stop")
+	}
+	if ps := n.Processes(); len(ps) != 0 {
+		t.Errorf("a shell started after Stop: %+v", ps)
 	}
 }

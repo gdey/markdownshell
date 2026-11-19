@@ -1,7 +1,6 @@
 package notebook
 
 import (
-	"context"
 	"regexp"
 	"slices"
 	"strings"
@@ -33,17 +32,18 @@ func (n *Notebook) Completions(before string) (Completion, error) {
 		return c, ErrBusy
 	}
 	n.waitReap()
-	n.running = true
+	ctx, cancel := n.askCtx(askWait)
 	sess, zsh := n.sess, n.lang() == "zsh"
 	n.mu.Unlock()
 	defer func() {
 		n.mu.Lock()
-		n.running = false
+		n.running, n.cancel = false, nil
 		n.mu.Unlock()
+		cancel()
 	}()
 
 	ask := func(script string) []string {
-		out, err := sess.Ask(context.Background(), script)
+		out, err := sess.Ask(ctx, script)
 		if err != nil {
 			return nil
 		}

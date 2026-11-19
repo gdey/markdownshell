@@ -24,8 +24,11 @@ type Env struct {
 // Stack creates envs on first use and keeps them for reuse.
 type Stack struct {
 	cfg  Config
-	mu   sync.Mutex // guards envs, for KillBusy
+	mu   sync.Mutex // guards envs and starting, for KillBusy
 	envs map[string]*Env
+	// starting holds the shells still starting, by env name, so a
+	// shell whose start hangs can be listed and killed.
+	starting map[string]*Shell
 	// OnStart, if set, is called as each env's shell starts, with the
 	// share it was made with (nil for the top level, whose Config.Env
 	// is already filtered) and the names of the variables it was given.
@@ -49,7 +52,7 @@ type Stack struct {
 
 // NewStack returns a stack whose top-level env starts with cfg.
 func NewStack(cfg Config) *Stack {
-	return &Stack{cfg: cfg, envs: map[string]*Env{}}
+	return &Stack{cfg: cfg, envs: map[string]*Env{}, starting: map[string]*Shell{}}
 }
 
 // Get returns the env called name, creating it and any missing parents.
@@ -80,7 +83,7 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 			}
 			s.prepared = true
 		}
-		sh, err := Start(s.cfg)
+		sh, err := s.start(ctx, name, s.cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +114,7 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 		filter = FilterStrict
 	}
 	cfg.Env = Environ(filter(vars, share))
-	sh, err := Start(cfg)
+	sh, err := s.start(ctx, name, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +124,33 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 	s.mu.Unlock()
 	s.started(e, share, cfg.Env)
 	return e, nil
+}
+
+// start starts the shell of env name, keeping it in s.starting while
+// it starts. Ending ctx kills it (see StartContext).
+func (s *Stack) start(ctx context.Context, name string, cfg Config) (*Shell, error) {
+	defer func() {
+		s.mu.Lock()
+		delete(s.starting, name)
+		s.mu.Unlock()
+	}()
+	return start(ctx, cfg, func(sh *Shell) {
+		s.mu.Lock()
+		s.starting[name] = sh
+		s.mu.Unlock()
+	})
+}
+
+// shells lists the stack's shells by env name, those still starting
+// too.
+func (s *Stack) shells() map[string]*Shell {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all := maps.Clone(s.starting)
+	for name, e := range s.envs {
+		all[name] = e.Shell
+	}
+	return all
 }
 
 func (s *Stack) started(e *Env, share, environ []string) {
@@ -154,17 +184,14 @@ func (s *Stack) SetArgs(ctx context.Context, args []string) error {
 	return nil
 }
 
-// KillBusy kills the shells running a script (see Shell.Kill) and
-// reports whether there were any. Unlike the stack's other methods, it
-// may be called while a script runs.
+// KillBusy kills the shells running a script (see Shell.Kill), those
+// still starting too, and reports whether there were any. Unlike the
+// stack's other methods, it may be called while a script runs.
 func (s *Stack) KillBusy() bool {
-	s.mu.Lock()
-	envs := slices.Collect(maps.Values(s.envs))
-	s.mu.Unlock()
 	killed := false
-	for _, e := range envs {
-		if e.Shell.Busy() {
-			e.Shell.Kill()
+	for _, sh := range s.shells() {
+		if sh.Busy() {
+			sh.Kill()
 			killed = true
 		}
 	}

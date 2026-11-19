@@ -114,6 +114,21 @@ type Config struct {
 
 // Start launches a shell.
 func Start(cfg Config) (*Shell, error) {
+	return StartContext(context.Background(), cfg)
+}
+
+// StartContext launches a shell, as Start does, unless ctx ends first:
+// a shell whose start hangs, such as one whose rc file waits for input
+// or that hides mdsh's markers, is killed as soon as ctx ends, since
+// nothing has run in it to lose.
+func StartContext(ctx context.Context, cfg Config) (*Shell, error) {
+	return start(ctx, cfg, nil)
+}
+
+// start is StartContext, calling launched, if set, with the shell once
+// its process runs, before anything is run in it, so a stack can list
+// it and kill it while it starts.
+func start(ctx context.Context, cfg Config, launched func(*Shell)) (*Shell, error) {
 	if cfg.Path == "" {
 		cfg.Path = "/bin/sh"
 	}
@@ -180,20 +195,35 @@ func Start(cfg Config) (*Shell, error) {
 		close(s.waited)
 	}()
 
+	if launched != nil {
+		launched(s)
+	}
+	// Until it has started, ending ctx kills the shell, which ends the
+	// Run waiting on it.
+	stop := context.AfterFunc(ctx, s.Kill)
+	defer stop()
+	failed := func(err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return err
+	}
+
 	init := "set -- " + quoteAll(cfg.Args) + "\n" + helpers
 	if cfg.TTY {
 		// The terminal stays the shell's controlling terminal, at
 		// /dev/tty, without blocks inheriting the descriptor.
 		init = "exec 3>&-\n" + init
 	}
-	if _, _, err := s.Run(context.Background(), init, io.Discard, io.Discard); err != nil {
+	if _, _, err := s.Run(ctx, init, io.Discard, io.Discard); err != nil {
 		s.Close()
-		return nil, fmt.Errorf("starting %s: %w", cfg.Path, err)
+		return nil, fmt.Errorf("starting %s: %w", cfg.Path, failed(err))
 	}
 	if cfg.Init != "" {
 		var errb bytes.Buffer
-		if _, _, err := s.Run(context.Background(), cfg.Init, io.Discard, &errb); err != nil {
+		if _, _, err := s.Run(ctx, cfg.Init, io.Discard, &errb); err != nil {
 			s.Close()
+			err = failed(err)
 			if msg := strings.TrimSpace(errb.String()); msg != "" {
 				err = fmt.Errorf("%w: %s", err, msg)
 			}
@@ -214,9 +244,24 @@ func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer
 	return s.run(ctx, script, stdout, stderr, false, false)
 }
 
+// RunKillAfter is Run with killAfter in place of Config.KillAfter: if
+// the script is still running that long after ctx ended and it was
+// interrupted, the shell is killed. It is for a script nobody is asked
+// about, such as one that reads the shell's prompt, when the shell was
+// started for blocks whose user is asked first.
+func (s *Shell) RunKillAfter(ctx context.Context, script string, stdout, stderr io.Writer, killAfter time.Duration) (status int, exited bool, err error) {
+	return s.runKill(ctx, script, stdout, stderr, false, false, killAfter)
+}
+
 // run runs script, on the shell's terminal if onTTY is set, with job
 // control if jobs is set too.
 func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer, onTTY, jobs bool) (status int, exited bool, err error) {
+	return s.runKill(ctx, script, stdout, stderr, onTTY, jobs, s.killAfter)
+}
+
+// runKill is run, killing the shell killAfter after the script was
+// interrupted, if it is still running then. Zero waits for Kill.
+func (s *Shell) runKill(ctx context.Context, script string, stdout, stderr io.Writer, onTTY, jobs bool, killAfter time.Duration) (status int, exited bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -334,7 +379,7 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 			gotErr = true
 		case <-done:
 			done, stopped = nil, ctx.Err()
-			go s.interrupt(stop)
+			go s.interrupt(stop, killAfter)
 		case <-s.forced:
 			<-s.waited
 			s.drainTTY(onTTY)
@@ -342,7 +387,11 @@ func (s *Shell) run(ctx context.Context, script string, stdout, stderr io.Writer
 		}
 	}
 	if onTTY {
-		s.pty.wait(s.ttyRun)
+		// What the block wrote to its terminal is read up to the
+		// terminal's marker. A shell that hides it, as a prompt drawn
+		// on the terminal can, mustn't keep a stopped or killed run
+		// waiting for it.
+		s.pty.wait(s.ttyRun, ctx.Done(), s.forced)
 	}
 	rc, err := strconv.Atoi(outRC)
 	if err != nil {
@@ -372,14 +421,14 @@ const (
 // interruptFor it also kills every process the shell started, except
 // its background jobs, in case one ignores SIGINT. A script still
 // running after that, such as a loop in the shell that ignores the
-// trap, needs Kill, which Config.KillAfter does itself.
-func (s *Shell) interrupt(stop <-chan struct{}) {
+// trap, needs Kill, which killAfter, if set, does itself.
+func (s *Shell) interrupt(stop <-chan struct{}, killAfter time.Duration) {
 	start := time.Now()
 	t := time.NewTicker(interruptEvery)
 	defer t.Stop()
 	for {
 		interrupt(s.cmd)
-		if s.killAfter > 0 && time.Since(start) >= s.killAfter {
+		if killAfter > 0 && time.Since(start) >= killAfter {
 			s.Kill()
 			return
 		}

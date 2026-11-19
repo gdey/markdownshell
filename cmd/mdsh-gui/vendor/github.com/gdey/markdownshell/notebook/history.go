@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/history"
@@ -48,11 +49,12 @@ func (n *Notebook) SetHistory(on, restart bool) (restarted bool, err error) {
 		n.history = true
 		// The shells have terminals; they only need the rc file.
 		if rc := rcScript(n.opts.Run.HistoryRC, n.shell()); rc != "" {
-			n.running = true
+			ctx, cancel := n.askCtx(rcWait)
 			n.mu.Unlock()
-			_, err := n.sess.Ask(context.Background(), rc)
+			_, err := n.sess.Ask(ctx, rc)
 			n.mu.Lock()
-			n.running = false
+			n.running, n.cancel = false, nil
+			cancel()
 			return false, err
 		}
 		return false, nil
@@ -110,6 +112,24 @@ func (n *Notebook) source(ro RunOptions) string {
 		return ro.Source
 	}
 	return ro.Source + "\n" + rc
+}
+
+// askWait is how long the shell has to answer what the History pane
+// asks it, its prompt or completions, and rcWait to read the rc file,
+// before it is interrupted, and killed should that not stop it (see
+// run.Session.Ask). Stop interrupts it sooner.
+const (
+	askWait = 10 * time.Second
+	rcWait  = 30 * time.Second
+)
+
+// askCtx marks, with n.mu held, that the notebook asks its shell
+// something, as running, and returns the context to ask with, which
+// ends after wait or on Stop. The caller clears running and cancel.
+func (n *Notebook) askCtx(wait time.Duration) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	n.running, n.cancel = true, cancel
+	return ctx, cancel
 }
 
 // rcScript reads the file at path, if there is one, in the shell, as an
@@ -211,16 +231,18 @@ func (n *Notebook) PromptAt(cols, rows int) (Prompt, error) {
 		return Prompt{}, ErrBusy
 	}
 	n.waitReap()
-	n.running, n.asking = true, true
+	ctx, cancel := n.askCtx(askWait)
+	n.asking = true
 	sess, zsh := n.sess, n.lang() == "zsh"
 	n.mu.Unlock()
 	defer func() {
 		n.mu.Lock()
-		n.running, n.asking = false, false
+		n.running, n.asking, n.cancel = false, false, nil
 		n.idle.Broadcast()
 		n.mu.Unlock()
+		cancel()
 	}()
-	out, err := sess.AskSized(context.Background(), promptScript(zsh, cols, rows), cols, rows)
+	out, err := sess.AskSized(ctx, promptScript(zsh, cols, rows), cols, rows)
 	if err != nil {
 		return Prompt{}, err
 	}

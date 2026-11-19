@@ -286,11 +286,26 @@ func (p *ptyConn) attach(w io.Writer) {
 // wait waits for the marker of block n, which the shell writes to the
 // terminal after the block, so everything the block wrote before it has
 // gone to the attached writer. A marker left by a block cut short is
-// skipped.
-func (p *ptyConn) wait(n int) {
+// skipped. It gives up drainWait after stopped closes, or at once when
+// killed closes, since a shell that hides the marker would otherwise
+// keep it waiting for good.
+func (p *ptyConn) wait(n int, stopped, killed <-chan struct{}) {
 	want := strconv.Itoa(n)
-	for v := range p.d.done {
-		if strings.TrimRight(v, "\r") == want {
+	var late <-chan time.Time
+	for {
+		select {
+		case v, ok := <-p.d.done:
+			if !ok || strings.TrimRight(v, "\r") == want {
+				return
+			}
+		case <-stopped:
+			stopped = nil
+			t := time.NewTimer(drainWait)
+			defer t.Stop()
+			late = t.C
+		case <-late:
+			return
+		case <-killed:
 			return
 		}
 	}
@@ -307,7 +322,7 @@ func (p *ptyConn) wait(n int) {
 // writer, but not past drainWait, in case reading never ends.
 func (p *ptyConn) drain(mark string, n int) {
 	if _, err := fmt.Fprintf(p.pts, "%s%d\n", mark, n); err == nil {
-		p.wait(n)
+		p.wait(n, nil, nil)
 		return
 	}
 	select {
