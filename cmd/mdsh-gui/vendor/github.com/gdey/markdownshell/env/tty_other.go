@@ -32,12 +32,12 @@ func (s *Shell) SetSize(int, int) {}
 
 type ptyConn struct{}
 
-func openPTY(*exec.Cmd) (*ptyConn, error) { return nil, errNoTTY }
-func (*ptyConn) started(string)           {}
-func (*ptyConn) wait(int)                 {}
-func (*ptyConn) drain(string, int)        {}
-func (*ptyConn) close()                   {}
-func (*ptyConn) name() string             { return "" }
+func openPTY(*exec.Cmd) (*ptyConn, error)                   { return nil, errNoTTY }
+func (*ptyConn) started(string)                             {}
+func (*ptyConn) wait(int, <-chan struct{}, <-chan struct{}) {}
+func (*ptyConn) drain(string, int)                          {}
+func (*ptyConn) close()                                     {}
+func (*ptyConn) name() string                               { return "" }
 
 // BackgroundTerminal is not supported here.
 func (s *Shell) BackgroundTerminal(context.Context, string, string, Terminal, io.Writer) (*Job, error) {

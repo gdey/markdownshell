@@ -26,6 +26,7 @@ const rowsKey = "mdsh.historyRows";
 let term: Terminal | null = null;
 let block = -1; // the command running in the pane, or -1; -2 is one not recorded
 let last = -1; // the last command that ran in the pane
+let ctrlCSent = -1; // the command Stop sent ctrl+c to, or -1
 let entering = false; // a command entered here is running
 let typed: string[] = []; // what was entered, for up and down
 let ps1 = ""; // the shell's prompts, expanded, or "" for none
@@ -735,6 +736,7 @@ export function historyWrite(i: number, bytes: string | undefined): boolean {
 export function historyEnd(i: number): boolean {
   if (!term || i !== block) return false;
   block = -1;
+  ctrlCSent = -1;
   term.options.disableStdin = true;
   term.options.cursorBlink = false;
   // The keys come back to the input, not to the page: blurring the
@@ -792,8 +794,19 @@ export function initHistory(h: HistoryHooks) {
   $("history-record").onclick = () => setRecord(!record);
   // A command typed here gets ctrl+c, as in a terminal, so the shell
   // and what blocks set in it live on; anything else stops as Run ›
-  // Stop does.
-  $("history-stop").onclick = () => (block !== -1 ? typeKeys("\x03") : hooks.stop());
+  // Stop does. So does pressing Stop again on the same command, for one
+  // that ctrl+c doesn't end, or a shell that never says it ended: Run ›
+  // Stop then offers to kill the shell.
+  $("history-stop").onclick = () => {
+    if (block === -1 || ctrlCSent === block) {
+      ctrlCSent = -1;
+      hooks.stop();
+      return;
+    }
+    typeKeys("\x03");
+    ctrlCSent = block;
+    hooks.say("Sent ctrl+c. If the command doesn't stop, press Stop again.");
+  };
   $("history-restart").onclick = async () => {
     if (!(await hooks.restart())) return;
     if (term) say("\x1b[2m(The shells started again, so variables that blocks set are gone.)\x1b[0m");

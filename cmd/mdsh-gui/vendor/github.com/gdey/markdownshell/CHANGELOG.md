@@ -35,6 +35,26 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Stop and the Processes view work when a shell is stuck. A shell that
+  never finished starting, such as `zsh -i` (which reads its commands
+  from the terminal rather than from mdsh), held the History pane for
+  good: Stop did nothing, Kill Shell had no shell to kill, and the
+  Processes view showed none. Stop now kills a shell still starting,
+  since nothing has run in it to lose, and the Processes view lists it
+  meanwhile, with Kill Shell able to end it. A block whose shell never
+  says it finished on the terminal ends when stopped or killed, and
+  mdsh-gui's questions to the shell, its prompt and completions for the
+  History pane and reading the rc file, can be stopped, give up after a
+  while, and kill the shell if it won't stop. In the History pane, Stop
+  sends ctrl+c to the command as before, and pressing it again stops as
+  Run › Stop does, offering to kill the shell if that doesn't work.
+
+  ![The Processes view listing a zsh -i shell stuck starting while a command typed in the History pane waits on it](docs/changelog/stuck-shell-procs.png)
+
+  ![After Stop, the run is over and the History pane takes commands again](docs/changelog/stuck-shell-stopped.png)
+
+  ![Stop pressed once in the History pane: the status line says ctrl+c was sent and to press Stop again if the command doesn't stop](docs/changelog/history-stop-again.png)
+
 - Pressing ctrl+z in vim or nvim in the History pane, or in any block
   run on a terminal, no longer hangs mdsh. Where the shell has no job
   control, as zsh and bash don't when mdsh runs them, nvim's suspend

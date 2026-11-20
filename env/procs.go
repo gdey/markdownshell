@@ -107,32 +107,32 @@ func children(rows map[int]psRow) map[int][]int {
 	return kids
 }
 
-// Processes lists the stack's shells, each with the processes under it:
+// Processes lists the stack's shells, those still starting too, each
+// with the processes under it:
 // what blocks are running, background blocks, and anything a block or
 // the History pane left running, such as cmd &. It is empty where ps
 // can't be read.
 func (s *Stack) Processes() []ShellProcs {
-	s.mu.Lock()
-	envs := slices.Collect(maps.Values(s.envs))
-	s.mu.Unlock()
-	slices.SortFunc(envs, func(a, b *Env) int { return strings.Compare(a.Name, b.Name) })
+	shells := s.shells()
+	names := slices.Sorted(maps.Keys(shells))
 	rows := psRows()
 	kids := children(rows)
 	var out []ShellProcs
-	for _, e := range envs {
-		pid := e.Shell.PID()
-		if pid == 0 || e.Shell.Exited() {
+	for _, name := range names {
+		sh := shells[name]
+		pid := sh.PID()
+		if pid == 0 || sh.Exited() {
 			continue
 		}
 		procs := tree(rows, kids, pid)
 		// A job on a terminal of its own is mdsh's child, not the
 		// shell's, but it is the shell's background block.
-		for _, j := range e.Shell.termJobPIDs() {
+		for _, j := range sh.termJobPIDs() {
 			if r, ok := rows[j]; ok {
 				procs = append(procs, &Proc{PID: j, Command: r.command, Secs: int(r.running / time.Second), Children: tree(rows, kids, j)})
 			}
 		}
-		out = append(out, ShellProcs{Env: e.Name, PID: pid, Secs: int(rows[pid].running / time.Second), Children: procs})
+		out = append(out, ShellProcs{Env: name, PID: pid, Secs: int(rows[pid].running / time.Second), Children: procs})
 	}
 	return out
 }

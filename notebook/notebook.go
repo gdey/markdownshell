@@ -268,6 +268,9 @@ type Notebook struct {
 	// Turning the History pane on or running waits for it, rather than
 	// failing as a block running would.
 	asking bool
+	// stops counts calls to Stop, so a run waiting while Prompt asks
+	// can tell it was stopped.
+	stops int
 	// history is set while the History pane is on, and noteEnd is the
 	// length of the source when the last note added there ended it, or
 	// -1.
@@ -608,7 +611,14 @@ func (n *Notebook) RunRange(from, to int) error {
 
 func (n *Notebook) start(f func(context.Context) error) error {
 	n.mu.Lock()
+	// A Stop while the run waits for the shell to answer a question,
+	// such as its prompt, stops the run too, before it starts.
+	stops := n.stops
 	n.waitAsking()
+	if n.stops != stops {
+		n.mu.Unlock()
+		return nil
+	}
 	if n.running {
 		n.mu.Unlock()
 		return ErrBusy
@@ -644,6 +654,7 @@ func (n *Notebook) start(f func(context.Context) error) error {
 func (n *Notebook) Stop() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	n.stops++
 	if n.cancel != nil {
 		n.cancel()
 	}

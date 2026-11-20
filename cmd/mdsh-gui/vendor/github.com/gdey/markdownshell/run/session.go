@@ -364,7 +364,8 @@ func (s *Session) Ask(ctx context.Context, script string) (string, error) {
 }
 
 // AskSized is Ask with the shell's terminal, if it has one, sized cols
-// by rows first. Zero leaves it as it is.
+// by rows first. Zero leaves it as it is. If ctx ends and the script
+// won't stop, the shell is killed KillAfter later.
 func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (string, error) {
 	if err := s.checkFrontMatter(); err != nil {
 		return "", err
@@ -375,7 +376,9 @@ func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (
 	}
 	e.Shell.SetSize(cols, rows)
 	var out bytes.Buffer
-	if _, _, err := e.Shell.Run(ctx, script, &out, io.Discard); err != nil {
+	// Nobody is asked about a question that won't stop: the shell is
+	// killed KillAfter after ctx ends, as a run's would be.
+	if _, _, err := e.Shell.RunKillAfter(ctx, script, &out, io.Discard, KillAfter); err != nil {
 		return "", err
 	}
 	return out.String(), nil
