@@ -40,6 +40,9 @@ type Job struct {
 // A script with a syntax error doesn't start: the job is already done,
 // with status 2 and the error as its stderr.
 func (s *Shell) Background(ctx context.Context, script, pidVar string) (*Job, error) {
+	if s.ia != nil {
+		return nil, errors.New("background blocks need a scripted shell, not an interactive one")
+	}
 	s.mu.Lock()
 	s.bgRun++
 	dir := filepath.Join(s.tmp, "bg"+strconv.Itoa(s.bgRun))

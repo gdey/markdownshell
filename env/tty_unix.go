@@ -130,6 +130,10 @@ func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec 
 // the terminal its size between blocks, such as a prompt drawn to fit
 // the width, sees the size it is shown at.
 func (s *Shell) SetSize(cols, rows int) {
+	if s.ia != nil && cols > 0 && rows > 0 {
+		s.ia.setSize(cols, rows)
+		return
+	}
 	if s.pty == nil || cols <= 0 || rows <= 0 {
 		return
 	}
