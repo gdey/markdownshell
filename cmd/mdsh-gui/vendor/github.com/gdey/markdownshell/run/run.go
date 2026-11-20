@@ -167,6 +167,14 @@ type Options struct {
 	// caller that asks the user before Session.Kill. See
 	// env.Config.KillAfter.
 	KillAfter time.Duration
+	// InteractiveShell, with PTY and Terminal, runs the top-level shell
+	// as an interactive shell on its terminal (env.Config.Interactive),
+	// so ctrl+z, fg, bg and jobs work as in a terminal. Every block in
+	// the top-level env then runs on Terminal, with output and errors
+	// as one stream. Sub-envs stay scripted. Experimental.
+	InteractiveShell bool
+	// LoginShell, with InteractiveShell, starts it as a login shell.
+	LoginShell bool
 }
 
 // KillAfter is Options.KillAfter for a run nobody can be asked about,
@@ -531,8 +539,24 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	out := io.MultiWriter(&stdout, eventWriter{Stdout, b, emit})
 	errw := io.MultiWriter(&stderr, eventWriter{Stderr, b, emit})
 
+	if e.Shell.Interactive() {
+		// The variables to capture come with the prompt after the
+		// block; an error here shows when they are read.
+		e.Shell.Want(vars)
+	}
 	var rec *termrec.Recorder
 	switch {
+	case e.Shell.Interactive() && opts.Terminal != nil:
+		// An interactive shell runs every block on its terminal.
+		rec = termrec.NewRecorder(opts.Terminal.Dims())
+		w := io.MultiWriter(rec, eventWriter{Stdout, b, emit})
+		giveBack := takeTTY(b, opts)
+		r.Status, r.Exited, err = e.Shell.RunTerminal(ctx, pre+b.Body, termOut(*opts.Terminal, w), io.Discard)
+		giveBack()
+		if shown := rec.Recording(); !shown.FullScreen() && !b.Attrs.Has("tty") {
+			stdout.WriteString(shown.Text())
+			rec = nil
+		}
 	case !b.Attrs.Has("tty"):
 		if kind, _ := outKind(b); kind == "image" {
 			r.Status, r.Exited, err = e.Shell.Run(ctx, pre+b.Body, out, errw)
@@ -605,9 +629,24 @@ func envFor(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Block
 	return stack.Get(ctx, b.Attrs["env"], share)
 }
 
+// termOut is t with what the block shows going to w as well.
+func termOut(t env.Terminal, w io.Writer) env.Terminal {
+	t.Out = io.MultiWriter(t.Out, w)
+	return t
+}
+
 // captureVars reads vars from sh, exported or not.
 func captureVars(ctx context.Context, sh *env.Shell, vars []string) (map[string]string, error) {
 	out := map[string]string{}
+	if sh.Interactive() {
+		// The shell sent them with the prompt after the block, having
+		// been asked for them before it (see runBlock).
+		st, _ := sh.State()
+		for _, v := range vars {
+			out[v] = st.Vars[v]
+		}
+		return out, nil
+	}
 	for _, v := range vars {
 		if _, ok := out[v]; ok {
 			continue

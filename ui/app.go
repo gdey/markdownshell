@@ -90,7 +90,7 @@ func New(host Host, store *settings.Store, cwd, dir, source string) *App {
 // rc file from Settings, and what --source read.
 func (a *App) runOptions() notebook.RunOptions {
 	s := a.settings.Get()
-	return notebook.RunOptions{Shell: s.Shell, Source: a.source, HistoryRC: s.HistoryRC}
+	return notebook.RunOptions{Shell: s.Shell, Source: a.source, HistoryRC: s.HistoryRC, InteractiveShell: s.InteractiveShell, LoginShell: s.LoginShell}
 }
 
 // errNoFile is returned by calls that need a file before one is open.

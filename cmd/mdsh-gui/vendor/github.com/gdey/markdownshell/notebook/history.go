@@ -45,10 +45,11 @@ func (n *Notebook) SetHistory(on, restart bool) (restarted bool, err error) {
 		n.history = false
 		return false, nil
 	}
-	if n.sess.PTY() {
+	if n.sess.PTY() && (!n.opts.Run.InteractiveShell || n.sess.InteractiveShell()) {
 		n.history = true
-		// The shells have terminals; they only need the rc file.
-		if rc := rcScript(n.opts.Run.HistoryRC, n.shell()); rc != "" {
+		// The shells have terminals; they only need the rc file, which
+		// an interactive shell reads itself.
+		if rc := rcScript(n.opts.Run.HistoryRC, n.shell()); rc != "" && !n.opts.Run.InteractiveShell {
 			ctx, cancel := n.askCtx(rcWait)
 			n.mu.Unlock()
 			_, err := n.sess.Ask(ctx, rc)
@@ -104,11 +105,21 @@ func (n *Notebook) SetHistoryRC(path string) {
 	n.opts.Run.HistoryRC = path
 }
 
+// SetInteractiveShell sets whether the top-level shell runs
+// interactively while the History pane is on, and as a login shell,
+// from the next time the pane is turned on.
+func (n *Notebook) SetInteractiveShell(on, login bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.opts.Run.InteractiveShell, n.opts.Run.LoginShell = on, login
+}
+
 // source is what the shells read as they start: ro.Source, and the rc
 // file while the History pane is on.
 func (n *Notebook) source(ro RunOptions) string {
 	rc := rcScript(ro.HistoryRC, n.shellFor(ro))
-	if !n.history || rc == "" {
+	if !n.history || rc == "" || ro.InteractiveShell {
+		// An interactive shell reads the user's rc files itself.
 		return ro.Source
 	}
 	return ro.Source + "\n" + rc
@@ -242,6 +253,18 @@ func (n *Notebook) PromptAt(cols, rows int) (Prompt, error) {
 		n.mu.Unlock()
 		cancel()
 	}()
+	// An interactive shell draws its own prompt, and running its prompt
+	// hooks from a script would confuse the marks they print; the pane
+	// shows a plain one in the directory the shell reported.
+	if st, ok, err := sess.TopState(ctx); err != nil {
+		return Prompt{}, err
+	} else if ok {
+		ps1 := "$ "
+		if zsh {
+			ps1 = "% "
+		}
+		return Prompt{PS1: ps1, PS2: "> ", Dir: history.Tilde(st.PWD)}, nil
+	}
 	out, err := sess.AskSized(ctx, promptScript(zsh, cols, rows), cols, rows)
 	if err != nil {
 		return Prompt{}, err

@@ -157,6 +157,19 @@ export interface Settings {
     "historyReuse": boolean;
 
     /**
+     * InteractiveShell runs the History pane's shell as an interactive
+     * shell on its terminal, reading your rc files, so ctrl+z, fg, bg
+     * and jobs work as in a terminal. Experimental; off by default.
+     */
+    "interactiveShell": boolean;
+
+    /**
+     * LoginShell, with InteractiveShell, starts it as a login shell, so
+     * it reads the profile files too, as Terminal.app does.
+     */
+    "loginShell": boolean;
+
+    /**
      * View is how a file opens: "rendered", "source" or "both".
      * Empty opens a file as it was last shown (see FileViews), and a
      * file not shown before in the rendered view.

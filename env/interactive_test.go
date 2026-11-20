@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -342,5 +343,29 @@ func TestKindOf(t *testing.T) {
 	}
 	if _, err := kindOf("/usr/bin/fish"); err == nil {
 		t.Error("fish: no error")
+	}
+}
+
+// TestInteractiveBackground: a background block starts on an
+// interactive shell too, though the shell reports the job as it goes.
+func TestInteractiveBackground(t *testing.T) {
+	for _, sh := range shells(t) {
+		t.Run(filepath.Base(sh), func(t *testing.T) {
+			s := startI(t, sh, nil)
+			j, err := s.Background(context.Background(), "echo from-bg", "BGPID")
+			if err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "job", func() bool { _, done, _ := j.Done(); return done })
+			if out, _ := j.Output(); string(out) != "from-bg\n" {
+				t.Errorf("output %q", out)
+			}
+			// The shell may report the job done first, as a terminal
+			// shows it.
+			_, out := runI(t, s, `echo "$BGPID"`)
+			if f := strings.Fields(out); len(f) == 0 || f[len(f)-1] != strconv.Itoa(j.PID) {
+				t.Errorf("BGPID %q, PID %d", out, j.PID)
+			}
+		})
 	}
 }

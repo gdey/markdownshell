@@ -245,6 +245,20 @@
         </div>
         <input id="history-reuse" type="checkbox">
       </div>
+      <div class="setting">
+        <div class="text">
+          <label for="interactive-shell">Interactive shell <span class="experimental">Experimental</span></label>
+          <p class="muted">History runs your shell interactively, reading its own rc files, so ctrl+z stops a command and <code>fg</code>, <code>bg</code> and <code>jobs</code> work as in a terminal. Output and errors become one stream. Takes effect the next time History is turned on.</p>
+        </div>
+        <input id="interactive-shell" type="checkbox">
+      </div>
+      <div class="setting">
+        <div class="text">
+          <label for="login-shell">Start it as a login shell</label>
+          <p class="muted">With the interactive shell, also reads the profile files (<code>.zprofile</code>, <code>.bash_profile</code>), where <code>PATH</code> is often set on macOS.</p>
+        </div>
+        <input id="login-shell" type="checkbox">
+      </div>
       <div class="setting" id="cli-row" hidden>
         <div class="text">
           <span class="label-text" id="cli-label">Command line tool</span>

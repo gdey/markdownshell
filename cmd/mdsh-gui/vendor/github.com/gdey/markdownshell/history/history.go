@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/gdey/markdownshell/env"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -106,11 +107,31 @@ printf '%s\n%s\n%s\n%s\n%s' "$p1" '--mdsh-ps2--' "$p2" '--mdsh-dir--' "${PWD:-$(
 
 // AskPrompt asks the shell for its prompts. zsh says the shell is zsh.
 func AskPrompt(ctx context.Context, a Asker, zsh bool) (Prompt, error) {
+	// An interactive shell draws its own prompt, and running its prompt
+	// hooks from a script would confuse the marks they print: a plain
+	// prompt in the directory it reported stands in.
+	if t, ok := a.(topStater); ok {
+		if st, ok, err := t.TopState(ctx); err != nil {
+			return Prompt{}, err
+		} else if ok {
+			ps1 := "$ "
+			if zsh {
+				ps1 = "% "
+			}
+			return Prompt{PS1: ps1, PS2: "> ", Dir: Tilde(st.PWD)}, nil
+		}
+	}
 	out, err := a.Ask(ctx, promptScript(zsh))
 	if err != nil {
 		return Prompt{}, err
 	}
 	return ParsePrompt(out), nil
+}
+
+// topStater is an Asker that knows whether its shell is interactive,
+// such as run.Session.
+type topStater interface {
+	TopState(ctx context.Context) (env.State, bool, error)
 }
 
 // ParsePrompt reads what a prompt script printed: PS1, then PS2 and the

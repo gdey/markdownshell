@@ -168,7 +168,7 @@ func start(ctx context.Context, cfg Config, launched func(*Shell)) (*Shell, erro
 		// its status is ignored, and what it prints shows on the
 		// terminal.
 		init := "set -- " + quoteAll(cfg.Args) + "\n" + helpers + cfg.Init + "\n"
-		if err := startInteractive(s, cfg, init); err != nil {
+		if err := startInteractive(ctx, s, cfg, init, launched); err != nil {
 			os.RemoveAll(tmp)
 			return nil, fmt.Errorf("starting %s: %w", cfg.Path, err)
 		}
@@ -473,6 +473,10 @@ func (s *Shell) interrupt(stop <-chan struct{}, killAfter time.Duration) {
 		}
 	}
 }
+
+// Interactive reports whether the shell was started with
+// Config.Interactive.
+func (s *Shell) Interactive() bool { return s.ia != nil }
 
 // Busy reports whether a script is running in the shell.
 func (s *Shell) Busy() bool { return s.busy.Load() }

@@ -83,6 +83,9 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 // script, and what the script writes to its terminal goes to t.Out and
 // to rec. The shell's pseudo-terminal takes t's size, and follows it.
 func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec io.Writer) (status int, exited bool, err error) {
+	if s.ia != nil {
+		return s.runTerminalInteractive(ctx, script, t, rec)
+	}
 	if s.pty == nil {
 		return 0, false, ErrNoPTY
 	}

@@ -121,7 +121,7 @@ func (m *Model) openHistory() tea.Cmd {
 		return nil
 	}
 	m.hist.open = true
-	if !m.sess.PTY() {
+	if !m.sess.PTY() || (m.opts.Run.InteractiveShell && !m.sess.InteractiveShell()) {
 		sess, err := m.newSession(m.opts.Run)
 		if err != nil {
 			m.hist.open = false

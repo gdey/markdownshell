@@ -80,6 +80,9 @@ function draw() {
   input("shell").value = s.shell;
   input("history-rc").value = s.historyRC;
   input("history-reuse").checked = s.historyReuse;
+  input("interactive-shell").checked = s.interactiveShell;
+  input("login-shell").checked = s.loginShell;
+  input("login-shell").disabled = !s.interactiveShell;
   select("start-mode").value = s.startFolder ? "fixed" : "last";
   input("start-folder").value = s.startFolder;
   input("template-folder").value = s.templateFolder;
@@ -304,6 +307,12 @@ select("view").onchange = () => ((s.view = select("view").value), save());
 input("shell").onchange = () => ((s.shell = input("shell").value.trim()), save());
 input("history-rc").onchange = () => ((s.historyRC = input("history-rc").value.trim()), save());
 input("history-reuse").onchange = () => ((s.historyReuse = input("history-reuse").checked), save());
+input("interactive-shell").onchange = () => {
+  s.interactiveShell = input("interactive-shell").checked;
+  input("login-shell").disabled = !s.interactiveShell;
+  save();
+};
+input("login-shell").onchange = () => ((s.loginShell = input("login-shell").checked), save());
 input("open-types").onchange = async () => {
   s.openTypes = input("open-types").value.split(/[\s,]+/).filter((t) => t !== "");
   await save();

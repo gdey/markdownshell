@@ -109,6 +109,13 @@ type Settings struct {
 	// keeping its last output as an earlier run, rather than add another
 	// block. Off adds a block for every command.
 	HistoryReuse bool `json:"historyReuse"`
+	// InteractiveShell runs the History pane's shell as an interactive
+	// shell on its terminal, reading your rc files, so ctrl+z, fg, bg
+	// and jobs work as in a terminal. Experimental; off by default.
+	InteractiveShell bool `json:"interactiveShell"`
+	// LoginShell, with InteractiveShell, starts it as a login shell, so
+	// it reads the profile files too, as Terminal.app does.
+	LoginShell bool `json:"loginShell"`
 	// View is how a file opens: "rendered", "source" or "both".
 	// Empty opens a file as it was last shown (see FileViews), and a
 	// file not shown before in the rendered view.

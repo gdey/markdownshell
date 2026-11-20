@@ -173,6 +173,8 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	interactive := fs.Bool("i", false, "open the file in a terminal UI that runs blocks as you pick them; with no file, or a folder, pick one first")
 	autosave := fs.Bool("autosave", false, "with -i, save output after every block that runs")
 	historyReuse := fs.Bool("history-reuse", false, "with -i, a command typed in History again runs its #history-N block again, keeping the last run under it, rather than adding another")
+	interactiveShell := fs.Bool("interactive-shell", false, "with -i, run History's shell interactively, reading your rc files, so ctrl+z, fg, bg and jobs work (experimental)")
+	loginShell := fs.Bool("login-shell", false, "with --interactive-shell, start it as a login shell")
 	serveOn := addServeFlag(fs)
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	allowOutside := fs.Bool("allow-outside", false, "let include blocks, out= files and report images reach outside the document's folder, or hidden files (.env, .git) in it; only for documents you trust")
@@ -237,7 +239,20 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		if fs.NArg() > 1 {
 			args = fs.Args()[1:]
 		}
-		return interactiveCmd(fs.Arg(0), args, sources.String(), expose, *stop, *step, *yes, *autosave, *historyReuse, *allowOutside, stdin, stdout)
+		return interactiveCmd(interactiveOpts{
+			file:             fs.Arg(0),
+			args:             args,
+			source:           sources.String(),
+			expose:           expose,
+			stop:             *stop,
+			step:             *step,
+			yes:              *yes,
+			autosave:         *autosave,
+			historyReuse:     *historyReuse,
+			allowOutside:     *allowOutside,
+			interactiveShell: *interactiveShell,
+			loginShell:       *loginShell,
+		}, stdin, stdout)
 	}
 	file, blockArgs := fs.Arg(0), fs.Args()[1:]
 	target := file
@@ -731,11 +746,25 @@ func (s *streamer) finish(results []*run.Result) error {
 	return s.err
 }
 
-// interactiveCmd opens file in the TUI. With no file, or a folder, the
+// interactiveOpts are -i's file, its arguments and the flags it takes.
+type interactiveOpts struct {
+	file   string
+	args   []string
+	source string
+	expose []string
+
+	stop, step, yes, autosave, historyReuse, allowOutside bool
+	// interactiveShell and loginShell are how History's shell runs:
+	// --interactive-shell and --login-shell.
+	interactiveShell, loginShell bool
+}
+
+// interactiveCmd opens o.file in the TUI. With no file, or a folder, the
 // TUI starts with a list of the markdown files under it to pick from.
 // Output is saved when asked, or with autosave after every block that
 // runs.
-func interactiveCmd(file string, args []string, source string, expose []string, stop, step, yes, autosave, historyReuse, allowOutside bool, stdin io.Reader, stdout io.Writer) error {
+func interactiveCmd(o interactiveOpts, stdin io.Reader, stdout io.Writer) error {
+	file := o.file
 	if file == "-" {
 		return errors.New("-i needs a file, not stdin")
 	}
@@ -783,18 +812,21 @@ func interactiveCmd(file string, args []string, source string, expose []string, 
 			Run: run.Options{
 				File:         abs,
 				LinkDir:      filepath.Dir(abs),
-				Args:         args,
-				Environ:      run.WithExpose(run.WithMode(os.Environ(), run.ModeInteractive), expose),
-				Source:       source,
-				StopOnError:  stop,
-				AllowOutside: allowOutside,
-				Step:         step,
+				Args:         o.args,
+				Environ:      run.WithExpose(run.WithMode(os.Environ(), run.ModeInteractive), o.expose),
+				Source:       o.source,
+				StopOnError:  o.stop,
+				AllowOutside: o.allowOutside,
+				Step:         o.step,
 				Mode:         run.ModeInteractive,
+				// Used once History is open: see tui's newSession.
+				InteractiveShell: o.interactiveShell,
+				LoginShell:       o.loginShell,
 			},
-			Yes:          yes,
+			Yes:          o.yes,
 			Save:         func(file string, out []byte) error { return writeFile(file, out, 0o644) },
-			AutoSave:     autosave,
-			HistoryReuse: historyReuse,
+			AutoSave:     o.autosave,
+			HistoryReuse: o.historyReuse,
 			Style:        style,
 			Images:       style != "notty",
 			Protocol:     protocol,
