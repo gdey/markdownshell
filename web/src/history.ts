@@ -40,7 +40,10 @@ export interface HistoryHooks {
   // canRun says whether a run may start, which it can't while one goes.
   canRun: () => boolean;
   // enter runs the call that takes what was typed, as a run of the page.
-  enter: (call: () => Promise<void>) => Promise<void>;
+  // added says the call adds to the end of the file, so the view goes
+  // there after; a command run while recording is off adds nothing, and
+  // the view stays where it is.
+  enter: (call: () => Promise<void>, added: boolean) => Promise<void>;
   // status is the exit status of block i, once the page has drawn it
   // again after the run.
   status: (i: number) => number | undefined;
@@ -455,7 +458,7 @@ async function submit(entered: string) {
       } catch (err) {
         say(`\x1b[31m${message(err)}\x1b[0m`);
       }
-    });
+    }, record || isNote(text) || block);
   } finally {
     entering = false;
     stopClock();

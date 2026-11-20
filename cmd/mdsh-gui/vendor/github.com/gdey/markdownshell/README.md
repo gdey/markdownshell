@@ -478,6 +478,19 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image: SVG, or PNG if the path ends in `.png` |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
+| `history[=N]` | Keep the block's N earlier runs under its output, newest first (bare: the front matter's `history:`, else 10); see Earlier runs below |
+
+## Earlier runs
+
+A block marked `history=N` keeps the outputs of its earlier runs under
+its current one, as fences marked `history=K`, K runs back, newest
+first. Each run moves the output the file held down a place and drops
+those past N; every output fence carries `at=`, when its run started.
+mdsh-gui shows them under the output, `mdsh -i` with `b`, and
+`mdsh -n --history` prints them. Saving holds them to N, so lowering
+N, or dropping `history=`, trims them. mdsh 1.6.0 and older read them
+as copies of the output. See
+[examples/earlier-runs.md](examples/earlier-runs.md).
 
 ## Output copies
 

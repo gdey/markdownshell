@@ -221,10 +221,11 @@ function drawOptions() {
 function drawDoc() {
   const main = $("doc");
   const restore = anchor();
+  const heights = drawnHeights();
   closeTerminal();
   behind = false;
   lazyDoc = cells.length > lazyCells;
-  main.replaceChildren(...cells.map((c) => drawCell(c)));
+  main.replaceChildren(...cells.map((c) => keepHeight(drawCell(c), c, heights)));
   drawn++;
   nameFolds();
   applyFolds();
@@ -239,6 +240,39 @@ function drawDoc() {
   // Every card is new, which can leave the view blank as a long jump
   // does.
   repaint($("doc-scroll"));
+}
+
+// drawnHeights is the height of each block's card as it is drawn now,
+// with the cell it shows, by the line it starts on. A card out of sight
+// isn't laid out, so the page takes it to be as tall as its guess until
+// it comes near the view; drawing the document again with guesses
+// where the cards had their heights would move the view when they came
+// near it, after anchor had put it back.
+function drawnHeights(): Map<number, { cell: Cell; height: number }> {
+  const heights = new Map<number, { cell: Cell; height: number }>();
+  // The guess is the height inside the card's border, which every card
+  // has alike.
+  let border = -1;
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    const cell = cellOf.get(e);
+    if (!cell || cell.block < 0 || e.classList.contains("stub")) continue;
+    const height = e.getBoundingClientRect().height;
+    if (!height) continue;
+    if (border < 0) {
+      const s = getComputedStyle(e);
+      border = parseFloat(s.borderTopWidth) + parseFloat(s.borderBottomWidth) + parseFloat(s.paddingTop) + parseFloat(s.paddingBottom);
+    }
+    heights.set(cell.from, { cell, height: height - border });
+  }
+  return heights;
+}
+
+// keepHeight has card, drawn for c, guess the height the card drawn
+// before it had, where that showed the same block and output.
+function keepHeight(card: HTMLElement, c: Cell, heights: Map<number, { cell: Cell; height: number }>): HTMLElement {
+  const was = heights.get(c.from);
+  if (was && card.style.getPropertyValue("--guess") && was.cell.to === c.to && was.cell.body === c.body && was.cell.output === c.output) card.style.setProperty("--guess", was.height + "px");
+  return card;
 }
 
 // drawn counts the times the document's cards were drawn, all of them
@@ -767,7 +801,8 @@ function unfill(pane: HTMLElement) {
 // are not laid out, and a guess near their size keeps the scroll bar
 // steady as they come into it.
 function guessHeight(c: Cell): number {
-  const lines = (s?: string) => (s ? s.split("\n").length : 0);
+  // A body or output ends with a newline, which starts no line.
+  const lines = (s?: string) => (s ? s.replace(/\r?\n$/, "").split("\n").length : 0);
   const out = lines(c.output);
   return 60 + 19 * lines(c.body) + (out ? 30 + 19 * out : 0);
 }
@@ -4792,7 +4827,7 @@ initSplitGrip();
 initDeps($("doc-scroll"), { jump: jumpTo, setDepends, peek, endPeek });
 initHistory({
   canRun: () => !running,
-  async enter(call) {
+  async enter(call, added) {
     busy(true);
     ranHere = true;
     status("running");
@@ -4801,7 +4836,9 @@ initHistory({
     ranHere = false;
     busy(false);
     await refresh();
-    // What was added is at the end.
+    // What was added is at the end. A command run while recording is
+    // off added nothing, so the view stays where it was.
+    if (!added) return;
     const scroll = $("doc-scroll");
     scroll.scrollTop = scroll.scrollHeight;
   },
