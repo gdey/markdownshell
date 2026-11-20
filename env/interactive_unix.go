@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/charmbracelet/x/ansi"
 	"github.com/creack/pty"
 	"golang.org/x/sys/unix"
 )
@@ -179,7 +178,7 @@ func startInteractive(s *Shell, cfg Config, init string) error {
 	ia.view = nil
 	ia.mu.Unlock()
 	if !ok {
-		msg := strings.TrimSpace(ansi.Strip(startOut.String()))
+		msg := strings.TrimSpace(stripEsc(startOut.String()))
 		if s.Exited() {
 			return fmt.Errorf("%s -i exited as it started: %s", filepath.Base(cfg.Path), msg)
 		}
@@ -284,7 +283,7 @@ func (ia *interactive) start() {
 	cmd := ia.lastCmd
 	ia.lastCmd = ""
 	if cmd == "" {
-		cmd = strings.TrimSpace(ansi.Strip(ia.echo.String()))
+		cmd = strings.TrimSpace(stripEsc(ia.echo.String()))
 	}
 	if ia.watch != nil {
 		ia.watch(Event{Kind: "start", Command: cmd})

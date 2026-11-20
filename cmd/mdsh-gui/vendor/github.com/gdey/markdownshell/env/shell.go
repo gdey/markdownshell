@@ -54,6 +54,8 @@ type Shell struct {
 	// a block leaves running.
 	jobMu sync.Mutex
 	jobs  map[int]bool
+	// ia is set for a shell started with Config.Interactive.
+	ia *interactive
 	// termJobs are the jobs BackgroundTerminal started that are still
 	// running, by PID, and dir is the directory the shell started in.
 	termJobs map[int]*Job
@@ -106,6 +108,18 @@ type Config struct {
 	// script was interrupted (see Run). Zero leaves it running until
 	// Kill, for a caller that asks the user first.
 	KillAfter time.Duration
+	// Interactive runs the shell as an interactive shell (-i) on a
+	// pseudo-terminal of its own, which it reads commands from, so job
+	// control works as in a terminal: ctrl+z, fg, bg and jobs. mdsh
+	// hooks into its prompt (OSC 133 marks and a state fifo) to learn
+	// where each command starts and ends, its status, and the shell's
+	// jobs and variables. Blocks run by a line typed at the prompt, and
+	// their output and errors share the terminal. The shell reads the
+	// user's rc files. Unix only; Path must be a POSIX shell.
+	Interactive bool
+	// Login, with Interactive, starts the shell as a login shell, so it
+	// reads the profile files too.
+	Login bool
 	// Init runs in the shell once it starts, before any block, such as
 	// aliases and functions to define. Its exit status is ignored, but
 	// an Init that ends the shell is an error.
@@ -133,6 +147,17 @@ func Start(cfg Config) (*Shell, error) {
 		killAfter: cfg.KillAfter,
 		forced:    make(chan struct{}),
 		dir:       cfg.Dir,
+	}
+	if cfg.Interactive {
+		// Started from the integration files, before the first prompt;
+		// its status is ignored, and what it prints shows on the
+		// terminal.
+		init := "set -- " + quoteAll(cfg.Args) + "\n" + helpers + cfg.Init + "\n"
+		if err := startInteractive(s, cfg, init); err != nil {
+			os.RemoveAll(tmp)
+			return nil, fmt.Errorf("starting %s: %w", cfg.Path, err)
+		}
+		return s, nil
 	}
 	s.cmd = exec.Command(cfg.Path)
 	s.cmd.Env = cfg.Env
@@ -211,6 +236,9 @@ func Start(cfg Config) (*Shell, error) {
 // (see interrupt). Should the script not stop, Run waits until it does,
 // or until Kill, or Config.KillAfter, ends the shell.
 func (s *Shell) Run(ctx context.Context, script string, stdout, stderr io.Writer) (status int, exited bool, err error) {
+	if s.ia != nil {
+		return s.runInteractive(ctx, script, stdout, stderr)
+	}
 	return s.run(ctx, script, stdout, stderr, false, false)
 }
 
@@ -460,6 +488,9 @@ if [ "$__mdsh_jobs" = yes ]; then set -m; else trap '' TSTP TTIN TTOU; fi
 // being waited for.
 func (s *Shell) kill() {
 	kill(s.cmd)
+	if s.ia != nil {
+		return
+	}
 	for _, p := range s.pipes {
 		p.Close()
 	}
@@ -494,6 +525,14 @@ func (s *Shell) Exited() bool {
 
 // Exported returns the shell's exported variables.
 func (s *Shell) Exported(ctx context.Context) (map[string]string, error) {
+	if s.ia != nil {
+		// An interactive shell sends them at every prompt.
+		st, ok := s.State()
+		if !ok {
+			return nil, errors.New("the shell hasn't reported its state")
+		}
+		return maps.Clone(st.Exported), nil
+	}
 	// awk's ENVIRON is the exported environment it inherits. Escape
 	// backslashes and newlines so every variable is one line.
 	const script = `awk 'BEGIN { for (k in ENVIRON) { v = ENVIRON[k]; gsub(/\\/, "\\\\", v); gsub(/\n/, "\\n", v); print k "=" v } }'`
@@ -522,6 +561,10 @@ func (s *Shell) Exported(ctx context.Context) (map[string]string, error) {
 // Close ends the shell and removes its temp files.
 func (s *Shell) Close() error {
 	s.killTermJobs()
+	if s.ia != nil {
+		s.closeInteractive()
+		return os.RemoveAll(s.tmp)
+	}
 	s.stdin.Close()
 	select {
 	case <-s.waited:
