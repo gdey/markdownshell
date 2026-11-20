@@ -91,6 +91,10 @@ type Cell struct {
 	// Running is true while a background block is still going; its
 	// output and status come in when it ends.
 	Running bool `json:"running"`
+	// Terminal is true while the block runs in the background on a
+	// terminal of its own, which its card shows and keys typed there go
+	// to (see TypeBackground).
+	Terminal bool `json:"terminal,omitempty"`
 	// Ms is how long the block's last run this session took, in
 	// milliseconds, and TimedOut is true when its timeout= ended it.
 	Ms       int64 `json:"ms,omitempty"`
@@ -233,7 +237,12 @@ type Notebook struct {
 	term *terminal
 
 	mu sync.Mutex // guards the fields below
-	d  *doc.Document
+	// bgTerms are the terminals of the background blocks marked tty
+	// still running, by block.
+	bgTerms map[int]*terminal
+	// bgCols and bgRows are the size SetBackgroundTerminalSize set, or 0.
+	bgCols, bgRows int
+	d              *doc.Document
 	// warned are the document's warnings already logged, without their
 	// line numbers, so a warning is logged once, not on every edit.
 	warned  map[string]bool
@@ -313,6 +322,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		d:       d,
 		index:   map[*doc.Block]int{},
 		term:    newTerminal(),
+		bgTerms: map[int]*terminal{},
 		bg:      map[*doc.Block]bool{},
 		quit:    make(chan struct{}),
 		noteEnd: -1,
@@ -360,9 +370,12 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		DependOff:   n.dependOff,
 		Terminal:    n.term.env(n.emit),
 		TakeTTY:     n.takeTTY,
-		Mode:        run.ModeInteractive,
-		PTY:         n.history,
-		Audit:       n.opts.Events.Audit(),
+		// A background tty block runs in its card while other
+		// blocks run.
+		BackgroundTerminal: n.backgroundTerminal,
+		Mode:               run.ModeInteractive,
+		PTY:                n.history,
+		Audit:              n.opts.Events.Audit(),
 		// Nil stays nil: run treats that as nobody to ask.
 		ApproveSources: n.opts.Sources,
 		AllowedOutside: n.allowedOutside(n.d),

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/termrec"
 )
 
 // BackgroundWait is how long a run waits, after its last block, for a
@@ -29,6 +30,10 @@ type bgJob struct {
 	// timedOut is set when timeout= killed the job, overdue when the
 	// run's end did, and stopped when StopBackground did.
 	timedOut, overdue, stopped atomic.Bool
+	// rec records a block marked tty, which runs on a terminal of its
+	// own, and release gives that terminal back once it ends.
+	rec     *termrec.Recorder
+	release func()
 }
 
 // PIDVar is the shell variable that holds the process ID of background
@@ -42,6 +47,10 @@ func PIDVar(id string) string {
 		return '_'
 	}, id)
 }
+
+// ErrNoBackgroundTTY is the error of a background block marked tty in a
+// run with no terminal to give it, such as mdsh on the command line.
+var ErrNoBackgroundTTY = errors.New("a background tty block needs a terminal of its own, which only mdsh-gui, mdsh -i and mdsh --serve give")
 
 // background starts b in the background of its env's shell. The run
 // goes on at once; r is Running until Reap sees the block end.
@@ -65,15 +74,35 @@ func (s *Session) background(ctx context.Context, b *doc.Block, r *Result) {
 			return
 		}
 	}
+	var (
+		rec     *termrec.Recorder
+		release = func() {}
+		job     *env.Job
+	)
 	pre, revoke := s.issue(b)
-	job, err := e.Shell.Background(ctx, pre+b.Body, PIDVar(b.ID))
+	if b.Attrs.Has("tty") {
+		// Someone at the terminal types for the block while other
+		// blocks run, so it needs a terminal of its own.
+		if s.opts.BackgroundTerminal == nil {
+			revoke()
+			done(ErrNoBackgroundTTY)
+			return
+		}
+		var t *env.Terminal
+		t, release = s.opts.BackgroundTerminal(b)
+		rec = termrec.NewRecorder(t.Dims())
+		job, err = e.Shell.BackgroundTerminal(ctx, pre+b.Body, PIDVar(b.ID), *t, rec)
+	} else {
+		job, err = e.Shell.Background(ctx, pre+b.Body, PIDVar(b.ID))
+	}
 	if err != nil {
+		release()
 		revoke()
 		done(err)
 		return
 	}
 	r.Running = true
-	j := &bgJob{r: r, job: job, label: s.d.Label(b), timeout: t, revoke: revoke, start: time.Now()}
+	j := &bgJob{r: r, job: job, label: s.d.Label(b), timeout: t, revoke: revoke, start: time.Now(), rec: rec, release: release}
 	if hasTimeout {
 		j.timer = time.AfterFunc(dur, func() {
 			j.timedOut.Store(true)
@@ -177,14 +206,16 @@ func (s *Session) Reap() {
 
 // Wait waits for the background blocks still running, each until its
 // timeout= or, without one, for BackgroundWait, and kills those that
-// don't end in time. If ctx ends first, it kills them all.
+// don't end in time. If ctx ends first, it kills them all. A block on a
+// terminal of its own isn't waited for: someone is at it, and it runs
+// on until it ends, is stopped or times out, or the session closes.
 func (s *Session) Wait(ctx context.Context) error {
 	end := time.Now()
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	for {
 		s.Reap()
-		jobs := s.running()
+		jobs := slices.DeleteFunc(s.running(), func(j *bgJob) bool { return j.rec != nil })
 		if len(jobs) == 0 {
 			return nil
 		}
@@ -235,6 +266,14 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 	r.Err = err
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, s.opts)
+	}
+	if j.rec != nil {
+		j.release()
+		img, err := saveRecording(b, j.rec.Recording(), s.opts)
+		r.Image = img
+		if r.Err == nil {
+			r.Err = err
+		}
 	}
 	s.logEnd(b, r, j.start)
 	s.emit(Event{Kind: Done, Block: b, Result: r})

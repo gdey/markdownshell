@@ -124,7 +124,15 @@ func (s *Stack) Processes() []ShellProcs {
 		if pid == 0 || e.Shell.Exited() {
 			continue
 		}
-		out = append(out, ShellProcs{Env: e.Name, PID: pid, Secs: int(rows[pid].running / time.Second), Children: tree(rows, kids, pid)})
+		procs := tree(rows, kids, pid)
+		// A job on a terminal of its own is mdsh's child, not the
+		// shell's, but it is the shell's background block.
+		for _, j := range e.Shell.termJobPIDs() {
+			if r, ok := rows[j]; ok {
+				procs = append(procs, &Proc{PID: j, Command: r.command, Secs: int(r.running / time.Second), Children: tree(rows, kids, j)})
+			}
+		}
+		out = append(out, ShellProcs{Env: e.Name, PID: pid, Secs: int(rows[pid].running / time.Second), Children: procs})
 	}
 	return out
 }

@@ -54,6 +54,10 @@ type Shell struct {
 	// a block leaves running.
 	jobMu sync.Mutex
 	jobs  map[int]bool
+	// termJobs are the jobs BackgroundTerminal started that are still
+	// running, by PID, and dir is the directory the shell started in.
+	termJobs map[int]*Job
+	dir      string
 }
 
 // Terminal is a terminal mdsh draws itself, such as a pane in a window,
@@ -128,6 +132,7 @@ func Start(cfg Config) (*Shell, error) {
 		waited:    make(chan struct{}),
 		killAfter: cfg.KillAfter,
 		forced:    make(chan struct{}),
+		dir:       cfg.Dir,
 	}
 	s.cmd = exec.Command(cfg.Path)
 	s.cmd.Env = cfg.Env
@@ -400,6 +405,7 @@ func (s *Shell) Busy() bool { return s.busy.Load() }
 func (s *Shell) Kill() {
 	s.force.Do(func() { close(s.forced) })
 	s.kill()
+	s.killTermJobs()
 }
 
 // keepScript is script ending by clearing _mdsh_in, the mark that an
@@ -515,6 +521,7 @@ func (s *Shell) Exported(ctx context.Context) (map[string]string, error) {
 
 // Close ends the shell and removes its temp files.
 func (s *Shell) Close() error {
+	s.killTermJobs()
 	s.stdin.Close()
 	select {
 	case <-s.waited:

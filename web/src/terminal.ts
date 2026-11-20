@@ -55,6 +55,7 @@ function cols(): number {
 // the next tty block runs and records at the size it is shown at.
 export function sizeTerminal() {
   App.SetTerminalSize(cols(), rows()).catch(() => {});
+  sizeBackground();
 }
 
 function colors(): Record<string, string> {
@@ -65,10 +66,12 @@ function colors(): Record<string, string> {
 
 // The look changed: a terminal that is open takes its colors and font.
 window.addEventListener("mdsh-look", () => {
-  if (!term) return;
-  term.options.theme = colors();
-  term.options.fontFamily = codeFont();
-  term.options.fontSize = textSize(13);
+  for (const t of [term, ...[...backgrounds.values()].map((b) => b.term)]) {
+    if (!t) continue;
+    t.options.theme = colors();
+    t.options.fontFamily = codeFont();
+    t.options.fontSize = textSize(13);
+  }
 });
 
 // openTerminal shows the pane in block i's card, and focuses it.
@@ -111,4 +114,110 @@ export function closeTerminal() {
   term?.dispose();
   term = null;
   block = -1;
+}
+
+// A background block marked tty runs on a terminal of its own, in its
+// card, while other blocks run: an editor, say, open on a file another
+// block runs. Each keeps its xterm across redraws of the page, which
+// move it to the card drawn in its place.
+interface Background {
+  term: Terminal;
+  host: HTMLElement;
+  typing: Promise<unknown>;
+  opened: boolean;
+}
+
+const backgrounds = new Map<number, Background>();
+
+// sizeBackground tells Go the size of background blocks' terminals: as
+// wide as a card, and as tall as the front matter asks.
+export function sizeBackground() {
+  App.SetBackgroundTerminalSize(cols(), rows()).catch(() => {});
+  for (const b of backgrounds.values()) {
+    if (b.term.cols !== cols() || b.term.rows !== rows()) b.term.resize(cols(), rows());
+  }
+}
+
+function newBackground(i: number): Background {
+  const host = document.createElement("div");
+  host.className = "terminal background-terminal";
+  host.setAttribute("aria-label", "The block's terminal: what you type goes to it while other blocks run");
+  const term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: !matchMedia("(prefers-reduced-motion: reduce)").matches, theme: colors(), scrollback: 1000, screenReaderMode: true });
+  const b: Background = { term, host, typing: Promise.resolve(), opened: false };
+  // Keys go to Go one call at a time, in order, as typeKeys does.
+  term.onData((keys) => {
+    b.typing = b.typing.then(() => App.TypeBackground(i, keys)).catch(() => {});
+  });
+  backgrounds.set(i, b);
+  return b;
+}
+
+// showBackground opens b's xterm in its host, once the host is on the
+// page: xterm measures its cells as it opens, which it can't off the
+// page. What was written before then shows as it opens.
+function showBackground(b: Background) {
+  if (b.opened || !b.host.isConnected) return;
+  b.opened = true;
+  b.term.open(b.host);
+}
+
+// openBackground shows a new terminal in background block i's card, and
+// focuses it, as the block starts.
+export function openBackground(i: number) {
+  backgrounds.get(i)?.term.dispose();
+  backgrounds.delete(i);
+  const out = document.getElementById("block-" + i)?.querySelector<HTMLElement>(".output");
+  const b = newBackground(i);
+  if (out) setOutput(out, b.host);
+  showBackground(b);
+  b.term.focus();
+}
+
+// adoptBackground puts background block i's terminal in out, the output
+// of the card just drawn for it. A page that has none, as one opened
+// while the block runs, makes one and has the program draw its screen
+// again, since what it showed before isn't kept.
+export function adoptBackground(i: number, out: HTMLElement) {
+  let b = backgrounds.get(i);
+  if (!b) {
+    b = newBackground(i);
+    App.RedrawBackground(i).catch(() => {});
+  }
+  const focused = b.host.contains(document.activeElement);
+  setOutput(out, b.host);
+  const t = b.term;
+  const shown = b;
+  requestAnimationFrame(() => {
+    showBackground(shown);
+    t.refresh(0, t.rows - 1);
+    if (focused) t.focus();
+  });
+}
+
+// writeBackground shows what background block i wrote to its terminal.
+export function writeBackground(i: number, bytes: string | undefined) {
+  const b = backgrounds.get(i);
+  if (!b || !bytes) return;
+  const raw = atob(bytes);
+  const data = new Uint8Array(raw.length);
+  for (let k = 0; k < raw.length; k++) data[k] = raw.charCodeAt(k);
+  b.term.write(data);
+}
+
+// endBackground leaves background block i's terminal showing how it
+// ended, until its card is drawn again with its recording.
+export function endBackground(i: number) {
+  const b = backgrounds.get(i);
+  if (!b) return;
+  backgrounds.delete(i);
+  b.term.options.disableStdin = true;
+  b.term.options.cursorBlink = false;
+  b.term.blur();
+}
+
+// closeBackgrounds drops every background terminal, as when the tab
+// shows another file.
+export function closeBackgrounds() {
+  for (const b of backgrounds.values()) b.term.dispose();
+  backgrounds.clear();
 }

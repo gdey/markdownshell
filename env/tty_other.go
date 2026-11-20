@@ -38,3 +38,10 @@ func (*ptyConn) wait(int)                 {}
 func (*ptyConn) drain(string, int)        {}
 func (*ptyConn) close()                   {}
 func (*ptyConn) name() string             { return "" }
+
+// BackgroundTerminal is not supported here.
+func (s *Shell) BackgroundTerminal(context.Context, string, string, Terminal, io.Writer) (*Job, error) {
+	return nil, errNoTTY
+}
+
+func killSession(pid int) { killTree(pid) }

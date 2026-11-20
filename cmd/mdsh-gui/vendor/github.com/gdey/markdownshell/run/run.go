@@ -137,6 +137,13 @@ type Options struct {
 	// Terminal, if TTY is nil, is a terminal the caller draws itself,
 	// such as a pane in a window, for blocks marked tty to run on.
 	Terminal *env.Terminal
+	// BackgroundTerminal, if set, gives a background block marked tty a
+	// terminal the caller draws, such as a pane in the block's card, for
+	// as long as the block runs: it is called as the block starts, and
+	// the function it returns is called once the block has ended. Then
+	// the block runs while other blocks do, with keys typed there going
+	// to it. Without it, such blocks fail with ErrNoBackgroundTTY.
+	BackgroundTerminal func(*doc.Block) (t *env.Terminal, release func())
 	// TakeTTY, if set, is called before a tty block uses TTY, so a front
 	// end that draws on the terminal can step aside. The block runs once
 	// it returns, and calls the function it returned when done with TTY.
@@ -734,10 +741,11 @@ func runTaped(ctx context.Context, sh *env.Shell, script string, taped *Result, 
 	return rec, err
 }
 
-// hasTTY reports whether any block in d may run on the terminal.
+// hasTTY reports whether any block in d may run on the shell's
+// terminal. A background block has a terminal of its own instead.
 func hasTTY(d *doc.Document) bool {
 	for _, b := range d.Blocks {
-		if Runnable(b) && b.Attrs.Has("tty") {
+		if Runnable(b) && b.Attrs.Has("tty") && !b.Attrs.Has("background") {
 			return true
 		}
 	}

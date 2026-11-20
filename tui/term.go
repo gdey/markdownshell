@@ -286,6 +286,9 @@ func (m *Model) fit() {
 	cols := max(m.docWidth()-4-4-2, 20)
 	rows := min(paneRows, max(m.vpHeight()-6, minPaneRows))
 	m.pane.setSize(cols, rows)
+	for _, p := range m.bgPanes {
+		p.setSize(cols, rows)
+	}
 }
 
 // paneMsg says what the block in the pane shows changed.

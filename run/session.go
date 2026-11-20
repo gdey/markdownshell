@@ -404,6 +404,16 @@ func (s *Session) Close() {
 	for _, j := range s.running() {
 		j.job.Kill()
 	}
+	// A block on a terminal of its own has ended once what it showed
+	// there has been read.
+	for _, j := range s.running() {
+		if ended := j.job.Ended(); ended != nil {
+			select {
+			case <-ended:
+			case <-time.After(2 * time.Second):
+			}
+		}
+	}
 	s.Reap()
 	s.stack.Close()
 	s.closeCtl()

@@ -297,6 +297,7 @@ its output.
 | `R` | reload the file from disk, dropping output not saved |
 | `M` | when the file changed on disk, keep what is shown; the next save overwrites the file |
 | ctrl+c | stop the running block: it is interrupted, and its shell keeps what blocks set there. A block that won't stop gets ctrl+c again, which kills its shell. Quits when nothing runs |
+| `t` | type in the terminal of a `background tty` block running in its card; ctrl+g gives the keys back to the file, leaving it running. It takes the keys as it starts |
 | `q` | go back to the list of files, or close the tab; the last tab quits |
 | ctrl+t | open a new tab with the list of files; picking a file already open in a tab goes to that tab |
 | `]` / `[` | the next or previous tab. The tab bar marks a file with • when its output isn't saved, … while a block runs and ? while one waits for an answer. Blocks go on running in the tabs behind |
@@ -710,6 +711,32 @@ these, with the recordings they make.
 
 With no terminal (cron, CI) or with mdsh in the background, a `tty` block
 without a tape fails with an error instead of hanging.
+
+A `tty` block can run in the `background` too, in mdsh-gui, `mdsh -i`
+and `mdsh --serve`: it gets a terminal of its own, in its card, and
+other blocks run while it does. Keep an editor open on a script and
+run the script from the next block, as often as you like:
+
+````markdown
+```sh {#edit background tty}
+nvim deploy.sh
+```
+
+```sh {#try}
+sh deploy.sh --dry-run
+```
+````
+
+It takes your keys as it starts. In mdsh-gui click its terminal to type
+in it again; in `mdsh -i`, ctrl+g leaves it running and gives the keys
+back to the file, and `t` on its card hands them to it again. It isn't
+waited for at the end of a run: it runs until it ends, you stop it, its
+`timeout=` passes, or the file closes, and then its card shows the
+recording. It runs in a new shell of its env's kind that first takes on
+that shell's variables, working directory and options, and, in bash and
+zsh, its functions and aliases, so `$MDSH_BG_<id>` holds its process ID
+for `kill`, not for `wait`. A tape can't type for it, and `mdsh` on the
+command line fails it, since nobody is at a terminal there.
 
 ## HTTP requests
 

@@ -526,10 +526,13 @@ func TestTextboxFit(t *testing.T) {
 	}
 }
 
-func TestBackgroundNotTTY(t *testing.T) {
-	_, err := Parse([]byte("```sh {#a background tty}\nx\n```\n"))
-	if err == nil || !strings.Contains(err.Error(), "background") {
-		t.Errorf("err = %v, want background and tty refused", err)
+func TestBackgroundTTY(t *testing.T) {
+	if _, err := Parse([]byte("```sh {#a background tty}\nnvim x\n```\n")); err != nil {
+		t.Errorf("background tty: %v", err)
+	}
+	_, err := Parse([]byte("```sh {#a background tty}\nx\n```\n\n```tape {for=a}\nType \"y\"\n```\n"))
+	if err == nil || !strings.Contains(err.Error(), "tape can't type for a background block") {
+		t.Errorf("err = %v, want a tape for a background block refused", err)
 	}
 }
 

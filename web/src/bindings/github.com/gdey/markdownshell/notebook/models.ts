@@ -171,6 +171,13 @@ export interface Cell {
     "running": boolean;
 
     /**
+     * Terminal is true while the block runs in the background on a
+     * terminal of its own, which its card shows and keys typed there go
+     * to (see TypeBackground).
+     */
+    "terminal"?: boolean;
+
+    /**
      * Ms is how long the block's last run this session took, in
      * milliseconds, and TimedOut is true when its timeout= ended it.
      */

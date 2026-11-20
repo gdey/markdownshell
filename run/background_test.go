@@ -4,12 +4,17 @@ package run_test
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/run"
 )
 
@@ -226,5 +231,176 @@ func TestProcessesNamesBackgroundBlocks(t *testing.T) {
 	}
 	if r.Running || r.Err == nil {
 		t.Errorf("after KillProcess: running %v, err %v", r.Running, r.Err)
+	}
+}
+
+// bgTerminal is a terminal for background tty blocks, as a front end
+// gives them, with the keys typed at each.
+type bgTerminal struct {
+	mu       sync.Mutex
+	keys     map[string]chan []byte
+	shown    map[string]*strings.Builder
+	released map[string]bool
+}
+
+func newBGTerminal() *bgTerminal {
+	return &bgTerminal{keys: map[string]chan []byte{}, shown: map[string]*strings.Builder{}, released: map[string]bool{}}
+}
+
+func (bt *bgTerminal) open(b *doc.Block) (*env.Terminal, func()) {
+	bt.mu.Lock()
+	defer bt.mu.Unlock()
+	k := make(chan []byte, 4)
+	bt.keys[b.ID] = k
+	bt.shown[b.ID] = &strings.Builder{}
+	return &env.Terminal{Keys: k, Out: shownWriter{bt, b.ID}, Size: func() (int, int) { return 60, 10 }}, func() {
+		bt.mu.Lock()
+		bt.released[b.ID] = true
+		bt.mu.Unlock()
+	}
+}
+
+func (bt *bgTerminal) show(id string) string {
+	bt.mu.Lock()
+	defer bt.mu.Unlock()
+	if s := bt.shown[id]; s != nil {
+		return s.String()
+	}
+	return ""
+}
+
+type shownWriter struct {
+	bt *bgTerminal
+	id string
+}
+
+func (w shownWriter) Write(p []byte) (int, error) {
+	w.bt.mu.Lock()
+	defer w.bt.mu.Unlock()
+	return w.bt.shown[w.id].Write(p)
+}
+
+// A background tty block runs on a terminal of its own while other
+// blocks run, with the shell's state, takes keys typed there, isn't
+// killed at the end of a run, and is recorded once it ends.
+func TestBackgroundTTY(t *testing.T) {
+	src := "```sh {#a}\nX=1\nf() { echo f$X; }\n```\n" +
+		"```sh {#edit background tty}\nf; [ -t 0 ] && echo on-tty; read -r l; echo got $l\n```\n" +
+		"```sh {#b}\necho b$X\n```\n"
+	d, err := doc.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bt := newBGTerminal()
+	dir := t.TempDir()
+	opts := run.Options{Dir: dir, File: filepath.Join(dir, "doc.md"), Environ: []string{"PATH=" + os.Getenv("PATH")}, BackgroundTerminal: bt.open}
+	if _, err := exec.LookPath("bash"); err == nil {
+		opts.Shell = "bash"
+	}
+	s, err := run.NewSession(d, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	start := time.Now()
+	if err := s.RunFrom(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > run.BackgroundWait {
+		t.Errorf("the run waited %s for the tty block", d)
+	}
+	r := s.Results()
+	wantStdout(t, map[string]*run.Result{"b": r[2]}, "b", "b1\n")
+	if !r[1].Running {
+		t.Fatalf("edit isn't running after the run: %+v", r[1])
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(bt.show("edit"), "on-tty") && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := bt.show("edit"); !strings.Contains(got, "f1\r\non-tty") {
+		t.Errorf("edit shows %q", got)
+	}
+	found := false
+	for _, sh := range s.Processes() {
+		for _, p := range sh.Children {
+			found = found || p.Block == "edit"
+		}
+	}
+	if !found {
+		t.Errorf("Processes has no edit: %+v", s.Processes())
+	}
+
+	bt.mu.Lock()
+	bt.keys["edit"] <- []byte("done\r")
+	bt.mu.Unlock()
+	for r[1].Running && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+		s.Reap()
+	}
+	if r[1].Running || r[1].Err != nil || r[1].Status != 0 {
+		t.Fatalf("edit: running %v, status %d, err %v", r[1].Running, r[1].Status, r[1].Err)
+	}
+	if !strings.HasSuffix(r[1].Image, ".cast") {
+		t.Errorf("edit's recording = %q, want a cast", r[1].Image)
+	}
+	bt.mu.Lock()
+	released := bt.released["edit"]
+	bt.mu.Unlock()
+	if !released {
+		t.Error("edit's terminal wasn't released")
+	}
+}
+
+// Without a terminal to give it, a background tty block fails.
+func TestBackgroundTTYNoTerminal(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#edit background tty}\nvi\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := run.NewSession(d, run.Options{Dir: t.TempDir(), Environ: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r, _ := s.RunBlock(context.Background(), 0)
+	if r == nil || !errors.Is(r.Err, run.ErrNoBackgroundTTY) {
+		t.Errorf("result %+v, want ErrNoBackgroundTTY", r)
+	}
+}
+
+// Stopping a background tty block kills it, and closing the session
+// kills one still running.
+func TestStopBackgroundTTY(t *testing.T) {
+	d, err := doc.Parse([]byte("```sh {#a background tty}\nsleep 60\n```\n```sh {#b background tty}\nsleep 60\n```\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bt := newBGTerminal()
+	s, err := run.NewSession(d, run.Options{Dir: t.TempDir(), Environ: []string{"PATH=" + os.Getenv("PATH")}, BackgroundTerminal: bt.open})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	ra, _ := s.RunBlock(ctx, 0)
+	rb, _ := s.RunBlock(ctx, 1)
+	if !ra.Running || !rb.Running {
+		t.Fatalf("running: a %v, b %v", ra.Running, rb.Running)
+	}
+	if !s.StopBackground(d.Blocks[0]) {
+		t.Fatal("StopBackground = false")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for ra.Running && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+		s.Reap()
+	}
+	if ra.Running || ra.Err == nil || ra.Err.Error() != "stopped" {
+		t.Errorf("a after StopBackground: running %v, err %v", ra.Running, ra.Err)
+	}
+	s.Close()
+	if rb.Running || rb.Err == nil {
+		t.Errorf("b after Close: running %v, err %v", rb.Running, rb.Err)
 	}
 }
