@@ -133,3 +133,35 @@ func parseMark(body string) (mark, bool) {
 	}
 	return mk, true
 }
+
+// stripEsc takes CSI and OSC escape sequences, and other two-byte
+// escapes, out of s, leaving its text.
+func stripEsc(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != 0x1b || i+1 >= len(s) {
+			b.WriteByte(s[i])
+			continue
+		}
+		switch s[i+1] {
+		case '[':
+			j := i + 2
+			for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
+				j++
+			}
+			i = j
+		case ']':
+			j := i + 2
+			for j < len(s) && s[j] != 0x07 && !(s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\') {
+				j++
+			}
+			if j < len(s) && s[j] == 0x1b {
+				j++
+			}
+			i = j
+		default:
+			i++
+		}
+	}
+	return b.String()
+}

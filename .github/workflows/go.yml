@@ -85,6 +85,11 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build .
+      # mdsh-gui vendors this module through a replace of ../.., so a
+      # change to a package it uses must be vendored here too.
+      - name: Check the vendored Go modules match the tree
+        if: runner.os == 'Linux'
+        run: go mod vendor && git diff --exit-code -- vendor && test -z "$(git status --porcelain -- vendor)"
       - name: Check the vendored JavaScript matches its lock
         if: runner.os == 'Linux'
         run: go run ./internal/vendorjs && git diff --exit-code -- ../../web/vendor

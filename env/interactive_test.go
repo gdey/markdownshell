@@ -68,37 +68,6 @@ func clean(s string) string {
 	return strings.TrimSpace(strings.ReplaceAll(stripEsc(s), "\r", ""))
 }
 
-// stripEsc takes out CSI and OSC sequences.
-func stripEsc(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		if s[i] != 0x1b || i+1 >= len(s) {
-			b.WriteByte(s[i])
-			continue
-		}
-		switch s[i+1] {
-		case '[':
-			j := i + 2
-			for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
-				j++
-			}
-			i = j
-		case ']':
-			j := i + 2
-			for j < len(s) && s[j] != 0x07 && !(s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\') {
-				j++
-			}
-			if j < len(s) && s[j] == 0x1b {
-				j++
-			}
-			i = j
-		default:
-			i++
-		}
-	}
-	return b.String()
-}
-
 type syncBuf struct {
 	mu sync.Mutex
 	b  bytes.Buffer
