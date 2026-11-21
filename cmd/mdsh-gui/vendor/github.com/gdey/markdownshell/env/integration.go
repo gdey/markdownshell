@@ -164,7 +164,13 @@ __mdsh_preexec() {
 	print -rn -- $'\e]133;C;mdsh\a'
 }
 __mdsh_addhistory() {
-	[[ $1 != '. "'$__mdsh_dir/* ]]
+	[[ $1 != '. "'$__mdsh_dir/* ]] || return 1
+	# Every line, as a comment runs no preexec: mdsh reads a note so.
+	local t=${1%$'\n'}
+	t=${t//\\/\\\\}
+	t=${t//$'\n'/\\n}
+	{ print -r -- cmd; print -r -- "text $t"; print -r -- end } >"$__mdsh_dir/state" 2>/dev/null
+	return 0
 }
 precmd_functions=(__mdsh_precmd $precmd_functions __mdsh_wrap)
 preexec_functions+=(__mdsh_preexec)

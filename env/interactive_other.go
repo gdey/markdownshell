@@ -17,6 +17,8 @@ type Event struct {
 	Command string
 	Status  int
 	State   *State
+	Typed   bool
+	Output  []byte
 }
 
 var (

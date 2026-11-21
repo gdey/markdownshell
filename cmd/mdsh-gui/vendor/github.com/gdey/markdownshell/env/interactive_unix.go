@@ -60,20 +60,31 @@ type interactive struct {
 	states  int          // state records read
 	last    State
 	lastCmd string // the command line zsh's preexec sent
-	readEOF bool
-	watch   func(Event)
-	scan    markScanner
+	// typedOut is the output of a command typed at the terminal, not
+	// by RunLine, from C to D, for its end Event.
+	typedOut bytes.Buffer
+	readEOF  bool
+	watch    func(Event) // calls each of Watch's functions
+	scan     markScanner
 }
 
 // Event is something an interactive shell did, for Shell.Watch.
 type Event struct {
 	// Kind is "start" when a command starts, with Command; "end" when
 	// it ends, with Status; "state" when the shell sent its state, at
-	// each prompt.
+	// each prompt; "line" when a line typed at the terminal ran no
+	// command, as a comment doesn't in bash and zsh, with Command.
 	Kind    string
 	Command string
 	Status  int
 	State   *State
+	// Typed, on start and end, says RunLine typed the command; it is
+	// false for one typed at the terminal through Type.
+	Typed bool
+	// Output, on the end of a command not typed by RunLine, is what it
+	// wrote to the terminal, from its start to its end, escapes and
+	// all.
+	Output []byte
 }
 
 // startTimeout bounds how long Start waits for an interactive shell's
@@ -226,29 +237,42 @@ func (ia *interactive) read() {
 
 // text takes the stream between marks; ia.mu is held.
 func (ia *interactive) text(p []byte) {
+	if ia.phase == phaseInput && ia.kind == kindSh {
+		// sh has no C mark: the command starts where its echoed line
+		// ends, which the view gets before the start is seen, and
+		// what follows after.
+		if i := bytes.IndexByte(p, '\n'); i >= 0 {
+			if ia.view != nil {
+				ia.view.Write(p[:i+1])
+			}
+			ia.echo.Write(p[:i+1])
+			ia.start()
+			if rest := p[i+1:]; len(rest) > 0 {
+				ia.text(rest)
+			}
+			return
+		}
+	}
 	if ia.view != nil {
 		ia.view.Write(p)
 	}
 	switch ia.phase {
 	case phaseInput:
-		if ia.kind == kindSh {
-			// sh has no C mark: the command starts where its echoed
-			// line ends.
-			if i := bytes.IndexByte(p, '\n'); i >= 0 {
-				ia.echo.Write(p[:i+1])
-				ia.start()
-				if rest := p[i+1:]; len(rest) > 0 && ia.out != nil {
-					ia.out.Write(rest)
-				}
-				return
-			}
-		}
 		ia.echo.Write(p)
 	case phaseRunning:
+		ia.running(p)
+	}
+}
+
+// running takes a running command's output; ia.mu is held.
+func (ia *interactive) running(p []byte) {
+	if ia.typed {
 		if ia.out != nil {
 			ia.out.Write(p)
 		}
+		return
 	}
+	ia.typedOut.Write(p)
 }
 
 // writeView passes a mark on to the view, which is a terminal that
@@ -281,6 +305,7 @@ func (ia *interactive) onMark(mk mark) {
 			// a line: the prompt alone ends the command.
 			ia.end(-1)
 		}
+		ia.lineRan()
 		ia.phase = phasePrompt
 	case markInput:
 		if ia.phase == phaseRunning && ia.typed {
@@ -298,19 +323,63 @@ func (ia *interactive) onMark(mk mark) {
 		if ia.phase == phaseRunning || (ia.phase == phaseInput && ia.typed) {
 			ia.end(mk.status)
 		}
+		ia.lineRan()
 		ia.phase = phaseDone
+	}
+}
+
+// lineRan reports a line typed at the terminal that ran no command, as
+// a comment does in bash and zsh, which leave out the C mark; ia.mu is
+// held.
+func (ia *interactive) lineRan() {
+	if ia.phase != phaseInput || ia.typed {
+		return
+	}
+	// zsh sends the line from its history hook; the echo, which zle
+	// may have redrawn, is the fallback.
+	ia.waitCmd()
+	line := ia.lastCmd
+	ia.lastCmd = ""
+	if line == "" {
+		line = strings.ReplaceAll(stripEsc(ia.echo.String()), "\r", "")
+	}
+	line = strings.TrimSpace(line)
+	ia.echo.Reset()
+	if line != "" && ia.watch != nil {
+		ia.watch(Event{Kind: "line", Command: line})
+	}
+}
+
+// cmdWait bounds how long a command's start waits for the line zsh
+// sends through the state fifo, which is read apart from the terminal
+// and so may come a moment after the marks around it.
+const cmdWait = 250 * time.Millisecond
+
+// waitCmd waits, for a line typed at zsh's prompt, for the line zsh
+// sends, up to cmdWait; ia.mu is held.
+func (ia *interactive) waitCmd() {
+	if ia.kind != kindZsh || ia.typed || ia.lastCmd != "" || ia.cond == nil {
+		return
+	}
+	t := time.AfterFunc(cmdWait, func() { ia.mu.Lock(); ia.cond.Broadcast(); ia.mu.Unlock() })
+	defer t.Stop()
+	deadline := time.Now().Add(cmdWait)
+	for ia.lastCmd == "" && time.Now().Before(deadline) {
+		ia.cond.Wait()
 	}
 }
 
 func (ia *interactive) start() {
 	ia.phase = phaseRunning
+	ia.waitCmd()
 	cmd := ia.lastCmd
 	ia.lastCmd = ""
 	if cmd == "" {
 		cmd = strings.TrimSpace(stripEsc(ia.echo.String()))
 	}
+	ia.typedOut.Reset()
 	if ia.watch != nil {
-		ia.watch(Event{Kind: "start", Command: cmd})
+		ia.watch(Event{Kind: "start", Command: cmd, Typed: ia.typed})
 	}
 }
 
@@ -319,8 +388,13 @@ func (ia *interactive) end(status int) {
 	ia.ended = true
 	ia.phase = phaseDone
 	if ia.watch != nil {
-		ia.watch(Event{Kind: "end", Status: status})
+		ev := Event{Kind: "end", Status: status, Typed: ia.typed}
+		if !ia.typed {
+			ev.Output = bytes.Clone(ia.typedOut.Bytes())
+		}
+		ia.watch(ev)
 	}
+	ia.typedOut.Reset()
 }
 
 func (ia *interactive) onRecord(r record) {
@@ -328,6 +402,7 @@ func (ia *interactive) onRecord(r record) {
 	defer ia.mu.Unlock()
 	if r.cmd != nil {
 		ia.lastCmd = *r.cmd
+		ia.cond.Broadcast()
 		return
 	}
 	ia.states++
@@ -641,7 +716,7 @@ func (s *Shell) View(w io.Writer) {
 	s.ia.mu.Unlock()
 }
 
-// Watch sets fn to be called with what an interactive shell does:
+// Watch adds fn to be called with what an interactive shell does:
 // commands starting and ending and its state at each prompt. fn is
 // called with the shell's lock held, so it must not call back in.
 func (s *Shell) Watch(fn func(Event)) {
@@ -649,7 +724,11 @@ func (s *Shell) Watch(fn func(Event)) {
 		return
 	}
 	s.ia.mu.Lock()
-	s.ia.watch = fn
+	if prev := s.ia.watch; prev != nil {
+		s.ia.watch = func(e Event) { prev(e); fn(e) }
+	} else {
+		s.ia.watch = fn
+	}
 	s.ia.mu.Unlock()
 }
 

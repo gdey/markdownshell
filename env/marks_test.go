@@ -153,7 +153,7 @@ func TestShNoC(t *testing.T) {
 	ia := &interactive{kind: kindSh, status: -1}
 	ia.cond = newCond(ia)
 	var out strings.Builder
-	ia.out = &out
+	ia.out, ia.typed = &out, true
 	ia.scan = markScanner{text: ia.text, mark: ia.onMark}
 	ia.mu.Lock()
 	ia.scan.Write([]byte("\x1b]133;A;mdsh\x07$ \x1b]133;B;mdsh\x07ech"))
