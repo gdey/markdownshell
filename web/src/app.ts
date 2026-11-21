@@ -20,7 +20,7 @@ import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdown
 import { confirmShells, dismissShells, lostWarning } from "./confirm.js";
 import { addEvent, consoleFile, initConsole, loadEvents, showConsole } from "./console.js";
 import { bugReportPage, copyBugReport } from "./bugreport.js";
-import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, selectAllHistory, showBar, showHistory } from "./history.js";
+import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyLive, historyStatus, historyTerminal, historyWrite, initHistory, jobLabel, selectAllHistory, shellJobs, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
 import { offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
@@ -1508,6 +1508,7 @@ function drawBlock(c: Cell): HTMLElement {
       c.stale ? el("span", { className: "stale-badge", title: staleNote }, "stale") : "",
       c.nosave ? nosaveBadge("block") : "",
       c.http?.status ? statusBadge(c.http) : "",
+      jobBadge(c.block),
       exit,
       timer,
       c.secret ? revealButton(c) : "",
@@ -4784,6 +4785,10 @@ function onBlock(e: BlockEvent) {
   // A background block marked tty has a terminal of its own in its
   // card, apart from the pane a tty block runs in.
   if (e.data === "background" && (e.kind === "terminal" || e.kind === "tty" || e.kind === "terminal-end")) return onBackgroundTerminal(e);
+  // The live History pane's shell, and what was typed at its prompt.
+  if (e.block === -1 && historyLive(e.kind, e.data, e.bytes)) return;
+  if (e.kind === "changed") return changedSoon();
+  if (e.kind === "error" && e.block === -1) return status(e.data ?? "");
   // A command typed in the History pane runs there, before its card is
   // drawn.
   if (e.kind === "terminal" && historyTerminal(e.block, e.data)) return;
@@ -4856,6 +4861,45 @@ function onBlock(e: BlockEvent) {
     labelBlock(block);
     drawOutline();
   }
+}
+
+// changedSoon draws the document again once what was typed at the live
+// History pane's prompt has changed it, as a note or a block, unless a
+// run of the page's goes, which draws it when it ends.
+let changedTimer = 0;
+function changedSoon() {
+  clearTimeout(changedTimer);
+  changedTimer = window.setTimeout(() => {
+    if (!running) void refresh();
+  }, 50);
+}
+
+// jobBadge marks a History block whose command is a job of the live
+// shell: stopped, or running on in the background.
+function jobBadge(block: number): HTMLElement | "" {
+  const j = shellJobs().find((j) => j.block === block);
+  if (!j) return "";
+  const stopped = /^(stopped|suspended)/i.test(j.state);
+  const what = stopped ? "stopped" : j.state.toLowerCase();
+  return el("span", { className: "job-badge" + (stopped ? " stopped" : ""), title: `${jobLabel(j)} is ${what} in the History shell${stopped ? ": fg there brings it back" : ""}` }, what);
+}
+
+// drawJobBadges marks the drawn cards again, the live shell's jobs
+// having changed.
+function drawJobBadges() {
+  for (const b of document.querySelectorAll("#doc .job-badge")) b.remove();
+  for (const j of shellJobs()) {
+    const exit = document.querySelector(`#block-${j.block} > .head > .exit`);
+    const badge = jobBadge(j.block);
+    if (exit && badge) exit.before(badge);
+  }
+}
+
+// jobsWarning names the live shell's jobs, which a restart ends too.
+function jobsWarning(): string {
+  const jobs = shellJobs();
+  if (!jobs.length) return "";
+  return ` Its ${jobs.length === 1 ? "job" : "jobs"} end too: ${jobs.map((j) => `${jobLabel(j)} (${j.state.toLowerCase()})`).join(", ")}.`;
 }
 
 function onBackgroundTerminal(e: BlockEvent) {
@@ -5097,7 +5141,7 @@ initHistory({
   toggle: () => void actions.history(),
   stop: () => void actions.stop(),
   async restart() {
-    if (!(await confirmShells("Restart the shells?", "This file's shells end, along with any background block, and new ones start with the next block. " + lostWarning, "Restart Shells"))) return false;
+    if (!(await confirmShells("Restart the shells?", "This file's shells end, along with any background block, and new ones start with the next block. " + lostWarning + jobsWarning(), "Restart Shells"))) return false;
     try {
       await App.RestartShells();
     } catch (err) {
@@ -5108,6 +5152,7 @@ initHistory({
     return true;
   },
   say: status,
+  jobs: drawJobBadges,
 });
 initFrontMatter({ edit });
 bugReportPage(() => [

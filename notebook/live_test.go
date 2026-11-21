@@ -26,6 +26,7 @@ func TestLiveHistory(t *testing.T) {
 			var mu sync.Mutex
 			var shown strings.Builder
 			var kinds []string
+			var live []string // live and changed events
 			n, err := Open(file, Options{OnEvent: func(e Event) {
 				mu.Lock()
 				defer mu.Unlock()
@@ -34,6 +35,8 @@ func TestLiveHistory(t *testing.T) {
 					shown.Write(e.Bytes)
 				case "jobs":
 					kinds = append(kinds, "jobs "+e.Data)
+				case "live", "changed":
+					live = append(live, strings.TrimSpace(e.Kind+" "+e.Data))
 				}
 			}})
 			if err != nil {
@@ -98,6 +101,16 @@ func TestLiveHistory(t *testing.T) {
 			if strings.Contains(got, "unrecorded") {
 				t.Errorf("unrecorded command added:\n%s", got)
 			}
+			// The window hears when a typed command starts and ends,
+			// and when the document changes, as the note did.
+			mu.Lock()
+			said := strings.Join(live, "\n")
+			mu.Unlock()
+			for _, s := range []string{"changed\nlive running\nchanged\nlive\nchanged", "live running"} {
+				if !strings.Contains(said, s) {
+					t.Errorf("no %q in live events:\n%s", s, said)
+				}
+			}
 			if name != "sh" {
 				deadline := time.Now().Add(5 * time.Second)
 				for {
@@ -115,6 +128,23 @@ func TestLiveHistory(t *testing.T) {
 					}
 					time.Sleep(20 * time.Millisecond)
 				}
+				// Brought back, it is the command that runs, and no
+				// longer a stopped job.
+				n.TypeShell("fg\r")
+				deadline = time.Now().Add(5 * time.Second)
+				for {
+					mu.Lock()
+					last := kinds[len(kinds)-1]
+					mu.Unlock()
+					if last == "jobs []" {
+						break
+					}
+					if time.Now().After(deadline) {
+						t.Fatalf("jobs events after fg: %q", kinds)
+					}
+					time.Sleep(20 * time.Millisecond)
+				}
+				n.Stop()
 			}
 		})
 	}

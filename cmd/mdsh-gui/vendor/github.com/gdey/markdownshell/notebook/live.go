@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
@@ -209,21 +210,36 @@ func (n *Notebook) liveLoop() {
 			lv.mu.Unlock()
 			switch it.ev.Kind {
 			case "start":
-				cur, running = n.liveStart(it.sh, it.ev.Command, it.unrecorded, it.ev.Resumed), true
+				var busy bool
+				cur, busy = n.liveStart(it.sh, it.ev.Command, it.unrecorded, it.ev.Resumed)
+				running = true
+				if busy {
+					n.emit(Event{Kind: "live", Block: -1, Data: "running"})
+					// fg, or mdsh bringing back the job a played block
+					// stopped, has a stopped job run again: once it
+					// holds the terminal, its badge goes.
+					sh := it.sh
+					time.AfterFunc(liveJobsWait, func() { n.liveJobs(sh) })
+				}
+				n.emit(Event{Kind: "changed", Block: -1})
 			case "end":
 				if running {
 					n.liveEnd(cur, it.ev.Status, it.shown)
+					n.emit(Event{Kind: "live", Block: -1})
+					n.emit(Event{Kind: "changed", Block: -1})
 				}
 				cur, running = -1, false
 			case "exit":
 				if running {
 					n.liveEnd(cur, -1, it.shown)
+					n.emit(Event{Kind: "live", Block: -1})
+					n.emit(Event{Kind: "changed", Block: -1})
 				}
 				cur, running = -1, false
 				n.emit(Event{Kind: "shell-exit", Block: -1})
 			case "line":
-				if text, ok := note(it.ev.Command); ok {
-					n.addNote(text)
+				if text, ok := note(it.ev.Command); ok && n.addNote(text) == nil {
+					n.emit(Event{Kind: "changed", Block: -1})
 				}
 			case "state":
 				n.liveJobs(it.sh)
@@ -237,11 +253,12 @@ func (n *Notebook) liveLoop() {
 // anything else becomes a History block, unless recording is off, or
 // it is mdsh bringing back the job a played block stopped. The
 // notebook is busy until it ends, though a block played meanwhile
-// stops it to run (see start). It returns the block, or -1.
-func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded, resumed bool) int {
+// stops it to run (see start). It returns the block, or -1, and
+// whether the notebook is busy with it, which it isn't for a note.
+func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded, resumed bool) (int, bool) {
 	if text, ok := note(cmd); ok && !resumed {
 		n.addNote(text)
-		return -1
+		return -1, false
 	}
 	n.mu.Lock()
 	n.liveCancel = func() { sh.Type([]byte{0x03}) }
@@ -254,7 +271,7 @@ func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded, resumed bool
 			n.noteEnd = -1
 		}
 		n.mu.Unlock()
-		return -1
+		return -1, true
 	}
 	var b *doc.Block
 	var err error
@@ -273,7 +290,7 @@ func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded, resumed bool
 	if err != nil {
 		n.mu.Unlock()
 		n.emit(Event{Kind: "error", Block: -1, Data: "can't add the command to the document: " + err.Error()})
-		return -1
+		return -1, true
 	}
 	n.noteEnd = -1
 	// With the lock held, so a run ending meanwhile doesn't rewrite the
@@ -282,10 +299,10 @@ func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded, resumed bool
 	started, err := n.sess.TypedStart(i)
 	n.mu.Unlock()
 	if err != nil {
-		return -1
+		return -1, true
 	}
 	started()
-	return i
+	return i, true
 }
 
 // liveEnded is a typed command's end that waits for the block played
@@ -363,14 +380,25 @@ type ShellJob struct {
 func (n *Notebook) liveJobs(sh *env.Shell) {
 	jobs := sh.Jobs()
 	out := make([]ShellJob, 0, len(jobs))
+	fg := sh.Foreground()
 	n.mu.Lock()
 	for _, j := range jobs {
+		if fg != 0 && j.PGID == fg {
+			// In the foreground again: it is the command that runs,
+			// not a job beside it, though the shell lists it till the
+			// next prompt.
+			continue
+		}
 		out = append(out, ShellJob{N: j.N, State: j.State, Command: j.Command, Block: n.blockFor(j.Command)})
 	}
 	n.mu.Unlock()
 	data, _ := json.Marshal(out)
 	n.emit(Event{Kind: "jobs", Block: -1, Data: string(data)})
 }
+
+// liveJobsWait is how long after a typed command starts its jobs are
+// sent again, by when fg has given the terminal to the job it resumed.
+const liveJobsWait = 200 * time.Millisecond
 
 // blockFor is the index of the last History block whose body is cmd,
 // with n.mu held, or -1.

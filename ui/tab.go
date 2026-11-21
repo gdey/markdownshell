@@ -120,13 +120,21 @@ type tabEvent struct {
 // emit sends an event to this tab's page, in whichever window holds it.
 func (t *docTab) emit(name string, data any) {
 	t.mu.Lock()
-	if t.running && name != "menu" && name != "audit" && name != "view-image" {
+	if t.running && name != "menu" && name != "audit" && name != "view-image" && !liveShell(data) {
 		t.live = append(t.live, liveEvent{name, data})
 	}
 	t.mu.Unlock()
 	if w := t.window(); w != nil {
 		w.win.Emit(name, tabEvent{t.id, data})
 	}
+}
+
+// liveShell reports whether data is a notebook event of the live History
+// pane's shell, which a page drawn again doesn't replay: the shell draws
+// its screen again on the next key.
+func liveShell(data any) bool {
+	e, ok := data.(notebook.Event)
+	return ok && e.Block == -1 && (e.Kind == "shell" || e.Kind == "jobs")
 }
 
 // window is the window holding the tab, or nil once it has closed.
@@ -176,6 +184,15 @@ func (t *docTab) open(file string, ro notebook.RunOptions) error {
 			case <-done:
 			default:
 				t.emit("block", e)
+				// A command typed at the live History pane's prompt
+				// changes the file outside a run of the page's: the
+				// title shows it, and autosave saves when it ends.
+				switch {
+				case e.Kind == "live" && e.Data == "":
+					go t.app.afterLive(t)
+				case e.Kind == "changed":
+					t.changed()
+				}
 			}
 		},
 		Confirm: func(block int, question string) run.Answer {

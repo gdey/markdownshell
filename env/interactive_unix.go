@@ -49,6 +49,12 @@ type interactive struct {
 	// dirty is set when keys were typed at the prompt since the last
 	// B, so a line may be half typed.
 	dirty bool
+	// entered is set when a key that ends the line at the prompt, such
+	// as enter or ctrl+c, was typed since the last B. An A without it
+	// is the prompt drawn again, as zsh and bash do when the terminal
+	// is resized, not a line that ran.
+	entered bool
+	redraw  bool // an A came for the prompt drawn again; its B is too
 	// view gets the whole stream, as a terminal would show it.
 	view io.Writer
 	// out gets a command's output, C to D, for the RunLine waiting on
@@ -313,14 +319,25 @@ func (ia *interactive) onMark(mk mark) {
 			// a line: the prompt alone ends the command.
 			ia.end(-1)
 		}
+		if ia.phase == phaseInput && !ia.entered && !ia.typed {
+			// The prompt drawn again: what is typed stays.
+			ia.redraw = true
+			return
+		}
 		ia.lineRan()
 		ia.phase = phasePrompt
 	case markInput:
 		if ia.phase == phaseRunning && ia.typed {
 			return
 		}
+		if ia.redraw {
+			// The line typed so far is drawn again after it.
+			ia.redraw = false
+			ia.echo.Reset()
+			return
+		}
 		ia.phase = phaseInput
-		ia.dirty = false
+		ia.dirty, ia.entered = false, false
 		ia.echo.Reset()
 	case markCommand:
 		if ia.phase == phaseInput {
@@ -801,6 +818,9 @@ func (s *Shell) Type(keys []byte) error {
 	s.ia.mu.Lock()
 	if s.ia.phase == phaseInput && len(keys) > 0 {
 		s.ia.dirty = true
+		if bytes.ContainsAny(keys, "\r\n\x03\x04") {
+			s.ia.entered = true
+		}
 	}
 	s.ia.mu.Unlock()
 	_, err := s.ia.ptm.Write(keys)

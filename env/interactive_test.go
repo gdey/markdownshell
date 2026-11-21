@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -455,6 +456,49 @@ func TestInteractiveTypedNote(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			if cmd[0] != want {
+				t.Errorf("got %q, want %q", cmd, want)
+			}
+		})
+	}
+}
+
+// TestInteractiveRedraw: the prompt drawn again, as bash and zsh draw
+// it when the terminal is resized, with a line half typed, isn't a line
+// that ran: the line runs whole when enter is pressed, and RunLine
+// still knows it is being typed.
+func TestInteractiveRedraw(t *testing.T) {
+	for _, sh := range shells(t) {
+		name := filepath.Base(sh)
+		if name == "sh" {
+			continue // its prompt isn't drawn again
+		}
+		t.Run(name, func(t *testing.T) {
+			s := startI(t, sh, nil)
+			var mu sync.Mutex
+			var cmd []string
+			s.Watch(func(e Event) {
+				if e.Kind == "line" || e.Kind == "start" {
+					mu.Lock()
+					cmd = append(cmd, e.Kind+" "+e.Command)
+					mu.Unlock()
+				}
+			})
+			s.Type([]byte("echo re"))
+			time.Sleep(200 * time.Millisecond)
+			s.SetSize(100, 30)
+			time.Sleep(300 * time.Millisecond)
+			if _, _, err := s.RunLine(context.Background(), "true", io.Discard); !errors.Is(err, ErrLineTyped) {
+				t.Errorf("RunLine with a line half typed: %v", err)
+			}
+			s.Type([]byte("drawn\r"))
+			waitFor(t, "the command", func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return len(cmd) > 0
+			})
+			mu.Lock()
+			defer mu.Unlock()
+			if want := []string{"start echo redrawn"}; !slices.Equal(cmd, want) {
 				t.Errorf("got %q, want %q", cmd, want)
 			}
 		})

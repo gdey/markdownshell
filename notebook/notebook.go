@@ -179,6 +179,11 @@ type Event struct {
 	// background block starts, which goes on while other blocks run,
 	// with done when it ends; or, for a tty block, terminal (it takes
 	// the terminal pane), tty (it showed Bytes there) and terminal-end.
+	// The live History pane (see Live) has Block -1 and kinds shell
+	// (its shell showed Bytes), shell-exit, jobs (Data is a JSON list
+	// of ShellJob), live (Data is "running" while a command typed at
+	// its prompt runs, "" once it ends) and changed (what was typed
+	// changed the document).
 	Kind  string `json:"kind"`
 	Block int    `json:"block"`
 	Data  string `json:"data,omitempty"`

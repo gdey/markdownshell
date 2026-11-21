@@ -81,6 +81,14 @@ export function Attach(want: number): $CancellablePromise<notebook$0.Heads> {
 }
 
 /**
+ * AttachShell starts the live History pane's shell, if it isn't
+ * running, so its prompt shows.
+ */
+export function AttachShell(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.AttachShell");
+}
+
+/**
  * BlockAt is the top-level block on line of the file, or -1.
  */
 export function BlockAt(line: number): $CancellablePromise<number> {
@@ -416,6 +424,16 @@ export function HistoryCompletions(before: string): $CancellablePromise<notebook
  */
 export function HistoryEnter(input: string, record: boolean): $CancellablePromise<void> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryEnter", input, record);
+}
+
+/**
+ * HistoryLive reports whether the History pane is a terminal on the
+ * file's interactive shell: keys go to TypeShell, and the shell's
+ * screen comes as "shell" events, rather than lines being edited for
+ * HistoryEnter. Settings › Run › Interactive shell turns it on.
+ */
+export function HistoryLive(): $CancellablePromise<boolean> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryLive");
 }
 
 /**
@@ -934,6 +952,14 @@ export function SetIncludeRange(i: number, $from: number, to: number): $Cancella
 }
 
 /**
+ * SetRecording turns the live History pane's Record switch on or off:
+ * off, commands typed at its prompt run but aren't added to the file.
+ */
+export function SetRecording(on: boolean): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetRecording", on);
+}
+
+/**
  * SetRunOptions sets the arguments (one line, split as a shell would),
  * --only, --step and --stop-on-error for this file.
  */
@@ -1003,6 +1029,13 @@ export function SetZshWrapper(on: boolean): $CancellablePromise<$models.ZshWrapp
  */
 export function Settings(): $CancellablePromise<settings$0.Settings> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.Settings");
+}
+
+/**
+ * ShellSize sets the live History pane's size, in cells.
+ */
+export function ShellSize(cols: number, rows: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.ShellSize", cols, rows);
 }
 
 /**
@@ -1106,6 +1139,14 @@ export function Type(keys: string): $CancellablePromise<void> {
  */
 export function TypeBackground(block: number, keys: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.TypeBackground", block, keys);
+}
+
+/**
+ * TypeShell sends keys typed in the live History pane to its shell,
+ * starting it again if it ended.
+ */
+export function TypeShell(keys: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.TypeShell", keys);
 }
 
 /**
