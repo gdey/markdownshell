@@ -23,6 +23,12 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The History pane as a terminal: a note, echo and vim typed at the shell's prompt, vim stopped with ctrl+z, its block marked stopped and the bar showing %1 vim stopped](docs/changelog/live-history.png)
 
+  `mdsh -i --interactive-shell` has the same History pane, as a
+  terminal: the shell's jobs show on the pane's rule, and ctrl+g gives
+  the keys back to the file, since esc is the program's.
+
+  ![mdsh -i: the History pane as a terminal, vim stopped with ctrl+z, the rule showing jobs: %1 vim (stopped), and the vim block kept as a recording](docs/changelog/live-history-tui.png)
+
 - With the experimental interactive shell on, running a block while a
   command such as vim holds the History pane's shell no longer fails
   with "the shell is running a command": mdsh stops the command, as

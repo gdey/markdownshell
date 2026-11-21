@@ -110,6 +110,9 @@ func historyEnv(environ []string) []string {
 func (m *Model) openHistory() tea.Cmd {
 	if m.hist.open {
 		m.hist.focus = true
+		if m.isLive() {
+			return nil
+		}
 		return m.hist.input.Focus()
 	}
 	if m.running {
@@ -146,6 +149,15 @@ func (m *Model) openHistory() tea.Cmd {
 		}
 	}
 	m.hist.recallAt = len(m.hist.recall)
+	if m.isLive() {
+		if m.ready {
+			m.resize(m.width, m.height)
+		}
+		if err := m.attachLive(); err != nil {
+			m.histLog(stderrStyle.Render("can't start the shell: " + err.Error()))
+		}
+		return nil
+	}
 	m.askPrompt()
 	if m.ready {
 		m.resize(m.width, m.height)
@@ -696,17 +708,37 @@ func (m *Model) histView() string {
 	if m.hist.running {
 		hint = " keys go to the command · ctrl+] stops it "
 	}
+	live := m.isLive()
+	if live {
+		hint = " keys go to the shell · ctrl+g back to the file "
+		if !m.hist.focus {
+			hint = " h type here "
+		}
+	}
 	if m.hist.sel != nil {
 		hint = " ↑/↓ select · y copy · esc cancel "
 	}
 	// The shell's directory follows the title; a long one loses its
 	// start.
 	dir := ""
-	if d := termsafe.Visible(m.hist.prompt.Dir); d != "" {
+	where := m.hist.prompt.Dir
+	if live {
+		// The shell's jobs, where the line editor shows its directory.
+		where = ""
+		if j := m.lterm.jobsText(); j != "" {
+			where = "jobs: " + j
+		}
+	}
+	if d := termsafe.Visible(where); d != "" {
 		room := m.width - lipgloss.Width(title) - lipgloss.Width(off) - lipgloss.Width(hint) - 6
 		if r := []rune(d); len(r) > room {
 			d = ""
-			if room > 1 {
+			switch {
+			case room <= 1:
+			case live:
+				// The first jobs matter most.
+				d = string(r[:room-1]) + "…"
+			default:
 				d = "…" + string(r[len(r)-room+1:])
 			}
 		}
@@ -721,6 +753,10 @@ func (m *Model) histView() string {
 		lines = m.selView(rows)
 	} else if m.hist.running {
 		lines = strings.Split(m.pane.screen(), "\n")
+	} else if live && m.lterm.sh != nil {
+		lines = strings.Split(m.lterm.p.screen(), "\n")
+	} else if live {
+		lines = slices.Clone(m.hist.log)
 	} else {
 		lines = slices.Clone(m.hist.log)
 		// The prompt's lines before its last show above what is typed.

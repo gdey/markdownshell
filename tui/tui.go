@@ -104,6 +104,8 @@ type Model struct {
 	parts   []part
 
 	events chan tea.Msg
+	// lterm is the History pane as a terminal on the interactive shell.
+	lterm  *liveTerm
 	cancel context.CancelFunc
 	// stopping is set once the user stopped the run going, so stopping
 	// it again kills the shell of a block that won't stop.
@@ -321,6 +323,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		shown:     opts.View,
 		active:    -1,
 		pane:      newPane(),
+		lterm:     newLiveTerm(),
 		termBlock: -1,
 		bgPanes:   map[int]*pane{},
 		bgFocus:   -1,
@@ -493,7 +496,7 @@ func (m *Model) clock() tea.Cmd {
 }
 
 // Init starts listening for run events, and watching the file.
-func (m *Model) Init() tea.Cmd { return tea.Batch(m.wait, m.check(), m.watchPane) }
+func (m *Model) Init() tea.Cmd { return tea.Batch(m.wait, m.check(), m.watchPane, m.watchLive) }
 
 // Update handles a key, a window size or a run event.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -596,6 +599,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.follow(m.termBlock)
 		}
 		return m, m.watchPane
+	case liveMsg:
+		return m, tea.Batch(m.watchLive, m.onLive(msg))
+	case liveDrawnMsg:
+		if msg.m != m {
+			return m, nil
+		}
+		if m.hist.open {
+			m.refresh()
+		}
+		return m, m.watchLive
 	case bgPaneMsg:
 		return m, tea.Batch(m.wait, m.bgPane(msg))
 	case bgDrawnMsg:
@@ -620,6 +633,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.hist != nil {
 			m.typedDone(msg.hist)
 		}
+		// Commands typed at the live pane's prompt that ended meanwhile.
+		m.finishLiveEnds()
 		switch {
 		case errors.Is(msg.err, context.Canceled):
 			m.status = "stopped"
@@ -641,7 +656,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// A block with a history keeps this run under the next one.
 		m.foldRuns()
 		// What ran may have changed the prompt, as cd does.
-		if m.hist.open {
+		if m.hist.open && !m.isLive() {
 			m.askPrompt()
 		}
 		m.refresh()
@@ -728,6 +743,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pane.typeKey(k)
 		}
 		return m, nil
+	}
+	// Keys in the live History pane are the shell's.
+	if m.hist.focus && m.isLive() {
+		return m, m.liveKey(k)
 	}
 	// So are they for a background tty block's terminal with the focus.
 	if m.bgKey(k) {
@@ -1718,6 +1737,8 @@ func (m *Model) footer() string {
 		help = m.askHelp()
 	case m.hist.sel != nil:
 		help = helpStyle.Render("↑/↓ j/k move the end · g/G first/last · o other end · y enter copy · esc cancel")
+	case m.hist.focus && m.isLive():
+		help = helpStyle.Render("the file's shell: what runs there goes into the file · ctrl+z, fg, jobs work · ctrl+g back to the file")
 	case m.hist.focus:
 		help = helpStyle.Render("shift+↑ select lines · enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
 	case len(m.nav) > 0 && m.bg[m.cur()]:

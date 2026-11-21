@@ -278,6 +278,12 @@ const paneRows, minPaneRows = 24, 5
 // fit sizes the pane to the card it is drawn in: the card's width, and
 // up to 24 rows, less when the window is short.
 func (m *Model) fit() {
+	// The live History pane's shell has the pane's size.
+	if m.hist.open && m.lterm.sh != nil {
+		cols, rows := max(m.width, 20), max(m.histRows(), minPaneRows)
+		m.lterm.p.setSize(cols, rows)
+		m.lterm.sh.SetSize(cols, rows)
+	}
 	// A command typed in the History pane runs in the pane.
 	if m.hist.running {
 		m.pane.setSize(max(m.width, 20), max(m.histRows(), minPaneRows))
