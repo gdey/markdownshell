@@ -37,9 +37,14 @@ type Shell struct {
 	out    *demux
 	errs   *demux
 	waited chan struct{}
-	pty    *ptyConn // nil unless started with Config.TTY
-	ttyRun int      // blocks run on the pty, to tell their markers apart
-	bgRun  int      // background jobs started, to name their files
+	// closeOnce makes Close safe to call again: a second
+	// closeInteractive would look for jobs on a terminal that may by
+	// then be another program's, and kill them.
+	closeOnce sync.Once
+	closeErr  error
+	pty       *ptyConn // nil unless started with Config.TTY
+	ttyRun    int      // blocks run on the pty, to tell their markers apart
+	bgRun     int      // background jobs started, to name their files
 	// pipes are the read ends of stdout and stderr.
 	pipes []io.Closer
 	exit  int
@@ -455,6 +460,9 @@ func (s *Shell) interrupt(stop <-chan struct{}, killAfter time.Duration) {
 	t := time.NewTicker(interruptEvery)
 	defer t.Stop()
 	for {
+		if s.Exited() {
+			return
+		}
 		interrupt(s.cmd)
 		if killAfter > 0 && time.Since(start) >= killAfter {
 			s.Kill()
@@ -613,6 +621,11 @@ func (s *Shell) Exported(ctx context.Context) (map[string]string, error) {
 
 // Close ends the shell and removes its temp files.
 func (s *Shell) Close() error {
+	s.closeOnce.Do(func() { s.closeErr = s.close() })
+	return s.closeErr
+}
+
+func (s *Shell) close() error {
 	s.killTermJobs()
 	if s.ia != nil {
 		s.closeInteractive()

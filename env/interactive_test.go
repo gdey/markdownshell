@@ -360,11 +360,12 @@ func TestInteractiveBackground(t *testing.T) {
 			if out, _ := j.Output(); string(out) != "from-bg\n" {
 				t.Errorf("output %q", out)
 			}
-			// The shell may report the job done first, as a terminal
-			// shows it.
-			_, out := runI(t, s, `echo "$BGPID"`)
-			if f := strings.Fields(out); len(f) == 0 || f[len(f)-1] != strconv.Itoa(j.PID) {
-				t.Errorf("BGPID %q, PID %d", out, j.PID)
+			// Through a file: the shell reports the job done on the
+			// terminal, as it likes, mixed with anything printed there.
+			f := filepath.Join(t.TempDir(), "pid")
+			runI(t, s, `printf '%s' "$BGPID" >`+f)
+			if got, _ := os.ReadFile(f); string(got) != strconv.Itoa(j.PID) {
+				t.Errorf("BGPID %q, PID %d", got, j.PID)
 			}
 		})
 	}

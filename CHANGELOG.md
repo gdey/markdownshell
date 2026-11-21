@@ -75,6 +75,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Closing an interactive shell twice no longer kills another program's
+  processes. The second close looked for jobs left on the shell's
+  terminal after mdsh had let go of it, when the system may have given
+  the same terminal to another program, such as another document's
+  shell, and killed what it found there.
 - Saving in mdsh-gui and `mdsh --serve` no longer drops what was just
   typed in the source pane. Right after a command typed in the History
   pane ended, the pane asked the shell for its prompt, and an edit or
