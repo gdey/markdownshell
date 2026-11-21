@@ -6,10 +6,12 @@ When a block fails, mdsh can ask a language model what went wrong, with
 the block, its output and a little of the document as context. The model
 runs on the machine (through [Kronk](https://www.kronkai.com/)) or at a
 hosted provider the user holds a token for (Anthropic first). The reverse
-also works: `mdsh mcp doc.md` serves a document to an outside agent such
-as Claude Code over the Model Context Protocol, so a tool the user already
+also works: `mdsh mcp` serves a session to an outside agent such as
+Claude Code over the Model Context Protocol, so a tool the user already
 has can read the document, see what failed and, with the usual
-confirmation, run blocks.
+confirmation, run blocks. The MCP server's design of record is
+[mcp/design.md](mcp/design.md) (Nov 4); this note keeps the assistant,
+the bundle, and what the server takes from them.
 
 This note covers both, because they share one piece: the context bundle
 mdsh builds for a block, with secrets taken out, which the user sees
@@ -366,77 +368,26 @@ MCP server gives an outside agent one for free.
 
 ## The document MCP server
 
-`mdsh mcp doc.md` serves one document to an MCP client over stdio, the
-transport every client supports, so a Claude Code or Claude Desktop
-configuration is one entry:
+Designed in [mcp/design.md](mcp/design.md), which replaces the version
+of this section written on Nov 1: `mdsh mcp` is a stdio bridge that
+attaches to a running `mdsh`, `mdsh -i`, mdsh-gui or `mdsh --serve`
+session over the control socket, with levels the person sets, and
+`mdsh mcp doc.md` for a headless session later. Where that doc and the
+Nov 1 text differed (editing tools, env values, confirmation on every
+run, the GUI surface), its "Reconciled with diagnose.md" section says
+which stands.
 
-```json
-{"mcpServers": {"deploy-runbook": {"command": "mdsh", "args": ["mcp", "deploy.md"]}}}
-```
+What the server takes from this note:
 
-The GUI's Run › Start MCP Server… shows that snippet for the open file
-with Copy, and a tab serving a document shows a plug icon in its tab;
-Stop MCP Server ends it. In the GUI the server runs inside the app, on a
-Unix socket in the same 0700 temp directory the control socket uses,
-and the snippet uses `mdsh mcp --connect <socket>` as the command, a
-thin stdio-to-socket bridge, so the agent drives the notebook the user
-is looking at: runs show in the cards, confirms are asked in the window,
-and edits land in the source view with Undo. From the CLI the server
-owns a `run.Session` of its own, as `mdsh -i` does, and writes output to
-the file as blocks run.
-
-It is built on the official Go SDK,
-`github.com/modelcontextprotocol/go-sdk`. It is the inverse of the
-control socket: `ctl` is a block talking up to the run; MCP is an agent
-talking down to the document. They share the temp directory and the
-audit log and nothing else.
-
-**Resources**
-
-| URI | Holds |
-| --- | --- |
-| `mdsh://doc` | The document as it is now, as markdown |
-| `mdsh://blocks/<id>` | One block: info string, body, and its result as the bundle's Result and output parts |
-| `mdsh://outline` | Headings and blocks with their state (ran, failed, waiting, running), as the outline shows |
-
-**Tools**
-
-| Tool | Does | Gate |
-| --- | --- | --- |
-| `list_blocks` | Ids, languages, attributes, state, heading path | None |
-| `get_block` | The block and its last result, output capped as the bundle caps it | None |
-| `diagnose_context` | The bundle for a block, redacted, exactly as the assistant would send it | None |
-| `run_block` | Runs one block as if the user pressed Run | Confirmation (below) |
-| `run_from` / `run_all` | As Run from here and Run all, with their confirm questions | Confirmation |
-| `set_block` | Replaces a block's body (and, with `info`, its attributes), as an edit in the source view | Confirmation when it changes a runnable block |
-| `append_block` | Adds a block at the end, as `-i` does for a typed command | Confirmation |
-| `set_input` | Types into a textbox or picks a choice by id | None |
-| `check_task` | Ticks or unticks a task, as `ctl check` will | None |
-| `stop` | Stops a run | None |
-
-**Confirmation.** Every tool that runs or changes code asks the user
-through the front end, the same question a `confirm` block asks, showing
-the code that will run or the diff that will be made, with the agent's
-one-line reason from the tool call. In the GUI that is the card's
-question; in the CLI it is the prompt on `/dev/tty`. There is no `--yes`
-for `mdsh mcp`: with no terminal it refuses those tools with a message
-the agent can read ("needs a person at the terminal"). A block's own
-`confirm` is asked after that, as it is for a run by hand. Confirmation
-can't be turned off in Settings, by a flag or by the document.
-
-**What an agent can't do.** Read anything but the document and its
-results; write anything but blocks, inputs and tasks; see env var
-values; change `shell:` or anything in front matter; run a block the
-view doesn't show (the GUI draws every runnable block since #143, so
-there is none). Output an agent reads is the same redacted output a person would
-send to a model, since `get_block` runs through `diag`. An agent that
-wants the raw output can read the file.
-
-**Audit.** Every tool call, with the agent's stated reason, the answer to
-the confirmation and who gave it, goes to the audit log as `mcp` events,
-beside `ctl` events. Diagnosis requests from the built-in assistant log
-a `diagnose` event with the backend, model, bundle size and a SHA-256 of
-the bundle, never the bundle.
+- **`mdsh_diagnose`**, a read tool that returns the bundle above for a
+  failed block, redacted and capped exactly as the assistant would send
+  it, so an outside agent gets the same honest context with one call.
+- **The sanitizer and redaction** on everything a model can read: a
+  `secret` block, a `--secret` variable and an `ask --secret` answer
+  never cross the socket in the clear, and control characters are shown
+  as escapes.
+- **The audit log.** Every call an agent makes is logged; see "Everything
+  is logged" there.
 
 ## Security and privacy notes
 
@@ -469,9 +420,9 @@ can now put in front of a model and from there into a suggested fix.
   and a model may repeat it as the fix. So the system prompt says the
   output is untrusted, the answer is drawn as text with no live links,
   Apply never runs anything, Insert as new block never runs anything,
-  and the MCP server's `run_*` and `set_block` always ask. An agent on
-  the MCP side reading `get_block` gets the same warning in the tool's
-  description. None of this makes a model immune; it makes the person
+  and the MCP server's `mdsh_run` goes through the same gates a click
+  does. An agent reading `mdsh_output` gets the same warning in the
+  tool's description. None of this makes a model immune; it makes the person
   the gate, which is where the rest of mdsh already puts them.
 - **Tokens.** Stored in the keychain by default, never in `gui.json` or
   `assistant.json`, never logged, never in a bundle (the `sk-ant-` and
@@ -485,9 +436,11 @@ can now put in front of a model and from there into a suggested fix.
   send time. `http://kronk.local` is remote. A `kronk server` bound to
   `0.0.0.0` on a shared machine is the user's business, but Settings
   says so when a loopback URL answers from a non-loopback interface.
-- **MCP over stdio only.** `mdsh mcp` never listens on TCP. The GUI's
-  socket is in a 0700 directory and the bridge is the only client we
-  document. A document can't start the server.
+- **MCP over stdio only.** `mdsh mcp` never listens on TCP; the one
+  later exception, inside `mdsh --serve` behind its token, is in
+  [mcp/design.md](mcp/design.md). The session's socket is in a 0700
+  directory, attaching asks the person, and a document can't attach,
+  since a block's token never reaches an operator command.
 - **What is never sent.** Other blocks' output, files the document
   names, include bodies, tapes, the audit log, the user's arguments
   unless ticked, and anything from another open tab.
@@ -497,16 +450,15 @@ can now put in front of a model and from there into a suggested fix.
 | Package | Job |
 | --- | --- |
 | `diag` | Build a bundle from a document, a block and its result; redact; the sanitizer; the system prompt; the `Backend` interface and the `anthropic` and `openai` backends; `Settings` and the token store; parse an answer for its fences |
-| `mcp` | The MCP server on a `run.Session`: resources, tools, the confirmation callback the front end fills in |
-| `cmd/mdsh` | `diagnose` and `mcp` subcommands; the completion script learns them |
+| `live`, `bridge` | The MCP server, in [mcp/design.md](mcp/design.md): session records, and `mdsh mcp` on the Go SDK; `mdsh_diagnose` calls `diag` |
+| `cmd/mdsh` | The `diagnose` subcommand; the completion script learns it and `mcp` |
 | `tui` | The preview pane, the answer pane, `?`, `A` |
-| `cmd/mdsh-gui` | The Diagnose button, the preview sheet, the Assistant drawer, Settings › Assistant, Start MCP Server…, the socket bridge |
+| `cmd/mdsh-gui` | The Diagnose button, the preview sheet, the Assistant drawer, Settings › Assistant |
 
 `diag` imports `doc` and `run` and nothing from the front ends, and is
 tested with golden bundles: a document, a result and the expected
 bundle, including one for every redaction pattern and one for each cap.
-`mcp` is tested against the Go SDK's in-memory transport with a fake
-confirmer. Backends are tested against `httptest` servers that replay
+Backends are tested against `httptest` servers that replay
 recorded streams; nothing in CI calls a provider.
 
 ## Milestones
@@ -519,13 +471,9 @@ drawing hidden blocks in the GUI (#143).
 1. **M0, `diag`.** The bundle, redaction, caps, the sanitizer, golden
    tests. No backend and no front end yet: the MCP server and the
    assistant both need this and nothing else from each other.
-2. **M1, `mdsh mcp`.** The server over stdio on a `run.Session`, every
-   resource and tool, confirmation on `/dev/tty`, audit events, the
-   completion script. Tested against the Go SDK's in-memory transport
-   and by hand from Claude Code.
-3. **M2, the GUI's MCP server.** The in-app server on the socket, the
-   `mdsh mcp --connect` bridge, Run › Start/Stop MCP Server…, the
-   snippet, the plug icon, confirms asked in the card.
+2. **M1 and M2, the MCP server.** The phases in
+   [mcp/design.md](mcp/design.md), which land on their own; M0 is
+   needed only for its `mdsh_diagnose` tool.
 4. **M3, `mdsh diagnose`.** `assistant.json` and env overrides, the
    `anthropic` and `openai` backends with streaming, the system prompt,
    `--show-context`, the `y/e/n` question, the hint after a failed run.
