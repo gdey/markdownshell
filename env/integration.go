@@ -105,6 +105,8 @@ else
 fi
 __mdsh_precmd() {
 	local s=$? h
+	# Only as the prompt's hook, not called from a script.
+	[ "${#FUNCNAME[@]}" -gt 1 ] && return $s
 	h=$(HISTTIMEFORMAT= history 1 2>/dev/null)
 	case $h in
 	*'. "'"$__mdsh_dir"/*)
@@ -146,6 +148,8 @@ const zshHooks = `setopt interactive_comments
 PROMPT_EOL_MARK=''
 __mdsh_precmd() {
 	local s=$?
+	# Only as the prompt's hook, not called from a script.
+	(( ${#funcstack} > 1 )) && return $s
 	__mdsh_dump $s
 	print -rn -- $'\e]133;D;'$s$';mdsh\a'
 	return $s

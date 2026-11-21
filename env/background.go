@@ -42,9 +42,6 @@ type Job struct {
 // A script with a syntax error doesn't start: the job is already done,
 // with status 2 and the error as its stderr.
 func (s *Shell) Background(ctx context.Context, script, pidVar string) (*Job, error) {
-	if s.ia != nil {
-		return nil, errors.New("background blocks need a scripted shell, not an interactive one")
-	}
 	s.mu.Lock()
 	s.bgRun++
 	dir := filepath.Join(s.tmp, "bg"+strconv.Itoa(s.bgRun))
@@ -76,7 +73,11 @@ func (s *Shell) Background(ctx context.Context, script, pidVar string) (*Job, er
 	if pidVar != "" {
 		launch += pidVar + "=$!\n"
 	}
-	launch += "printf '%s' \"$!\"\n"
+	// The PID goes to a file: an interactive shell prints its own job
+	// reports ("[1] 4242", "[1]+ Done ...") on the terminal, mixed with
+	// anything else written there.
+	pidFile := filepath.Join(dir, "pid")
+	launch += "printf '%s' \"$!\" >" + quote(pidFile) + "\n"
 	var out, errb bytes.Buffer
 	rc, exited, err := s.Run(ctx, launch, &out, &errb)
 	switch {
@@ -85,8 +86,12 @@ func (s *Shell) Background(ctx context.Context, script, pidVar string) (*Job, er
 	case exited || rc != 0:
 		return nil, fmt.Errorf("starting background job: %s", strings.TrimSpace(errb.String()))
 	}
-	if j.PID, err = strconv.Atoi(out.String()); err != nil {
-		return nil, fmt.Errorf("starting background job: bad pid %q", out.String())
+	pid, err := os.ReadFile(pidFile)
+	if err != nil {
+		return nil, fmt.Errorf("starting background job: %w", err)
+	}
+	if j.PID, err = strconv.Atoi(strings.TrimSpace(string(pid))); err != nil {
+		return nil, fmt.Errorf("starting background job: bad pid %q", pid)
 	}
 	s.jobMu.Lock()
 	if s.jobs == nil {

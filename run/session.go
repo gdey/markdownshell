@@ -91,6 +91,10 @@ func NewSession(d *doc.Document, opts Options) (*Session, error) {
 			Args:      opts.Args,
 			TTY:       hasTTY(d) || opts.PTY,
 			KillAfter: opts.KillAfter,
+			// The top-level shell runs interactively only where a
+			// terminal shows it; Stack starts sub-envs scripted.
+			Interactive: opts.InteractiveShell && opts.PTY && opts.Terminal != nil && env.CanInteractive(shell),
+			Login:       opts.LoginShell,
 		}),
 		tty:            hasTTY(d) || opts.PTY,
 		badFrontMatter: d.FrontMatterErr != nil,
@@ -384,6 +388,25 @@ func (s *Session) AskSized(ctx context.Context, script string, cols, rows int) (
 	return out.String(), nil
 }
 
+// TopState starts the top-level shell if it hasn't started, and, if it
+// runs interactively (Options.InteractiveShell), returns what it
+// reported at its last prompt: its directory, jobs and variables. ok is
+// false for a scripted shell, which reports nothing.
+func (s *Session) TopState(ctx context.Context) (st env.State, ok bool, err error) {
+	if err := s.checkFrontMatter(); err != nil {
+		return st, false, err
+	}
+	e, err := s.stack.Get(ctx, "", s.d.Options.Env.Share)
+	if err != nil {
+		return st, false, err
+	}
+	if !e.Shell.Interactive() {
+		return st, false, nil
+	}
+	st, ok = e.Shell.State()
+	return st, ok, nil
+}
+
 // Kill ends the shell a block is running in, at once, as when a block
 // that was stopped won't stop. What blocks set there is gone; the next
 // block in that env starts a new shell. It reports whether a block was
@@ -395,6 +418,12 @@ func (s *Session) Kill() bool {
 		return false
 	}
 	return true
+}
+
+// InteractiveShell reports whether the session's top-level shell runs
+// interactively (Options.InteractiveShell), once it starts.
+func (s *Session) InteractiveShell() bool {
+	return s.stack.TopInteractive()
 }
 
 // PTY reports whether the session's shells have terminals of their own,

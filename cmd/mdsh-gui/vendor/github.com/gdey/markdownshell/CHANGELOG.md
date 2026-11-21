@@ -26,6 +26,21 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![mdsh -i: the same file, nvim in the edit block's card and the run block's output under it](docs/changelog/background-tty-tui.png)
 
+- An experimental interactive shell for the History pane, for using mdsh
+  as the terminal you live in. With Settings › Shell › Interactive shell
+  in mdsh-gui, or `mdsh -i --interactive-shell`, the file's top-level
+  shell runs as an interactive shell (`zsh -i`, `bash -i`, `sh -i`) on
+  its own terminal and reads your rc files, so ctrl+z stops a command and
+  `fg`, `bg` and `jobs` work as they do in a terminal. Blocks run there
+  are typed at its prompt as one line that sources them, and their
+  output and errors come back as one stream. Blocks with `env=` still
+  run in shells of their own, as before. "Start it as a login shell"
+  (`--login-shell`) reads the profile files too. The audit log marks
+  the shell `interactive` and logs `job.stopped`, `job.backgrounded` and
+  `job.ended` for bash and zsh. It is off by default.
+
+  ![Settings › Shell with Interactive shell, marked experimental, turned on, and Start it as a login shell below it](docs/changelog/interactive-shell-setting.png)
+
 ### Changed
 
 - The `.dmg` window shows the newest look, Green Tea, in the app rising

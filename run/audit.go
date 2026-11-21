@@ -149,5 +149,46 @@ func (s *Session) logEnv(e *env.Env, share, names []string) {
 	if e.Parent != nil {
 		f["parent"] = e.Parent.Name
 	}
+	if e.Shell.Interactive() {
+		f["interactive"] = true
+		e.Shell.Watch(jobWatcher(s.opts.Audit, e.Name))
+	}
 	s.opts.Audit.Event("env.start", f)
+}
+
+// jobWatcher logs the changes to an interactive shell's jobs that each
+// prompt's state shows: job.stopped when one stops, as by ctrl+z,
+// job.backgrounded when one runs in the background, as with & or bg,
+// and job.ended when one leaves the table, having ended or been
+// brought back with fg and run to its end. A job fg brings back that
+// stops again looks the same before and after, so a resume as such
+// isn't logged. Jobs are told apart by process group.
+func jobWatcher(log *audit.Log, envName string) func(env.Event) {
+	known := map[int]env.ShellJob{}
+	return func(ev env.Event) {
+		if ev.Kind != "state" || ev.State == nil {
+			return
+		}
+		now := map[int]env.ShellJob{}
+		for _, j := range ev.State.Jobs {
+			if j.State == "done" {
+				continue
+			}
+			now[j.PGID] = j
+			was, ok := known[j.PGID]
+			f := audit.Fields{"env": envName, "job": j.N, "pgid": j.PGID, "command": j.Command}
+			switch {
+			case j.Stopped() && (!ok || !was.Stopped()):
+				log.Event("job.stopped", f)
+			case j.State == "running" && (!ok || was.Stopped()):
+				log.Event("job.backgrounded", f)
+			}
+		}
+		for pg, was := range known {
+			if _, ok := now[pg]; !ok {
+				log.Event("job.ended", audit.Fields{"env": envName, "job": was.N, "pgid": pg, "command": was.Command})
+			}
+		}
+		known = now
+	}
 }

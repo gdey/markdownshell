@@ -592,7 +592,9 @@ func (a *App) SetHistory(ctx context.Context, on, restart bool) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	n.SetHistoryRC(a.settings.Get().HistoryRC)
+	st := a.settings.Get()
+	n.SetHistoryRC(st.HistoryRC)
+	n.SetInteractiveShell(st.InteractiveShell, st.LoginShell)
 	return n.SetHistory(on, restart)
 }
 
@@ -751,6 +753,7 @@ func edited(cur *settings.Settings, s settings.Settings) {
 	cur.OpenTypes = settings.CleanTypes(s.OpenTypes)
 	cur.HistoryRC = strings.TrimSpace(s.HistoryRC)
 	cur.HistoryReuse = s.HistoryReuse
+	cur.InteractiveShell, cur.LoginShell = s.InteractiveShell, s.LoginShell
 	cur.Neovim, cur.NeovimPath, cur.NeovimClean = s.Neovim, strings.TrimSpace(s.NeovimPath), s.NeovimClean
 	cur.NeovimOwnColors = s.NeovimOwnColors
 	cur.Theme = ""

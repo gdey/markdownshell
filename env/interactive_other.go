@@ -25,7 +25,7 @@ var (
 	ErrNotInteractive = errors.New("shell isn't interactive")
 )
 
-func startInteractive(*Shell, Config, string) error {
+func startInteractive(context.Context, *Shell, Config, string, func(*Shell)) error {
 	return errors.New("interactive shells need Unix")
 }
 
@@ -44,3 +44,6 @@ func (s *Shell) Watch(func(Event))    {}
 func (s *Shell) State() (State, bool) { return State{}, false }
 func (s *Shell) Want([]string) error  { return ErrNotInteractive }
 func (s *Shell) Jobs() []ShellJob     { return nil }
+
+// CanInteractive is false: interactive shells need Unix.
+func CanInteractive(string) bool { return false }

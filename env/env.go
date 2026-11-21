@@ -109,6 +109,9 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 		return nil, fmt.Errorf("env %q: %w", name, err)
 	}
 	cfg := s.cfg
+	// Only the top-level env, the one a terminal shows, runs
+	// interactively; the rest are scripted.
+	cfg.Interactive, cfg.Login = false, false
 	filter := Filter
 	if s.Strict {
 		filter = FilterStrict
@@ -165,6 +168,10 @@ func (s *Stack) started(e *Env, share, environ []string) {
 	sort.Strings(names)
 	s.OnStart(e, share, names)
 }
+
+// TopInteractive reports whether the top-level env's shell runs, or
+// will run, interactively.
+func (s *Stack) TopInteractive() bool { return s.cfg.Interactive }
 
 // SetArgs sets the positional parameters in every shell started, and
 // in those started from now on. Call it while no script runs.

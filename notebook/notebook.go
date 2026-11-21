@@ -194,6 +194,13 @@ type RunOptions struct {
 	// start while the History pane is on, so the pane can be used as an
 	// everyday shell. It isn't sent to the window.
 	HistoryRC string `json:"-"`
+	// InteractiveShell runs the top-level shell interactively while the
+	// History pane is on, so job control works: see
+	// run.Options.InteractiveShell. Experimental. It isn't sent to the
+	// window.
+	InteractiveShell bool `json:"-"`
+	// LoginShell, with InteractiveShell, starts it as a login shell.
+	LoginShell bool `json:"-"`
 }
 
 // Options configure a Notebook.
@@ -379,6 +386,10 @@ func (n *Notebook) newSession(ro RunOptions) (*run.Session, error) {
 		Mode:               run.ModeInteractive,
 		PTY:                n.history,
 		Audit:              n.opts.Events.Audit(),
+		// The shell reads the user's rc files itself, so HistoryRC
+		// isn't sourced into it (see SetHistory).
+		InteractiveShell: ro.InteractiveShell,
+		LoginShell:       ro.LoginShell,
 		// Nil stays nil: run treats that as nobody to ask.
 		ApproveSources: n.opts.Sources,
 		AllowedOutside: n.allowedOutside(n.d),
@@ -467,7 +478,7 @@ func (n *Notebook) SetRunOptions(ro RunOptions) (waiting bool, err error) {
 		n.opts.Events.Event("args", audit.Fields{"args": ro.Args})
 	}
 	n.opts.Run = ro
-	if ro.Shell != was.Shell || ro.Source != was.Source || ro.HistoryRC != was.HistoryRC {
+	if ro.Shell != was.Shell || ro.Source != was.Source || ro.HistoryRC != was.HistoryRC || ro.InteractiveShell != was.InteractiveShell || ro.LoginShell != was.LoginShell {
 		n.opts.Events.Event("restart.needed", audit.Fields{"reason": whyRunOptions})
 		return true, nil
 	}

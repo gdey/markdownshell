@@ -84,7 +84,7 @@ var startTimeout = 30 * time.Second
 // the state the shell sends with its next prompt.
 const stateWait = 2 * time.Second
 
-func startInteractive(s *Shell, cfg Config, init string) error {
+func startInteractive(ctx context.Context, s *Shell, cfg Config, init string, launched func(*Shell)) error {
 	kind, err := kindOf(cfg.Path)
 	if err != nil {
 		return err
@@ -158,7 +158,12 @@ func startInteractive(s *Shell, cfg Config, init string) error {
 		ia.mu.Unlock()
 	}()
 
-	// Wait for the first prompt and the state sent with it.
+	if launched != nil {
+		launched(s)
+	}
+
+	// Wait for the first prompt and the state sent with it; ending ctx
+	// first kills the shell.
 	var startOut bytes.Buffer
 	ia.mu.Lock()
 	ia.view = &startOut
@@ -170,8 +175,14 @@ func startInteractive(s *Shell, cfg Config, init string) error {
 		ia.mu.Unlock()
 	})
 	defer stop.Stop()
+	unwatch := context.AfterFunc(ctx, func() {
+		ia.mu.Lock()
+		ia.cond.Broadcast()
+		ia.mu.Unlock()
+	})
+	defer unwatch()
 	ia.mu.Lock()
-	for !(ia.phase == phaseInput && ia.states > 0) && !s.Exited() && time.Now().Before(deadline) {
+	for !(ia.phase == phaseInput && ia.states > 0) && !s.Exited() && time.Now().Before(deadline) && ctx.Err() == nil {
 		ia.cond.Wait()
 	}
 	ok := ia.phase == phaseInput && ia.states > 0
@@ -179,6 +190,10 @@ func startInteractive(s *Shell, cfg Config, init string) error {
 	ia.mu.Unlock()
 	if !ok {
 		msg := strings.TrimSpace(stripEsc(startOut.String()))
+		if ctx.Err() != nil {
+			s.kill()
+			return ctx.Err()
+		}
 		if s.Exited() {
 			return fmt.Errorf("%s -i exited as it started: %s", filepath.Base(cfg.Path), msg)
 		}
@@ -255,6 +270,12 @@ func (ia *interactive) onMark(mk mark) {
 	defer ia.cond.Broadcast()
 	switch mk.kind {
 	case markPrompt:
+		if ia.phase == phaseRunning && ia.typed {
+			// A command mdsh typed ends at its D, which the hooks
+			// always write; an A in its output is the prompt printed,
+			// as by a script that expands PS1.
+			return
+		}
 		if ia.phase == phaseRunning {
 			// The D was lost, as when a ctrl+c threw away the end of
 			// a line: the prompt alone ends the command.
@@ -262,6 +283,9 @@ func (ia *interactive) onMark(mk mark) {
 		}
 		ia.phase = phasePrompt
 	case markInput:
+		if ia.phase == phaseRunning && ia.typed {
+			return
+		}
 		ia.phase = phaseInput
 		ia.dirty = false
 		ia.echo.Reset()
@@ -544,6 +568,42 @@ func (s *Shell) runInteractive(ctx context.Context, script string, stdout, stder
 	return s.runLine(ctx, sourceLine(f), w)
 }
 
+// runTerminalInteractive is RunTerminal for an interactive shell: the
+// script is sourced by a typed line, as Run does, with t's keys going
+// to the terminal while it runs, and its output, from C to D, to t.Out
+// and rec. Job control is the shell's own, so t.JobControl is moot.
+func (s *Shell) runTerminalInteractive(ctx context.Context, script string, t Terminal, rec io.Writer) (int, bool, error) {
+	cols, rows := t.Dims()
+	s.ia.setSize(cols, rows)
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		keys, resized := t.Keys, t.Resized
+		for {
+			select {
+			case <-stop:
+				return
+			case k, ok := <-keys:
+				if !ok {
+					keys = nil
+					continue
+				}
+				s.ia.ptm.Write(k)
+			case <-resized:
+				s.ia.setSize(t.Dims())
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		wg.Wait()
+	}()
+	out := io.MultiWriter(t.Out, rec)
+	return s.runInteractive(ctx, script, out, out)
+}
+
 // sourceLine is the line typed to run the script in file f. The
 // integration keeps lines of this form out of the shell's history.
 func sourceLine(f string) string {
@@ -731,4 +791,14 @@ func unsetEnv(environ []string, key string) []string {
 // master is ptm.
 func tcgetpgrp(ptm *os.File) (int, error) {
 	return unix.IoctlGetInt(int(ptm.Fd()), unix.TIOCGPGRP)
+}
+
+// CanInteractive reports whether the shell at path can run with
+// Config.Interactive: a POSIX shell, on Unix.
+func CanInteractive(path string) bool {
+	if path == "" {
+		path = "/bin/sh"
+	}
+	_, err := kindOf(path)
+	return err == nil
 }
