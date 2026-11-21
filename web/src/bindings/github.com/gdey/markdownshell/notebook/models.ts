@@ -197,6 +197,11 @@ export interface Cell {
     "heading"?: number;
 
     /**
+     * Title is a heading's text, as it reads.
+     */
+    "title"?: string;
+
+    /**
      * SectionFrom and SectionTo are the blocks a heading's section
      * holds, its subsections' included: Blocks[SectionFrom:SectionTo],
      * for RunRange. They are both 0 when no block in it runs.
@@ -292,6 +297,21 @@ export interface Cell {
      */
     "dropAfter": number;
     "dropBefore": number;
+
+    /**
+     * Hash is a hash of what the cell's body is drawn from, its prose,
+     * or its code, output, earlier runs and HTTP response: two cells with
+     * the same hash draw those the same.
+     */
+    "hash"?: string;
+
+    /**
+     * CodeLines and OutputLines are how many lines a block's code and
+     * output have, for guessing its card's height before its body is
+     * drawn.
+     */
+    "codeLines"?: number;
+    "outputLines"?: number;
 }
 
 /**
@@ -525,6 +545,40 @@ export interface HTTPCheck {
     "text": string;
     "ok": boolean;
     "got"?: string;
+}
+
+/**
+ * HeadList is heads as they go to the page: a 1M-line document has a
+ * few hundred thousand, so each is a JSON array rather than an object,
+ * 
+ * 	[line, from, to, hash, block, kind, flags, level, codeLines,
+ * 	 outputLines, sectionFrom, sectionTo, id, name, title, depends]
+ * 
+ * with what is left at its zero at the end left off, block's zero being
+ * -1. Line and From are counted on from the head before's, the first's
+ * from 0, and To from From, so most of the numbers are short.
+ */
+export type HeadList = any;
+
+/**
+ * Heads is a chunk of a layout's heads: Heads are cells [At,
+ * At+len(Heads)), and Fixes are the heads of cells before At that
+ * changed after Since, the step the page asked from, of the cells
+ * FixAt, in order. A fixed cell's body may have changed too. Step is
+ * where the layout is now, the Since to ask from next. Laid is how much
+ * of the file, in bytes, is laid out, of Size; Done is set when all of
+ * it is.
+ */
+export interface Heads {
+    "gen": number;
+    "at": number;
+    "heads": HeadList;
+    "fixAt"?: number[] | null;
+    "fixes"?: HeadList;
+    "step": number;
+    "laid": number;
+    "size": number;
+    "done": boolean;
 }
 
 /**

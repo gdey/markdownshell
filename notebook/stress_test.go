@@ -206,3 +206,21 @@ func BenchmarkStressType(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkStressAttach lays out the first chunk of each shape's cells
+// and draws the first screen's bodies, as a page opening the file does.
+func BenchmarkStressAttach(b *testing.B) {
+	for _, shape := range stress.Shapes {
+		for _, size := range stressSizes {
+			b.Run(shape+"/"+size.name, func(b *testing.B) {
+				n, _ := openStress(b, shape, size.lines)
+				for b.Loop() {
+					h := n.Attach(300)
+					if _, err := n.Bodies(h.Gen, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+}

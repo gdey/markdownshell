@@ -105,6 +105,8 @@ type Cell struct {
 	// Heading is the level of a prose cell that is a heading, 1 to 6;
 	// its section runs to the next heading of the same or a higher level.
 	Heading int `json:"heading,omitempty"`
+	// Title is a heading's text, as it reads.
+	Title string `json:"title,omitempty"`
 	// SectionFrom and SectionTo are the blocks a heading's section
 	// holds, its subsections' included: Blocks[SectionFrom:SectionTo],
 	// for RunRange. They are both 0 when no block in it runs.
@@ -160,6 +162,15 @@ type Cell struct {
 	// is fine.
 	DropAfter  int `json:"dropAfter"`
 	DropBefore int `json:"dropBefore"`
+	// Hash is a hash of what the cell's body is drawn from, its prose,
+	// or its code, output, earlier runs and HTTP response: two cells with
+	// the same hash draw those the same.
+	Hash string `json:"hash,omitempty"`
+	// CodeLines and OutputLines are how many lines a block's code and
+	// output have, for guessing its card's height before its body is
+	// drawn.
+	CodeLines   int `json:"codeLines,omitempty"`
+	OutputLines int `json:"outputLines,omitempty"`
 }
 
 // Event is what OnEvent reports while a block runs.
@@ -293,6 +304,11 @@ type Notebook struct {
 	undo, redo []change
 	// lines is the text's changes as line events, for Edit.
 	lines lineLog
+	// lay is the layout of the cells the page last attached to, and
+	// prose the prose rendered for it by hash, for the file proseFile.
+	lay       *cellLayout
+	prose     map[string]string
+	proseFile string
 }
 
 // reapEvery is how often a notebook checks on background blocks while
