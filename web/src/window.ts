@@ -226,7 +226,9 @@ Events.On("tabs", (ev: { sender?: string; data: Tabs }) => {
 Events.On("settings", (ev: { data: Settings }) => applyTheme(ev.data));
 
 applyKeyHints();
-me = await Window.Name();
-applyTheme(await App.Settings());
-show(await App.Tabs());
+// The three calls go together, as each waits on Go.
+const [name, settings, tabs] = await Promise.all([Window.Name(), App.Settings(), App.Tabs()]);
+me = name;
+applyTheme(settings);
+show(tabs);
 startupDrawn("window");

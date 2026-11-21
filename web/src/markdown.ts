@@ -14,7 +14,7 @@ import { codeLanguages } from "./highlight.js";
 import { hinted } from "./keys.js";
 import { Synced } from "./sync.js";
 import { spellCheck } from "./spell.js";
-import { editorLook } from "./theme.js";
+import { editorLook } from "./editorlook.js";
 
 export interface MarkdownEditorOptions {
   text: string;

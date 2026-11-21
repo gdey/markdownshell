@@ -4993,10 +4993,9 @@ document.addEventListener("keydown", (e) => {
 });
 
 startupMark("set up");
-me = await Window.Name();
-settings = await App.Settings();
+// These go together, as each waits on Go.
+[me, settings, attrs] = await Promise.all([Window.Name(), App.Settings(), App.BlockAttrs().then((a) => a ?? [])]);
 applyTheme(settings);
-attrs = (await App.BlockAttrs()) ?? [];
 applyView();
 startupMark("settings");
 await refresh();
