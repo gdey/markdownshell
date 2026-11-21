@@ -492,6 +492,14 @@ func (n *Notebook) Dirty() bool {
 	return n.dirty
 }
 
+// Busy reports whether a run is going, so that another run, a save or
+// a reload would fail with ErrBusy.
+func (n *Notebook) Busy() bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.running
+}
+
 // Changed reports whether the file changed on disk since it was read or
 // last saved.
 func (n *Notebook) Changed() bool {

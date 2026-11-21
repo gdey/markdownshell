@@ -18,6 +18,7 @@ import { type GoBlocks } from "./editor.js";
 import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdownEditor } from "./markdown.js";
 import { confirmShells, dismissShells, lostWarning } from "./confirm.js";
 import { addEvent, consoleFile, initConsole, loadEvents, showConsole } from "./console.js";
+import { bugReportPage, copyBugReport } from "./bugreport.js";
 import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyStatus, historyTerminal, historyWrite, initHistory, selectAllHistory, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
 import { offsetOf, posOf, stateOf } from "./nvimtext.js";
@@ -3493,6 +3494,7 @@ const actions: Record<string, () => Promise<void> | void> = {
     focusHistory();
   },
   console: () => toggle("console"),
+  bugreport: () => void copyBugReport(status),
 };
 
 // Moving blocks
@@ -4902,6 +4904,11 @@ initHistory({
   say: status,
 });
 initFrontMatter({ edit });
+bugReportPage(() => [
+  `Run going (page): ${running}`,
+  `Unsaved (page): ${doc.dirty}`,
+  `Source editor: ${nvimDoc ? "Neovim" : "CodeMirror"}`,
+]);
 initConsole({ toggle: () => void actions.console(), jump: (line) => void goToLine(line), fix: (warning) => void fixWarning(warning), lost: shellLost });
 initReport({
   dirty: () => !$("dirty").hidden,

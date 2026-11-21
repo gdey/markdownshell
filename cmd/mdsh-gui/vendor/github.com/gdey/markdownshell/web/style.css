@@ -876,6 +876,7 @@ body.history-full #history-grip { display: none; }
 #console-log .level { flex: none; width: 3ch; font-weight: 700; color: var(--muted); }
 #console-log .message { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 #console-log .warn .level { color: var(--warn-border); }
+#console-log .count { flex: none; align-self: flex-start; margin-top: 1.5px; padding: 0 5px; border-radius: 8px; background: var(--border); color: var(--fg); font-size: 0.9em; line-height: 15px; font-weight: 600; }
 #console-log .error .level, #console-log .error .message { color: var(--bad); }
 #console-log .where { color: var(--muted); }
 #console-log .jump { cursor: pointer; }

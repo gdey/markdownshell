@@ -15,13 +15,21 @@
 // skipped, the file changing on disk and mdsh ctl calls. An event that
 // lost what blocks set in a shell, its variables, functions and
 // aliases, stands out, counts toward the toolbar's badge and shows in
-// the status line. Copy there copies the events as JSON lines.
+// the status line. Copy there copies the events as JSON lines, and in
+// the Processes tab the process tree as text.
+//
+// A line that repeats the one before it isn't drawn again: the line
+// before shows how many times it came, and when the last one did.
+//
+// Bug Report copies a Markdown report of all of this, and of the app
+// and what this tab is doing, to paste into an issue or a chat.
 
 import { Clipboard, Events } from "/wails/runtime.js";
 import { App, type AuditEvent, type ConsoleEntry } from "./api.js";
 import { $, el } from "./dom.js";
 import { hinted } from "./keys.js";
 import { initProcs, watchProcs } from "./procs.js";
+import { copyBugReport } from "./bugreport.js";
 
 let entries: ConsoleEntry[] = [];
 let lastSeq = 0;
@@ -73,10 +81,55 @@ const where = (e: ConsoleEntry) => (e.file ? base(e.file) + (e.line ? `:${e.line
 const line = (e: ConsoleEntry) =>
   `${time(e.time)} ${short[e.level] ?? e.level.toUpperCase()} ${where(e) ? where(e) + " " : ""}${e.message}${e.stale ? " (fixed)" : ""}`;
 
-// rows holds the entry each drawn row is for.
-const rows = new WeakMap<HTMLElement, ConsoleEntry>();
+// A row stands for a run of entries that say the same thing, back to
+// back: e is the first, n how many, lastTime when the last came and seqs
+// their Seqs.
+interface Run {
+  e: ConsoleEntry;
+  n: number;
+  lastTime: unknown;
+  seqs: number[];
+}
 
-function row(e: ConsoleEntry): HTMLElement {
+// rows holds the run each drawn row is for.
+const rows = new WeakMap<HTMLElement, Run>();
+
+// same reports whether b says what a does, so it shows as a repeat.
+const same = (a: ConsoleEntry, b: ConsoleEntry) =>
+  a.level === b.level && a.message === b.message && (a.file ?? "") === (b.file ?? "") && (a.line ?? 0) === (b.line ?? 0) && (a.fix ?? "") === (b.fix ?? "") && !!a.stale === !!b.stale;
+
+// runs groups entries into runs of repeats.
+function runs(list: ConsoleEntry[]): Run[] {
+  const out: Run[] = [];
+  for (const e of list) {
+    const r = out[out.length - 1];
+    if (r && same(r.e, e)) {
+      r.n++;
+      r.lastTime = e.time;
+      r.seqs.push(e.seq);
+    } else out.push({ e, n: 1, lastTime: e.time, seqs: [e.seq] });
+  }
+  return out;
+}
+
+// runLine is a run as text, for copying.
+const runLine = (r: Run) => line(r.e) + (r.n > 1 ? ` (×${r.n}, last ${time(r.lastTime)})` : "");
+
+// count shows how many times a row's line came.
+function count(r: HTMLElement, run: Run) {
+  let c = r.querySelector<HTMLElement>(".count");
+  if (run.n < 2) return void c?.remove();
+  if (!c) {
+    c = el("span", { className: "count" });
+    r.querySelector(".level")!.after(c);
+  }
+  c.textContent = `×${run.n}`;
+  c.title = `${run.n} times, the last at ${time(run.lastTime)}`;
+  c.setAttribute("aria-label", `repeated ${run.n} times, the last at ${time(run.lastTime)}`);
+}
+
+function row(run: Run): HTMLElement {
+  const e = run.e;
   const r = el(
     "div",
     { className: "entry " + e.level + (e.stale ? " stale" : "") },
@@ -101,7 +154,8 @@ function row(e: ConsoleEntry): HTMLElement {
     };
     r.append(b);
   }
-  rows.set(r, e);
+  rows.set(r, run);
+  count(r, run);
   mark(r, e);
   return r;
 }
@@ -127,8 +181,8 @@ export function consoleFile(file: string) {
   if (file === here) return;
   here = file;
   for (const r of $("console-log").children) {
-    const e = rows.get(r as HTMLElement);
-    if (e) mark(r as HTMLElement, e);
+    const run = rows.get(r as HTMLElement);
+    if (run) mark(r as HTMLElement, run.e);
   }
 }
 
@@ -136,7 +190,7 @@ export function consoleFile(file: string) {
 // unless the click ended a drag that selected text to copy.
 function click(ev: MouseEvent) {
   const r = (ev.target as HTMLElement).closest<HTMLElement>(".entry");
-  const e = r && rows.get(r);
+  const e = r && rows.get(r)?.e;
   if (!e || !canJump(e)) return;
   const sel = window.getSelection();
   if (sel && !sel.isCollapsed && $("console-log").contains(sel.anchorNode)) return;
@@ -147,17 +201,18 @@ function click(ev: MouseEvent) {
 // is fixed.
 function stale(seqs: number[]) {
   const set = new Set(seqs);
+  for (const e of entries) if (set.has(e.seq)) e.stale = true;
   for (const r of [...$("console-log").children] as HTMLElement[]) {
-    const e = rows.get(r);
-    if (!e || !set.has(e.seq) || e.stale) continue;
-    e.stale = true;
-    r.replaceWith(row(e));
+    const run = rows.get(r);
+    if (!run || run.e.stale || !run.seqs.some((s) => set.has(s))) continue;
+    run.e.stale = true;
+    r.replaceWith(row(run));
   }
 }
 
 function drawAll() {
   const log = $("console-log");
-  log.replaceChildren(...entries.map(row));
+  log.replaceChildren(...runs(entries).map(row));
   $("console-empty").hidden = tab !== "log" || entries.length > 0;
   log.scrollTop = log.scrollHeight;
 }
@@ -168,10 +223,24 @@ function add(e: ConsoleEntry) {
   const log = $("console-log");
   // Follow the end, unless scrolled up to read.
   const atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 8;
-  log.append(row(e));
+  const end = log.lastElementChild as HTMLElement | null;
+  const run = end && rows.get(end);
+  if (run && same(run.e, e)) {
+    // A repeat: count it on the line it repeats.
+    run.n++;
+    run.lastTime = e.time;
+    run.seqs.push(e.seq);
+    count(end!, run);
+  } else log.append(row({ e, n: 1, lastTime: e.time, seqs: [e.seq] }));
   if (entries.length > 1000) {
     entries.shift();
-    log.firstElementChild?.remove();
+    const first = log.firstElementChild as HTMLElement | null;
+    const r = first && rows.get(first);
+    if (r && r.n > 1) {
+      r.n--;
+      r.seqs.shift();
+      count(first!, r);
+    } else first?.remove();
   }
   $("console-empty").hidden = true;
   if (atEnd) log.scrollTop = log.scrollHeight;
@@ -224,12 +293,18 @@ function dragGrip(e: PointerEvent) {
 }
 
 // copy puts the selected lines on the clipboard, or every line: in the
-// Events tab, every event as a line of JSON.
+// Events tab, every event as a line of JSON, and in the Processes tab
+// the tree, indented, as text.
 async function copy() {
   const sel = window.getSelection()?.toString() ?? "";
-  const log = tab === "events" ? $("events-log") : $("console-log");
-  const all = tab === "events" ? events.map((e) => e.json).join("\n") : entries.map(line).join("\n");
-  const text = sel && log.contains(window.getSelection()!.anchorNode) ? sel : all;
+  const log = $(tab === "events" ? "events-log" : tab === "procs" ? "procs-list" : "console-log");
+  const picked = sel && log.contains(window.getSelection()!.anchorNode);
+  let text = sel;
+  if (!picked) {
+    if (tab === "events") text = events.map((e) => e.json).join("\n");
+    else if (tab === "procs") text = (await App.ProcessesText().catch(() => "")) || "No shells running.";
+    else text = runs(entries).map(runLine).join("\n");
+  }
   try {
     await Clipboard.SetText(text);
     flash("Copied");
@@ -309,8 +384,11 @@ function showTab(which: Tab, focus = false) {
   $("events-empty").hidden = !ev || events.length > 0;
   if (!pr) $("procs-empty").hidden = true;
   $("console-clear").hidden = which !== "log";
-  $("console-copy").hidden = pr;
-  $("console-copy").title = ev ? "Copy the selected lines, or every event as JSON lines" : "Copy the selected lines, or all of them";
+  $("console-copy").title = ev
+    ? "Copy the selected lines, or every event as JSON lines"
+    : pr
+      ? "Copy the selected lines, or every process as an indented tree"
+      : "Copy the selected lines, or all of them";
   watchProcs(pr && open);
   const log = ev ? $("events-log") : $("console-log");
   if (!pr) log.scrollTop = log.scrollHeight;
@@ -384,6 +462,7 @@ export function initConsole(h: ConsoleHooks) {
   }
   $("console-clear").onclick = () => void App.ClearConsole().catch(() => {});
   $("console-copy").onclick = () => void copy();
+  $("console-bugreport").onclick = () => void copyBugReport(flash);
   $("console-close").onclick = () => hooks.toggle();
   $("console-toggle").onclick = () => hooks.toggle();
   Events.On("console", (ev: { data: ConsoleEntry }) => {

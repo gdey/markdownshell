@@ -286,6 +286,10 @@ func (g *gui) addHelpMenu(m *application.Menu) {
 	help := m.AddSubmenu("Help")
 	help.Add("Cheat Sheet").OnClick(func(*application.Context) { go g.ctrl.ShowCheatsheet() })
 	help.Add("Changelog").OnClick(func(*application.Context) { go g.ctrl.ShowChangelog() })
+	help.AddSeparator()
+	// It copies a report from the tab in front; see the frontend's
+	// bugreport.ts.
+	help.Add("Copy Bug Report").OnClick(g.send("bugreport"))
 }
 
 // addAppMenu adds macOS's app menu: About, Settings, Hide and Quit.
