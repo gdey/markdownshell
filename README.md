@@ -247,6 +247,16 @@ With `--history-reuse`, a command typed in the History pane that has a
 `#history-N` block already runs that block again, keeping its last
 output under it as an earlier run (`history`), rather than adding
 another block.
+With `--interactive-shell` (experimental), History's shell runs
+interactively on a terminal of its own, reading your rc files, and the
+History pane is that terminal: the shell draws its prompt, every key
+goes to it, so vim, ctrl+z, `fg`, `bg` and `jobs` work, and ctrl+g
+gives the keys back to the document. Commands still become blocks as
+they run; the pane's rule lists the shell's jobs. A block run while a
+command holds the shell stops it, as ctrl+z would, runs, and brings it
+back. `--login-shell` starts it as a login shell. Blocks such as `fg`
+or a stopped `vim` are a record of the session, not steps to repeat,
+which is why History blocks are `skip`.
 If the file is read-only, `w` opens save as instead; with `--autosave`,
 save as opens before the first run, and `esc` there lets the next run
 go ahead without saving. mdsh-gui does the same with its Save dialog.

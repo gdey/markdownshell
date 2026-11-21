@@ -180,6 +180,18 @@ This page is the reference.
   block once moved. The separator over the input shows the shell's
   working directory, and the button with the two arrows has the pane
   fill the tab, up to the tab bar, until it is pressed again.
+  With Settings › Shell › Interactive shell (experimental), the pane is
+  a real terminal on the file's shell, which reads your own rc files:
+  your prompt, key bindings and completion, and every key goes to the
+  shell, so vim, ctrl+z, `fg`, `bg` and `jobs` work. Commands still
+  become blocks as they run, and one that took the screen is kept as a
+  recording. The bar under the pane lists the shell's jobs, and a
+  stopped job's block has a badge. Playing a block while a command such
+  as vim holds the shell stops it, runs the block in the same shell and
+  brings the command back; alt-click (option-click on a Mac) the play
+  button, or press cmd/ctrl+alt+enter, to run the block in a side shell
+  and leave the command running. Blocks such as `fg` are a record of
+  the session, not steps to repeat.
 - **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from
   the app, with a count on the toolbar; a line about a place in a file
   jumps to it. A warning an edit fixed is struck out, and one with a
