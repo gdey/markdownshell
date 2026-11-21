@@ -103,7 +103,7 @@ func isTask(src []byte, p int) bool {
 func (n *Notebook) SetTask(task int, done bool) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	marks := n.taskMarks()
@@ -153,7 +153,7 @@ func (n *Notebook) setResultTask(marks []int, task int, mark byte) []outChange {
 func (n *Notebook) SetTextbox(i int, text string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) || !n.d.Blocks[i].IsTextbox() {
@@ -173,7 +173,7 @@ func (n *Notebook) SetTextbox(i int, text string) error {
 func (n *Notebook) SetChoice(i int, checked []bool) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) || !n.d.Blocks[i].IsChoice() {

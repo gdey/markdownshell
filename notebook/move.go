@@ -73,7 +73,7 @@ func (n *Notebook) PlanMove(i, dir int, byBlock bool) (Move, error) {
 func (n *Notebook) MoveTo(from, at int) (Move, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running || len(n.bg) > 0 {
+	if n.busy() || len(n.bg) > 0 {
 		return Move{}, ErrBusy
 	}
 	// Offsets change if blocks get ids first, so the move is kept as
@@ -157,7 +157,7 @@ func stepMove(i, dir int, byBlock bool) moveFn {
 // the moved block's index, or -1 for a section, and heading the
 // section's heading's, or -1 for a block.
 func (n *Notebook) plan(fn moveFn, block, heading int) (Move, error) {
-	if n.running || len(n.bg) > 0 {
+	if n.busy() || len(n.bg) > 0 {
 		return Move{}, ErrBusy
 	}
 	m, order, err := n.tryMove(fn, block, heading)

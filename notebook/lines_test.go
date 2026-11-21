@@ -3,9 +3,11 @@ package notebook
 import (
 	"errors"
 	"math/rand/v2"
+	"os"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // applyEvents makes events on text, as the source pane does.
@@ -191,5 +193,62 @@ func TestBlocksAt(t *testing.T) {
 	problems, _ := n.DependsAt()
 	if want := []DependsProblem{{Line: 11, Name: "x", Input: true}, {Line: 11, Name: "nope"}}; !slices.Equal(problems, want) {
 		t.Errorf("DependsAt = %v, want %v", problems, want)
+	}
+}
+
+// TestEditWaitsForPrompt checks that an edit and a save made while
+// Prompt asks the shell for its prompt, as the History pane does as soon
+// as a command typed there ends, wait for the answer and go through,
+// rather than failing with ErrBusy as they do while a block runs: the
+// page saved without the refused edit, so :w lost what was typed.
+func TestEditWaitsForPrompt(t *testing.T) {
+	src := "# Title\n\n```sh\necho hi\n```\n"
+	file := write(t, src)
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	_, v := n.TextAt()
+
+	// A block running still turns an edit down.
+	n.mu.Lock()
+	n.running = true
+	n.mu.Unlock()
+	if _, err := n.Edit(v, []LineEdit{{5, 5, "\nMore.\n"}}); !errors.Is(err, ErrBusy) {
+		t.Fatalf("Edit while a block runs: %v, want ErrBusy", err)
+	}
+
+	// Prompt asking, as PromptAt marks it.
+	n.mu.Lock()
+	n.asking = true
+	n.mu.Unlock()
+	type reply struct {
+		rep EditReply
+		err error
+	}
+	edited, saved := make(chan reply, 1), make(chan error, 1)
+	go func() {
+		rep, err := n.Edit(v, []LineEdit{{5, 5, "\nMore.\n"}})
+		edited <- reply{rep, err}
+		saved <- n.Save()
+	}()
+	select {
+	case r := <-edited:
+		t.Fatalf("Edit returned while Prompt asked: %+v, %v", r.rep, r.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	n.mu.Lock()
+	n.running, n.asking = false, false
+	n.idle.Broadcast()
+	n.mu.Unlock()
+	if r := <-edited; r.err != nil || !r.rep.Applied {
+		t.Fatalf("Edit once Prompt answered: %+v, %v", r.rep, r.err)
+	}
+	if err := <-saved; err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if got, _ := os.ReadFile(file); !strings.HasSuffix(string(got), "```\n\nMore.\n") {
+		t.Errorf("file = %q, want the edit saved", got)
 	}
 }

@@ -50,6 +50,19 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Saving in mdsh-gui and `mdsh --serve` no longer drops what was just
+  typed in the source pane. Right after a command typed in the History
+  pane ended, the pane asked the shell for its prompt, and an edit or
+  save made in that moment was turned down with "a block is running";
+  the page then saved the file without the edit and said "saved", so a
+  new block typed while the command ran was gone from the file. Edits
+  and saves now wait for the prompt, and a save never goes ahead
+  without the typing it was asked to keep. Saving while a block runs,
+  as with `:w` while a long command runs in a collapsed History pane,
+  says the file isn't saved yet and saves it as soon as the block ends.
+
+  ![mdsh-gui: :w while sleep runs in the collapsed History pane says the file isn't saved yet](docs/changelog/save-while-running.png)
+
 - Stop and the Processes view work when a shell is stuck. A shell that
   never finished starting, such as `zsh -i` (which reads its commands
   from the terminal rather than from mdsh), held the History pane for

@@ -33,7 +33,7 @@ const foldLine = "<!-- mdsh:collapse -->\n"
 func (n *Notebook) SetFolds(folds []Fold) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	d := n.d

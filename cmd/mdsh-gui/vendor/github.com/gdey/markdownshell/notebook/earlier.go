@@ -84,7 +84,7 @@ func hasEntry(b *doc.Block, k int) bool {
 func (n *Notebook) dropEarlier(i int, what string, drop func(doc.Entry) bool) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) {

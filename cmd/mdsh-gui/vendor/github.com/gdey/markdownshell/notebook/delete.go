@@ -26,7 +26,7 @@ type Deleted struct {
 func (n *Notebook) DeleteBlock(i int) (Deleted, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running || len(n.bg) > 0 {
+	if n.busy() || len(n.bg) > 0 {
 		return Deleted{}, ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) {
@@ -76,7 +76,7 @@ func (n *Notebook) tryDelete(i int) (Deleted, []byte, error) {
 func (n *Notebook) ClearOutput(i int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) {

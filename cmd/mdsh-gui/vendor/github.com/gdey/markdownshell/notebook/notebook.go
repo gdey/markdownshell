@@ -463,7 +463,7 @@ func (n *Notebook) RunOptions() RunOptions {
 func (n *Notebook) SetRunOptions(ro RunOptions) (waiting bool, err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return false, ErrBusy
 	}
 	n.waitReap()
@@ -571,6 +571,16 @@ func (n *Notebook) waitAsking() {
 	for n.asking {
 		n.idle.Wait()
 	}
+}
+
+// busy reports, with n.mu held, whether a block is running, after
+// waiting for Prompt to finish asking the shell: that takes a moment
+// and isn't a run, so an edit or a save made meanwhile, as right after
+// a command typed in the History pane ends, goes through rather than
+// failing with ErrBusy.
+func (n *Notebook) busy() bool {
+	n.waitAsking()
+	return n.running
 }
 
 func attrsText(info string) string {
@@ -722,7 +732,7 @@ func (n *Notebook) HasOutput() bool {
 func (n *Notebook) ClearOutputs() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	n.waitReap()
@@ -754,7 +764,7 @@ func (n *Notebook) forgetRuns() {
 func (n *Notebook) Restart() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	n.waitReap()
@@ -773,7 +783,7 @@ func (n *Notebook) Restart() error {
 func (n *Notebook) Save() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	return n.write(n.file)
@@ -789,7 +799,7 @@ func (n *Notebook) SaveAs(file string) error {
 	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	n.waitReap()
@@ -1051,7 +1061,7 @@ func (n *Notebook) Reload() (waiting bool, err error) {
 	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return false, ErrBusy
 	}
 	n.waitReap()

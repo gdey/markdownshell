@@ -19,7 +19,7 @@ import (
 func (n *Notebook) SetDepends(i int, deps []int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running || len(n.bg) > 0 {
+	if n.busy() || len(n.bg) > 0 {
 		return ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) {
