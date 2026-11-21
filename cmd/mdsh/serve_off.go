@@ -18,9 +18,11 @@ type serveFlag struct {
 	addr string
 }
 
+func (*serveFlag) stdio() bool { return false }
+
 // addServeFlag adds nothing: this mdsh has no --serve.
 func addServeFlag(*flag.FlagSet) *serveFlag { return &serveFlag{} }
 
-func serveCmd(addr, file string, args []string, source string, stderr io.Writer) error {
+func serveCmd(_ *serveFlag, file string, args []string, source string, stderr io.Writer) error {
 	return errors.New("this mdsh was built without --serve; build it with -tags serve")
 }
