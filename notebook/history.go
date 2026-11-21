@@ -38,7 +38,7 @@ func (n *Notebook) SetHistory(on, restart bool) (restarted bool, err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.waitAsking()
-	if n.running {
+	if n.busy() {
 		return false, ErrBusy
 	}
 	if !on {
@@ -435,7 +435,7 @@ func note(input string) (string, bool) {
 func (n *Notebook) addNote(text string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if strings.TrimSpace(text) == "" {
@@ -489,7 +489,7 @@ func (n *Notebook) addNote(text string) error {
 func (n *Notebook) addBlock(info, body string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if _, err := history.AddBlock(n.d, info, body); err != nil {

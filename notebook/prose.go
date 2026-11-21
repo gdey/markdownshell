@@ -614,7 +614,7 @@ func (n *Notebook) Text() string {
 func (n *Notebook) SetText(base, text string) (bool, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return false, ErrBusy
 	}
 	if string(n.d.Src) != base {

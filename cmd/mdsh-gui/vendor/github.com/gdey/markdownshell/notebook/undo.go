@@ -86,7 +86,7 @@ func (n *Notebook) Redo() (string, error) {
 func (n *Notebook) step(from, to *[]change, redo bool) (string, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return "", ErrBusy
 	}
 	if len(*from) == 0 {

@@ -229,7 +229,7 @@ func (n *Notebook) DescribeFix(warning string) (Fix, error) {
 func (n *Notebook) FixWarning(warning string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	f, err := n.fixFor(warning)

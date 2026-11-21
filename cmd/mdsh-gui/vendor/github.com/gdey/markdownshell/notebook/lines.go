@@ -132,7 +132,7 @@ func (n *Notebook) Edit(v Version, edits []LineEdit) (EditReply, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	now := n.noteLines()
-	if n.running {
+	if n.busy() {
 		return EditReply{Version: now}, ErrBusy
 	}
 	if v != now {

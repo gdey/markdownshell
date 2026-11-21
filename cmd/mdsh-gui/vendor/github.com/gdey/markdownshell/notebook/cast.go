@@ -24,7 +24,7 @@ import (
 func (n *Notebook) SetCastFrame(i int, body string, frame int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	var b *doc.Block
@@ -72,7 +72,7 @@ var castLink = regexp.MustCompile(`!\[([^\]\n]*)\]\(([^)\s]+)\)`)
 func (n *Notebook) ReplaceCast(i int, as string, frame int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	if i < 0 || i >= len(n.d.Blocks) {

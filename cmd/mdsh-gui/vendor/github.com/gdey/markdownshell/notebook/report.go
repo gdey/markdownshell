@@ -76,7 +76,7 @@ func (n *Notebook) MakeReport(r Report) ([]byte, error) {
 	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return nil, ErrBusy
 	}
 	// Each run is written into the document as it ends, so what it

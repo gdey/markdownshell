@@ -56,7 +56,7 @@ func (n *Notebook) IncludeFile(i int) (IncludeFile, error) {
 func (n *Notebook) SetIncludeRange(i, from, to int) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running {
+	if n.busy() {
 		return ErrBusy
 	}
 	b, err := n.includeBlock(i)

@@ -191,7 +191,7 @@ func knownKeys(root *yaml.Node) map[string]bool {
 func (n *Notebook) SetFrontMatter(f FrontMatter) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.running || len(n.bg) > 0 {
+	if n.busy() || len(n.bg) > 0 {
 		return ErrBusy
 	}
 	root, err := n.frontMatterNode()

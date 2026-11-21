@@ -2049,8 +2049,14 @@ async function clearOutputsButton() {
   b.disabled = running || !has;
 }
 
+// saveAfterRun is set by a save asked for while a block ran, such as
+// :w with a command running in the History pane: the save is made once
+// the run ends, with what was typed meanwhile.
+let saveAfterRun = false;
+
 function busy(on: boolean) {
   running = on;
+  if (!on && saveAfterRun) void actions.save();
   document.body.classList.toggle("running", on);
   if (!on) for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
   if (!on) stopTimers();
@@ -3398,9 +3404,20 @@ const actions: Record<string, () => Promise<void> | void> = {
   historycopy: () => copyHistory(),
   historyselectall: () => selectAllHistory(),
   async save() {
+    // Go takes no edits, and saves nothing, while a block runs: what was
+    // typed waits for the run to end, and so does the save.
+    if (running) {
+      saveAfterRun = true;
+      status("not saved yet: a block is running; it saves when the block ends");
+      return;
+    }
+    saveAfterRun = false;
     try {
       await nvimState();
       await applySource();
+      // Saving what Go has without what it refused would write the file
+      // as it was before the typing, and say it saved.
+      if (source?.pending || nvimDoc?.sync.pending) throw new Error("not saved: the edits didn't reach the file; save again");
       await App.Save();
       if (nvimDoc) await App.NvimSaved();
       status("saved");
@@ -4788,7 +4805,7 @@ Events.On(
   }),
 );
 
-Events.On("opened", mine(() => ((selected = -1), (outsideFile = ""), void refresh())));
+Events.On("opened", mine(() => ((selected = -1), (outsideFile = ""), (saveAfterRun = false), void refresh())));
 Events.On("audit", mine(addEvent));
 Events.On("view-image", mine((src: string) => viewSrc(src, "")));
 Events.On(
