@@ -204,10 +204,19 @@ func (h *consoleHandler) Enabled(ctx context.Context, l slog.Level) bool {
 	return l >= slog.LevelInfo || h.next.Enabled(ctx, l)
 }
 
-// noise reports whether r is too common to show: the asset server notes
-// every file a page loads.
+// boundFailed starts Wails' line for a bound method that returned an
+// error. It doesn't say which method, so the page logs the failure
+// itself, by name, through LogCallFailed, and the console keeps that
+// line rather than this one.
+const boundFailed = "Binding call failed: Bound method returned an error: "
+
+// noise reports whether r is too common or too vague to show: the asset
+// server notes every file a page loads, and see boundFailed.
 func noise(r slog.Record) bool {
-	return r.Level < slog.LevelWarn && strings.HasPrefix(r.Message, "[AssetFileServerFS] ")
+	if r.Level < slog.LevelWarn && strings.HasPrefix(r.Message, "[AssetFileServerFS] ") {
+		return true
+	}
+	return strings.HasPrefix(r.Message, boundFailed)
 }
 
 func (h *consoleHandler) Handle(ctx context.Context, r slog.Record) error {
@@ -299,6 +308,21 @@ func writeAttr(b *strings.Builder, group string, a slog.Attr) {
 // cleared.
 func (a *App) Console() []ConsoleEntry {
 	return a.console.list()
+}
+
+// LogCallFailed logs to the console that the page's call to method, an
+// App method, failed with err, naming the calling tab's file. It is how
+// the console says which call failed: see boundFailed.
+func (a *App) LogCallFailed(ctx context.Context, method, err string) {
+	var file string
+	if t, e := a.tab(ctx); e == nil {
+		file = t.file()
+	}
+	args := []any{}
+	if file != "" {
+		args = append(args, "file", file)
+	}
+	slog.Error(method+" failed: "+err, args...)
 }
 
 // DescribeFix says what FixWarning would do for warning, a console

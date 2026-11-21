@@ -8,6 +8,31 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Help › Copy Bug Report, and a Bug Report button in the Console pane,
+  copy a Markdown report to paste into an issue or a chat with Claude:
+  the version and build, the settings (less the recent, pinned and
+  window lists), what the tab is doing (its file, whether a run is
+  going, unsaved output, the History pane open or minimized, the view),
+  its processes, the console and the file's events. Paths under your
+  home folder show as `~`. It holds commands and what blocks printed,
+  so read it before you share it.
+
+  ![The Console pane's bar with Copy and Bug Report, its note saying the bug report was copied, over the Processes tab](docs/changelog/bug-report.png)
+
+- The Console pane's Processes tab has Copy too, as Console and Events
+  do: the selected lines, or every process as an indented tree with its
+  pid and how long it has run.
+- A Console line that repeats the one before it isn't shown again: the
+  first shows how many times it came, such as ×7, and hovering says when
+  the last did. Copy copies it once, with the count.
+
+  ![The Console with "Binding call failed: … a block is running" shown once with a ×7 badge](docs/changelog/console-repeats.png)
+
+- A call from the window to the app that fails now says which call it
+  was in the Console, and for which file, such as `demo.md Save failed:
+  a block is running`, in place of Wails' `Binding call failed: Bound
+  method returned an error: …`, which named none.
+
 - A `background` block can be `tty` too. In mdsh-gui, `mdsh -i` and
   `mdsh --serve` it runs on a terminal of its own, in its card, while
   other blocks run, so an editor can stay open on a script that the

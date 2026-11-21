@@ -359,7 +359,7 @@ explains an attribute and `zc`/`zo` fold.
 | Edit | Undo · Redo · Move Block Up · Move Block Down · Move Block Above Previous Block · Move Block Below Next Block · Depends On… · Front Matter · Cut · Copy · Paste · Select All · Preferences… (Linux) |
 | Run | Run Current Block · Run Section · Run All · Stop · Clear All Outputs… · Run Options… |
 | View | Source View · Rendered View · Outline · History · Console · Show Code · Show Output · Folding › Collapse All Blocks, Collapse All Sections, Expand All, Copy Folds to Source View, Copy Folds to Rendered View · Zoom In · Zoom Out · Actual Size · Toggle Full Screen · Show Next Tab · Show Previous Tab |
-| Help | Cheat Sheet · Changelog |
+| Help | Cheat Sheet · Changelog · Copy Bug Report |
 | Insert (right-click in the source view) | Heading · Bold · Italic · Code · Link · Image · Bulleted List · Numbered List · Task List · Quote · Table · Code Block · sh Block · sh Block, Confirm First · zsh Block · http Request · Textbox · Choice |
 
 Settings has six tabs: General, Look, Editing, Shell, Files and About;

@@ -86,6 +86,17 @@ export function BlockAttrs(): $CancellablePromise<doc$0.AttrSpec[] | null> {
 }
 
 /**
+ * BugReport is a Markdown bug report from the calling tab, to copy:
+ * the app's version and settings, the tab's file and what it is doing,
+ * its processes, the console and the file's events. page is what the
+ * page says it is doing, such as whether the History pane is minimized,
+ * as "name: value" lines.
+ */
+export function BugReport(page: string[] | null): $CancellablePromise<string> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.BugReport", page);
+}
+
+/**
  * CLIState says where the command line tool stands.
  */
 export function CLIState(): $CancellablePromise<$models.CLI> {
@@ -456,6 +467,15 @@ export function Live(): $CancellablePromise<$models.liveEvent[] | null> {
 }
 
 /**
+ * LogCallFailed logs to the console that the page's call to method, an
+ * App method, failed with err, naming the calling tab's file. It is how
+ * the console says which call failed: see boundFailed.
+ */
+export function LogCallFailed(method: string, err: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.LogCallFailed", method, err);
+}
+
+/**
  * MoveBlock moves top-level block i up (dir < 0) or down past the next
  * cell, or with byBlock past the next block. Undo takes it back.
  */
@@ -657,6 +677,14 @@ export function PlanMove(i: number, dir: number, byBlock: boolean): $Cancellable
  */
 export function Processes(): $CancellablePromise<env$0.ShellProcs[] | null> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.Processes");
+}
+
+/**
+ * ProcessesText is the calling tab's processes as the Processes tab
+ * shows them, as text, for its Copy.
+ */
+export function ProcessesText(): $CancellablePromise<string> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.ProcessesText");
 }
 
 /**

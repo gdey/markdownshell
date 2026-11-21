@@ -143,3 +143,22 @@ func TestConsoleSend(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// Wails' line for a bound method's error doesn't name the method, so the
+// console leaves it to the page's LogCallFailed, which does.
+func TestConsoleSkipsUnnamedBindingErrors(t *testing.T) {
+	var out bytes.Buffer
+	c := NewConsole()
+	log := slog.New(NewConsoleHandler(slog.NewTextHandler(&out, nil), c))
+	log.Error(boundFailed + "a block is running")
+	log.Error("Binding call failed: failed to call binding: could not parse argument #0")
+	log.Error("Save failed: a block is running", "file", "/x/a.md")
+	got := c.list()
+	if len(got) != 2 || !strings.HasPrefix(got[0].Message, "Binding call failed: failed to call") || got[1].Message != "Save failed: a block is running" || got[1].File != "/x/a.md" {
+		t.Errorf("console = %+v", got)
+	}
+	// The terminal still gets it.
+	if !strings.Contains(out.String(), "a block is running") {
+		t.Errorf("next handler got:\n%s", out.String())
+	}
+}
