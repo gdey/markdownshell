@@ -1,4 +1,5 @@
-import "./tab.js";
+import "./startup.js";
+import { tabID } from "./tab.js";
 import { copyLineDown, copyLineUp, moveLineDown, moveLineUp, redo, undo } from "@codemirror/commands";
 import { ChangeSet, type EditorState, type StateCommand, type Text } from "@codemirror/state";
 import { EditorView, scrollPastEnd } from "@codemirror/view";
@@ -34,6 +35,7 @@ import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, t
 import { adoptBackground, closeBackgrounds, closeTerminal, endBackground, endTerminal, openBackground, openTerminal, sizeTerminal, wantTerminalSize, writeBackground, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
+import { drawn as startupDrawn, mark as startupMark } from "./startup.js";
 
 let me = ""; // this window's name; events from other windows are ignored
 let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "", frontMatterError: "", frontMatterFix: { label: "", detail: "" }, lastView: "", lastHistory: false };
@@ -4990,9 +4992,11 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
 });
 
-me = await Window.Name();
-settings = await App.Settings();
+startupMark("set up");
+// These go together, as each waits on Go.
+[me, settings, attrs] = await Promise.all([Window.Name(), App.Settings(), App.BlockAttrs().then((a) => a ?? [])]);
 applyTheme(settings);
-attrs = (await App.BlockAttrs()) ?? [];
 applyView();
+startupMark("settings");
 await refresh();
+startupDrawn("tab " + tabID);

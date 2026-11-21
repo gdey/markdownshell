@@ -2,6 +2,7 @@
 // it. Events from Go for one tab carry its id, and this page passes them
 // on to that tab's page alone; other events go to every tab.
 
+import { drawn as startupDrawn } from "./startup.js";
 import { Events, Window } from "/wails/runtime.js";
 
 import { App, type Settings, type Tab, type Tabs } from "./api.js";
@@ -225,6 +226,9 @@ Events.On("tabs", (ev: { sender?: string; data: Tabs }) => {
 Events.On("settings", (ev: { data: Settings }) => applyTheme(ev.data));
 
 applyKeyHints();
-me = await Window.Name();
-applyTheme(await App.Settings());
-show(await App.Tabs());
+// The three calls go together, as each waits on Go.
+const [name, settings, tabs] = await Promise.all([Window.Name(), App.Settings(), App.Tabs()]);
+me = name;
+applyTheme(settings);
+show(tabs);
+startupDrawn("window");

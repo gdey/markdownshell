@@ -7,8 +7,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -102,6 +105,7 @@ func List(root string) (Listing, error) {
 		return Listing{}, err
 	}
 	var l Listing
+	sizes := []int64{} // each file's size, by its index in l.Files
 	// tags holds each visited folder's inherited tags: its own
 	// collection's plus those of the collections above it, up to root.
 	tags := map[string][]string{}
@@ -148,16 +152,39 @@ func List(root string) (Listing, error) {
 		if err != nil {
 			return nil
 		}
-		n, desc, own := read(path, fi.Size())
 		l.Files = append(l.Files, File{
-			Path: path, Rel: filepath.ToSlash(rel), Blocks: n, Description: desc,
-			Tags: collection.Merge(tags[filepath.Dir(path)], own), Mod: fi.ModTime(),
+			Path: path, Rel: filepath.ToSlash(rel), Tags: tags[filepath.Dir(path)], Mod: fi.ModTime(),
 		})
+		sizes = append(sizes, fi.Size())
 		return nil
 	})
+	readAll(l.Files, sizes)
 	slices.SortFunc(l.Files, func(a, b File) int { return strings.Compare(a.Rel, b.Rel) })
 	slices.SortFunc(l.Collections, func(a, b Collection) int { return strings.Compare(a.Rel, b.Rel) })
 	return l, err
+}
+
+// readAll reads each of files, whose sizes are sizes, for its blocks,
+// description and front matter tags, which it adds to the tags the file
+// has from its folders. Parsing is most of a listing's time, so the
+// files are read on all the CPUs at once.
+func readAll(files []File, sizes []int64) {
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	for range min(runtime.GOMAXPROCS(0), len(files)) {
+		wg.Go(func() {
+			for {
+				i := int(next.Add(1) - 1)
+				if i >= len(files) {
+					return
+				}
+				f := &files[i]
+				n, desc, own := read(f.Path, sizes[i])
+				f.Blocks, f.Description, f.Tags = n, desc, collection.Merge(f.Tags, own)
+			}
+		})
+	}
+	wg.Wait()
 }
 
 // read returns how many blocks mdsh would run in the file at path, or -1

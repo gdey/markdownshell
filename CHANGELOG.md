@@ -68,6 +68,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- mdsh-gui starts faster. The window's tab bar no longer loads the
+  editor's code, the first calls each page makes to Go go together, and
+  the start folder's files are listed while the window loads, on every
+  CPU at once. On an M2 Max a file named on the command line is drawn
+  in 526ms, down from 559ms, and the start screen of a 500-file folder
+  in 509ms, down from 836ms.
+- `MDSH_STARTUP_TRACE=1 mdsh-gui` prints when it gets to each point of
+  starting up, and `go run ./internal/startuptime` in cmd/mdsh-gui
+  times a build's startup over several runs.
 - The `.dmg` window shows the newest look, Green Tea, in the app rising
   from its bottom edge. `build/darwin/dmg/render.sh` takes the newest
   look's picture from `site/data/looks.toml`, so running it again when a
@@ -75,6 +84,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- On macOS, mdsh-gui opened with a folder on the command line showed
+  a "read …: is a directory" error sheet, which held back the window by
+  a quarter of a second or kept it from showing at all. macOS asks to
+  open the command line's folder as if Finder had, and mdsh-gui now
+  skips that, and the same for a file it opened already.
 - Closing an interactive shell twice no longer kills another program's
   processes. The second close looked for jobs left on the shell's
   terminal after mdsh had let go of it, when the system may have given

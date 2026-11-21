@@ -20,14 +20,24 @@ func ControlOf(a *App) Control { return Control{a} }
 // with the start screen if file is "".
 func (c Control) Start(file string, run notebook.RunOptions) error {
 	t := c.a.newTab()
+	if c.a.dir != "" {
+		c.a.finderOpens.arg(c.a.dir)
+	}
+	if file == "" {
+		c.a.prefetchStart()
+	} else {
+		c.a.finderOpens.arg(file)
+	}
 	if file != "" {
 		ro := c.a.runOptions()
 		ro.Args, ro.Only, ro.Step, ro.StopOnError = run.Args, run.Only, run.Step, run.StopOnError
 		if err := t.open(file, ro); err != nil {
 			return err
 		}
+		StartupMark("file opened")
 	}
 	c.a.newWindow(t)
+	StartupMark("window made")
 	return nil
 }
 

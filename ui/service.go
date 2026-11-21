@@ -676,10 +676,11 @@ type Start struct {
 // recent files that still exist.
 func (a *App) StartScreen() (Start, error) {
 	dir := a.startDir()
-	l, err := library.List(dir)
+	l, err := a.listStart(dir)
 	if err != nil {
 		return Start{}, err
 	}
+	StartupMark(fmt.Sprintf("start screen listed %d files", len(l.Files)))
 	// The window may load the collections' images, and nothing else
 	// outside the open documents' folders.
 	images := map[string]bool{}
@@ -703,6 +704,49 @@ func (a *App) StartScreen() (Start, error) {
 	home, _ := os.UserHomeDir()
 	last, _ := session.Last(a.sessionDir())
 	return Start{Dir: dir, Home: home, Files: l.Files, Collections: l.Collections, Full: l.Full, Recent: existing(s.Recent), Pinned: existing(s.Pinned), LastSession: last, Writable: writable, Outside: a.outside.Allowed()}, nil
+}
+
+// startListing is a listing of a start folder made before the start
+// screen asked for it, as the app starts with one, so the files are read
+// while the window's pages load.
+type startListing struct {
+	dir  string
+	made time.Time
+	done chan struct{} // closed once l and err are set
+	l    library.Listing
+	err  error
+}
+
+// prefetchFresh is how long a prefetched listing stays good for.
+const prefetchFresh = 10 * time.Second
+
+// prefetchStart starts listing the start folder for the start screen
+// the app opens with.
+func (a *App) prefetchStart() {
+	p := &startListing{dir: a.startDir(), made: time.Now(), done: make(chan struct{})}
+	a.mu.Lock()
+	a.prefetched = p
+	a.mu.Unlock()
+	go func() {
+		p.l, p.err = library.List(p.dir)
+		close(p.done)
+	}()
+}
+
+// listStart lists dir for the start screen: the listing prefetchStart
+// started, the first time it is asked for if that is soon after, else
+// afresh. A start screen shown later, such as when the system opened a
+// file in the first tab, lists the folder as it is then.
+func (a *App) listStart(dir string) (library.Listing, error) {
+	a.mu.Lock()
+	p := a.prefetched
+	a.prefetched = nil
+	a.mu.Unlock()
+	if p != nil && p.dir == dir && time.Since(p.made) < prefetchFresh {
+		<-p.done
+		return p.l, p.err
+	}
+	return library.List(dir)
 }
 
 // existing are the files that still exist. The others stay in the

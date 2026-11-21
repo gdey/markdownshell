@@ -21,6 +21,10 @@ const docCSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inli
 // images their blocks write.
 func (a *App) assets(pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == startupPath {
+			serveStartupMarks(w, r)
+			return
+		}
 		if name, ok := strings.CutPrefix(r.URL.Path, changelogImages); ok {
 			serveChangelogImage(w, r, name)
 			return
