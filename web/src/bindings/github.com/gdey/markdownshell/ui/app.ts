@@ -71,6 +71,16 @@ export function AnswerOutside(answer: string): $CancellablePromise<void> {
 }
 
 /**
+ * Attach starts laying the document's cells out afresh and returns the
+ * heads of the first want: what the page needs of every cell to place
+ * it, without its body. A 1M-line document's first screen is drawn from
+ * these while the rest are laid out. See notebook.Heads.
+ */
+export function Attach(want: number): $CancellablePromise<notebook$0.Heads> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Attach", want);
+}
+
+/**
  * BlockAt is the top-level block on line of the file, or -1.
  */
 export function BlockAt(line: number): $CancellablePromise<number> {
@@ -83,6 +93,14 @@ export function BlockAt(line: number): $CancellablePromise<number> {
  */
 export function BlockAttrs(): $CancellablePromise<doc$0.AttrSpec[] | null> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.BlockAttrs");
+}
+
+/**
+ * Bodies is cells of layout gen, whole, for the cards the page draws.
+ * It fails as MoreHeads does.
+ */
+export function Bodies(gen: number, cells: number[] | null): $CancellablePromise<notebook$0.Cell[] | null> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Bodies", gen, cells);
 }
 
 /**
@@ -473,6 +491,16 @@ export function Live(): $CancellablePromise<$models.liveEvent[] | null> {
  */
 export function LogCallFailed(method: string, err: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.LogCallFailed", method, err);
+}
+
+/**
+ * MoreHeads is the heads of layout gen from cell at on, want of them
+ * if there are that many, with the fixes to earlier heads since step
+ * since. It fails when the document changed since the layout started:
+ * the page attaches again.
+ */
+export function MoreHeads(gen: number, at: number, since: number, want: number): $CancellablePromise<notebook$0.Heads> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.MoreHeads", gen, at, since, want);
 }
 
 /**

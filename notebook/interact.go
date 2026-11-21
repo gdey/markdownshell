@@ -74,8 +74,12 @@ func (n *Notebook) taskMarks() []int {
 // marksIn are the offsets in md of the [ ] of its task list items and
 // table cell checkboxes, in order.
 func (n *Notebook) marksIn(md []byte) []int {
+	return marksOf(n.md.Parser().Parse(text.NewReader(md)), md)
+}
+
+// marksOf is marksIn, given root, md parsed.
+func marksOf(root ast.Node, md []byte) []int {
 	var marks []int
-	root := n.md.Parser().Parse(text.NewReader(md))
 	_ = ast.Walk(root, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
 		if _, ok := c.(*east.TaskCheckBox); !ok || !entering {
 			return ast.WalkContinue, nil

@@ -111,6 +111,40 @@ func (a *App) Cells(ctx context.Context) ([]notebook.Cell, error) {
 	return n.Cells(), nil
 }
 
+// Attach starts laying the document's cells out afresh and returns the
+// heads of the first want: what the page needs of every cell to place
+// it, without its body. A 1M-line document's first screen is drawn from
+// these while the rest are laid out. See notebook.Heads.
+func (a *App) Attach(ctx context.Context, want int) (notebook.Heads, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Heads{}, err
+	}
+	return n.Attach(want), nil
+}
+
+// MoreHeads is the heads of layout gen from cell at on, want of them
+// if there are that many, with the fixes to earlier heads since step
+// since. It fails when the document changed since the layout started:
+// the page attaches again.
+func (a *App) MoreHeads(ctx context.Context, gen int64, at, since, want int) (notebook.Heads, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Heads{}, err
+	}
+	return n.MoreHeads(gen, at, since, want)
+}
+
+// Bodies is cells of layout gen, whole, for the cards the page draws.
+// It fails as MoreHeads does.
+func (a *App) Bodies(ctx context.Context, gen int64, cells []int) ([]notebook.Cell, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return n.Bodies(gen, cells)
+}
+
 // RunBlock runs block i alone.
 func (a *App) RunBlock(ctx context.Context, i int) error {
 	t, n, err := a.notebook(ctx)

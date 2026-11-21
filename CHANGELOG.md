@@ -77,6 +77,11 @@ follow [Semantic Versioning](https://semver.org/).
 - `MDSH_STARTUP_TRACE=1 mdsh-gui` prints when it gets to each point of
   starting up, and `go run ./internal/startuptime` in cmd/mdsh-gui
   times a build's startup over several runs.
+- A long file opens at once: the first screen is drawn from the first
+  few hundred cells while the rest are laid out behind it, and only the
+  cards near the view are rendered. A 1M-line runbook shows its first
+  screen in about 0.4 s, against 13.5 s before in Chromium; a 1M-line
+  file that is mostly prose opens, where before the window gave up.
 - The `.dmg` window shows the newest look, Green Tea, in the app rising
   from its bottom edge. `build/darwin/dmg/render.sh` takes the newest
   look's picture from `site/data/looks.toml`, so running it again when a
