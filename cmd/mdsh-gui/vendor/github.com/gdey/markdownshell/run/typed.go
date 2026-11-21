@@ -27,27 +27,29 @@ func (s *Session) TopShell(ctx context.Context) (*env.Shell, error) {
 
 // TypedStart says block i is a command typed at the top-level shell's
 // own prompt, which has started: the shell runs it, not the session.
-// It is logged and its Started event sent; TypedEnd ends it.
-func (s *Session) TypedStart(i int) error {
+// It is logged; started sends its Started event, which the caller does
+// once it no longer holds what OnEvent takes, as the lock that keeps
+// the document from changing under TypedStart. TypedEnd ends it.
+func (s *Session) TypedStart(i int) (started func(), err error) {
 	if i < 0 || i >= len(s.d.Blocks) {
-		return fmt.Errorf("no block %d", i)
+		return nil, fmt.Errorf("no block %d", i)
 	}
 	b := s.d.Blocks[i]
 	r := &Result{Block: b, Ran: true, Running: true, Start: s.now()}
 	s.results[i] = r
 	s.rotateAssets(b)
-	s.emit(Event{Kind: Started, Block: b})
 	s.logStart(b)
-	return nil
+	return func() { s.emit(Event{Kind: Started, Block: b}) }, nil
 }
 
 // TypedEnd ends block i, which TypedStart started, with the status the
 // shell gave it and what it showed on the terminal. A command that took
 // the screen gets the recording, as RunTyped's does, and reports it;
-// any other gets the text it showed as its stdout.
-func (s *Session) TypedEnd(i int, status int, shown termrec.Recording) (r *Result, fullScreen bool, err error) {
+// any other gets the text it showed as its stdout. It is logged; done
+// sends its Done event, as TypedStart's started does.
+func (s *Session) TypedEnd(i int, status int, shown termrec.Recording) (r *Result, fullScreen bool, done func(), err error) {
 	if i < 0 || i >= len(s.d.Blocks) {
-		return nil, false, fmt.Errorf("no block %d", i)
+		return nil, false, nil, fmt.Errorf("no block %d", i)
 	}
 	b := s.d.Blocks[i]
 	r = s.results[i]
@@ -60,16 +62,12 @@ func (s *Session) TypedEnd(i int, status int, shown termrec.Recording) (r *Resul
 	if status < 0 {
 		r.Status = 0
 	}
-	defer func() {
-		s.logEnd(b, r, r.Start)
-		s.emit(Event{Kind: Done, Block: b, Result: r})
-	}()
 	if !shown.FullScreen() {
 		r.Stdout = []byte(shown.Text())
-		return r, false, nil
+	} else {
+		fullScreen = true
+		r.Image, r.Err = saveRecording(b, shown, s.opts)
 	}
-	img, err := saveRecording(b, shown, s.opts)
-	r.Image = img
-	r.Err = err
-	return r, true, nil
+	s.logEnd(b, r, r.Start)
+	return r, fullScreen, func() { s.emit(Event{Kind: Done, Block: b, Result: r}) }, nil
 }

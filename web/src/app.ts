@@ -1467,9 +1467,14 @@ function runs(b: HTMLButtonElement): HTMLButtonElement {
   return b;
 }
 
+// playHint is a play button's title. With alt (option on a Mac), the
+// block runs in a side shell, started from the History shell's state,
+// leaving what runs there, such as an editor, as it is.
+const playHint = "Run this block (alt-click: in a side shell, leaving the History pane's command running)";
+
 // runBlockButton is a block's play button.
 function runBlockButton(block: number): HTMLButtonElement {
-  const b = runs(iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", block)));
+  const b = runs(iconButton("play", hinted(playHint, "Enter"), (e) => start(e.altKey ? "RunBlockSide" : "RunBlock", block)));
   b.classList.add("run-block");
   return b;
 }
@@ -2272,10 +2277,10 @@ function busy(on: boolean) {
   if (!on && noRun) for (const x of document.querySelectorAll<HTMLButtonElement>(runButtons)) x.disabled = true;
 }
 
-function start(method: "RunBlock" | "RunFrom", block: number) {
+function start(method: "RunBlock" | "RunBlockSide" | "RunFrom", block: number) {
   // Run this block comes back to the block when it's done, though its
   // depends= ran first above it. Run from here ends where the run does.
-  const home = method === "RunBlock" ? () => document.getElementById("block-" + block) : undefined;
+  const home = method !== "RunFrom" ? () => document.getElementById("block-" + block) : undefined;
   return run(() => App[method](block), home);
 }
 
@@ -2991,11 +2996,12 @@ async function insertNvim(cmd: StateCommand) {
 }
 
 // nvimKey takes the app's own keys from Neovim: cmd/ctrl+enter runs the
-// block the cursor is in, and with shift its section, as in the built-in
-// editor. The menu then doesn't run it a second time.
+// block the cursor is in, with alt in a side shell, and with shift its
+// section, as in the built-in editor. The menu then doesn't run it a
+// second time.
 function nvimKey(e: KeyboardEvent): boolean {
-  if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.altKey) return false;
-  void (e.shiftKey ? runCurrentSection() : runCurrent());
+  if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || (e.altKey && e.shiftKey)) return false;
+  void (e.shiftKey ? runCurrentSection() : runCurrent(e.altKey));
   return true;
 }
 
@@ -3092,25 +3098,26 @@ async function runCurrentSection() {
 // fence, in its body or in its output. Without the source pane it runs
 // the selected card, as enter does. It goes through RunBlock, as the
 // card's play button does.
-async function runCurrent() {
+async function runCurrent(side = false) {
   if (running || !doc.file) return;
+  const method = side ? "RunBlockSide" : "RunBlock";
   if (nvimDoc) {
     const line = await nvimLine();
     const c = nvimDoc && line ? blockAtLine(nvimDoc.sync.base.toString(), line) : undefined;
-    if (c) await start("RunBlock", c.block);
+    if (c) await start(method, c.block);
     else status("the cursor isn't in a block that runs");
     return;
   }
   if (!source) {
     const all = blocks();
-    if (selected >= 0 && selected < all.length) await start("RunBlock", Number(all[selected].dataset.block));
+    if (selected >= 0 && selected < all.length) await start(method, Number(all[selected].dataset.block));
     else status("no block selected");
     return;
   }
   await applySource();
   const cm = source.view.state;
   const c = blockAtLine(cm.doc.toString(), cm.doc.lineAt(cm.selection.main.head).number);
-  if (c) await start("RunBlock", c.block);
+  if (c) await start(method, c.block);
   else status("the cursor isn't in a block that runs");
 }
 
@@ -3283,7 +3290,7 @@ function drawOutline() {
       if (mark === "▶") item.title = name + " (running now)";
       else if (mark === "◐") item.title = name + " (running in the background)";
       const block = Number(e.dataset.block);
-      const play = iconButton("play", hinted("Run this block", "Enter"), () => start("RunBlock", block));
+      const play = iconButton("play", hinted(playHint, "Enter"), (e) => start(e.altKey ? "RunBlockSide" : "RunBlock", block));
       play.classList.add("run");
       play.disabled = running || !!noRun;
       const row = outlineRow(item, e, 0);
@@ -3656,6 +3663,7 @@ const actions: Record<string, () => Promise<void> | void> = {
     await refresh();
   },
   runcurrent: () => runCurrent(),
+  runside: () => runCurrent(true),
   runsection: () => runCurrentSection(),
   report: () => (doc.file && !running ? openReport() : undefined),
   stop: () => void stopRun(),

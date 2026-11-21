@@ -35,6 +35,9 @@ type liveItem struct {
 	sh    *env.Shell
 	ev    env.Event
 	shown termrec.Recording // on a typed command's end
+	// unrecorded is whether recording was off as the command started,
+	// not when the loop gets to it.
+	unrecorded bool
 }
 
 func newLive() *live { return &live{wake: make(chan struct{}, 1)} }
@@ -169,7 +172,7 @@ func (n *Notebook) liveEvent(sh *env.Shell, e env.Event) {
 		// Blocks played from the document run as they always do.
 		return
 	}
-	it := liveItem{sh: sh, ev: e}
+	it := liveItem{sh: sh, ev: e, unrecorded: lv.unrecorded}
 	switch e.Kind {
 	case "start":
 		lv.rec = termrec.NewRecorder(n.term.size())
@@ -203,11 +206,10 @@ func (n *Notebook) liveLoop() {
 			}
 			it := lv.queue[0]
 			lv.queue = lv.queue[1:]
-			unrecorded := lv.unrecorded
 			lv.mu.Unlock()
 			switch it.ev.Kind {
 			case "start":
-				cur, running = n.liveStart(it.sh, it.ev.Command, unrecorded), true
+				cur, running = n.liveStart(it.sh, it.ev.Command, it.unrecorded, it.ev.Resumed), true
 			case "end":
 				if running {
 					n.liveEnd(cur, it.ev.Status, it.shown)
@@ -232,18 +234,25 @@ func (n *Notebook) liveLoop() {
 
 // liveStart takes a command typed at the shell's prompt, which has
 // started: a note becomes prose, as sh runs a comment as a command;
-// anything else becomes a History block, unless recording is off. The
-// notebook is busy until it ends. It returns the block, or -1.
-func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded bool) int {
-	if text, ok := note(cmd); ok {
+// anything else becomes a History block, unless recording is off, or
+// it is mdsh bringing back the job a played block stopped. The
+// notebook is busy until it ends, though a block played meanwhile
+// stops it to run (see start). It returns the block, or -1.
+func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded, resumed bool) int {
+	if text, ok := note(cmd); ok && !resumed {
 		n.addNote(text)
 		return -1
 	}
 	n.mu.Lock()
-	n.running = true
-	n.cancel = func() { sh.Type([]byte{0x03}) }
-	if strings.TrimSpace(cmd) == "" || unrecorded {
-		n.noteEnd = -1
+	n.liveCancel = func() { sh.Type([]byte{0x03}) }
+	if !n.playing {
+		n.cancel = n.liveCancel
+	}
+	n.running, n.liveCmd = true, true
+	if resumed || strings.TrimSpace(cmd) == "" || unrecorded {
+		if !resumed {
+			n.noteEnd = -1
+		}
 		n.mu.Unlock()
 		return -1
 	}
@@ -267,40 +276,73 @@ func (n *Notebook) liveStart(sh *env.Shell, cmd string, unrecorded bool) int {
 		return -1
 	}
 	n.noteEnd = -1
-	i, sess := n.index[b], n.sess
+	// With the lock held, so a run ending meanwhile doesn't rewrite the
+	// document under it.
+	i := n.index[b]
+	started, err := n.sess.TypedStart(i)
 	n.mu.Unlock()
-	if err := sess.TypedStart(i); err != nil {
+	if err != nil {
 		return -1
 	}
+	started()
 	return i
 }
 
+// liveEnded is a typed command's end that waits for the block played
+// meanwhile, which has the session.
+type liveEnded struct {
+	block, status int
+	shown         termrec.Recording
+}
+
 // liveEnd ends the command liveStart started, with its status and what
-// it showed: block i gets its result, and tty if it took the screen.
+// it showed. When a played block stopped it, as one does to run in the
+// shell it held, the block's result waits for that run to end.
 func (n *Notebook) liveEnd(i, status int, shown termrec.Recording) {
 	n.mu.Lock()
-	sess := n.sess
-	n.mu.Unlock()
-	if i >= 0 {
-		r, full, _ := sess.TypedEnd(i, status, shown)
-		if full && r != nil {
-			n.mu.Lock()
-			b := r.Block
-			if _, ok := n.index[b]; ok && !b.Attrs.Has("tty") {
-				text := b.Fence + strings.TrimSuffix(b.Info, "}") + " tty}\n" + b.Body + b.Fence + "\n"
-				if err := n.d.SetBlock(b, text); err == nil {
-					n.sync()
-				}
-			}
-			n.mu.Unlock()
-		}
+	if n.playing {
+		n.liveCmd = false
+		n.liveEnds = append(n.liveEnds, liveEnded{i, status, shown})
+		n.mu.Unlock()
+		return
 	}
+	done := n.finishLive(liveEnded{i, status, shown})
+	n.mu.Unlock()
+	// Its Done event gives the notebook the result, which the fold
+	// below writes.
+	done()
 	n.mu.Lock()
-	n.running, n.cancel = false, nil
+	n.running, n.cancel, n.liveCmd = false, nil, false
 	n.readIncludes()
 	n.fold()
 	n.idle.Broadcast()
 	n.mu.Unlock()
+}
+
+// finishLive gives a typed command's block its result, and tty if it
+// took the screen, with n.mu held, so no run starts or rewrites the
+// document meanwhile. done sends the block's Done event, once n.mu is
+// let go.
+func (n *Notebook) finishLive(e liveEnded) (done func()) {
+	done = func() {}
+	if e.block < 0 {
+		return done
+	}
+	r, full, sent, err := n.sess.TypedEnd(e.block, e.status, e.shown)
+	if err != nil {
+		return done
+	}
+	if !full || r == nil {
+		return sent
+	}
+	b := r.Block
+	if _, ok := n.index[b]; ok && !b.Attrs.Has("tty") {
+		text := b.Fence + strings.TrimSuffix(b.Info, "}") + " tty}\n" + b.Body + b.Fence + "\n"
+		if err := n.d.SetBlock(b, text); err == nil {
+			n.sync()
+		}
+	}
+	return sent
 }
 
 // ShellJob is a job of the live pane's shell, for the window's badges.
@@ -349,4 +391,26 @@ func (n *Notebook) Running() bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.running
+}
+
+// RunBlockSide runs block i in a side shell, started from the state the
+// live pane's shell last reported, so it runs while a command typed at
+// that shell's prompt, such as an editor, holds it: see
+// run.Session.RunSide. What the block changes isn't kept.
+func (n *Notebook) RunBlockSide(i int) error {
+	return n.startRun(func(ctx context.Context) error {
+		n.mu.Lock()
+		if i >= 0 && i < len(n.d.Blocks) {
+			n.clicked = n.d.Blocks[i]
+		}
+		sess := n.sess
+		n.mu.Unlock()
+		defer func() {
+			n.mu.Lock()
+			n.clicked = nil
+			n.mu.Unlock()
+		}()
+		_, err := sess.RunSide(ctx, i)
+		return err
+	}, true)
 }

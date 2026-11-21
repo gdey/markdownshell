@@ -41,9 +41,11 @@ type interactive struct {
 	ttyName string
 	state   *os.File // the state fifo, held open for reading and writing
 
-	mu    sync.Mutex
-	cond  *sync.Cond // signalled on every mark and state record
-	phase phase
+	mu sync.Mutex
+	// ptmClosed is set, under mu, once close has closed ptm.
+	ptmClosed bool
+	cond      *sync.Cond // signalled on every mark and state record
+	phase     phase
 	// dirty is set when keys were typed at the prompt since the last
 	// B, so a line may be half typed.
 	dirty bool
@@ -60,6 +62,9 @@ type interactive struct {
 	states  int          // state records read
 	last    State
 	lastCmd string // the command line zsh's preexec sent
+	// resuming is set while the line that brings back a job RunLine
+	// stopped is typed, until its command starts.
+	resuming bool
 	// typedOut is the output of a command typed at the terminal, not
 	// by RunLine, from C to D, for its end Event.
 	typedOut bytes.Buffer
@@ -81,6 +86,9 @@ type Event struct {
 	// Typed, on start and end, says RunLine typed the command; it is
 	// false for one typed at the terminal through Type.
 	Typed bool
+	// Resumed, on start, says the command is mdsh bringing back the
+	// job RunLine stopped to run its line, as fg: not one to record.
+	Resumed bool
 	// Output, on the end of a command not typed by RunLine, is what it
 	// wrote to the terminal, from its start to its end, escapes and
 	// all.
@@ -378,8 +386,10 @@ func (ia *interactive) start() {
 		cmd = strings.TrimSpace(stripEsc(ia.echo.String()))
 	}
 	ia.typedOut.Reset()
+	resumed := ia.resuming && !ia.typed
+	ia.resuming = false
 	if ia.watch != nil {
-		ia.watch(Event{Kind: "start", Command: cmd, Typed: ia.typed})
+		ia.watch(Event{Kind: "start", Command: cmd, Typed: ia.typed, Resumed: resumed})
 	}
 }
 
@@ -418,6 +428,78 @@ func (ia *interactive) onRecord(r record) {
 // so it isn't at a prompt to type at.
 var ErrBusy = errors.New("the shell is running a command")
 
+// markWait bounds how long RunLine waits for the mark of a command
+// that already holds the terminal.
+const markWait = time.Second
+
+// suspendWait bounds how long RunLine waits for a command typed at the
+// terminal to stop for ctrl+z, and the prompt to come back.
+const suspendWait = 3 * time.Second
+
+// suspend stops the command typed at the terminal that holds the shell,
+// as ctrl+z would, and waits for the prompt and the state sent with
+// it. It returns the job to bring back: %N, or %+ where the shell
+// doesn't number its jobs at the prompt. ok is false if the command
+// didn't stop, as one that ignores SIGTSTP won't. ia.mu is held.
+func (s *Shell) suspend() (job string, ok bool) {
+	ia := s.ia
+	pg, _ := tcgetpgrp(ia.ptm)
+	states := ia.states
+	// SIGTSTP to the job itself, as ctrl+z sends, but straight: a
+	// program that reads keys raw, such as an editor inserting text,
+	// would take a typed ctrl+z as one more key.
+	if pg > 0 && pg != s.cmd.Process.Pid {
+		syscall.Kill(-pg, syscall.SIGTSTP)
+	} else {
+		ia.ptm.Write([]byte{0x1a})
+	}
+	t := time.AfterFunc(suspendWait, func() { ia.mu.Lock(); ia.cond.Broadcast(); ia.mu.Unlock() })
+	defer t.Stop()
+	deadline := time.Now().Add(suspendWait)
+	for !(ia.phase == phaseInput && ia.states > states) && !s.Exited() && time.Now().Before(deadline) {
+		ia.cond.Wait()
+	}
+	if ia.phase != phaseInput || s.Exited() {
+		return "", false
+	}
+	job = "%+"
+	for _, j := range ia.last.Jobs {
+		if j.PGID == pg && j.N > 0 && j.Stopped() {
+			job = "%" + strconv.Itoa(j.N)
+		}
+	}
+	return job, true
+}
+
+// resume brings back the job suspend stopped, as fg would, with a line
+// kept out of the shell's history. Its start is reported as Resumed,
+// and it runs as a command typed at the terminal.
+func (s *Shell) resume(job string) {
+	ia := s.ia
+	f := filepath.Join(s.tmp, "resume.sh")
+	if err := os.WriteFile(f, []byte("fg "+job+"\n"), 0o600); err != nil {
+		return
+	}
+	ia.mu.Lock()
+	defer ia.mu.Unlock()
+	t := time.AfterFunc(promptWait, func() { ia.mu.Lock(); ia.cond.Broadcast(); ia.mu.Unlock() })
+	defer t.Stop()
+	deadline := time.Now().Add(promptWait)
+	for ia.phase != phaseInput && !s.Exited() && time.Now().Before(deadline) {
+		ia.cond.Wait()
+	}
+	if ia.phase != phaseInput || ia.dirty || s.Exited() {
+		return
+	}
+	ia.resuming = true
+	io.WriteString(ia.ptm, sourceLine(f)+"\r")
+}
+
+// ErrNotStopped is returned by RunLine when the command typed at the
+// terminal that holds the shell didn't stop for ctrl+z. It is an
+// ErrBusy.
+var ErrNotStopped = fmt.Errorf("%w, which didn't stop as ctrl+z stops it", ErrBusy)
+
 // ErrLineTyped is returned by RunLine when keys were typed at the
 // prompt since it was drawn, so a line may be half typed.
 var ErrLineTyped = errors.New("a line is being typed at the prompt")
@@ -449,6 +531,26 @@ func (s *Shell) runLine(ctx context.Context, line string, out io.Writer) (status
 			ia.cond.Wait()
 		}
 		t.Stop()
+	}
+	// A command just typed may hold the terminal before its mark, which
+	// says it runs, is read: wait for the mark.
+	if ia.phase == phaseInput && ia.dirty && s.foreground() != 0 {
+		t := time.AfterFunc(markWait, func() { ia.mu.Lock(); ia.cond.Broadcast(); ia.mu.Unlock() })
+		deadline := time.Now().Add(markWait)
+		for ia.phase == phaseInput && !s.Exited() && time.Now().Before(deadline) {
+			ia.cond.Wait()
+		}
+		t.Stop()
+	}
+	// A command typed at the terminal holds the shell, as an editor
+	// does: stop it, as ctrl+z would, run the line, and bring it back.
+	if ia.phase == phaseRunning && !ia.typed {
+		job, ok := s.suspend()
+		if !ok {
+			ia.mu.Unlock()
+			return 0, false, ErrNotStopped
+		}
+		defer s.resume(job)
 	}
 	switch {
 	case s.Exited():
@@ -791,6 +893,29 @@ func (s *Shell) Jobs() []ShellJob {
 	return ttyJobs(strings.TrimPrefix(s.ia.ttyName, "/dev/"), s.cmd.Process.Pid)
 }
 
+// Foreground is the process group in the foreground of an interactive
+// shell's terminal, when a command holds it, or 0 at the prompt.
+func (s *Shell) Foreground() int {
+	if s.ia == nil {
+		return 0
+	}
+	s.ia.mu.Lock()
+	defer s.ia.mu.Unlock()
+	return s.foreground()
+}
+
+// foreground is Foreground with ia.mu held.
+func (s *Shell) foreground() int {
+	if s.ia.ptmClosed {
+		return 0
+	}
+	pg, err := tcgetpgrp(s.ia.ptm)
+	if err != nil || pg <= 0 || pg == s.cmd.Process.Pid {
+		return 0
+	}
+	return pg
+}
+
 // ttyJobs lists the process groups with processes on terminal tty,
 // other than the shell's own, as ps shows them.
 func ttyJobs(tty string, shell int) []ShellJob {
@@ -854,7 +979,11 @@ func (s *Shell) closeInteractive() {
 		kill(s.cmd)
 		<-s.waited
 	}
+	ia.mu.Lock()
+	// Foreground may ask after the terminal from another goroutine.
+	ia.ptmClosed = true
 	ia.ptm.Close()
+	ia.mu.Unlock()
 	ia.state.Close()
 }
 

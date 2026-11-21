@@ -255,6 +255,15 @@ type Notebook struct {
 	term *terminal
 	// live is the History pane as a terminal, on an interactive shell.
 	live *live
+	// liveCmd is set while a command typed at the live pane's prompt
+	// holds the shell; liveCancel stops it, as ctrl+c does. liveEnds
+	// are the typed commands that ended while a played block had the
+	// session, whose results wait for it.
+	liveCmd    bool
+	liveCancel func()
+	// playing is set while a run start began has the session.
+	playing  bool
+	liveEnds []liveEnded
 
 	mu sync.Mutex // guards the fields below
 	// bgTerms are the terminals of the background blocks marked tty
@@ -659,6 +668,13 @@ func (n *Notebook) RunRange(from, to int) error {
 }
 
 func (n *Notebook) start(f func(context.Context) error) error {
+	return n.startRun(f, false)
+}
+
+// startRun is start; side says the run doesn't need the shell a command
+// typed at the live pane's prompt holds, as a block run in a side shell
+// doesn't, so it leaves that command running.
+func (n *Notebook) startRun(f func(context.Context) error, side bool) error {
 	n.mu.Lock()
 	// A Stop while the run waits for the shell to answer a question,
 	// such as its prompt, stops the run too, before it starts.
@@ -668,9 +684,15 @@ func (n *Notebook) start(f func(context.Context) error) error {
 		n.mu.Unlock()
 		return nil
 	}
-	if n.running {
+	if n.playing || (n.running && !n.liveCmd) {
 		n.mu.Unlock()
 		return ErrBusy
+	}
+	if !side {
+		// A command typed at the live pane's prompt holds the shell:
+		// the run takes over, and the shell stops the command, as
+		// ctrl+z would, to run the block, and brings it back after.
+		n.liveCmd = false
 	}
 	// Nothing runs, not even a typed command, with settings mdsh can't
 	// read.
@@ -680,13 +702,30 @@ func (n *Notebook) start(f func(context.Context) error) error {
 	}
 	n.waitReap()
 	ctx, cancel := context.WithCancel(context.Background())
-	n.running, n.cancel = true, cancel
+	n.running, n.cancel, n.playing = true, cancel, true
 	n.mu.Unlock()
 
 	err := f(ctx)
 
+	// Typed commands that ended meanwhile get their results now that
+	// the session is free.
 	n.mu.Lock()
-	n.running, n.cancel = false, nil
+	var sent []func()
+	for _, e := range n.liveEnds {
+		sent = append(sent, n.finishLive(e))
+	}
+	n.liveEnds = nil
+	n.mu.Unlock()
+	for _, done := range sent {
+		done()
+	}
+
+	n.mu.Lock()
+	n.running, n.cancel, n.playing = false, nil, false
+	if n.liveCmd {
+		// The command the run stopped is back, and holds the shell.
+		n.running, n.cancel = true, n.liveCancel
+	}
 	n.readIncludes()
 	if ferr := n.fold(); err == nil {
 		err = ferr
