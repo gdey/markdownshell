@@ -38,17 +38,24 @@ interface Edge {
   k: number;
 }
 
-// Host is what the layer asks of the page: to go to a card, to write a
+// Host is what the layer asks of the page: to go to a block, to write a
 // block's depends= as the blocks it names, by index, with a word for
 // the status line, and, while a line is dragged, to open folded
 // sections for the moment: peek is told the top-level cell under the
 // pointer, or null between cells, and endPeek the block the line was
-// dropped on, or null.
+// dropped on, or null. The page draws only the cards near the view, so
+// it also says which card stands for a block, if one is drawn: its own,
+// or the heading's whose fold hides it; where, as the page is laid out
+// now, each block's card is or would be, in the view's content; and a
+// block's name.
 export interface Host {
-  jump(block: HTMLElement): void;
+  jump(block: number): void;
   setDepends(block: number, deps: number[], what: string): Promise<void>;
   peek(cell: HTMLElement | null): void;
   endPeek(dropped: HTMLElement | null): void;
+  shown(block: number): HTMLElement | null;
+  places(): (block: number) => { top: number; bottom: number; at: number } | null;
+  name(block: number): string;
 }
 
 // The number of colors; dependencies past them share the gray of
@@ -65,7 +72,7 @@ let lit = -1; // the selected block, whose lines are lit
 let svg: SVGSVGElement | null = null; // the paint
 let ui: SVGSVGElement | null = null; // dots, rings and the drag
 let scroll: HTMLElement;
-let host: Host = { jump() {}, setDepends: async () => {}, peek() {}, endPeek() {} };
+let host: Host = { jump() {}, setDepends: async () => {}, peek() {}, endPeek() {}, shown: () => null, places: () => () => null, name: () => "" };
 let pending = 0;
 // The line being dragged, kept over a redraw, and how to draw it again
 // when the page under it moves, as when a section opens.
@@ -157,28 +164,21 @@ export function drawDeps() {
 }
 
 // An Anchor is where a line attaches to a block: the card, or the
-// heading of the folded section hiding it, and the y of its head row in
-// the scrolling view's content coordinates.
+// heading of the folded section hiding it, where it is drawn, and the y
+// of its head row in the scrolling view's content coordinates.
 interface Anchor {
-  card: HTMLElement;
+  card: HTMLElement | null;
   y: number;
+  at?: number; // for a card not drawn, the index of the cell it stands for
 }
 
-function anchorOf(block: number, top: number, end: "top" | "bottom"): Anchor | null {
-  const card = shown(block);
-  if (!card) return null;
-  return { card, y: end === "top" ? headY(card, top) : footY(card, top) };
-}
-
-// shown is block's card, or the heading of the folded section hiding it.
-function shown(block: number): HTMLElement | null {
-  const card = document.getElementById("block-" + block);
-  if (!card || !card.classList.contains("in-fold")) return card;
-  // The nearest cell above that isn't hidden is the heading that folds
-  // it away.
-  let e: Element | null = card;
-  while (e && e.classList.contains("in-fold")) e = e.previousElementSibling;
-  return e instanceof HTMLElement ? e : null;
+function anchorOf(block: number, top: number, end: "top" | "bottom", places: ReturnType<Host["places"]>): Anchor | null {
+  const card = host.shown(block);
+  if (card) return { card, y: end === "top" ? headY(card, top) : footY(card, top) };
+  // A card not drawn, where it would be.
+  const p = places(block);
+  if (!p) return null;
+  return { card: null, y: end === "top" ? p.top + (lastHeadAt ?? 14) : p.bottom - 12, at: p.at };
 }
 
 // markDeps outlines what the lit block depends on, in the colors of its
@@ -194,7 +194,7 @@ export function markDeps() {
   const by = new Map<HTMLElement, string[]>();
   for (const e of edges) {
     if (e.from !== lit) continue;
-    const card = shown(e.to);
+    const card = host.shown(e.to);
     if (!card) continue;
     const list = by.get(card) ?? [];
     by.set(card, list);
@@ -225,7 +225,7 @@ function headY(card: HTMLElement, top: number): number {
   const box = rect(card);
   if (!card.classList.contains("block")) return box.top + Math.min(box.height / 2, 14) - top;
   if (headAt === undefined) {
-    // A card not drawn yet, a stub, has no head row to measure.
+    // A card drawn without its head row has none to measure.
     const head = card.querySelector(":scope > .head");
     if (!head) return box.top + (lastHeadAt ?? 14) - top;
     const r = head.getBoundingClientRect();
@@ -311,10 +311,13 @@ function draw() {
   headAt = undefined;
   rects = new Map();
   const lines: Line[] = [];
+  const places = host.places();
   for (const e of edges) {
-    const a = anchorOf(e.from, top, "top");
-    const b = anchorOf(e.to, top, "bottom");
-    if (a && b && a.card !== b.card) lines.push({ ...e, a, b, lane: 0 });
+    const a = anchorOf(e.from, top, "top", places);
+    const b = anchorOf(e.to, top, "bottom", places);
+    // Two ends standing for the same card, as in one folded section,
+    // make no line.
+    if (a && b && (a.card || b.card ? a.card !== b.card : a.at !== b.at)) lines.push({ ...e, a, b, lane: 0 });
   }
   // Lanes: the shortest lines nearest the cards, and a line takes the
   // first lane where no line already there runs over the same rows.
@@ -410,7 +413,7 @@ function paint() {
       g.classList.add("hover");
       if (hit.querySelector("title")) return;
       const title = make("title", {});
-      title.textContent = `${name(l.a.card)} depends on ${name(l.b.card)}`;
+      title.textContent = `${host.name(l.from)} depends on ${host.name(l.to)}`;
       hit.append(title);
     };
     hit.onpointerleave = () => g.classList.remove("hover");
@@ -418,13 +421,17 @@ function paint() {
       ev.preventDefault();
       // The far end from where the click was.
       const y = ev.clientY - origin().top;
-      host.jump(Math.abs(y - y1) >= Math.abs(y - y2) ? l.a.card : l.b.card);
+      host.jump(Math.abs(y - y1) >= Math.abs(y - y2) ? l.from : l.to);
     };
     const dot = make("circle", { class: "dot " + color + (l.from === lit ? " lit" : ""), cx: x, cy: y2, r: 3.5 });
     const hint = make("title", {});
     hint.textContent = "Click to take this dependency out, or drag it to another block above";
     dot.append(hint);
-    dot.onpointerdown = (ev) => startDrag(ev, l.from, l.k, l.a.card);
+    dot.onpointerdown = (ev) => {
+      // The line leaves from its block's card, drawn now if it wasn't.
+      const card = l.a.card ?? host.shown(l.from);
+      if (card) startDrag(ev, l.from, l.k, card);
+    };
     hits.push(hit);
     dots.push(dot);
   }
@@ -625,7 +632,7 @@ function startDrag(ev: PointerEvent, from: number, k: number, card: HTMLElement)
       void host.setDepends(
         from,
         deps.filter((_, i) => i !== k),
-        "took out the dependency on " + name(document.getElementById("block-" + deps[k]) ?? card),
+        "took out the dependency on " + host.name(deps[k]),
       );
     }
   };
