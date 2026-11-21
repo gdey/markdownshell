@@ -26,8 +26,10 @@ func (c Control) Start(file string, run notebook.RunOptions) error {
 		if err := t.open(file, ro); err != nil {
 			return err
 		}
+		StartupMark("file opened")
 	}
 	c.a.newWindow(t)
+	StartupMark("window made")
 	return nil
 }
 

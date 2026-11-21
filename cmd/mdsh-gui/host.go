@@ -86,6 +86,10 @@ func (g *gui) NewWindow(file string) ui.Window {
 	}
 	opts.Linux.Menu = g.menu
 	win := g.app.Window.NewWithOptions(opts)
+	if ui.StartupTracing() {
+		win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { ui.StartupMark(name + " shown") })
+		win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { ui.StartupMark(name + " runtime ready") })
+	}
 	switch {
 	case move:
 		g.settle(win, p)

@@ -2,6 +2,7 @@
 // it. Events from Go for one tab carry its id, and this page passes them
 // on to that tab's page alone; other events go to every tab.
 
+import { drawn as startupDrawn } from "./startup.js";
 import { Events, Window } from "/wails/runtime.js";
 
 import { App, type Settings, type Tab, type Tabs } from "./api.js";
@@ -228,3 +229,4 @@ applyKeyHints();
 me = await Window.Name();
 applyTheme(await App.Settings());
 show(await App.Tabs());
+startupDrawn("window");
