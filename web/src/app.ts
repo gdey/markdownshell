@@ -5,7 +5,7 @@ import { ChangeSet, type EditorState, type StateCommand, type Text } from "@code
 import { EditorView, scrollPastEnd } from "@codemirror/view";
 import { Clipboard, Events, Window } from "/wails/runtime.js";
 
-import { App, type AttrSpec, type Cell, type Deleted, type Doc, type File as Template, type Fold, type Move, type Names, type OutsideFiles, type Settings, type SourceBlock, type Start, message } from "./api.js";
+import { App, type AttrSpec, type Cell, type Deleted, type Heads, type Doc, type File as Template, type Fold, type Move, type Names, type OutsideFiles, type Settings, type SourceBlock, type Start, message } from "./api.js";
 import { enableCasts } from "./cast.js";
 import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBehavior, setOutput, svg } from "./dom.js";
@@ -36,6 +36,7 @@ import { adoptBackground, closeBackgrounds, closeTerminal, endBackground, endTer
 import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 import { drawn as startupDrawn, mark as startupMark } from "./startup.js";
+import { type HeadRow, decodeHeads, partial, sameHead } from "./heads.js";
 
 let me = ""; // this window's name; events from other windows are ignored
 let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "", frontMatterError: "", frontMatterFix: { label: "", detail: "" }, lastView: "", lastHistory: false };
@@ -188,8 +189,7 @@ async function refresh() {
   $("dirty").hidden = !doc.dirty;
   $("changed").hidden = !doc.changed || $("changed").dataset.kept === doc.file;
   drawOptions();
-  cells = (await App.Cells()) ?? [];
-  drawDoc();
+  await openCells();
   await loadFrontMatter();
   if (opened) applyView();
   if (doc.running && !ranHere) await catchUp();
@@ -223,14 +223,162 @@ function drawOptions() {
   $("options").setAttribute("aria-label", "Run options: " + parts.join(", "));
 }
 
+// firstHeads is how many cells' heads a file opens with, and
+// moreHeads how many each later chunk brings.
+const firstHeads = 300;
+const moreHeads = 2000;
+
+// layout is the layout of Go's that the cells came from, while some of
+// them are partial: their bodies are asked for by its gen. It is null
+// once the cells all came whole, from Cells, as after an edit.
+let layout: { gen: number; done: boolean } | null = null;
+// headIndex is each partial cell's index in the layout.
+const headIndex = new WeakMap<Cell, number>();
+
+// openCells draws the document from the heads of its first cells, the
+// first screen's bodies and those of the cards that are always drawn,
+// and then takes in the rest as Go lays them out, chunk by chunk.
+async function openCells() {
+  const h = await App.Attach(firstHeads);
+  const fresh = decodeHeads(h.heads as HeadRow[]);
+  fresh.forEach((c, i) => headIndex.set(c, i));
+  layout = { gen: h.gen, done: h.done };
+  const want = h.done && fresh.length <= lazyCells ? fresh : fresh.filter((c, i) => i < firstBodies || !lazy(c, true));
+  if (!(await takeBodies(want))) return;
+  cells = fresh;
+  drawDoc();
+  if (!h.done) void streamHeads(h.gen, h.step);
+}
+
+// firstBodies is how many cells from the top have bodies as a file
+// opens: more than a screen holds.
+const firstBodies = 60;
+
+// streamHeads takes in the heads of layout gen after those the page
+// has, a chunk at a time, while the page goes on, and the fixes to
+// heads it has, from step since.
+async function streamHeads(gen: number, since: number) {
+  while (layout?.gen === gen && !layout.done) {
+    let h: Heads;
+    try {
+      // Each chunk is as long as the document so far: every chunk of
+      // cards put in the page has it work out the style of all of them,
+      // so chunks that double keep that to a few times in all.
+      h = await App.MoreHeads(gen, cells.length, since, Math.max(moreHeads, cells.length));
+    } catch {
+      // The document changed; whatever changed it draws it again.
+      return;
+    }
+    if (layout?.gen !== gen) return;
+    since = h.step;
+    const more = decodeHeads(h.heads as HeadRow[]);
+    more.forEach((c, k) => headIndex.set(c, h.at + k));
+    if (!(await takeBodies(more.filter((c) => !lazy(c, true)))) || layout?.gen !== gen) return;
+    fixHeads(h.fixAt ?? [], decodeHeads(h.fixes as HeadRow[]));
+    layout.done = h.done;
+    appendCells(more);
+    // The outline, folds and dependency lines read every card: they
+    // are drawn once the cells are all in, rather than after every
+    // chunk, which took time in the square of the document's length.
+    if (h.done) afterCells();
+    // A chunk at a time, so typing and scrolling go on between.
+    await new Promise((r) => setTimeout(r));
+  }
+}
+
+// appendCells adds more cells' cards at the end of the document.
+function appendCells(more: Cell[]) {
+  if (!more.length) return;
+  for (const c of more) cells.push(c);
+  // stub has fill look for stubs in sight once the page is drawn.
+  $("doc").append(fragment(more.map((c) => drawCell(c))));
+}
+
+// fixHeads takes in the heads of cells Go laid out before and since
+// changed, as a heading's section does once the next heading comes.
+// A card drawn from a fixed cell is drawn again, from its new body.
+function fixHeads(at: number[], heads: Cell[]) {
+  const redraw: HTMLElement[] = [];
+  const kids = $("doc").children as HTMLCollectionOf<HTMLElement>;
+  at.forEach((i, k) => {
+    const c = cells[i];
+    if (!c) return;
+    const h = heads[k];
+    // The cell keeps what it has, but for what the head says now, and
+    // its body is asked for again.
+    for (const key of ["collapsed", "collapsedOutput", "ran", "failed", "stale", "running", "secret", "terminal", "nosave", "sectionFrom", "sectionTo", "movable", "lastLine"] as const) delete c[key];
+    Object.assign(c, h);
+    headIndex.set(c, i);
+    partial.add(c);
+    const card = kids[i];
+    if (!card) return;
+    if (c.heading) {
+      card.dataset.sectionFrom = String(c.sectionFrom ?? 0);
+      card.dataset.sectionTo = String(c.sectionTo ?? 0);
+      card.dataset.foldDefault = c.collapsed ? "1" : "";
+    }
+    if (!stubs.has(card)) redraw.push(card);
+  });
+  if (redraw.length) void bodiesFor(redraw);
+}
+
+// takeBodies asks Go for the bodies of the partial ones of these cells
+// and puts them in, saying whether the layout is still the page's.
+async function takeBodies(list: Cell[]): Promise<boolean> {
+  const l = layout;
+  const want = list.filter((c) => partial.has(c));
+  if (!want.length) return !!l;
+  if (!l) return false;
+  let got: Cell[];
+  try {
+    got = (await App.Bodies(l.gen, want.map((c) => headIndex.get(c)!))) ?? [];
+  } catch {
+    return false;
+  }
+  if (layout !== l) return false;
+  want.forEach((c, k) => {
+    // Go leaves out fields that are false.
+    for (const key of ["collapsed", "collapsedOutput", "hidden"] as const) delete c[key];
+    Object.assign(c, got[k]);
+    partial.delete(c);
+  });
+  return true;
+}
+
+// bodiesFor draws again, from their bodies, cards drawn before their
+// bodies came.
+async function bodiesFor(cards: HTMLElement[]) {
+  const want = cards.map((e) => cellOf.get(e)).filter((c): c is Cell => !!c && partial.has(c));
+  if (!(await takeBodies(want))) return;
+  const drawn: HTMLElement[] = [];
+  for (const card of cards) {
+    if (!card.isConnected || stubs.has(card)) continue;
+    const c = cellOf.get(card);
+    if (!c || partial.has(c)) continue;
+    drawn.push(redrawCard(card, c));
+  }
+  // A card drawn again is folded as the one it replaced was.
+  if (drawn.length) applyFolds(drawn);
+}
+
+// afterCells brings what reads every card up to date with them.
+function afterCells() {
+  nameFolds();
+  applyFolds();
+  runAllButton();
+  markSection();
+  drawOutline();
+  setDeps(cells);
+}
+
 function drawDoc() {
   const main = $("doc");
   const restore = anchor();
   const heights = drawnHeights();
   closeTerminal();
   behind = false;
-  lazyDoc = cells.length > lazyCells;
-  main.replaceChildren(...cells.map((c) => keepHeight(drawCell(c), c, heights)));
+  lazyDoc = cells.length > lazyCells || !!(layout && !layout.done);
+  main.replaceChildren(fragment(cells.map((c) => keepHeight(drawCell(c), c, heights))));
   drawn++;
   nameFolds();
   applyFolds();
@@ -312,6 +460,8 @@ const placeFields = ["line", "from", "to", "lastLine", "outputLine", "drop", "dr
 // each into JSON, as this once did, took most of the time a pause in
 // typing spent on a long document.
 function sameDrawn(a: Cell, b: Cell): boolean {
+  // A cell made from its head is known by its hash.
+  if (partial.has(a) || partial.has(b)) return sameHead(a, b);
   if (renumbered(a) !== renumbered(b) || !!a.heading !== !!b.heading || !!a.sectionTo !== !!b.sectionTo) return false;
   const skip = new Set<string>(placeFields);
   if (renumbered(a)) {
@@ -359,6 +509,8 @@ const renumbered = (c: Cell) => c.block >= 0 && !c.textbox && !c.choice;
 // places in the file brought up to date. Their handlers hold their
 // cells, so those are updated in place.
 function updateDoc(fresh: Cell[]) {
+  // The cells come whole from now on.
+  layout = null;
   const main = $("doc");
   const cards = [...main.children] as HTMLElement[];
   if (cards.length !== cells.length || cards.some((e) => !e.hasAttribute("data-line"))) {
@@ -373,6 +525,18 @@ function updateDoc(fresh: Cell[]) {
     const c = cells[i];
     const f = fresh[j];
     const card = cards[i];
+    if (partial.has(c)) {
+      // Its head was all it had: it takes the rest from f. What says
+      // where it is, and its numbers, stay as drawn, for the lines
+      // below to bring up to date.
+      const input = (c.textbox ?? c.choice)?.block;
+      const was = { block: c.block, name: c.name, id: c.id, sectionFrom: c.sectionFrom, sectionTo: c.sectionTo, ...Object.fromEntries(placeFields.map((k) => [k, c[k]])) };
+      for (const key of ["collapsed", "collapsedOutput", "hidden"] as const) delete c[key];
+      Object.assign(c, f, was, { textbox: f.textbox && { ...f.textbox }, choice: f.choice && { ...f.choice } });
+      const box = c.textbox ?? c.choice;
+      if (box && input !== undefined) box.block = input;
+      partial.delete(c);
+    }
     if (renumbered(c) && (c.block !== f.block || c.name !== f.name || c.id !== f.id)) {
       card.id = "block-" + f.block;
       card.dataset.block = String(f.block);
@@ -416,7 +580,7 @@ function updateDoc(fresh: Cell[]) {
   const middle = fresh.slice(head, fresh.length - tail);
   const next: Cell[] = [];
   for (let i = 0; i < head; i++) next.push(keep(i, i));
-  next.push(...middle);
+  for (const c of middle) next.push(c);
   for (let k = tail; k > 0; k--) next.push(keep(cells.length - k, fresh.length - k));
   const gone = cards.slice(head, cards.length - tail);
   const before = cards[cards.length - tail] ?? null;
@@ -470,7 +634,9 @@ function unchanged(fresh: Cell[]): { head: number; tail: number } {
 // fragment holds nodes, to be put in the page at once.
 function fragment(nodes: Node[]): DocumentFragment {
   const f = document.createDocumentFragment();
-  f.append(...nodes);
+  // In pieces: a spread of more than some ten thousand is more than a
+  // call takes.
+  for (let i = 0; i < nodes.length; i += 10000) f.append(...nodes.slice(i, i + 10000));
   return f;
 }
 
@@ -663,8 +829,9 @@ const stubs = new Set<HTMLElement>();
 const filled = new Set<HTMLElement>();
 
 // lazy says c's card can be a stub.
-function lazy(c: Cell): boolean {
-  return lazyDoc && !c.heading && !c.textbox && !c.choice && !(c.block >= 0 && (c.running || timerStarts.has(c.block)));
+// With assume, it says so as if the document were long.
+function lazy(c: Cell, assume = false): boolean {
+  return (lazyDoc || assume) && !c.heading && !c.textbox && !c.choice && !(c.block >= 0 && (c.running || timerStarts.has(c.block)));
 }
 
 // stub is c's card, not drawn.
@@ -695,6 +862,17 @@ function real(card: HTMLElement): HTMLElement {
   if (!stubs.has(card)) return card;
   const c = cellOf.get(card)!;
   stubs.delete(card);
+  const e = redrawCard(card, c);
+  filled.add(e);
+  // A cell whose body hasn't come is drawn without it, and again when
+  // it comes.
+  if (partial.has(c)) wantBody(e);
+  return e;
+}
+
+// redrawCard draws c's card again in card's place, keeping the marks
+// put on it since.
+function redrawCard(card: HTMLElement, c: Cell): HTMLElement {
   const e = drawCell(c, true);
   for (const k in card.dataset) e.dataset[k] = card.dataset[k];
   for (const k of card.classList) if (k !== "stub") e.classList.add(k);
@@ -703,10 +881,24 @@ function real(card: HTMLElement): HTMLElement {
   if (running) for (const b of e.querySelectorAll<HTMLButtonElement>(".head button")) b.disabled = true;
   card.replaceWith(e);
   if (following === card) following = e;
+  if (filled.delete(card)) filled.add(e);
   drawPart(e, "code");
   drawPart(e, "output");
-  filled.add(e);
   return e;
+}
+
+// wanted are cards drawn without their cells' bodies, which are asked
+// for together, once the page is done drawing.
+let wanted: HTMLElement[] = [];
+function wantBody(card: HTMLElement) {
+  if (!wanted.length) {
+    queueMicrotask(() => {
+      const cards = wanted;
+      wanted = [];
+      void bodiesFor(cards);
+    });
+  }
+  wanted.push(card);
 }
 
 // blockCard is block i's card, drawn.
@@ -808,8 +1000,10 @@ function unfill(pane: HTMLElement) {
 function guessHeight(c: Cell): number {
   // A body or output ends with a newline, which starts no line.
   const lines = (s?: string) => (s ? s.replace(/\r?\n$/, "").split("\n").length : 0);
-  const out = lines(c.output);
-  return 60 + 19 * lines(c.body) + (out ? 30 + 19 * out : 0);
+  // A cell whose body hasn't come has its lines counted by Go.
+  const out = partial.has(c) ? (c.outputLines ?? 0) : lines(c.output);
+  const code = partial.has(c) ? (c.codeLines ?? 0) : lines(c.body);
+  return 60 + 19 * code + (out ? 30 + 19 * out : 0);
 }
 
 // drawProse draws one top-level block of prose. Clicking it shows its
@@ -1194,6 +1388,7 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   const focused = document.activeElement as HTMLTextAreaElement | null;
   const input = focused?.closest<HTMLElement>("[data-input]")?.dataset.input;
   const [from, to] = [focused?.selectionStart, focused?.selectionEnd];
+  layout = null;
   if (fresh.length !== cells.length) {
     cells = fresh;
     drawDoc();
@@ -1212,6 +1407,7 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
       const changed = c.block < 0 && (c.textbox || c.choice ? inputChanged && !holdsFocus : c.html !== cells[i].html);
       // Go leaves out fields that are false, so clear the fold flags first.
       Object.assign(cells[i], { collapsed: false, collapsedOutput: false }, c);
+      partial.delete(cells[i]);
       const card = $("doc").children[i] as HTMLElement | undefined;
       if (card && changed) {
         const fold = card.dataset.fold;

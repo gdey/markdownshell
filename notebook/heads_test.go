@@ -133,10 +133,13 @@ func decodeHeads(t *testing.T, l HeadList) []Head {
 		}
 		h := Head{Line: line + num(0, 0), From: from + num(1, 0), Hash: str(3), Block: num(4, -1), Kind: num(5, 0), Flags: num(6, 0), Level: num(7, 0), CodeLines: num(8, 0), OutputLines: num(9, 0), SectionFrom: num(10, 0), SectionTo: num(11, 0), ID: str(12), Name: str(13), Title: str(14)}
 		h.To = h.From + num(2, 0)
-		if len(r) > 15 {
+		if len(r) > 15 && r[15] != nil {
 			for _, d := range r[15].([]any) {
 				h.Depends = append(h.Depends, d.(string))
 			}
+		}
+		if h.Flags&HeadMovable != 0 {
+			h.LastLine = h.Line + num(16, 0)
 		}
 		line, from = h.Line, h.From
 		out = append(out, h)

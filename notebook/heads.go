@@ -56,6 +56,8 @@ type Head struct {
 	// when it is the ID.
 	ID, Name string
 	Depends  []string
+	// LastLine is a movable cell's, as Cell's is.
+	LastLine int
 	// Hash is Cell.Hash.
 	Hash string
 }
@@ -80,6 +82,7 @@ const (
 	HeadSecret
 	HeadTerminal
 	HeadNoSave
+	HeadMovable
 )
 
 // headOf is c's head.
@@ -96,10 +99,13 @@ func headOf(c *Cell) Head {
 	if c.Name != c.ID {
 		h.Name = c.Name
 	}
+	if c.Movable {
+		h.LastLine = c.LastLine
+	}
 	for _, f := range []struct {
 		on   bool
 		flag int
-	}{{c.Ran, HeadRan}, {c.Failed, HeadFailed}, {c.Stale, HeadStale}, {c.Running, HeadRunning}, {c.Hidden != "", HeadHidden}, {c.Collapsed, HeadCollapsed}, {c.CollapsedOutput, HeadCollapsedOutput}, {c.Secret, HeadSecret}, {c.Terminal, HeadTerminal}, {c.NoSave, HeadNoSave}} {
+	}{{c.Ran, HeadRan}, {c.Failed, HeadFailed}, {c.Stale, HeadStale}, {c.Running, HeadRunning}, {c.Hidden != "", HeadHidden}, {c.Collapsed, HeadCollapsed}, {c.CollapsedOutput, HeadCollapsedOutput}, {c.Secret, HeadSecret}, {c.Terminal, HeadTerminal}, {c.NoSave, HeadNoSave}, {c.Movable, HeadMovable}} {
 		if f.on {
 			h.Flags |= f.flag
 		}
@@ -111,11 +117,13 @@ func headOf(c *Cell) Head {
 // few hundred thousand, so each is a JSON array rather than an object,
 //
 //	[line, from, to, hash, block, kind, flags, level, codeLines,
-//	 outputLines, sectionFrom, sectionTo, id, name, title, depends]
+//	 outputLines, sectionFrom, sectionTo, id, name, title, depends,
+//	 lastLine]
 //
 // with what is left at its zero at the end left off, block's zero being
 // -1. Line and From are counted on from the head before's, the first's
-// from 0, and To from From, so most of the numbers are short.
+// from 0, To from From, and LastLine from Line, so most of the numbers
+// are short.
 type HeadList []Head
 
 // MarshalJSON writes l as HeadList says.
@@ -132,7 +140,11 @@ func (l HeadList) MarshalJSON() ([]byte, error) {
 		if len(h.Depends) > 0 {
 			deps = h.Depends
 		}
-		vals = append(vals[:0], h.Line-line, h.From-from, h.To-h.From, h.Hash, h.Block, h.Kind, h.Flags, h.Level, h.CodeLines, h.OutputLines, h.SectionFrom, h.SectionTo, h.ID, h.Name, h.Title, deps)
+		last := 0
+		if h.LastLine > 0 {
+			last = h.LastLine - h.Line
+		}
+		vals = append(vals[:0], h.Line-line, h.From-from, h.To-h.From, h.Hash, h.Block, h.Kind, h.Flags, h.Level, h.CodeLines, h.OutputLines, h.SectionFrom, h.SectionTo, h.ID, h.Name, h.Title, deps, last)
 		line, from = h.Line, h.From
 		n := len(vals)
 		for n > 4 {
@@ -639,11 +651,28 @@ func (l *cellLayout) moves(first int) {
 func (l *cellLayout) hash(i int) string {
 	h := fnv.New64a()
 	s := l.bodies[i]
+	c := &l.cells[i]
+	// What else a card draws that its head doesn't say.
+	fmt.Fprintf(h, "%v %v %q\x00", c.Tasks, c.OutputTasks, c.Hidden)
 	switch {
+	case c.Textbox != nil || c.Choice != nil:
+		// Not its block's index, which a block added above changes
+		// without changing the card.
+		var in []byte
+		if t := c.Textbox; t != nil {
+			k := *t
+			k.Block = 0
+			in, _ = json.Marshal(k)
+		} else {
+			k := *c.Choice
+			k.Block = 0
+			in, _ = json.Marshal(k)
+		}
+		h.Write(in)
 	case s.block >= 0:
 		b := l.n.d.Blocks[s.block]
 		r := l.n.results[s.block]
-		fmt.Fprintf(h, "block %d %d\x00", len(b.Body), len(s.out))
+		fmt.Fprintf(h, "block %q %d %d\x00", b.Info, len(b.Body), len(s.out))
 		h.Write([]byte(b.Body))
 		h.Write(s.out)
 		for _, e := range b.History {

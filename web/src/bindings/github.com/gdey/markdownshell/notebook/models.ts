@@ -552,11 +552,13 @@ export interface HTTPCheck {
  * few hundred thousand, so each is a JSON array rather than an object,
  * 
  * 	[line, from, to, hash, block, kind, flags, level, codeLines,
- * 	 outputLines, sectionFrom, sectionTo, id, name, title, depends]
+ * 	 outputLines, sectionFrom, sectionTo, id, name, title, depends,
+ * 	 lastLine]
  * 
  * with what is left at its zero at the end left off, block's zero being
  * -1. Line and From are counted on from the head before's, the first's
- * from 0, and To from From, so most of the numbers are short.
+ * from 0, To from From, and LastLine from Line, so most of the numbers
+ * are short.
  */
 export type HeadList = any;
 
