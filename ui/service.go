@@ -159,6 +159,22 @@ func (a *App) RunBlock(ctx context.Context, i int) error {
 	return err
 }
 
+// RunBlockSide runs block i alone in a side shell, started from the
+// state the History pane's shell last reported, leaving what runs in
+// that shell, such as an editor, running.
+func (a *App) RunBlockSide(ctx context.Context, i int) error {
+	t, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	if err := a.beforeRun(t, n); err != nil {
+		return err
+	}
+	err = t.run(func() error { return n.RunBlockSide(i) })
+	a.afterRun(t, n)
+	return err
+}
+
 // RunFrom runs block i and the blocks after it.
 func (a *App) RunFrom(ctx context.Context, i int) error {
 	t, n, err := a.notebook(ctx)

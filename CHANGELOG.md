@@ -8,6 +8,18 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- With the experimental interactive shell on, running a block while a
+  command such as vim holds the History pane's shell no longer fails
+  with "the shell is running a command": mdsh stops the command, as
+  ctrl+z would, runs the block in the same shell, so what it sets is
+  kept, and brings the command back with `fg`. A command that doesn't
+  stop for ctrl+z still keeps the shell. Alt-click (option-click on a
+  Mac) a block's play button, or press cmd/ctrl+alt+enter (Run › Run
+  Current Block in a Side Shell), to run it in a side shell instead:
+  one of its own, started from the History shell's exported variables
+  and directory, which leaves the command running and keeps nothing
+  the block sets.
+
 - Help › Copy Bug Report, and a Bug Report button in the Console pane,
   copy a Markdown report to paste into an issue or a chat with Claude:
   the version and build, the settings (less the recent, pinned and

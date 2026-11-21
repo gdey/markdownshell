@@ -191,6 +191,25 @@ func (s *Stack) SetArgs(ctx context.Context, args []string) error {
 	return nil
 }
 
+// Side is a stack of its own whose top-level shell starts from st, the
+// state the interactive top-level shell of s reported: its exported
+// variables and its directory, though not its functions or aliases,
+// which it doesn't report. Its shells are scripted and apart from s's;
+// the caller closes it.
+func (s *Stack) Side(st State) *Stack {
+	s.mu.Lock()
+	cfg, prepared, strict := s.cfg, s.prepared, s.Strict
+	s.mu.Unlock()
+	cfg.Interactive, cfg.Login = false, false
+	cfg.Env = Environ(st.Exported)
+	if st.PWD != "" {
+		cfg.Dir = st.PWD
+	}
+	side := NewStack(cfg)
+	side.Prepare, side.prepared, side.Strict = s.Prepare, prepared, strict
+	return side
+}
+
 // KillBusy kills the shells running a script (see Shell.Kill), those
 // still starting too, and reports whether there were any. Unlike the
 // stack's other methods, it may be called while a script runs.

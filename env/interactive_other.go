@@ -18,6 +18,7 @@ type Event struct {
 	Status  int
 	State   *State
 	Typed   bool
+	Resumed bool
 	Output  []byte
 }
 
@@ -25,6 +26,7 @@ var (
 	ErrBusy           = errors.New("the shell is running a command")
 	ErrLineTyped      = errors.New("a line is being typed at the prompt")
 	ErrNotInteractive = errors.New("shell isn't interactive")
+	ErrNotStopped     = ErrBusy
 )
 
 func startInteractive(context.Context, *Shell, Config, string, func(*Shell)) error {
@@ -46,6 +48,7 @@ func (s *Shell) Watch(func(Event))    {}
 func (s *Shell) State() (State, bool) { return State{}, false }
 func (s *Shell) Want([]string) error  { return ErrNotInteractive }
 func (s *Shell) Jobs() []ShellJob     { return nil }
+func (s *Shell) Foreground() int      { return 0 }
 
 // CanInteractive is false: interactive shells need Unix.
 func CanInteractive(string) bool { return false }

@@ -175,6 +175,9 @@ func (g *gui) buildMenu() *application.Menu {
 
 	run := m.AddSubmenu("Run")
 	run.Add("Run Current Block").SetAccelerator("CmdOrCtrl+Enter").OnClick(send("runcurrent"))
+	// In a shell of its own, from the History pane's shell's state,
+	// leaving what runs there, such as an editor, running.
+	run.Add("Run Current Block in a Side Shell").SetAccelerator("CmdOrCtrl+Alt+Enter").OnClick(send("runside"))
 	// The section is the selected heading's, or the one the selected
 	// block or the source pane's cursor is in; see runCurrentSection.
 	run.Add("Run Section").SetAccelerator("CmdOrCtrl+Shift+Enter").OnClick(send("runsection"))
