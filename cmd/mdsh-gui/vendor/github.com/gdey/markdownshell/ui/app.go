@@ -63,6 +63,9 @@ type App struct {
 	// startFolders are the folders the start screen lists, by rel, with
 	// their absolute paths, which the folder settings may edit.
 	startFolders map[string]string
+	// prefetched is the start folder's listing begun as the app
+	// started, until the start screen takes it.
+	prefetched *startListing
 	// finderOpens holds the files Finder asks to open (Open With, a
 	// double click, a drop on the Dock icon) until the app has started.
 	finderOpens openQueue
@@ -494,19 +497,38 @@ func (a *App) openFromMenu() {
 // ready for them. On macOS, Finder's Open With sends the file in an Apple
 // Event, not on the command line, and on a cold launch that event comes
 // before the app has finished starting.
+//
+// macOS also sends the file or folder named on the command line that
+// way, as if Finder had asked; args holds those, and the queue drops
+// them until it starts, as the app opened them itself. Opening a folder
+// named on the command line again failed, and its error sheet held back
+// the first window by a quarter of a second, or for good.
 type openQueue struct {
 	mu      sync.Mutex
 	ready   bool
 	pending []string
+	args    []string
+}
+
+// arg notes path, named on the command line, which the system's
+// request to open before start is dropped for.
+func (q *openQueue) arg(path string) {
+	if abs, err := filepath.Abs(path); err == nil {
+		q.mu.Lock()
+		q.args = append(q.args, abs)
+		q.mu.Unlock()
+	}
 }
 
 // add reports whether file can be opened now; if not, it is held for
-// start.
+// start, unless it was named on the command line.
 func (q *openQueue) add(file string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if !q.ready {
-		q.pending = append(q.pending, file)
+		if abs, err := filepath.Abs(file); err != nil || !slices.Contains(q.args, abs) {
+			q.pending = append(q.pending, file)
+		}
 	}
 	return q.ready
 }
