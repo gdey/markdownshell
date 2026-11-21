@@ -811,6 +811,15 @@ export function RunBlock(i: number): $CancellablePromise<void> {
 }
 
 /**
+ * RunBlockSide runs block i alone in a side shell, started from the
+ * state the History pane's shell last reported, leaving what runs in
+ * that shell, such as an editor, running.
+ */
+export function RunBlockSide(i: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.RunBlockSide", i);
+}
+
+/**
  * RunFrom runs block i and the blocks after it.
  */
 export function RunFrom(i: number): $CancellablePromise<void> {

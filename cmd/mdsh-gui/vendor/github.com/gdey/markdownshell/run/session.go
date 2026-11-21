@@ -57,6 +57,8 @@ type Session struct {
 	ended, restarts map[string]bool
 	// killed is set by Kill, so the shell's end is logged as killed.
 	killed atomic.Bool
+	// side, while RunSide runs a block, is the stack it runs in.
+	side *env.Stack
 	// badFrontMatter is set when the front matter didn't parse as the
 	// session started, so its shells have the default settings.
 	badFrontMatter bool
@@ -995,7 +997,11 @@ func (s *Session) run(ctx context.Context, b *doc.Block, r *Result) {
 	}
 	defer s.logEnd(b, r, time.Now())
 	pre, revoke := s.issue(b)
-	runBlock(ctx, s.stack, s.d, b, pre, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
+	stack := s.stack
+	if s.side != nil {
+		stack = s.side
+	}
+	runBlock(ctx, stack, s.d, b, pre, r, s.opts, s.emit, s.wanted[b.ID], tapeFor(s.d, s.results, b), LookupAt(s.lookup, s.d, s.results, b.Span.Start))
 	revoke()
 	s.emit(Event{Kind: Done, Block: b, Result: r})
 }

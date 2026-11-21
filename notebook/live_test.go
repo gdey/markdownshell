@@ -72,10 +72,16 @@ func TestLiveHistory(t *testing.T) {
 			wait("full screen", has("history-2.cast"))
 			n.SetRecording(false)
 			n.TypeShell("echo unrecorded\r")
-			time.Sleep(300 * time.Millisecond)
-			wait("unrecorded", func(string) bool { return true })
+			wait("unrecorded", func(string) bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return strings.Count(shown.String(), "unrecorded") >= 2
+			})
 			n.SetRecording(true)
 			n.TypeShell("sleep 5\r")
+			for !n.Running() {
+				time.Sleep(20 * time.Millisecond)
+			}
 			time.Sleep(300 * time.Millisecond)
 			n.TypeShell("\x1a")
 			wait("stopped", has("```output {for=history-3 exit="))
@@ -111,5 +117,137 @@ func TestLiveHistory(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestLivePlayStops: a block played while a command typed at the live
+// pane's prompt holds the shell stops it, runs in the same shell, and
+// brings it back.
+func TestLivePlayStops(t *testing.T) {
+	for _, name := range []string{"sh", "bash", "zsh"} {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("skip_global_compinit", "1")
+			file := write(t, "---\nmdsh:\n  shell: "+path+"\n  env:\n    share: [\"...\"]\n---\n"+
+				"```sh {#a}\nexport Z=from-a; echo played\n```\n\n```sh {#b}\necho \"$Z\"\n```\n")
+			n, err := Open(file, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer n.Close()
+			n.SetInteractiveShell(true, false)
+			if _, err := n.SetHistory(true, true); err != nil {
+				t.Fatal(err)
+			}
+			if err := n.AttachShell(); err != nil {
+				t.Fatal(err)
+			}
+			n.TypeShell("sleep 30\r")
+			deadline := time.Now().Add(10 * time.Second)
+			for !n.Running() {
+				if time.Now().After(deadline) {
+					t.Fatal("sleep never ran")
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			time.Sleep(200 * time.Millisecond)
+			if err := n.RunBlock(0); err != nil {
+				t.Fatal(err)
+			}
+			// Once sleep is back it holds the shell again, so b stops it
+			// too.
+			if err := n.RunBlock(1); err != nil {
+				t.Fatal(err)
+			}
+			for !n.Running() {
+				if time.Now().After(deadline) {
+					t.Fatal("sleep isn't back")
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			n.Stop()
+			for n.Running() {
+				if time.Now().After(deadline) {
+					t.Fatal("sleep never ended")
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			got := noAt(n.Text())
+			for _, s := range []string{
+				"{for=a exit=0}\nplayed\n```",
+				"{for=b exit=0}\nfrom-a\n```",
+				" {#history-1 skip links}\nsleep 30\n```",
+				"{for=history-1 exit=",
+			} {
+				if !strings.Contains(got, s) {
+					t.Errorf("no %q in\n%s", s, got)
+				}
+			}
+		})
+	}
+}
+
+// TestLiveSide: a block run in a side shell while a typed command holds
+// the live pane's shell runs from the shell's state, and leaves the
+// command running.
+func TestLiveSide(t *testing.T) {
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash")
+	}
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	file := write(t, "---\nmdsh:\n  shell: "+path+"\n  env:\n    share: [\"...\"]\n---\n"+
+		"```sh {#a}\necho \"$Y $PWD\"; Z=side\n```\n")
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	n.SetInteractiveShell(true, false)
+	if _, err := n.SetHistory(true, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.AttachShell(); err != nil {
+		t.Fatal(err)
+	}
+	n.TypeShell("export Y=from-shell; cd " + dir + "\r")
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(n.Text(), "{#history-1") || n.Running() {
+		if time.Now().After(deadline) {
+			t.Fatal("the first command never ended")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	n.TypeShell("sleep 30\r")
+	for !strings.Contains(n.Text(), "sleep 30") || !n.Running() {
+		if time.Now().After(deadline) {
+			t.Fatal("sleep never ran")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := n.RunBlockSide(0); err != nil {
+		t.Fatal(err)
+	}
+	got := noAt(n.Text())
+	if !strings.Contains(got, "{for=a exit=0}\nfrom-shell "+dir+"\n```") {
+		t.Errorf("side run:\n%s", got)
+	}
+	if strings.Contains(got, "{for=history-") || !n.Running() {
+		t.Errorf("sleep didn't go on: running %v\n%s", n.Running(), got)
+	}
+	n.Stop()
+	for n.Running() {
+		if time.Now().After(deadline) {
+			t.Fatal("sleep never ended")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := noAt(n.Text()); !strings.Contains(got, "{for=history-2 exit=130}") {
+		t.Errorf("after ctrl+c:\n%s", got)
 	}
 }

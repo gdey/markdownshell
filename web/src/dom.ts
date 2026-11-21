@@ -75,11 +75,11 @@ export function svg(path: string): SVGSVGElement {
   return s;
 }
 
-export function iconButton(icon: keyof typeof icons, title: string, onclick: () => void): HTMLButtonElement {
+export function iconButton(icon: keyof typeof icons, title: string, onclick: (e: MouseEvent) => void): HTMLButtonElement {
   const b = el("button", { className: "icon", title }, svg(icons[icon]));
   b.onclick = (e) => {
     e.stopPropagation();
-    onclick();
+    onclick(e);
   };
   b.setAttribute("aria-label", title);
   return b;

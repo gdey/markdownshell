@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -454,6 +456,83 @@ func TestInteractiveTypedNote(t *testing.T) {
 			defer mu.Unlock()
 			if cmd[0] != want {
 				t.Errorf("got %q, want %q", cmd, want)
+			}
+		})
+	}
+}
+
+// TestInteractiveSuspend: RunLine while a command typed at the terminal
+// holds the shell stops it, runs the line and brings it back; one that
+// won't stop leaves RunLine busy.
+func TestInteractiveSuspend(t *testing.T) {
+	for _, sh := range shells(t) {
+		name := filepath.Base(sh)
+		t.Run(name, func(t *testing.T) {
+			s := startI(t, sh, nil)
+			var mu sync.Mutex
+			var evs []Event
+			s.Watch(func(e Event) {
+				if e.Kind == "start" || e.Kind == "end" {
+					mu.Lock()
+					evs = append(evs, e)
+					mu.Unlock()
+				}
+			})
+			s.Type([]byte("sleep 30\r"))
+			waitFor(t, "sleep to run", func() bool { return fg(s) })
+			if rc, out := runI(t, s, "echo played"); rc != 0 || out != "played" {
+				t.Fatalf("played: %d %q", rc, out)
+			}
+			waitFor(t, "sleep back", func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return len(evs) > 0 && evs[len(evs)-1].Resumed
+			})
+			waitFor(t, "sleep in the foreground", func() bool { return fg(s) })
+			s.Type([]byte{0x03})
+			waitFor(t, "prompt", func() bool {
+				s.ia.mu.Lock()
+				defer s.ia.mu.Unlock()
+				return s.ia.phase == phaseInput
+			})
+			mu.Lock()
+			var got []string
+			for _, e := range evs {
+				got = append(got, fmt.Sprintf("%s typed=%v resumed=%v %d", e.Kind, e.Typed, e.Resumed, e.Status))
+			}
+			mu.Unlock()
+			want := []string{
+				"start typed=false resumed=false 0",
+				"end typed=false resumed=false " + strconv.Itoa(stoppedStatus),
+				"start typed=true resumed=false 0",
+				"end typed=true resumed=false 0",
+				"start typed=false resumed=true 0",
+				"end typed=false resumed=false 130",
+			}
+			if strings.Join(got, "\n") != strings.Join(want, "\n") {
+				t.Errorf("events:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+			}
+			if j := s.Jobs(); len(j) != 0 {
+				t.Errorf("jobs left: %+v", j)
+			}
+
+			// One that ignores ctrl+z keeps the shell.
+			s.Type([]byte("sh -c \"trap '' TSTP; exec sleep 30\"\r"))
+			// Once sh has set the trap and become sleep: sooner, ctrl+z
+			// stops sh.
+			waitFor(t, "sleep to run", func() bool {
+				if !fg(s) {
+					return false
+				}
+				for _, j := range ttyJobs(strings.TrimPrefix(s.ia.ttyName, "/dev/"), s.PID()) {
+					if j.Command == "sleep 30" {
+						return true
+					}
+				}
+				return false
+			})
+			if _, _, err := s.RunLine(context.Background(), "echo no", io.Discard); !errors.Is(err, ErrNotStopped) {
+				t.Errorf("RunLine: %v", err)
 			}
 		})
 	}
