@@ -497,6 +497,9 @@ func (s *Shell) interruptTTY(stop <-chan struct{}) {
 	killed := false
 	var sent time.Time
 	for {
+		if s.Exited() {
+			return
+		}
 		if time.Since(sent) >= time.Second {
 			s.ia.ptm.Write([]byte{0x03})
 			// The shell isn't in the foreground group, so the ctrl+c

@@ -2,8 +2,10 @@ package notebook
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func cellsHTML(t *testing.T, md string) string {
@@ -93,7 +95,10 @@ func TestD2Timeout(t *testing.T) {
 	old := d2Timeout
 	d2Timeout = 0
 	defer func() { d2Timeout = old }()
-	if _, _, note := drawD2([]byte("slow -> layout\n")); !strings.Contains(note, "too long") {
+	// A source of its own each time: a drawing the last run finished
+	// is cached, and comes back at once.
+	src := fmt.Sprintf("slow -> layout%d\n", time.Now().UnixNano())
+	if _, _, note := drawD2([]byte(src)); !strings.Contains(note, "too long") {
 		t.Errorf("note = %q", note)
 	}
 }
