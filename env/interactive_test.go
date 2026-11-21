@@ -370,3 +370,91 @@ func TestInteractiveBackground(t *testing.T) {
 		})
 	}
 }
+
+// TestInteractiveTypedEvents: a command typed at the terminal, rather
+// than by RunLine, is reported with its text, status and output.
+func TestInteractiveTypedEvents(t *testing.T) {
+	for _, sh := range shells(t) {
+		name := filepath.Base(sh)
+		t.Run(name, func(t *testing.T) {
+			s := startI(t, sh, nil)
+			var mu sync.Mutex
+			var evs []Event
+			s.Watch(func(e Event) {
+				if e.Kind == "state" {
+					return
+				}
+				mu.Lock()
+				evs = append(evs, e)
+				mu.Unlock()
+			})
+			ended := func(n int) func() bool {
+				return func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					c := 0
+					for _, e := range evs {
+						if e.Kind == "end" {
+							c++
+						}
+					}
+					return c >= n
+				}
+			}
+			s.Type([]byte("echo hi; (exit 3)\r"))
+			waitFor(t, "typed command", ended(1))
+			runI(t, s, "echo played")
+			mu.Lock()
+			got := append([]Event(nil), evs...)
+			mu.Unlock()
+			if len(got) != 4 {
+				t.Fatalf("events: %+v", got)
+			}
+			if got[0].Kind != "start" || got[0].Typed || got[0].Command != "echo hi; (exit 3)" {
+				t.Errorf("start: %+v", got[0])
+			}
+			if got[1].Kind != "end" || got[1].Typed || got[1].Status != 3 || clean(string(got[1].Output)) != "hi" {
+				t.Errorf("end: %+v %q", got[1], got[1].Output)
+			}
+			if !got[2].Typed || !got[3].Typed || got[3].Output != nil {
+				t.Errorf("RunLine's events: %+v", got[2:])
+			}
+		})
+	}
+}
+
+// TestInteractiveTypedNote: a comment typed at the terminal is reported
+// with its text, as a line that ran nothing in bash and zsh, and as a
+// command in sh, which marks it as one.
+func TestInteractiveTypedNote(t *testing.T) {
+	for _, sh := range shells(t) {
+		name := filepath.Base(sh)
+		t.Run(name, func(t *testing.T) {
+			s := startI(t, sh, nil)
+			var mu sync.Mutex
+			var cmd []string
+			s.Watch(func(e Event) {
+				if e.Kind == "line" || e.Kind == "start" {
+					mu.Lock()
+					cmd = append(cmd, e.Kind+" "+e.Command)
+					mu.Unlock()
+				}
+			})
+			s.Type([]byte("# a note\r"))
+			want := "line # a note"
+			if name == "sh" {
+				want = "start # a note"
+			}
+			waitFor(t, "the note", func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return len(cmd) > 0
+			})
+			mu.Lock()
+			defer mu.Unlock()
+			if cmd[0] != want {
+				t.Errorf("got %q, want %q", cmd, want)
+			}
+		})
+	}
+}

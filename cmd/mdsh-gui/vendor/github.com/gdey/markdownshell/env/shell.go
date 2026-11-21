@@ -584,6 +584,9 @@ func (s *Shell) Exited() bool {
 	}
 }
 
+// Done is closed when the shell has ended.
+func (s *Shell) Done() <-chan struct{} { return s.waited }
+
 // Exported returns the shell's exported variables.
 func (s *Shell) Exported(ctx context.Context) (map[string]string, error) {
 	if s.ia != nil {

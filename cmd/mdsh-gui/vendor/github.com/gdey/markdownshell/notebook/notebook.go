@@ -242,6 +242,8 @@ type Notebook struct {
 	opts Options
 	md   goldmark.Markdown
 	term *terminal
+	// live is the History pane as a terminal, on an interactive shell.
+	live *live
 
 	mu sync.Mutex // guards the fields below
 	// bgTerms are the terminals of the background blocks marked tty
@@ -332,6 +334,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		d:       d,
 		index:   map[*doc.Block]int{},
 		term:    newTerminal(),
+		live:    newLive(),
 		bgTerms: map[int]*terminal{},
 		bg:      map[*doc.Block]bool{},
 		quit:    make(chan struct{}),
@@ -360,6 +363,7 @@ func Open(file string, opts Options) (*Notebook, error) {
 		}
 	}
 	go n.reaper()
+	go n.liveLoop()
 	return n, nil
 }
 
