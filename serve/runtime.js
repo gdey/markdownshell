@@ -114,6 +114,10 @@ function keyAction(e) {
 function onKey(e) {
   const action = keyAction(e);
   if (!action) return;
+  // Off macOS, ctrl and a letter in a terminal is the program's, as
+  // ctrl+z, ctrl+r and ctrl+s are a shell's: the shortcuts there take
+  // shift too, or are keys no program reads, such as ctrl+enter.
+  if (!mac && !e.shiftKey && e.key.length === 1 && e.target instanceof Element && e.target.closest(".xterm")) return;
   e.preventDefault();
   e.stopPropagation();
   if (parent) return parent.__mdshMenu?.(action);

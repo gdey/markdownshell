@@ -8,6 +8,21 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- With the experimental interactive shell on (Settings › Shell), the
+  History pane is a terminal on the document's shell, in mdsh-gui and
+  `mdsh --serve`: the shell draws its own prompt, reads your rc file's
+  key bindings and completion, and every key goes to it, so vim, ctrl+z,
+  `fg`, `bg` and `jobs` work as in any terminal. What you type there
+  still goes into the file: a line starting with `#` as a note, any
+  other command as a History block with what it showed, and one that
+  took the screen as a recording. Record off runs commands without
+  adding them. The bar under the pane shows the shell's jobs, a stopped
+  one marked, and its block gets a stopped badge; Restart Shells names
+  the jobs it would end. In the browser, ctrl and a letter in a
+  terminal now go to the program, not to mdsh's shortcuts, off macOS.
+
+  ![The History pane as a terminal: a note, echo and vim typed at the shell's prompt, vim stopped with ctrl+z, its block marked stopped and the bar showing %1 vim stopped](docs/changelog/live-history.png)
+
 - With the experimental interactive shell on, running a block while a
   command such as vim holds the History pane's shell no longer fails
   with "the shell is running a command": mdsh stops the command, as

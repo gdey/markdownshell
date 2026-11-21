@@ -671,6 +671,59 @@ func (a *App) HistoryEnter(ctx context.Context, input string, record bool) error
 	return err
 }
 
+// afterLive saves, with autosave on, once a command typed at the live
+// History pane's prompt has ended, as afterRun does after a run.
+func (a *App) afterLive(t *docTab) {
+	if n, err := t.notebook(); err == nil && !n.Running() {
+		a.afterRun(t, n)
+	}
+}
+
+// HistoryLive reports whether the History pane is a terminal on the
+// file's interactive shell: keys go to TypeShell, and the shell's
+// screen comes as "shell" events, rather than lines being edited for
+// HistoryEnter. Settings › Run › Interactive shell turns it on.
+func (a *App) HistoryLive(ctx context.Context) bool {
+	_, n, err := a.notebook(ctx)
+	return err == nil && n.Live()
+}
+
+// AttachShell starts the live History pane's shell, if it isn't
+// running, so its prompt shows.
+func (a *App) AttachShell(ctx context.Context) error {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	return n.AttachShell()
+}
+
+// TypeShell sends keys typed in the live History pane to its shell,
+// starting it again if it ended.
+func (a *App) TypeShell(ctx context.Context, keys string) error {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	n.SetHistoryReuse(a.settings.Get().HistoryReuse)
+	return n.TypeShell(keys)
+}
+
+// ShellSize sets the live History pane's size, in cells.
+func (a *App) ShellSize(ctx context.Context, cols, rows int) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.ShellSize(cols, rows)
+	}
+}
+
+// SetRecording turns the live History pane's Record switch on or off:
+// off, commands typed at its prompt run but aren't added to the file.
+func (a *App) SetRecording(ctx context.Context, on bool) {
+	if _, n, err := a.notebook(ctx); err == nil {
+		n.SetRecording(on)
+	}
+}
+
 // HistoryComplete reports whether input is a whole command, so enter
 // runs it, rather than starting another line.
 func (a *App) HistoryComplete(ctx context.Context, input string) bool {

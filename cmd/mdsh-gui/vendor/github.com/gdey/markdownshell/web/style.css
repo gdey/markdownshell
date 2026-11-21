@@ -420,6 +420,10 @@ body.hide-output .block > .earlier-part { display: none !important; }
 .block .head .lang { padding: 0 6px; border-radius: 10px; font-size: calc(11px * var(--text-scale)); line-height: 18px; color: var(--muted); background: var(--code-bg); border: 1px solid var(--border); }
 .block .head .attrs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: calc(12px * var(--text-scale)); }
 .hidden-badge { padding: 0 8px; border: 1px solid var(--warn-border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; background: var(--warn-bg); margin-right: 8px; white-space: nowrap; cursor: help; }
+/* A History block whose command is still a job of the shell, stopped
+   or running on in the background. */
+.job-badge { padding: 0 8px; border: 1px solid var(--border); border-radius: 10px; font-size: calc(12px * var(--text-scale)); line-height: 16px; color: var(--muted); margin-right: 8px; white-space: nowrap; cursor: help; }
+.job-badge.stopped { border-color: var(--warn-border); background: var(--warn-bg); color: var(--fg); }
 .prose.hidden-block .hidden-badge { display: inline-block; margin-bottom: 4px; }
 .block.hidden-block { border-style: dashed; border-color: var(--warn-border); }
 .prose.hidden-block { border-left: 2px dashed var(--warn-border); padding-left: 10px; }
@@ -845,6 +849,19 @@ body.history-full #history-grip { display: none; }
    forced colors the outline and the system's caret come back. */
 #history-cursor { position: absolute; pointer-events: none; height: 18px; line-height: 18px; background: var(--fg); color: var(--bg); white-space: pre; animation: history-blink 1.06s steps(1) infinite; }
 #history-cursor[hidden] { display: none; }
+/* Live, the pane is a terminal on the shell, which draws its own
+   prompt: the line editor and its prompt give way, and the foot keeps
+   the clock and the shell's jobs. */
+#history.live :is(#history-input, #history-prompt, #history-block-prompt, #history-prompt-head, #history-dir, #history-cursor) { display: none !important; }
+#history.live:not(.closed) .history-line { min-height: 18px; padding-right: 150px; }
+#history-jobs { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; padding-top: 2px; }
+#history-jobs[hidden] { display: none; }
+#history.closed #history-jobs { order: 1; padding-top: 0; }
+#history-jobs .job { display: inline-flex; gap: 4px; align-items: center; max-width: 30ch; padding: 0 6px; border: 1px solid var(--border); border-radius: 9px; color: var(--fg); background: none; font: calc(11px * var(--text-scale))/16px var(--font-code); white-space: nowrap; cursor: pointer; }
+#history-jobs .job .cmd { overflow: hidden; text-overflow: ellipsis; }
+#history-jobs .job .state { color: var(--muted); }
+#history-jobs .job.stopped { border-color: var(--warn-border); background: var(--warn-bg); }
+#history-jobs .job:hover { background: var(--hover); }
 @keyframes history-blink { 50% { opacity: 0; } }
 :root[data-history-focus="cursor"] #history-input { caret-color: transparent; }
 :root[data-history-focus="cursor"] #history-input:is(:focus, :focus-visible) { outline: none; }

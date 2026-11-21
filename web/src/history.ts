@@ -3,6 +3,12 @@
 // to the end of the document with its output, and a line starting with
 // # is added as prose. The pane's terminal keeps a transcript, and is
 // where a command runs, so what you type while it runs goes to it.
+//
+// With Settings › Run › Interactive shell on, the pane is live instead:
+// a terminal on the document's shell, which draws its own prompt and
+// reads every key, as any terminal's shell does. What is typed at that
+// prompt still becomes notes and History blocks as it runs (see
+// notebook.Live), and the foot shows the shell's jobs.
 
 import { Terminal } from "@xterm/xterm";
 import { Clipboard } from "/wails/runtime.js";
@@ -36,6 +42,21 @@ let at = 0; // where up and down are in typed
 let promptCols = 0; // the width the prompt was last asked at
 let full = false; // the pane fills the tab, up to the tab bar
 let record = true; // commands typed here are added to the file
+let live = false; // the pane is a terminal on the shell (see HistoryLive)
+let liveRunning = false; // a command typed at the live shell's prompt runs
+
+// ShellJob is a job of the live pane's shell, as notebook.ShellJob.
+export interface ShellJob {
+  n: number;
+  state: string;
+  command: string;
+  block: number;
+}
+
+let jobs: ShellJob[] = [];
+
+// shellJobs are the live shell's jobs, as it last listed them.
+export const shellJobs = () => jobs;
 
 export interface HistoryHooks {
   // canRun says whether a run may start, which it can't while one goes.
@@ -57,6 +78,8 @@ export interface HistoryHooks {
   restart: () => Promise<boolean>;
   // say shows text in the status line.
   say: (text: string) => void;
+  // jobs is told the live shell's jobs changed, for the cards' badges.
+  jobs: () => void;
 }
 
 let hooks: HistoryHooks;
@@ -117,7 +140,8 @@ function ensureTerm(): Terminal {
   // What commands typed here print comes with links, as their blocks do.
   terminalLinks(term, (msg) => say(`\x1b[31m${msg}\x1b[0m`));
   term.onData((keys) => {
-    if (block !== -1) typeKeys(keys);
+    if (live) sendKeys(keys);
+    else if (block !== -1) typeKeys(keys);
   });
   // With lines selected, cmd/ctrl+c copies them rather than reaching a
   // command that runs, as in most terminals.
@@ -173,6 +197,10 @@ export function fitHistory() {
   if (rows > maxRows()) rows = maxRows();
   const r = full ? fullRows() : rows;
   if (c !== term.cols || r !== term.rows) term.resize(c, r);
+  if (live) {
+    App.ShellSize(c, r).catch(() => {});
+    return;
+  }
   App.SetTerminalSize(c, r).catch(() => {});
   // A prompt drawn to fit the width is asked for again at the new one.
   // While a block runs the shell can't answer; the prompt is asked for
@@ -300,8 +328,138 @@ export async function showHistory(on: boolean, docHas: boolean) {
       say(`\x1b[31m${message(err)}\x1b[0m`);
     }
   }
+  if (await goLive()) return;
   await updatePrompt();
   input().focus();
+}
+
+// goLive makes the pane a terminal on the shell, if the file's shell is
+// interactive, and reports whether it is.
+async function goLive(): Promise<boolean> {
+  const was = live;
+  live = await App.HistoryLive().catch(() => false);
+  setLive(live);
+  if (!live) return false;
+  if (!was) term?.reset();
+  fitHistory();
+  try {
+    await App.AttachShell();
+  } catch (err) {
+    say(`\x1b[31m${message(err)}\x1b[0m`);
+  }
+  term?.focus();
+  return true;
+}
+
+// setLive shows the pane as a terminal on the shell, or as a transcript
+// with the line editor under it.
+function setLive(on: boolean) {
+  live = on;
+  $("history").classList.toggle("live", on);
+  if (!term) return;
+  // The shell's terminal moves the cursor down a line with a newline,
+  // as full-screen programs do, so it is taken as it comes.
+  term.options.convertEol = !on;
+  term.options.disableStdin = !on && block === -1;
+  term.options.cursorBlink = on && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!on) {
+    jobs = [];
+    drawJobs();
+  }
+}
+
+// Keys typed in the live pane go to the shell in order, those typed
+// while a call is on its way going together in the next.
+let pending = "";
+let sending = false;
+
+async function sendKeys(keys: string) {
+  pending += keys;
+  if (sending) return;
+  sending = true;
+  try {
+    while (pending) {
+      const k = pending;
+      pending = "";
+      try {
+        await App.TypeShell(k);
+      } catch (err) {
+        hooks.say(message(err));
+      }
+    }
+  } finally {
+    sending = false;
+  }
+}
+
+// historyLive takes an event of the live pane's shell (see
+// notebook.Event), and reports whether it was one.
+export function historyLive(kind: string, data: string | undefined, bytes: string | undefined): boolean {
+  switch (kind) {
+    case "shell":
+      if (live && term && bytes) term.write(decode(bytes));
+      return true;
+    case "shell-exit":
+      liveRunning = false;
+      stopClock();
+      historyBusy(false);
+      jobs = [];
+      drawJobs();
+      if (live && term) say("\x1b[2m(the shell ended: type to start a new one)\x1b[0m");
+      return true;
+    case "live":
+      liveRunning = data === "running";
+      if (liveRunning) startClock();
+      else stopClock();
+      historyBusy(false);
+      return true;
+    case "jobs":
+      try {
+        jobs = (JSON.parse(data ?? "[]") as ShellJob[] | null) ?? [];
+      } catch {
+        jobs = [];
+      }
+      drawJobs();
+      return true;
+  }
+  return false;
+}
+
+// decode turns base64 into the bytes it holds.
+function decode(bytes: string): Uint8Array {
+  const raw = atob(bytes);
+  const data = new Uint8Array(raw.length);
+  for (let k = 0; k < raw.length; k++) data[k] = raw.charCodeAt(k);
+  return data;
+}
+
+// jobLabel names a job: its number, as %1, and its command.
+export const jobLabel = (j: ShellJob) => (j.n ? `%${j.n} ` : "") + j.command;
+
+// drawJobs shows the live shell's jobs in the foot, a stopped one
+// marked, each bringing its block into view when clicked.
+function drawJobs() {
+  const box = $("history-jobs");
+  box.hidden = jobs.length === 0;
+  box.replaceChildren(
+    ...jobs.map((j) => {
+      const stopped = j.state.toLowerCase().startsWith("stopped") || j.state.toLowerCase().startsWith("suspended");
+      const chip = document.createElement("button");
+      chip.className = "job" + (stopped ? " stopped" : "");
+      chip.setAttribute("role", "listitem");
+      chip.title = `${jobLabel(j)}: ${j.state}. ${stopped ? "fg brings it back" : "It runs in the background"}${j.block >= 0 ? "; click to show its block" : ""}`;
+      const cmd = document.createElement("span");
+      cmd.className = "cmd";
+      cmd.textContent = jobLabel(j);
+      const state = document.createElement("span");
+      state.className = "state";
+      state.textContent = stopped ? "stopped" : j.state.toLowerCase();
+      chip.append(cmd, state);
+      chip.onclick = () => document.getElementById("block-" + j.block)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return chip;
+    }),
+  );
+  hooks.jobs();
 }
 
 // setHistoryOn turns the History pane on for the file. If that needs the
@@ -330,14 +488,17 @@ async function setHistoryOn() {
 
 // focusHistory puts the keyboard in the pane's input, if it is open.
 export function focusHistory() {
-  if (!$("history").hidden && !$("history").classList.contains("closed")) input().focus();
+  if ($("history").hidden || $("history").classList.contains("closed")) return;
+  if (live) term?.focus();
+  else input().focus();
 }
 
 // updatePrompt asks the shell for its prompts, PS1 and PS2, and shows
 // PS1 before the input: all its lines but the last above it. A shell
 // with none gets a $. While a block runs the prompt stays as it was.
 export async function updatePrompt() {
-  if ($("history").hidden || asking) return;
+  // Live, the shell draws its own.
+  if ($("history").hidden || asking || live) return;
   asking = true;
   // At the pane's size, not the terminal's, which a block's card sets
   // too, so the prompt fits the pane however the calls cross.
@@ -481,6 +642,7 @@ async function submit(entered: string) {
 // again; quiet leaves the transcript be.
 function setRecord(on: boolean, quiet = false) {
   record = on;
+  App.SetRecording(on).catch(() => {});
   const button = $("history-record");
   button.setAttribute("aria-pressed", String(on));
   button.title = on ? recordOnTitle : recordOffTitle;
@@ -725,10 +887,7 @@ export function historyTerminal(i: number, pane: string | undefined): boolean {
 export function historyWrite(i: number, bytes: string | undefined): boolean {
   if (!term || i !== block) return false;
   if (!bytes) return true;
-  const raw = atob(bytes);
-  const data = new Uint8Array(raw.length);
-  for (let k = 0; k < raw.length; k++) data[k] = raw.charCodeAt(k);
-  term.write(data);
+  term.write(decode(bytes));
   return true;
 }
 
@@ -737,8 +896,8 @@ export function historyEnd(i: number): boolean {
   if (!term || i !== block) return false;
   block = -1;
   ctrlCSent = -1;
-  term.options.disableStdin = true;
-  term.options.cursorBlink = false;
+  term.options.disableStdin = !live;
+  term.options.cursorBlink = live;
   // The keys come back to the input, not to the page: blurring the
   // transcript would leave them with the rendered view.
   if (term.element?.contains(document.activeElement)) input().focus();
@@ -762,6 +921,8 @@ export function historyStatus(text: string) {
 export function historyBusy(on: boolean) {
   input().disabled = on && block === -1 && !entering;
   placeCursor();
+  // A command typed at the live shell's prompt can be stopped too.
+  if (live && liveRunning) on = true;
   $<HTMLButtonElement>("history-stop").disabled = !on;
   $<HTMLButtonElement>("history-restart").disabled = on;
   historyStatus(said);
@@ -798,7 +959,8 @@ export function initHistory(h: HistoryHooks) {
   // that ctrl+c doesn't end, or a shell that never says it ended: Run ›
   // Stop then offers to kill the shell.
   $("history-stop").onclick = () => {
-    if (block === -1 || ctrlCSent === block) {
+    // Live, Stop sends the shell ctrl+c (see notebook.Stop).
+    if (live || block === -1 || ctrlCSent === block) {
       ctrlCSent = -1;
       hooks.stop();
       return;
@@ -809,6 +971,11 @@ export function initHistory(h: HistoryHooks) {
   };
   $("history-restart").onclick = async () => {
     if (!(await hooks.restart())) return;
+    if (live) {
+      // The shell's ending says so; the new one shows its prompt.
+      await goLive();
+      return;
+    }
     if (term) say("\x1b[2m(The shells started again, so variables that blocks set are gone.)\x1b[0m");
     await updatePrompt();
   };
@@ -825,7 +992,7 @@ export function initHistory(h: HistoryHooks) {
     if (at.closest("button, textarea, a, #history-grip")) return;
     // Dragging over the prompt's lines selects them; leave that be.
     if (!$("history-term").contains(at) && !document.getSelection()?.isCollapsed) return;
-    if (block === -1) input().focus();
+    if (block === -1 && !live) input().focus();
     else if (!$("history-term").contains(at)) term?.focus();
   });
   // Edit › Copy, or the copy key where the menu takes it first, copies
