@@ -163,6 +163,7 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 }
 
 func mdshGUI(o options) error {
+	ui.StartupMark("main")
 	args := o.args
 	path, err := settings.DefaultPath()
 	if err != nil {
@@ -172,6 +173,7 @@ func mdshGUI(o options) error {
 	if err != nil {
 		return err
 	}
+	ui.StartupMark("settings read")
 	dir, err := argDir(args)
 	if err != nil {
 		return err
@@ -229,6 +231,7 @@ func mdshGUI(o options) error {
 	})
 	g.app = app
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		ui.StartupMark("app started")
 		g.started.Store(true)
 		go g.ctrl.SystemOpensReady()
 		go cons.Send(app.Context(), func(e ui.ConsoleEntry) { app.Event.Emit("console", e) }, func(seqs []int) { app.Event.Emit("console-stale", seqs) })
@@ -254,6 +257,7 @@ func mdshGUI(o options) error {
 	if err := g.ctrl.Start(file, run); err != nil {
 		return err
 	}
+	ui.StartupMark("app run")
 	return app.Run()
 }
 

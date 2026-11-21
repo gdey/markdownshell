@@ -680,6 +680,7 @@ func (a *App) StartScreen() (Start, error) {
 	if err != nil {
 		return Start{}, err
 	}
+	StartupMark(fmt.Sprintf("start screen listed %d files", len(l.Files)))
 	// The window may load the collections' images, and nothing else
 	// outside the open documents' folders.
 	images := map[string]bool{}
