@@ -115,6 +115,17 @@ follow [Semantic Versioning](https://semver.org/).
   cards near the view are rendered. A 1M-line runbook shows its first
   screen in about 0.4 s, against 13.5 s before in Chromium; a 1M-line
   file that is mostly prose opens, where before the window gave up.
+- A long file scrolls at once, wherever you jump: the rendered view
+  keeps only the cards near what is in sight, a few dozen, between
+  spacers as tall as the rest, and draws the others as you come to
+  them. Folding, the outline, j and k, the dependency lines, dragging
+  and the source pane's scrolling go by the document's cells rather than
+  its cards. A 1M-line runbook has every cell in about 4.5 s, against 9 s
+  before, and a jump anywhere in it draws in under 0.1 s; the page holds
+  about 20 cards wherever it is, where before it held one for every
+  cell.
+
+  ![A 1M-line runbook scrolled to its middle, at step 29,998, drawn as soon as the view got there](docs/changelog/scroll-1m.png)
 - The `.dmg` window shows the newest look, Green Tea, in the app rising
   from its bottom edge. `build/darwin/dmg/render.sh` takes the newest
   look's picture from `site/data/looks.toml`, so running it again when a

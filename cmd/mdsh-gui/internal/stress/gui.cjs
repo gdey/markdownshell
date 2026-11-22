@@ -15,8 +15,11 @@
 //
 // --slow slows the browser's CPU that many times, closer to a laptop.
 // --lazy is the most cells a document has with every card drawn; past
-// it, cards out of sight are stubs (lazyCells in app.ts). --check sets
-// it to 100, so the short documents it types into have stubs too.
+// it, only the cards near the view are (lazyCells in app.ts). --check
+// sets it to 100, so the short documents it types into are drawn so too.
+// --check also jumps around each document, drawn that way, and checks
+// that the cards drawn after each jump are those drawing every card
+// draws, and that there are fewer than 500 of them.
 // Each document is written by stressdoc, in the root module's
 // internal/stress, so go must be on the PATH.
 
@@ -79,37 +82,97 @@ async function serve(file) {
   throw new Error("the server didn't start");
 }
 
-// cards is the rendered view's cards' HTML, without the marks of the
-// selection and the cursor, which follow the user rather than the file.
-// A stub, a card not drawn as it's out of sight, is its line and id.
+// cards is the rendered view's cards drawn, by the line each starts on,
+// as HTML without the marks of the selection and the cursor, which
+// follow the user rather than the file. lines are the lines every cell
+// starts on, drawn or not, and loading says some are still coming, or
+// some cards wait for their bodies.
 const cards = (page) =>
   page.evaluate(() => {
-    const stub = (e) => `stub ${e.dataset.line} ${e.id}`;
     const plain = (e) => {
       const c = e.cloneNode(true);
       for (const x of [c, ...c.querySelectorAll("*")]) {
-        x.classList.remove("selected", "current", "lit", "dep-target");
+        x.classList.remove("selected", "current", "lit", "dep-target", "dep-of");
         x.removeAttribute("aria-current");
+        x.style?.removeProperty("--dep-rings");
         if (x.getAttribute("style") === "") x.removeAttribute("style");
         if (x.getAttribute("class") === "") x.removeAttribute("class");
       }
       return c.outerHTML;
     };
-    return [...document.querySelectorAll("#doc > *")].map((e) => (e.classList.contains("stub") ? stub(e) : plain(e)));
+    const drawn = {};
+    for (const e of document.querySelectorAll("#doc > section")) drawn[e.dataset.line] = plain(e);
+    return { drawn, lines: window.mdshLines(), loading: window.mdshLoading() };
   });
 
-// sameCard says cards a and b, as cards gives them, are drawn alike,
-// or are on the same line with the same id where either is a stub.
-const sameCard = (a, b) => {
-  if (a === b) return true;
-  if (!a?.startsWith("stub ") && !b?.startsWith("stub ")) return false;
-  const at = (c) => {
-    if (c.startsWith("stub ")) return c.slice(5);
-    const tag = c.slice(0, c.indexOf(">"));
-    return `${/ data-line="(\d+)"/.exec(tag)?.[1]} ${/ id="([^"]*)"/.exec(tag)?.[1] ?? ""}`;
-  };
-  return at(a) === at(b);
+// differ is the first card a draws otherwise than b, which draws every
+// card, or "" if none does.
+const differ = (a, b) => {
+  if (a.lines.join() !== b.lines.join()) return `the cells start on lines ${a.lines.slice(0, 20)}…, not ${b.lines.slice(0, 20)}…`;
+  for (const [line, html] of Object.entries(a.drawn)) {
+    const other = b.drawn[line];
+    if (other === html) continue;
+    // From a little before where they part.
+    let at = 0;
+    while (other && html[at] === other[at]) at++;
+    const from = Math.max(0, at - 60);
+    return `card on line ${line}, from character ${from}:\n  ${html.slice(from, from + 300)}\n  ${other?.slice(from, from + 300)}`;
+  }
+  return "";
 };
+
+// settled is the cards, as cards has them, once every cell is in, the
+// cards drawn have their bodies, and what is sized once laid out, such
+// as a textbox, is: once they stay as they are. It fails, saying what,
+// if they don't in time.
+async function settled(page, what, tries = 100) {
+  let got;
+  let was = "";
+  for (let k = 0; k < tries; k++) {
+    await page.waitForTimeout(100 + Math.min(k, 20) * 20);
+    got = await cards(page);
+    const now = JSON.stringify(got.drawn);
+    if (!got.loading && now === was) return got;
+    was = now;
+  }
+  fail(`${what}: the cards drawn never settled`);
+  return got;
+}
+
+// load loads the page, with lazy, and waits for its cards to settle.
+async function load(page, lazy, what) {
+  await page.goto(`http://localhost:${port}/index.html?tab=1${lazy ? "&lazy=" + lazy : ""}`);
+  await page.waitForSelector("#doc > section", { timeout: 600000 });
+  return settled(page, what, 1000);
+}
+
+// jumps scrolls page's rendered view to places picked at random and
+// fails where the cards drawn there differ from full, a draw of every
+// card, or there are 500 or more.
+async function jumps(page, full, what) {
+  let seed = 1;
+  const rand = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+  for (let k = 0; k < 20; k++) {
+    const at = rand();
+    await page.evaluate((at) => {
+      const p = document.getElementById("doc-scroll");
+      p.scrollTop = at * (p.scrollHeight - p.clientHeight);
+    }, at);
+    const got = await settled(page, `${what}: jump ${k}`);
+    const n = Object.keys(got.drawn).length;
+    const inView = await page.evaluate(() => {
+      const p = document.getElementById("doc-scroll").getBoundingClientRect();
+      return [...document.querySelectorAll("#doc > section")].some((e) => {
+        const r = e.getBoundingClientRect();
+        return r.height && r.bottom > p.top && r.top < p.bottom;
+      });
+    });
+    if (n >= 500) fail(`${what}: ${n} cards drawn after jump ${k}; want fewer than 500`);
+    if (!inView) fail(`${what}: no card in sight after jump ${k}, to ${at.toFixed(3)} of the way down`);
+    const d = differ(got, full);
+    if (d) fail(`${what}: after jump ${k}, to ${at.toFixed(3)} of the way down, ${d}`);
+  }
+}
 
 // typeAt puts the source pane's cursor at the end of the first line
 // past the middle of the document that ends with text.
@@ -150,14 +213,14 @@ async function run(shape, lines) {
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) window.stress.long.push(e.duration);
       }).observe({ type: "longtask" });
-      // Stubs, and cards drawn in a stub's place as the view comes to
-      // them, are not counted: they are drawn for scrolling, not typing.
+      // Spacers, and cards drawn as the view comes to them, are not
+      // counted: they are drawn for scrolling, not typing.
+      const counted = (e) => e.tagName === "SECTION" && !window.mdshPlaced.has(e);
       new MutationObserver((ms) => {
         let added = 0;
         for (const m of ms) {
-          if (m.removedNodes.length === 1 && m.addedNodes.length === 1 && m.removedNodes[0].classList.contains("stub")) continue;
-          added += [...m.addedNodes].filter((e) => !e.classList?.contains("stub")).length;
-          window.stress.removed += m.removedNodes.length;
+          added += [...m.addedNodes].filter(counted).length;
+          window.stress.removed += [...m.removedNodes].filter(counted).length;
         }
         window.stress.added += added;
         window.stress.most = Math.max(window.stress.most, added);
@@ -170,6 +233,15 @@ async function run(shape, lines) {
     // how long the view took to show a burst's last key, from just
     // before it was typed.
     await typeAt(page, " in it.");
+    // The rendered view follows the source pane to where the typing is,
+    // as it does once the source pane leads, so the cards typing draws
+    // again are in it.
+    await page.keyboard.press("End");
+    await page.evaluate(() => {
+      const v = document.querySelector(".cm-content").cmTile.view;
+      v.scrollDOM.scrollTop -= 1;
+    });
+    await page.waitForTimeout(500);
     const keys = [];
     const previews = [];
     for (let burst = 0; burst < 3; burst++) {
@@ -190,7 +262,7 @@ async function run(shape, lines) {
     const worst = Math.round(Math.max(0, ...s.long));
     keys.sort((a, b) => a - b);
     const p50 = keys[Math.floor(keys.length / 2)];
-    const nCards = await page.evaluate(() => document.querySelectorAll("#doc > *").length);
+    const nCards = await page.evaluate(() => document.querySelectorAll("#doc > section").length);
     console.log(
       [shape, lines, nCards, `${open}ms`, `${p50}ms`, `${keys[keys.length - 1]}ms`, `${Math.max(...previews)}ms`, s.long.length, `${total}ms`, `${worst}ms`, `${s.added}/${s.removed}`].join("\t"),
     );
@@ -217,14 +289,19 @@ async function run(shape, lines) {
       if (f.most > 30) fail(`${shape}/${lines}: typing a new block redrew ${f.most} cards at once; want 30 at most`);
     }
     if (check) {
-      // What typing drew must be what drawing it all afresh draws.
-      const typed = await cards(page);
-      await page.reload();
-      await page.waitForSelector("#doc > section", { timeout: 600000 });
-      await page.waitForTimeout(1000);
-      const fresh = await cards(page);
-      const differ = typed.findIndex((c, i) => !sameCard(c, fresh[i]));
-      if (typed.length !== fresh.length || differ >= 0) fail(`${shape}/${lines}: after typing, card ${differ} of ${typed.length} differs from a fresh draw of ${fresh.length}:\n  ${typed[differ]?.slice(0, 300)}\n  ${fresh[differ]?.slice(0, 300)}`);
+      // What typing drew must be what drawing it all afresh draws, every
+      // card.
+      const typed = await settled(page, `${shape}/${lines}: typing`);
+      const all = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+      all.on("pageerror", (e) => fail(`${shape}/${lines}: page error drawing every card: ${e.message}`));
+      const full = await load(all, "1000000", `${shape}/${lines}: every card`);
+      const d = differ(typed, full);
+      if (d) fail(`${shape}/${lines}: after typing, ${d}`);
+      // And jumping around a fresh page draws them as that does.
+      const fresh = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+      fresh.on("pageerror", (e) => fail(`${shape}/${lines}: page error jumping: ${e.message}`));
+      await load(fresh, lazy, `${shape}/${lines}: jumping`);
+      await jumps(fresh, full, `${shape}/${lines}`);
     }
   } finally {
     await browser.close();

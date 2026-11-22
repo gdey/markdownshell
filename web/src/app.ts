@@ -7,7 +7,7 @@ import { Clipboard, Events, Window } from "/wails/runtime.js";
 
 import { App, type AttrSpec, type Cell, type Deleted, type Heads, type Doc, type File as Template, type Fold, type Move, type Names, type OutsideFiles, type Settings, type SourceBlock, type Start, message } from "./api.js";
 import { enableCasts } from "./cast.js";
-import { initDeps, litDeps, markDeps, setDeps } from "./deps.js";
+import { drawDeps, initDeps, litDeps, markDeps, setDeps } from "./deps.js";
 import { $, announce, el, iconButton, icons, keyActivates, markOutput, scrollBehavior, setOutput, svg } from "./dom.js";
 import { folderGear, initFolders } from "./folders.js";
 import { foldMarks, restoreFolds, setSourceFolds, sourceFolding, sourceFolds } from "./fold.js";
@@ -37,6 +37,7 @@ import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 import { drawn as startupDrawn, mark as startupMark } from "./startup.js";
 import { type HeadRow, decodeHeads, partial, sameHead } from "./heads.js";
+import { Heights } from "./heights.js";
 
 let me = ""; // this window's name; events from other windows are ignored
 let doc: Doc = { file: "", dirty: false, changed: false, running: false, fresh: false, openHistory: false, run: { args: [], only: "", step: false, stopOnError: false, shell: "" }, args: "", history: false, termCols: 0, termRows: 0, envBanner: "", frontMatterError: "", frontMatterFix: { label: "", detail: "" }, lastView: "", lastHistory: false };
@@ -46,8 +47,8 @@ let running = false;
 // parse, or "".
 let noRun = "";
 let ranHere = false; // the run going on was started from this page
-let selected = -1; // index into the block cards, for j/k
-// selectedSection is the selected heading's dataset.fold, or "". A
+let selected = -1; // index into blocks(), for j/k
+// selectedSection is the selected heading's fold's name (foldKeys), or "". A
 // heading and a block aren't selected both at once.
 let selectedSection = "";
 let settings: Settings;
@@ -235,15 +236,15 @@ let layout: { gen: number; done: boolean } | null = null;
 // headIndex is each partial cell's index in the layout.
 const headIndex = new WeakMap<Cell, number>();
 
-// openCells draws the document from the heads of its first cells, the
-// first screen's bodies and those of the cards that are always drawn,
-// and then takes in the rest as Go lays them out, chunk by chunk.
+// openCells draws the document from the heads of its first cells and
+// the first screen's bodies, and then takes in the rest as Go lays them
+// out, chunk by chunk. A short document comes whole, every card drawn.
 async function openCells() {
   const h = await App.Attach(firstHeads);
   const fresh = decodeHeads(h.heads as HeadRow[]);
   fresh.forEach((c, i) => headIndex.set(c, i));
   layout = { gen: h.gen, done: h.done };
-  const want = h.done && fresh.length <= lazyCells ? fresh : fresh.filter((c, i) => i < firstBodies || !lazy(c, true));
+  const want = h.done && fresh.length <= lazyCells ? fresh : fresh.slice(0, firstBodies);
   if (!(await takeBodies(want))) return;
   cells = fresh;
   drawDoc();
@@ -261,9 +262,9 @@ async function streamHeads(gen: number, since: number) {
   while (layout?.gen === gen && !layout.done) {
     let h: Heads;
     try {
-      // Each chunk is as long as the document so far: every chunk of
-      // cards put in the page has it work out the style of all of them,
-      // so chunks that double keep that to a few times in all.
+      // Each chunk is as long as the document so far: each one has the
+      // page index every cell again, so chunks that double keep that to
+      // a few times in all.
       h = await App.MoreHeads(gen, cells.length, since, Math.max(moreHeads, cells.length));
     } catch {
       // The document changed; whatever changed it draws it again.
@@ -273,25 +274,29 @@ async function streamHeads(gen: number, since: number) {
     since = h.step;
     const more = decodeHeads(h.heads as HeadRow[]);
     more.forEach((c, k) => headIndex.set(c, h.at + k));
-    if (!(await takeBodies(more.filter((c) => !lazy(c, true)))) || layout?.gen !== gen) return;
     fixHeads(h.fixAt ?? [], decodeHeads(h.fixes as HeadRow[]));
     layout.done = h.done;
     appendCells(more);
-    // The outline, folds and dependency lines read every card: they
-    // are drawn once the cells are all in, rather than after every
-    // chunk, which took time in the square of the document's length.
+    // The outline, the Run all button and the dependency lines go
+    // through every cell: they are drawn once the cells are all in,
+    // rather than after every chunk.
     if (h.done) afterCells();
     // A chunk at a time, so typing and scrolling go on between.
     await new Promise((r) => setTimeout(r));
   }
 }
 
-// appendCells adds more cells' cards at the end of the document.
+// appendCells adds more cells at the end of the document. Their cards
+// are drawn as the view comes to them.
 function appendCells(more: Cell[]) {
-  if (!more.length) return;
   for (const c of more) cells.push(c);
-  // stub has fill look for stubs in sight once the page is drawn.
-  $("doc").append(fragment(more.map((c) => drawCell(c))));
+  // Once they are all in, a short document has every card drawn.
+  if (layout?.done) {
+    virtual = cells.length > lazyCells;
+    $("doc").classList.toggle("virtual", virtual);
+  }
+  indexCells();
+  placeSoon();
 }
 
 // fixHeads takes in the heads of cells Go laid out before and since
@@ -299,7 +304,6 @@ function appendCells(more: Cell[]) {
 // A card drawn from a fixed cell is drawn again, from its new body.
 function fixHeads(at: number[], heads: Cell[]) {
   const redraw: HTMLElement[] = [];
-  const kids = $("doc").children as HTMLCollectionOf<HTMLElement>;
   at.forEach((i, k) => {
     const c = cells[i];
     if (!c) return;
@@ -310,14 +314,14 @@ function fixHeads(at: number[], heads: Cell[]) {
     Object.assign(c, h);
     headIndex.set(c, i);
     partial.add(c);
-    const card = kids[i];
+    const card = cardOf.get(c);
     if (!card) return;
     if (c.heading) {
       card.dataset.sectionFrom = String(c.sectionFrom ?? 0);
       card.dataset.sectionTo = String(c.sectionTo ?? 0);
-      card.dataset.foldDefault = c.collapsed ? "1" : "";
     }
-    if (!stubs.has(card)) redraw.push(card);
+    bare.add(card);
+    redraw.push(card);
   });
   if (redraw.length) void bodiesFor(redraw);
 }
@@ -346,25 +350,20 @@ async function takeBodies(list: Cell[]): Promise<boolean> {
 }
 
 // bodiesFor draws again, from their bodies, cards drawn before their
-// bodies came.
+// bodies came: these cards, or the cards of their cells drawn since.
 async function bodiesFor(cards: HTMLElement[]) {
-  const want = cards.map((e) => cellOf.get(e)).filter((c): c is Cell => !!c && partial.has(c));
-  if (!(await takeBodies(want))) return;
-  const drawn: HTMLElement[] = [];
-  for (const card of cards) {
-    if (!card.isConnected || stubs.has(card)) continue;
-    const c = cellOf.get(card);
-    if (!c || partial.has(c)) continue;
-    drawn.push(redrawCard(card, c));
+  const list = cards.map((e) => cellOf.get(e)).filter((c): c is Cell => !!c);
+  if (!(await takeBodies(list))) return;
+  for (const c of list) {
+    const card = cardOf.get(c);
+    if (card && bare.has(card) && !partial.has(c)) redrawCard(card, c);
   }
-  // A card drawn again is folded as the one it replaced was.
-  if (drawn.length) applyFolds(drawn);
+  // A body can be taller or shorter than its head guessed.
+  placeSoon();
 }
 
-// afterCells brings what reads every card up to date with them.
+// afterCells brings what goes through every cell up to date with them.
 function afterCells() {
-  nameFolds();
-  applyFolds();
   runAllButton();
   markSection();
   drawOutline();
@@ -373,78 +372,32 @@ function afterCells() {
 
 function drawDoc() {
   const main = $("doc");
-  const restore = anchor();
-  const heights = drawnHeights();
+  const at = anchor();
+  measureCards();
   closeTerminal();
   behind = false;
-  lazyDoc = cells.length > lazyCells || !!(layout && !layout.done);
-  main.replaceChildren(fragment(cells.map((c) => keepHeight(drawCell(c), c, heights))));
+  virtual = cells.length > lazyCells || !!(layout && !layout.done);
+  main.classList.toggle("virtual", virtual);
+  cardOf.clear();
+  main.replaceChildren();
+  following = null;
   drawn++;
-  nameFolds();
-  applyFolds();
+  indexCells();
+  place(at);
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
   markSection();
   drawOutline();
   sizeTerminal();
-  restore();
-  fill();
   setDeps(cells);
   // Every card is new, which can leave the view blank as a long jump
   // does.
   repaint($("doc-scroll"));
 }
 
-// drawnHeights is the height of each block's card as it is drawn now,
-// with the cell it shows, by the line it starts on. A card out of sight
-// isn't laid out, so the page takes it to be as tall as its guess until
-// it comes near the view; drawing the document again with guesses
-// where the cards had their heights would move the view when they came
-// near it, after anchor had put it back.
-function drawnHeights(): Map<number, { cell: Cell; height: number }> {
-  const heights = new Map<number, { cell: Cell; height: number }>();
-  // The guess is the height inside the card's border, which every card
-  // has alike.
-  let border = -1;
-  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    const cell = cellOf.get(e);
-    if (!cell || cell.block < 0 || e.classList.contains("stub")) continue;
-    const height = e.getBoundingClientRect().height;
-    if (!height) continue;
-    if (border < 0) {
-      const s = getComputedStyle(e);
-      border = parseFloat(s.borderTopWidth) + parseFloat(s.borderBottomWidth) + parseFloat(s.paddingTop) + parseFloat(s.paddingBottom);
-    }
-    heights.set(cell.from, { cell, height: height - border });
-  }
-  return heights;
-}
-
-// keepHeight has card, drawn for c, guess the height the card drawn
-// before it had, where that showed the same block and output.
-function keepHeight(card: HTMLElement, c: Cell, heights: Map<number, { cell: Cell; height: number }>): HTMLElement {
-  const was = heights.get(c.from);
-  if (was && card.style.getPropertyValue("--guess") && was.cell.to === c.to && was.cell.body === c.body && was.cell.output === c.output) card.style.setProperty("--guess", was.height + "px");
-  return card;
-}
-
 // drawn counts the times the document's cards were drawn, all of them
 // or some.
 let drawn = 0;
-
-// nameFolds names each heading's fold. A heading is known by its level
-// and text, and which one it is of those alike, so its fold outlives
-// edits elsewhere.
-function nameFolds() {
-  const seen = new Map<string, number>();
-  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    if (!e.dataset.level) continue;
-    const name = e.dataset.level + ":" + (e.querySelector("h1, h2, h3, h4, h5, h6")?.textContent ?? "");
-    const nth = seen.get(name) ?? 0;
-    seen.set(name, nth + 1);
-    e.dataset.fold = "section:" + name + ":" + nth;
-  }
-}
 
 // placeFields are the fields of a cell that say where in the file it
 // is, which typing above it changes without changing how it is drawn.
@@ -511,20 +464,16 @@ const renumbered = (c: Cell) => c.block >= 0 && !c.textbox && !c.choice;
 function updateDoc(fresh: Cell[]) {
   // The cells come whole from now on.
   layout = null;
-  const main = $("doc");
-  const cards = [...main.children] as HTMLElement[];
-  if (cards.length !== cells.length || cards.some((e) => !e.hasAttribute("data-line"))) {
-    cells = fresh;
-    return drawDoc();
-  }
   behind = false;
-  lazyDoc = fresh.length > lazyCells;
   const { head, tail } = unchanged(fresh);
-  const restore = anchor();
+  const at = anchor();
+  // Cards drawn from heads alone are drawn again, from the cells whole.
+  const bodies: Cell[] = [];
   const keep = (i: number, j: number): Cell => {
     const c = cells[i];
     const f = fresh[j];
-    const card = cards[i];
+    const card = cardOf.get(c);
+    if (card && bare.has(card)) bodies.push(c);
     if (partial.has(c)) {
       // Its head was all it had: it takes the rest from f. What says
       // where it is, and its numbers, stay as drawn, for the lines
@@ -538,25 +487,29 @@ function updateDoc(fresh: Cell[]) {
       partial.delete(c);
     }
     if (renumbered(c) && (c.block !== f.block || c.name !== f.name || c.id !== f.id)) {
-      card.id = "block-" + f.block;
-      card.dataset.block = String(f.block);
-      if (c.secret) card.classList.toggle("masked", !revealed.has(f.block));
-      const id = card.querySelector(":scope > .head .id");
-      if (id) id.textContent = f.name ?? f.id ?? "";
+      if (card) {
+        card.id = "block-" + f.block;
+        card.dataset.block = String(f.block);
+        if (c.secret) card.classList.toggle("masked", !revealed.has(f.block));
+        const id = card.querySelector(":scope > .head .id");
+        if (id) id.textContent = f.name ?? f.id ?? "";
+      }
       c.block = f.block;
       c.name = f.name;
       c.id = f.id;
-      if (!stubs.has(card)) labelBlock(card);
+      if (card) labelBlock(card);
     }
     const input = c.textbox ?? c.choice;
     const to = (f.textbox ?? f.choice)?.block;
     if (input && to !== undefined && input.block !== to) {
-      renumberInput(card, input.block, to);
+      if (card) renumberInput(card, input.block, to);
       input.block = to;
     }
     if (c.heading && f.sectionTo && (c.sectionFrom !== f.sectionFrom || c.sectionTo !== f.sectionTo)) {
-      card.dataset.sectionFrom = String(f.sectionFrom ?? 0);
-      card.dataset.sectionTo = String(f.sectionTo);
+      if (card) {
+        card.dataset.sectionFrom = String(f.sectionFrom ?? 0);
+        card.dataset.sectionTo = String(f.sectionTo);
+      }
       c.sectionFrom = f.sectionFrom;
       c.sectionTo = f.sectionTo;
     }
@@ -565,7 +518,7 @@ function updateDoc(fresh: Cell[]) {
     // the same, made the page work out every card's style again. It is
     // told from the cell, as reading the card's took longer.
     const set = (key: string, was: string | undefined, v: string | undefined) => {
-      if (was === v) return;
+      if (was === v || !card) return;
       if (v === undefined) delete card.dataset[key];
       else card.dataset[key] = v;
     };
@@ -582,27 +535,37 @@ function updateDoc(fresh: Cell[]) {
   for (let i = 0; i < head; i++) next.push(keep(i, i));
   for (const c of middle) next.push(c);
   for (let k = tail; k > 0; k--) next.push(keep(cells.length - k, fresh.length - k));
-  const gone = cards.slice(head, cards.length - tail);
-  const before = cards[cards.length - tail] ?? null;
-  if (following && gone.includes(following)) following = null;
-  for (const e of gone) e.remove();
-  // A few cards, as typing changes, are drawn whole; many, as a fence
-  // opened above them makes, are drawn as stubs where out of sight.
-  const drawnNow = middle.map((c) => drawCell(c, middle.length <= manyCards));
-  main.insertBefore(fragment(drawnNow), before);
-  cells = next;
+  const gone = cells.slice(head, cells.length - tail);
   drawn++;
-  if (!gone.length && !middle.length) return;
-  // Headings are named by which of those alike they are, which only a
-  // heading coming or going changes.
-  if ([...gone, ...drawnNow].some((e) => e.dataset.level)) nameFolds();
-  applyFolds(drawnNow);
+  if (!gone.length && !middle.length) {
+    cells = next;
+    for (const c of bodies) redrawCard(cardOf.get(c)!, c);
+    return;
+  }
+  measureCards();
+  for (const c of gone) {
+    const card = cardOf.get(c);
+    if (!card) continue;
+    if (card === following) following = null;
+    card.remove();
+    cardOf.delete(c);
+  }
+  cells = next;
+  virtual = cells.length > lazyCells;
+  $("doc").classList.toggle("virtual", virtual);
+  indexCells();
+  for (const c of bodies) {
+    const card = cardOf.get(c);
+    if (card) redrawCard(card, c);
+  }
+  // A few new cards, as typing makes, are drawn as typing's; many, as
+  // a fence opened above them makes, are drawn as the view's, like
+  // those that scrolling brings into it.
+  place(at, middle.length <= manyCards ? new Set(middle) : undefined);
   runAllButton();
   select(Math.min(selected, blocks().length - 1), false);
   markSection();
   drawOutline();
-  restore();
-  fill();
   setDeps(cells);
   // Many new cards can leave the view blank, as drawing every one can.
   if (middle.length > 20) repaint($("doc-scroll"));
@@ -631,33 +594,28 @@ function unchanged(fresh: Cell[]): { head: number; tail: number } {
   return { head, tail };
 }
 
-// fragment holds nodes, to be put in the page at once.
-function fragment(nodes: Node[]): DocumentFragment {
-  const f = document.createDocumentFragment();
-  // In pieces: a spread of more than some ten thousand is more than a
-  // call takes.
-  for (let i = 0; i < nodes.length; i += 10000) f.append(...nodes.slice(i, i + 10000));
-  return f;
+// A Place is where a cell is in the rendered view: its index, and how
+// far its top is below the top of the view. follow marks the block being
+// followed.
+interface Place {
+  i: number;
+  offset: number;
+  follow?: boolean;
 }
 
-// anchor notes where the block being followed is in the rendered view,
-// or else the card at its top, and returns a function that puts that
-// card, or the card drawn in its place, back there. Drawing the document
-// anew replaces every card, and the view would otherwise jump, as far as
-// the top.
-function anchor(): () => void {
+// anchor is where the block being followed is in the rendered view, or
+// else the first cell in sight, for place to put back where it was once
+// the cards around it are drawn anew. Drawing the document again
+// replaces every card, and the view would otherwise jump, as far as the
+// top.
+function anchor(): Place | null {
   const pane = $("doc-scroll");
-  const cards = [...$("doc").children];
-  const top = pane.getBoundingClientRect().top;
-  const i = following ? cards.indexOf(following) : cards.findIndex((e) => e.getBoundingClientRect().bottom > top);
-  if (i < 0) return () => {};
-  const was = cards[i];
-  const offset = was.getBoundingClientRect().top - top;
-  return () => {
-    const e = (was.isConnected ? was : $("doc").children[i]) as HTMLElement | undefined;
-    if (following) following = e?.classList.contains("block") ? e : null;
-    if (e) pane.scrollTop += e.getBoundingClientRect().top - top - offset;
-  };
+  if (pane.hidden || !cells.length) return null;
+  const f = following?.isConnected ? cellOf.get(following) : undefined;
+  const fi = f && cellIndex.get(f);
+  if (following && fi !== undefined) return { i: fi, offset: following.getBoundingClientRect().top - pane.getBoundingClientRect().top, follow: true };
+  const i = indexAt(pane.scrollTop);
+  return i < 0 ? null : { i, offset: topOf(i) - pane.scrollTop };
 }
 
 // Following a run: as a block's output grows, the rendered view scrolls
@@ -771,9 +729,8 @@ function centerAsk(ask: HTMLElement, behavior: ScrollBehavior = "auto") {
   jump(r.top + r.height / 2 - (p.top + p.height / 2), behavior, (behavior) => ask.scrollIntoView({ block: "center", behavior }));
 }
 
-function drawCell(c: Cell, now = false): HTMLElement {
-  const stubbed = !now && lazy(c);
-  const e = stubbed ? stub(c) : c.textbox ? drawTextbox(c) : c.choice ? drawChoice(c) : c.block < 0 ? drawProse(c) : drawBlock(c);
+function drawCell(c: Cell): HTMLElement {
+  const e = c.textbox ? drawTextbox(c) : c.choice ? drawChoice(c) : c.block < 0 ? drawProse(c) : drawBlock(c);
   cellOf.set(e, c);
   e.dataset.line = String(c.line);
   e.dataset.from = String(c.from);
@@ -781,7 +738,6 @@ function drawCell(c: Cell, now = false): HTMLElement {
   if (c.dropAfter >= 0) e.dataset.dropAfter = String(c.dropAfter);
   if (c.dropBefore >= 0) e.dataset.dropBefore = String(c.dropBefore);
   if (c.block >= 0 && !c.textbox && !c.choice) e.style.setProperty("--guess", guessHeight(c) + "px");
-  if (stubbed) return e;
   if (c.movable) {
     // The grip goes first in a block's head, or on the line of an
     // input's name, before it.
@@ -803,87 +759,398 @@ function drawCell(c: Cell, now = false): HTMLElement {
   return e;
 }
 
-// Cards of a long document are drawn only near the view. The rest are
-// stubs: empty cards of about their height, with the classes, id and
-// data a drawn card has outside, which selecting, folding, the outline
-// and the dependency lines go by. Every card drawn, a long document
-// made a million or more elements, and WebKit then took seconds over
-// each key typed and ran short of memory. fill draws the stubs coming
-// into sight as the view scrolls, and puts cards far out of it back to
-// stubs. Headings and inputs, which are few and are looked into for
-// their names and values, are always drawn.
+// The rendered view of a long document draws only the cards near what is
+// in sight: a screen and a half above it and below it, between spacers
+// as tall as the cards they stand for, so the page holds a few hundred
+// cards however long the document is. Every card drawn, a long
+// document made a million or more elements, and WebKit then took
+// seconds over each key typed and ran short of memory. As the view
+// scrolls, place draws the cards coming near it and takes away those
+// that went far from it, but for cards in use: selected, followed,
+// focused, running, asking or being dragged.
+//
+// Each cell has a height in heights: a card's as last drawn, kept by the
+// hash of its cell so a card drawn again, or one alike, starts at its
+// size, or else a guess from its head. Selecting, folding, the outline,
+// the dependency lines and the source pane's scrolling go by the cells
+// and their heights, not the cards.
 
 // lazyCells is the most cells a document has with every card drawn.
 // ?lazy= in the page's address changes it, for the stress test.
-const lazyCells = Number(new URLSearchParams(location.search).get("lazy") ?? 1000);
-let lazyDoc = false;
+const lazyCells = Number(new URLSearchParams(location.search).get("lazy") ?? 400);
 
-// keepCards is how many cards drawn from stubs are kept, however far
-// from the view, before fill puts some back.
-const keepCards = 400;
+// virtual is set while the view draws only the cards near the view.
+let virtual = false;
 
-// cellOf is each card's cell; keep and edit update the cell in place.
+// maxCards is the most cards place draws around the view.
+const maxCards = 300;
+
+// cellOf is each card's cell, and cardOf each drawn cell's card; keep and
+// edit update the cell in place.
 const cellOf = new WeakMap<HTMLElement, Cell>();
-// stubs are the cards not drawn; filled are those drawn from stubs.
-const stubs = new Set<HTMLElement>();
-const filled = new Set<HTMLElement>();
+const cardOf = new Map<Cell, HTMLElement>();
 
-// lazy says c's card can be a stub.
-// With assume, it says so as if the document were long.
-function lazy(c: Cell, assume = false): boolean {
-  return (lazyDoc || assume) && !c.heading && !c.textbox && !c.choice && !(c.block >= 0 && (c.running || timerStarts.has(c.block)));
+// cellIndex is each cell's index in cells, blockCells each block's cell
+// by its index, and foldKeys each heading's fold's name.
+let cellIndex = new Map<Cell, number>();
+let blockCells = new Map<number, Cell>();
+const foldKeys = new WeakMap<Cell, string>();
+
+// hidden marks the cells a folded section hides, by index, hiddenBy is
+// the index of the heading whose fold hides each, and hides is how many
+// a folded heading hides.
+let hidden = new Uint8Array(0);
+let hiddenBy = new Int32Array(0);
+const hides = new WeakMap<Cell, number>();
+
+// heights is how tall each cell's card is, by index, and 0 for a hidden
+// one; measured is the height of cards drawn, by their cells' hashes.
+let heights = new Heights();
+const measured = new Map<string, number>();
+
+// spacerRange is the cells each spacer stands for, from up to to.
+const spacerRange = new WeakMap<HTMLElement, { from: number; to: number }>();
+
+// placed are the cards place drew for the view, rather than an edit,
+// which the stress test leaves out of the cards typing drew.
+const placed = new WeakSet<HTMLElement>();
+// The stress test (gui.cjs) reads these: the cards placed, the line each
+// cell starts on, and whether cells or bodies are still coming.
+Object.assign(window, { mdshPlaced: placed, mdshLines: () => cells.map((c) => c.line), mdshLoading: () => !!(layout && !layout.done) || [...cardOf.values()].some((e) => bare.has(e)) });
+
+// indexCells works out, for cells, what goes through all of them: their
+// indices, the folds' names and what they hide, and the heights.
+function indexCells() {
+  cellIndex = new Map();
+  blockCells = new Map();
+  headingByKey = new Map();
+  const seen = new Map<string, number>();
+  cells.forEach((c, i) => {
+    cellIndex.set(c, i);
+    if (renumbered(c)) blockCells.set(c.block, c);
+    if (!c.heading) return;
+    // A heading is known by its level and text, and which one it is of
+    // those alike, so its fold outlives edits elsewhere.
+    const name = c.heading + ":" + (c.title ?? "");
+    const nth = seen.get(name) ?? 0;
+    seen.set(name, nth + 1);
+    const key = "section:" + name + ":" + nth;
+    foldKeys.set(c, key);
+    headingByKey.set(key, c);
+  });
+  foldCells();
 }
 
-// stub is c's card, not drawn.
-function stub(c: Cell): HTMLElement {
-  const e = c.block < 0 ? el("section", { className: "prose stub" }) : el("section", { className: blockClass(c) + " stub", id: "block-" + c.block });
-  if (c.block >= 0) {
-    // A block's card is a tab stop, drawn as the focus comes to it.
-    e.tabIndex = 0;
-    e.setAttribute("role", "group");
-    e.setAttribute("aria-label", c.name ?? c.id ?? "block " + (c.block + 1));
-    e.onfocus = () => real(e).focus();
-    e.dataset.block = String(c.block);
-    e.dataset.foldCode = c.collapsed ? "1" : "";
-    e.dataset.foldOutput = c.collapsedOutput ? "1" : "";
-    if (c.timeout) e.dataset.timeout = String(c.timeout);
-  } else {
-    // About a line of prose for every 90 bytes of markdown.
-    e.style.setProperty("--guess", 20 + 24 * Math.max(1, Math.ceil((c.to - c.from) / 90)) + "px");
+// foldCells works out which cells the folded sections hide, and the
+// cells' heights, and marks the cards drawn.
+function foldCells() {
+  hidden = new Uint8Array(cells.length);
+  hiddenBy = new Int32Array(cells.length);
+  const open: { level: number; folded: boolean; cell: Cell; at: number; hidden: number }[] = [];
+  const headings: typeof open = [];
+  cells.forEach((c, i) => {
+    const level = c.heading ?? 0;
+    if (level) while (open.length && open[open.length - 1].level >= level) open.pop();
+    const owner = open.find((h) => h.folded);
+    if (owner) {
+      hidden[i] = 1;
+      hiddenBy[i] = owner.at;
+      owner.hidden++;
+    }
+    if (level) {
+      const h = { level, folded: shownFolded(c), cell: c, at: i, hidden: 0 };
+      open.push(h);
+      headings.push(h);
+    }
+  });
+  for (const h of headings) hides.set(h.cell, h.folded ? h.hidden : 0);
+  heights = new Heights(cells.map((c, i) => (hidden[i] ? 0 : (measured.get(c.hash ?? "") ?? guessPitch(c)))));
+  shownBlocks = null;
+  for (const [c, card] of cardOf) decorate(card, c);
+}
+
+// guessPitch is about how far down the page cell c's card takes the
+// next one, before it is drawn.
+function guessPitch(c: Cell): number {
+  if (c.textbox || c.choice) return 96;
+  if (c.heading) return [0, 64, 56, 48, 44, 40, 40][c.heading] ?? 40;
+  if (c.block >= 0) return guessHeight(c) + 18;
+  // About a line of prose for every 90 bytes of markdown.
+  return 16 + 24 * Math.max(1, Math.ceil((c.to - c.from) / 90));
+}
+
+// guessHeight is about how tall block c's card is, in pixels, inside its
+// border, which content-visibility takes it to be until it is first in
+// sight.
+function guessHeight(c: Cell): number {
+  // A body or output ends with a newline, which starts no line.
+  const lines = (s?: string) => (s ? s.replace(/\r?\n$/, "").split("\n").length : 0);
+  // A cell whose body hasn't come has its lines counted by Go.
+  const out = partial.has(c) ? (c.outputLines ?? 0) : lines(c.output);
+  const code = partial.has(c) ? (c.codeLines ?? 0) : lines(c.body);
+  return 60 + 19 * code + (out ? 30 + 19 * out : 0);
+}
+
+// decorate marks card, c's, with what the page knows of c beyond its
+// cell: whether a fold hides it, a heading's fold, a block's folded code
+// and output, and the selection and the source pane's cursor.
+function decorate(card: HTMLElement, c: Cell) {
+  const i = cellIndex.get(c);
+  card.classList.toggle("in-fold", i !== undefined && !!hidden[i]);
+  card.classList.toggle("current", c === currentCell);
+  if (c.heading) {
+    const key = foldKeys.get(c) ?? "";
+    const folded = shownFolded(c);
+    card.dataset.fold = key;
+    card.classList.toggle("folded", folded);
+    card.classList.toggle("selected", !!key && key === selectedSection);
+    card.querySelector(":scope > button.fold")?.setAttribute("aria-expanded", String(!folded));
+    const note = card.querySelector<HTMLElement>(".fold-note");
+    if (note) {
+      const n = folded ? (hides.get(c) ?? 0) : 0;
+      note.textContent = n ? "… " + n + (n === 1 ? " part" : " parts") : "";
+      note.setAttribute("aria-label", note.textContent ? note.textContent.slice(2) + " folded away: unfold this section" : "");
+    }
   }
-  stubs.add(e);
-  fillSoon();
-  return e;
+  if (renumbered(c)) {
+    card.classList.toggle("selected", c === blocks()[selected]);
+    drawPart(card, "code");
+    drawPart(card, "output");
+  }
 }
 
-// real is card, drawn: a stub is drawn in its place, keeping the marks
-// put on it since, and the view stays where it was.
-function real(card: HTMLElement): HTMLElement {
-  if (!stubs.has(card)) return card;
-  const c = cellOf.get(card)!;
-  stubs.delete(card);
-  const e = redrawCard(card, c);
-  filled.add(e);
+let placeFrame = 0;
+function placeSoon() {
+  if (!placeFrame) placeFrame = requestAnimationFrame(() => place());
+}
+
+// place draws the cards near the view, at, or where the view is, and
+// takes away those far from it, then puts at back where it was. With
+// eager, the cards of those cells are drawn as an edit's.
+function place(at = anchor(), eager?: Set<Cell>) {
+  cancelAnimationFrame(placeFrame);
+  placeFrame = 0;
+  const pane = $("doc-scroll");
+  measureCards();
+  const want: number[] = [];
+  if (!virtual) for (let i = 0; i < cells.length; i++) want.push(i);
+  else if (cells.length) {
+    const view = pane.clientHeight || window.innerHeight;
+    const i0 = at ? Math.min(at.i, cells.length - 1) : 0;
+    // The view's top, as the heights have it.
+    const y0 = heights.sum(i0) - (at?.offset ?? 0);
+    const lo = heights.find(y0 - 1.5 * view);
+    const hi = heights.find(y0 + 2.5 * view);
+    // Down from the cell in sight first, so a run of cells too short to
+    // count leaves the view drawn.
+    for (let i = i0; i <= hi && want.length < maxCards; i++) if (!hidden[i]) want.push(i);
+    for (let i = i0 - 1; i >= lo && want.length < maxCards; i--) if (!hidden[i]) want.push(i);
+    const keep = new Set(want);
+    for (const [c, card] of cardOf) {
+      const i = cellIndex.get(c);
+      if (i !== undefined && !keep.has(i) && inUse(card)) want.push(i);
+    }
+    want.sort((a, b) => a - b);
+  }
+  // The dependency lines go to the cards drawn.
+  if (reconcile(want, eager)) drawDeps();
+  if (!at || pane.hidden) return;
+  if (at.follow) {
+    const c = cells[at.i];
+    following = (c && renumbered(c) && cardOf.get(c)) || null;
+  }
+  const top = topOf(at.i) - at.offset;
+  if (Math.abs(pane.scrollTop - top) >= 1) pane.scrollTop = top;
+}
+
+// reconcile makes the cards in the page those of the cells at want, in
+// order, between spacers for the rest. The cards kept stay where they
+// are in the page, keeping the focus and what is drawn in them.
+function reconcile(want: number[], eager?: Set<Cell>): boolean {
+  const main = $("doc");
+  const keep = new Set(want);
+  let changed = false;
+  for (const [c, card] of cardOf) {
+    const i = cellIndex.get(c);
+    if (i !== undefined && keep.has(i)) continue;
+    card.remove();
+    cardOf.delete(c);
+    changed = true;
+  }
+  let next = main.firstElementChild as HTMLElement | null;
+  const skip = () => {
+    const e = next!;
+    next = e.nextElementSibling as HTMLElement | null;
+    return e;
+  };
+  const spacer = (from: number, to: number) => {
+    const s = next && spacerRange.has(next) ? skip() : main.insertBefore(el("div", { className: "spacer" }), next);
+    if (setSpacer(s, from, to)) changed = true;
+  };
+  let from = 0;
+  for (const i of want) {
+    const c = cells[i];
+    const card = cardOf.get(c);
+    if (i > from) spacer(from, i);
+    // Spacers no longer needed go.
+    while (next && next !== card && spacerRange.has(next)) skip().remove();
+    if (card && card === next) skip();
+    else {
+      main.insertBefore(card ?? drawCard(c, !eager?.has(c)), next);
+      changed = true;
+    }
+    from = i + 1;
+  }
+  if (from < cells.length) spacer(from, cells.length);
+  while (next) {
+    skip().remove();
+    changed = true;
+  }
+  return changed;
+}
+
+// setSpacer has spacer s stand for the cells from up to to, saying
+// whether its height changed.
+function setSpacer(s: HTMLElement, from: number, to: number): boolean {
+  spacerRange.set(s, { from, to });
+  const h = Math.round(heights.sum(from, to)) + "px";
+  if (s.style.height === h) return false;
+  s.style.height = h;
+  return true;
+}
+
+// measureCards notes the heights of the cards drawn: how far down each
+// takes the next, which counts the margin between them.
+function measureCards() {
+  if (!virtual) return;
+  const kids = [...($("doc").children as HTMLCollectionOf<HTMLElement>)].filter((e) => e.offsetParent !== null);
+  kids.forEach((e, k) => {
+    const c = cellOf.get(e);
+    if (!c || partial.has(c)) return;
+    const i = cellIndex.get(c);
+    if (i === undefined || hidden[i]) return;
+    const n = kids[k + 1];
+    const h = n && cellOf.has(n) ? n.offsetTop - e.offsetTop : e.offsetHeight + 16;
+    if (h <= 0) return;
+    heights.set(i, h);
+    if (c.hash) measured.set(c.hash, h);
+  });
+}
+
+// indexAt is the index of the cell shown at y, in the rendered view's
+// content: the first whose bottom is below it, or the last.
+function indexAt(y: number): number {
+  let last = -1;
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    if (e.offsetParent === null) continue;
+    const r = spacerRange.get(e);
+    if (r) {
+      if (r.to <= r.from) continue;
+      const top = e.offsetTop;
+      if (top + e.offsetHeight <= y) {
+        last = r.to - 1;
+        continue;
+      }
+      const i = heights.find(heights.sum(r.from) + Math.max(0, y - top));
+      return Math.max(r.from, Math.min(r.to - 1, i));
+    }
+    const i = cellIndex.get(cellOf.get(e)!) ?? -1;
+    if (e.offsetTop + e.offsetHeight > y) return i;
+    last = i;
+  }
+  return last;
+}
+
+// topOf is where cell i's top is, in the rendered view's content; a
+// hidden cell's is the top of what follows it.
+function topOf(i: number): number {
+  const main = $("doc");
+  for (const e of main.children as HTMLCollectionOf<HTMLElement>) {
+    if (e.offsetParent === null) continue;
+    const r = spacerRange.get(e);
+    if (r) {
+      if (r.to > i) return e.offsetTop + heights.sum(r.from, Math.max(i, r.from));
+      continue;
+    }
+    if ((cellIndex.get(cellOf.get(e)!) ?? -1) >= i) return e.offsetTop;
+  }
+  return main.offsetTop + main.offsetHeight;
+}
+
+// scrollToCell brings cell i to offset below the top of the rendered
+// view, drawing the cards around it.
+function scrollToCell(i: number, offset = 8) {
+  if (i < 0 || i >= cells.length) return;
+  place({ i, offset });
+}
+
+// inUse says card can't be taken away: it is selected, followed,
+// focused, running, asking or being dragged.
+function inUse(card: HTMLElement): boolean {
+  return card === following || card.matches(".selected, .current, .now, .background, .timing, .dep-target, .dragging") || card.contains(document.activeElement) || !!card.querySelector(".ask:not([hidden]), .terminal, .cast-player");
+}
+
+// bare are the cards drawn from their cells' heads alone, before their
+// bodies came.
+const bare = new WeakSet<HTMLElement>();
+
+// drawCard draws c's card, as the view's when mark is set.
+function drawCard(c: Cell, mark = true): HTMLElement {
+  const e = drawCell(c);
+  cardOf.set(c, e);
+  if (partial.has(c)) bare.add(e);
+  if (running) for (const b of e.querySelectorAll<HTMLButtonElement>(".head button:not(.stop-bg)")) b.disabled = true;
+  decorate(e, c);
+  if (mark) placed.add(e);
   // A cell whose body hasn't come is drawn without it, and again when
   // it comes.
   if (partial.has(c)) wantBody(e);
   return e;
 }
 
+// cardFor is c's card, drawn where it goes if it isn't, as a block that
+// starts running or asks is. It stays while it is in use.
+function cardFor(c: Cell): HTMLElement | null {
+  const have = cardOf.get(c);
+  if (have) return have;
+  const i = cellIndex.get(c);
+  if (i === undefined) return null;
+  const card = drawCard(c);
+  const main = $("doc");
+  for (const e of main.children as HTMLCollectionOf<HTMLElement>) {
+    const r = spacerRange.get(e);
+    if (r && r.from <= i && i < r.to) {
+      const after = el("div", { className: "spacer" });
+      e.after(card, after);
+      setSpacer(e, r.from, i);
+      setSpacer(after, i + 1, r.to);
+      return card;
+    }
+    const at = r ? r.from : (cellIndex.get(cellOf.get(e)!) ?? -1);
+    if (at > i) {
+      e.before(card);
+      return card;
+    }
+  }
+  main.append(card);
+  return card;
+}
+
 // redrawCard draws c's card again in card's place, keeping the marks
 // put on it since.
 function redrawCard(card: HTMLElement, c: Cell): HTMLElement {
-  const e = drawCell(c, true);
+  const e = drawCell(c);
   for (const k in card.dataset) e.dataset[k] = card.dataset[k];
-  for (const k of card.classList) if (k !== "stub") e.classList.add(k);
+  for (const k of card.classList) e.classList.add(k);
   const rings = card.style.getPropertyValue("--dep-rings");
   if (rings) e.style.setProperty("--dep-rings", rings);
-  if (running) for (const b of e.querySelectorAll<HTMLButtonElement>(".head button")) b.disabled = true;
+  if (running) for (const b of e.querySelectorAll<HTMLButtonElement>(".head button:not(.stop-bg)")) b.disabled = true;
   card.replaceWith(e);
+  cardOf.set(c, e);
+  if (partial.has(c)) bare.add(e);
   if (following === card) following = e;
-  if (filled.delete(card)) filled.add(e);
-  drawPart(e, "code");
-  drawPart(e, "output");
+  if (placed.has(card)) placed.add(e);
+  decorate(e, c);
   return e;
 }
 
@@ -903,108 +1170,64 @@ function wantBody(card: HTMLElement) {
 
 // blockCard is block i's card, drawn.
 function blockCard(i: number): HTMLElement | null {
-  const e = document.getElementById("block-" + i);
-  return e && real(e);
+  const c = blockCells.get(i);
+  return c ? cardFor(c) : null;
 }
 
 // cardName is a block card's name, as its head shows it.
 function cardName(e: HTMLElement): string | undefined {
-  if (stubs.has(e)) {
-    const c = cellOf.get(e)!;
-    return c.name ?? c.id ?? "";
-  }
   return e.querySelector(".name")?.firstChild?.textContent ?? undefined;
 }
 
-let fillFrame = 0;
-function fillSoon() {
-  if (!fillFrame) fillFrame = requestAnimationFrame(() => fill());
+// shownCard is block's card, or the card of the heading whose fold
+// hides it, where it is drawn, for the dependency lines.
+function shownCard(block: number): HTMLElement | null {
+  const c = blockCells.get(block);
+  const i = c ? cellIndex.get(c) : undefined;
+  if (!c || i === undefined) return null;
+  return cardOf.get(hidden[i] ? cells[hiddenBy[i]] : c) ?? null;
 }
 
-// fill draws the stubs within a view's height of the view, and puts
-// cards drawn from stubs far out of it back to stubs. A card drawn above
-// the view moves what is in sight by how much taller it is than its
-// stub, unless the page keeps it in place, as Chromium does and WebKit
-// doesn't: the first card in sight is kept where it was.
-function fill() {
-  cancelAnimationFrame(fillFrame);
-  fillFrame = 0;
-  const pane = $("doc-scroll");
-  if (pane.hidden || (!stubs.size && filled.size <= keepCards)) return;
-  const kids = $("doc").children as HTMLCollectionOf<HTMLElement>;
-  const p = pane.getBoundingClientRect();
-  const near = { top: p.top - p.height, bottom: p.bottom + p.height };
-  const want: HTMLElement[] = [];
-  let anchor = -1;
-  let anchorTop = 0;
-  for (let i = firstCell((e) => e.getBoundingClientRect().bottom > near.top, true); i < kids.length; i++) {
-    const e = kids[i];
-    const r = e.getBoundingClientRect();
-    if (r.top > near.bottom) break;
-    if (!r.height) continue;
-    if (anchor < 0 && r.bottom > p.top) {
-      anchor = i;
-      anchorTop = r.top;
-    }
-    if (stubs.has(e)) want.push(e);
-  }
-  if (want.length) {
-    want.forEach(real);
-    if (anchor >= 0) {
-      const by = kids[anchor].getBoundingClientRect().top - anchorTop;
-      if (Math.abs(by) >= 1) pane.scrollTop += by;
+// placesNow is where each block's card is, or would be, in the rendered
+// view's content, as it is laid out now: the top and the bottom of the
+// card, or of the heading whose fold hides it. The dependency lines run
+// to blocks whose cards aren't drawn.
+function placesNow(): (block: number) => { top: number; bottom: number; at: number } | null {
+  const segs: { from: number; to: number; top: number }[] = [];
+  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
+    if (e.offsetParent === null) continue;
+    const r = spacerRange.get(e);
+    if (r) segs.push({ ...r, top: e.offsetTop });
+    else {
+      const i = cellIndex.get(cellOf.get(e)!);
+      if (i !== undefined) segs.push({ from: i, to: i + 1, top: e.offsetTop });
     }
   }
-  if (filled.size > keepCards) unfill(pane);
+  const topAt = (i: number) => {
+    // The last stretch starting at or before i.
+    let lo = 0;
+    let hi = segs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (segs[mid].from > i) hi = mid;
+      else lo = mid + 1;
+    }
+    const s = segs[lo - 1];
+    if (s && i < s.to) return s.top + heights.sum(s.from, i);
+    return segs[lo]?.top ?? (s ? s.top + heights.sum(s.from, s.to) : 0);
+  };
+  return (block) => {
+    const c = blockCells.get(block);
+    let i = c ? cellIndex.get(c) : undefined;
+    if (i === undefined) return null;
+    if (hidden[i]) i = hiddenBy[i];
+    const top = topAt(i);
+    return { top, bottom: top + Math.max(20, heights.get(i) - 16), at: i };
+  };
 }
 
-// unfill puts the cards drawn from stubs that are far from the view back
-// to stubs, but for those in use: selected, followed, focused, running,
-// asking or being dragged.
-function unfill(pane: HTMLElement) {
-  const p = pane.getBoundingClientRect();
-  const far = 3 * p.height;
-  const focus = document.activeElement;
-  const back: { card: HTMLElement; height: number }[] = [];
-  for (const e of filled) {
-    if (!e.isConnected) {
-      filled.delete(e);
-      continue;
-    }
-    const r = e.getBoundingClientRect();
-    if (r.height && r.bottom > p.top - far && r.top < p.bottom + far) continue;
-    if (e === following || e.matches(".selected, .current, .now, .background, .timing, .dep-target, .dragging") || e.contains(focus) || e.querySelector(".ask:not([hidden]), .terminal, .cast-player")) continue;
-    back.push({ card: e, height: r.height });
-  }
-  for (const { card, height } of back) {
-    const c = cellOf.get(card);
-    filled.delete(card);
-    if (!c) continue;
-    const s = stub(c);
-    s.className = card.className + " stub";
-    for (const k in card.dataset) s.dataset[k] = card.dataset[k];
-    const rings = card.style.getPropertyValue("--dep-rings");
-    if (rings) s.style.setProperty("--dep-rings", rings);
-    // A card in a folded section has no height to keep.
-    if (height) s.style.setProperty("--guess", height + "px");
-    else if (c.block >= 0) s.style.setProperty("--guess", guessHeight(c) + "px");
-    cellOf.set(s, c);
-    card.replaceWith(s);
-  }
-}
-
-// guessHeight is about how tall block c's card is, in pixels, which the
-// page takes it to be until it is first in sight: the cards out of sight
-// are not laid out, and a guess near their size keeps the scroll bar
-// steady as they come into it.
-function guessHeight(c: Cell): number {
-  // A body or output ends with a newline, which starts no line.
-  const lines = (s?: string) => (s ? s.replace(/\r?\n$/, "").split("\n").length : 0);
-  // A cell whose body hasn't come has its lines counted by Go.
-  const out = partial.has(c) ? (c.outputLines ?? 0) : lines(c.output);
-  const code = partial.has(c) ? (c.codeLines ?? 0) : lines(c.body);
-  return 60 + 19 * code + (out ? 30 + 19 * out : 0);
-}
+// cellName is block c's name, as its card's head shows it.
+const cellName = (c: Cell) => c.name ?? c.id ?? "";
 
 // drawProse draws one top-level block of prose. Clicking it shows its
 // markdown in the source pane, except on a link, which followLinks
@@ -1024,7 +1247,7 @@ function drawProse(c: Cell): HTMLElement {
   if (c.include) includeControls(s, c, { commit: (i, from, to) => edit(() => App.SetIncludeRange(i, from, to)), busy: () => running, say: status });
   s.onclick = (e) => {
     if (window.getSelection()?.toString() || (e.target as HTMLElement).closest("input, .include-grip, .include-bar")) return;
-    if (c.heading) selectSection(s);
+    if (c.heading) selectSection(c);
     void showInSource(s, c.line, true);
   };
   enableTasks(s, c.tasks);
@@ -1034,7 +1257,7 @@ function drawProse(c: Cell): HTMLElement {
     if (c.sectionTo) {
       s.dataset.sectionFrom = String(c.sectionFrom ?? 0);
       s.dataset.sectionTo = String(c.sectionTo);
-      const play = iconButton("play", "Run this section (s)", () => void runSection(s));
+      const play = iconButton("play", "Run this section (s)", () => void runSection(c));
       play.classList.add("run-section");
       play.disabled = running || !!noRun;
       // Next to the heading's text, which names it in the outline and
@@ -1044,13 +1267,12 @@ function drawProse(c: Cell): HTMLElement {
       if (h) h.setAttribute("aria-label", h.textContent ?? "");
       (h ?? s).append(play);
     }
-    s.dataset.foldDefault = c.collapsed ? "1" : "";
     const note = el("button", { className: "fold-note", title: "Unfold this section" });
     note.onclick = (e) => {
       e.stopPropagation();
-      foldSection(s, false);
+      foldSection(c, false);
     };
-    s.prepend(foldButton("Fold or unfold this section", () => foldSection(s)));
+    s.prepend(foldButton("Fold or unfold this section", () => foldSection(c)));
     s.append(note);
   }
   return s;
@@ -1400,33 +1622,31 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   } else {
     // Each card's handlers hold its cell, so update them in place.
     fresh.forEach((c, i) => {
+      const cell = cells[i];
       // An input is drawn again when its value changed, as a copy of the
       // one being typed in does, but not the one that has the focus.
-      const inputChanged = (c.textbox && c.textbox.text !== cells[i].textbox?.text) || (c.choice && JSON.stringify(c.choice.options) !== JSON.stringify(cells[i].choice?.options));
-      const holdsFocus = !!focused && !!$("doc").children[i]?.contains(focused);
-      const changed = c.block < 0 && (c.textbox || c.choice ? inputChanged && !holdsFocus : c.html !== cells[i].html);
+      const inputChanged = (c.textbox && c.textbox.text !== cell.textbox?.text) || (c.choice && JSON.stringify(c.choice.options) !== JSON.stringify(cell.choice?.options));
+      const card = cardOf.get(cell);
+      const holdsFocus = !!focused && !!card?.contains(focused);
+      const changed = c.block < 0 && (c.textbox || c.choice ? inputChanged && !holdsFocus : c.html !== cell.html);
       // Go leaves out fields that are false, so clear the fold flags first.
-      Object.assign(cells[i], { collapsed: false, collapsedOutput: false }, c);
-      partial.delete(cells[i]);
-      const card = $("doc").children[i] as HTMLElement | undefined;
+      Object.assign(cell, { collapsed: false, collapsedOutput: false }, c);
+      partial.delete(cell);
       if (card && changed) {
-        const fold = card.dataset.fold;
-        const fresh = drawCell(cells[i], !stubs.has(card));
-        if (fold) fresh.dataset.fold = fold;
-        card.replaceWith(fresh);
+        const e = drawCard(cell, placed.has(card));
+        card.replaceWith(e);
+        if (following === card) following = e;
       } else if (card) {
-        cellOf.set(card, cells[i]);
         card.dataset.line = String(c.line);
-        // A var= input can change what mdsh:collapse and collapse= say.
-        if (c.heading) card.dataset.foldDefault = c.collapsed ? "1" : "";
-        if (c.block >= 0) {
-          markTrash(card, cells[i]);
-          card.dataset.foldCode = c.collapsed ? "1" : "";
-          card.dataset.foldOutput = c.collapsedOutput ? "1" : "";
-        }
+        if (c.block >= 0) markTrash(card, cell);
       }
     });
-    applyFolds();
+    // A var= input can change what mdsh:collapse and collapse= say, and
+    // a heading's text.
+    const was = blocks()[selected];
+    indexCells();
+    if (was) select(blocks().indexOf(was), false);
+    place();
     drawOutline();
   }
   await loadSource();
@@ -1520,9 +1740,9 @@ function drawBlock(c: Cell): HTMLElement {
       runs(iconButton("runFrom", "Run from here (a)", () => start("RunFrom", c.block))),
       ...(c.movable ? [trashButton(c)] : []),
     ),
-    foldPart("code", el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))), () => foldBlock(block, "code")),
+    foldPart("code", el("pre", { className: "code numbered" }, el("code", {}, ...codeLines(c.body ?? "", c.lang ?? ""))), () => foldBlock(c, "code")),
     el("div", { className: "ask", hidden: true }),
-    foldPart("output", el("div", { className: "output", innerHTML: c.output ?? "" }), () => foldBlock(block, "output")),
+    foldPart("output", el("div", { className: "output", innerHTML: c.output ?? "" }), () => foldBlock(c, "output")),
   );
   // The output's buttons sit in its top right corner: copy, and on the
   // selected card the trash.
@@ -1536,7 +1756,7 @@ function drawBlock(c: Cell): HTMLElement {
     // The earlier runs history=N keeps, folded under the output.
     block.querySelector(".output-part")!.after(
       drawEarlier(c.earlier, {
-        key: partKey(block, "output"),
+        key: partKey(c, "output"),
         copy: (r, out, b) => void copyEarlier(c, r.k, out, b),
         remove: (k) => void deleteEarlier(c.block, k),
         view: viewImage,
@@ -1546,7 +1766,7 @@ function drawBlock(c: Cell): HTMLElement {
   if (c.http) {
     // The response's view takes the output's place; the output stays,
     // hidden, so copying it copies the response as the file saves it.
-    block.querySelector(".output")!.before(drawHTTP(c.http, partKey(block, "output")));
+    block.querySelector(".output")!.before(drawHTTP(c.http, partKey(c, "output")));
     block.classList.add("has-http");
   }
   drawAt(block, c, new Date());
@@ -1554,8 +1774,6 @@ function drawBlock(c: Cell): HTMLElement {
   colorOutput(block.querySelector(".output")!);
   if (c.links) linkify(block.querySelector<HTMLElement>(".output")!);
   markOutput(block.querySelector<HTMLElement>(".output")!);
-  block.dataset.foldCode = c.collapsed ? "1" : "";
-  block.dataset.foldOutput = c.collapsedOutput ? "1" : "";
   // The card is a tab stop, named for the block and its state, so the
   // keyboard and a screen reader reach it; focusing it selects it, as a
   // click does.
@@ -1563,7 +1781,7 @@ function drawBlock(c: Cell): HTMLElement {
   block.tabIndex = 0;
   labelBlock(block);
   block.onfocus = () => {
-    if (!block.classList.contains("selected")) select(blocks().indexOf(block), false);
+    if (!block.classList.contains("selected")) select(blocks().indexOf(c), false);
   };
   // Checkboxes in output, such as out=markdown's, are edited in place
   // too, until the block runs again.
@@ -1586,7 +1804,7 @@ function drawBlock(c: Cell): HTMLElement {
     restTimer(timer, c.ms, !!c.timedOut, c.timeout ?? 0);
   }
   block.onclick = (e) => {
-    select(blocks().indexOf(block), false);
+    select(blocks().indexOf(c), false);
     if (!(e.target as HTMLElement).closest("button, input")) void showInSource(block, c.line, false);
   };
   return block;
@@ -1617,20 +1835,20 @@ function labelBlock(block: HTMLElement) {
 // copies them either way.
 
 // folds are the clicked folds the file doesn't hold, by key: the block's
-// id and part, or the heading's dataset.fold. The rest are as the file
-// says.
+// name and part, or the heading's fold's name (foldKeys). The rest are
+// as the file says.
 const folds = new Map<string, boolean>();
 
 type Part = "code" | "output";
 
-const partKey = (block: HTMLElement, part: Part) => part + ":" + (cardName(block) ?? block.dataset.block);
+const partKey = (c: Cell, part: Part) => part + ":" + (cellName(c) || String(c.block));
 
-function blockFolded(block: HTMLElement, part: Part): boolean {
-  return folds.get(partKey(block, part)) ?? !!block.dataset[part === "code" ? "foldCode" : "foldOutput"];
+function blockFolded(c: Cell, part: Part): boolean {
+  return folds.get(partKey(c, part)) ?? !!(part === "code" ? c.collapsed : c.collapsedOutput);
 }
 
-function sectionFolded(cell: HTMLElement): boolean {
-  return folds.get(cell.dataset.fold ?? "") ?? !!cell.dataset.foldDefault;
+function sectionFolded(c: Cell): boolean {
+  return folds.get(foldKeys.get(c) ?? "") ?? !!c.collapsed;
 }
 
 // peeks are the folded sections a dependency line being dragged has
@@ -1638,7 +1856,7 @@ function sectionFolded(cell: HTMLElement): boolean {
 // dropped on. They change neither folds nor the file.
 const peeks = new Set<string>();
 let peekTimer = 0;
-let peekCell: HTMLElement | null = null;
+let peekCell: Cell | null = null;
 // How long the line is held over a folded heading before it opens.
 const peekDelay = 400;
 
@@ -1650,25 +1868,26 @@ const askPeeks = new Set<string>();
 
 // shownFolded is whether a section is drawn folded: folded, and not
 // opened by a drag or a question.
-function shownFolded(cell: HTMLElement): boolean {
-  const key = cell.dataset.fold ?? "";
-  return !peeks.has(key) && !askPeeks.has(key) && sectionFolded(cell);
+function shownFolded(c: Cell): boolean {
+  const key = foldKeys.get(c) ?? "";
+  return !peeks.has(key) && !askPeeks.has(key) && sectionFolded(c);
 }
 
-// peekAsk opens the folded sections that hide cell, for its question.
-function peekAsk(cell: HTMLElement) {
-  if (!cell.classList.contains("in-fold")) return;
-  for (const key of hidingSections(cell)) askPeeks.add(key);
+// peekAsk opens the folded sections that hide c, for its question.
+function peekAsk(c: Cell) {
+  const i = cellIndex.get(c);
+  if (i === undefined || !hidden[i]) return;
+  for (const key of hidingSections(i)) askPeeks.add(key);
   applyFolds();
 }
 
 // closeAsks closes the sections a question opened, except those that
-// hold cell, the block the run is at now; with no cell, all of them.
-function closeAsks(cell?: HTMLElement | null) {
+// hold c, the block the run is at now; with no c, all of them.
+function closeAsks(c?: Cell | null) {
   let closed = false;
   for (const key of [...askPeeks]) {
-    const h = headingFor(key);
-    if (h && cell && holds(h, cell)) continue;
+    const h = headingByKey.get(key);
+    if (h && c && holds(h, c)) continue;
     askPeeks.delete(key);
     closed = true;
   }
@@ -1678,28 +1897,32 @@ function closeAsks(cell?: HTMLElement | null) {
   }
 }
 
-// holds is whether cell is in the section under heading, at any depth.
-function holds(heading: HTMLElement, cell: HTMLElement): boolean {
-  const level = Number(heading.dataset.level ?? 0);
-  for (let e = heading.nextElementSibling as HTMLElement | null; e; e = e.nextElementSibling as HTMLElement | null) {
-    const l = Number(e.dataset.level ?? 0);
+// holds is whether c is in the section under heading, at any depth.
+function holds(heading: Cell, c: Cell): boolean {
+  const from = cellIndex.get(heading);
+  const to = cellIndex.get(c);
+  if (from === undefined || to === undefined || to <= from) return false;
+  const level = heading.heading ?? 0;
+  for (let i = from + 1; i <= to; i++) {
+    const l = cells[i].heading ?? 0;
     if (l && l <= level) return false;
-    if (e === cell) return true;
   }
-  return false;
+  return true;
 }
 
-const headingFor = (key: string) => [...($("doc").children as HTMLCollectionOf<HTMLElement>)].find((e) => e.dataset.fold === key);
+// headingByKey is each heading's cell by its fold's name.
+let headingByKey = new Map<string, Cell>();
 
 // peek follows a dependency drag over cell, the top-level cell under
 // the pointer (null between cells changes nothing). The sections it
 // opened close once the pointer is out of them, and a folded heading
 // held under the pointer opens.
-function peek(cell: HTMLElement | null) {
+function peek(card: HTMLElement | null) {
+  const cell = card && cellOf.get(card);
   if (!cell) return;
   let closed = false;
   for (const key of [...peeks]) {
-    const h = headingFor(key);
+    const h = headingByKey.get(key);
     if (h && (h === cell || holds(h, cell))) continue;
     peeks.delete(key);
     closed = true;
@@ -1711,7 +1934,7 @@ function peek(cell: HTMLElement | null) {
   if (cell === peekCell) return;
   clearTimeout(peekTimer);
   peekCell = null;
-  const key = cell.dataset.fold;
+  const key = foldKeys.get(cell);
   if (!key || !shownFolded(cell)) return;
   peekCell = cell;
   peekTimer = window.setTimeout(() => {
@@ -1726,12 +1949,13 @@ function peek(cell: HTMLElement | null) {
 // holding the block it was dropped on stay open while the tab is, as
 // reveal leaves them, so the new line is seen arriving there; the file
 // keeps them folded.
-function endPeek(dropped: HTMLElement | null) {
+function endPeek(card: HTMLElement | null) {
+  const dropped = card && cellOf.get(card);
   clearTimeout(peekTimer);
   peekCell = null;
   if (!peeks.size) return;
   for (const key of peeks) {
-    const h = headingFor(key);
+    const h = headingByKey.get(key);
     if (dropped && h && holds(h, dropped)) folds.set(key, false);
   }
   peeks.clear();
@@ -1764,27 +1988,29 @@ function foldPart(part: Part, full: HTMLElement, toggle: () => void): HTMLElemen
   return el("div", { className: "part " + part + "-part" }, foldButton(part === "code" ? "Fold or unfold the code" : "Fold or unfold the output", toggle), full, summary);
 }
 
-function foldBlock(block: HTMLElement, part: Part, on = !blockFolded(block, part)) {
-  folds.set(partKey(block, part), on);
-  drawPart(block, part);
-  void saveFolds([blockFold(block, part, on)]);
+function foldBlock(c: Cell, part: Part, on = !blockFolded(c, part)) {
+  folds.set(partKey(c, part), on);
+  const card = cardOf.get(c);
+  if (card) drawPart(card, part);
+  placeSoon();
+  void saveFolds([blockFold(c, part, on)]);
 }
 
-function foldSection(cell: HTMLElement, on = !shownFolded(cell)) {
+function foldSection(c: Cell, on = !shownFolded(c)) {
+  const key = foldKeys.get(c) ?? "";
   // Folding by hand takes over from a question that opened it.
-  askPeeks.delete(cell.dataset.fold ?? "");
-  folds.set(cell.dataset.fold ?? "", on);
+  askPeeks.delete(key);
+  folds.set(key, on);
   applyFolds();
   drawOutline();
-  const f = sectionFold(cell, on);
+  const f = sectionFold(c, on);
   if (f) void saveFolds([f]);
 }
 
-const blockFold = (block: HTMLElement, part: Part, on: boolean): Fold => ({ block: Number(block.dataset.block), output: part === "output", heading: 0, on });
+const blockFold = (c: Cell, part: Part, on: boolean): Fold => ({ block: c.block, output: part === "output", heading: 0, on });
 
-function sectionFold(cell: HTMLElement, on: boolean): Fold | null {
-  const c = cells.find((c) => String(c.line) === cell.dataset.line);
-  return c?.heading ? { block: -1, output: false, heading: c.from, on } : null;
+function sectionFold(c: Cell, on: boolean): Fold | null {
+  return c.heading ? { block: -1, output: false, heading: c.from, on } : null;
 }
 
 // saveFolds writes folds to the file, then forgets the clicks the file
@@ -1793,12 +2019,12 @@ function sectionFold(cell: HTMLElement, on: boolean): Fold | null {
 async function saveFolds(list: Fold[]) {
   if (!list.length || running) return;
   if (!(await edit(() => App.SetFolds(list)))) return;
-  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    const held = (key: string, file: boolean) => folds.get(key) === file && folds.delete(key);
-    if (e.classList.contains("block")) {
-      held(partKey(e, "code"), !!e.dataset.foldCode);
-      held(partKey(e, "output"), !!e.dataset.foldOutput);
-    } else if (e.dataset.fold) held(e.dataset.fold, !!e.dataset.foldDefault);
+  const held = (key: string, file: boolean) => folds.get(key) === file && folds.delete(key);
+  for (const c of cells) {
+    if (renumbered(c)) {
+      held(partKey(c, "code"), !!c.collapsed);
+      held(partKey(c, "output"), !!c.collapsedOutput);
+    } else if (c.heading) held(foldKeys.get(c) ?? "", !!c.collapsed);
   }
   // Where the file folds by a condition, nothing changed.
   $("dirty").hidden = !(await App.Doc()).dirty;
@@ -1838,8 +2064,9 @@ async function saveFrame(i: number, body: string, n: number) {
 // drawPart shows a block's code or output whole, or as its first line.
 function drawPart(block: HTMLElement, part: Part) {
   const wrap = block.querySelector<HTMLElement>("." + part + "-part");
-  if (!wrap) return;
-  const on = blockFolded(block, part);
+  const c = cellOf.get(block);
+  if (!wrap || !c) return;
+  const on = blockFolded(c, part);
   wrap.classList.toggle("folded", on);
   wrap.querySelector(":scope > button.fold")?.setAttribute("aria-expanded", String(!on));
   const summary = wrap.querySelector<HTMLElement>(".fold-summary")!;
@@ -1861,59 +2088,22 @@ function summarize(full: HTMLElement, summary: HTMLElement) {
   summary.replaceChildren(el("span", { className: "first" }, lines[0] ?? (images ? "" : "empty")), el("span", { className: "muted" }, more));
 }
 
-// applyFolds draws every fold: each block's parts, and the sections,
-// hiding the cells under a folded heading.
-// With only, it draws the code and output folds of only those cards,
-// as after an edit draws a few cards again; the sections' folds are
-// always worked out for the whole document.
-function applyFolds(only?: HTMLElement[]) {
-  const doc = $("doc");
-  for (const b of only?.filter((e) => e.classList.contains("block")) ?? doc.querySelectorAll<HTMLElement>(":scope > .block")) {
-    drawPart(b, "code");
-    drawPart(b, "output");
-  }
-  // New cards that aren't headings, where no section is folded, are in
-  // no fold, and change no section's count of what it hides: going
-  // through every card after each pause in typing is left out.
-  if (only && !only.some((e) => e.dataset.level) && !sectionsFolded) return;
-  sectionsFolded = false;
-  const open: { level: number; folded: boolean; cell: HTMLElement; hidden: number }[] = [];
-  const headings: typeof open = [];
-  for (const e of doc.children as HTMLCollectionOf<HTMLElement>) {
-    const level = Number(e.dataset.level ?? 0);
-    if (level) while (open.length && open[open.length - 1].level >= level) open.pop();
-    const owner = open.find((h) => h.folded);
-    e.classList.toggle("in-fold", !!owner);
-    if (owner) owner.hidden++;
-    if (level) {
-      const h = { level, folded: shownFolded(e), cell: e, hidden: 0 };
-      if (h.folded) sectionsFolded = true;
-      e.classList.toggle("folded", h.folded);
-      open.push(h);
-      headings.push(h);
-    }
-  }
-  for (const h of headings) {
-    h.cell.querySelector(":scope > button.fold")?.setAttribute("aria-expanded", String(!h.folded));
-    const note = h.cell.querySelector<HTMLElement>(".fold-note");
-    if (!note) continue;
-    note.textContent = h.folded && h.hidden ? "… " + h.hidden + (h.hidden === 1 ? " part" : " parts") : "";
-    note.setAttribute("aria-label", note.textContent ? note.textContent.slice(2) + " folded away: unfold this section" : "");
-  }
+// applyFolds works out what the sections' folds hide again, marks the
+// cards drawn, and draws the cards that come into sight.
+function applyFolds() {
+  const was = blocks()[selected];
+  foldCells();
   // A selected block that a fold hides is selected no longer.
-  const current = doc.querySelector<HTMLElement>(".block.selected");
-  if (current) select(current.classList.contains("in-fold") ? -1 : blocks().indexOf(current), false);
+  if (was) select(blocks().indexOf(was), false);
+  place();
 }
 
-// sectionsFolded is whether a section was folded when applyFolds last
-// went through every card.
-let sectionsFolded = false;
-
-// reveal unfolds the sections that hide cell, so it can be shown, as
-// when a block asks before it runs or the toolbar jumps to it.
-function reveal(cell: HTMLElement) {
-  if (!cell.classList.contains("in-fold")) return;
-  for (const key of hidingSections(cell)) {
+// reveal unfolds the sections that hide c, so it can be shown, as when
+// a block asks before it runs or the toolbar jumps to it.
+function reveal(c: Cell) {
+  const i = cellIndex.get(c);
+  if (i === undefined || !hidden[i]) return;
+  for (const key of hidingSections(i)) {
     folds.set(key, false);
     askPeeks.delete(key);
   }
@@ -1921,15 +2111,15 @@ function reveal(cell: HTMLElement) {
   drawOutline();
 }
 
-// hidingSections are the keys of the folded sections that hold cell.
-function hidingSections(cell: HTMLElement): string[] {
+// hidingSections are the keys of the folded sections that hold cell i.
+function hidingSections(i: number): string[] {
   const keys: string[] = [];
-  let level = Number(cell.dataset.level ?? 0) || 7;
-  for (let e = cell.previousElementSibling as HTMLElement | null; e && level > 1; e = e.previousElementSibling as HTMLElement | null) {
-    const l = Number(e.dataset.level ?? 0);
+  let level = cells[i]?.heading || 7;
+  for (let j = i - 1; j >= 0 && level > 1; j--) {
+    const l = cells[j].heading ?? 0;
     if (!l || l >= level) continue;
     level = l;
-    if (sectionFolded(e)) keys.push(e.dataset.fold ?? "");
+    if (sectionFolded(cells[j])) keys.push(foldKeys.get(cells[j]) ?? "");
   }
   return keys;
 }
@@ -1938,19 +2128,19 @@ function hidingSections(cell: HTMLElement): string[] {
 // section.
 function foldAll(what: "blocks" | "sections", on: boolean): Fold[] {
   const list: Fold[] = [];
-  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    if (what === "blocks" && e.classList.contains("block")) {
+  for (const c of cells) {
+    if (what === "blocks" && renumbered(c)) {
       for (const part of ["code", "output"] as const) {
         // Only blocks with output get collapse-output.
-        const empty = part === "output" && !(stubs.has(e) ? cellOf.get(e)?.output : e.querySelector(".output")?.innerHTML)?.trim();
-        if (blockFolded(e, part) !== on && !(on && empty)) list.push(blockFold(e, part, on));
-        folds.set(partKey(e, part), on);
+        const empty = part === "output" && !(partial.has(c) ? c.outputLines : c.output?.trim());
+        if (blockFolded(c, part) !== on && !(on && empty)) list.push(blockFold(c, part, on));
+        folds.set(partKey(c, part), on);
       }
     }
-    if (what === "sections" && e.dataset.fold) {
-      const f = sectionFolded(e) !== on && sectionFold(e, on);
+    if (what === "sections" && c.heading) {
+      const f = sectionFolded(c) !== on && sectionFold(c, on);
       if (f) list.push(f);
-      folds.set(e.dataset.fold, on);
+      folds.set(foldKeys.get(c) ?? "", on);
     }
   }
   applyFolds();
@@ -1962,24 +2152,14 @@ function foldAll(what: "blocks" | "sections", on: boolean): Fold[] {
 // or, with fromFile, of the folds the file asks for.
 function renderedFoldLines(fromFile: boolean): number[] {
   const lines: number[] = [];
-  const at = cellsByLine();
-  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    const c = at.get(e.dataset.line ?? "");
-    if (!c) continue;
-    if (c.heading && (fromFile ? c.collapsed : sectionFolded(e))) lines.push(c.line);
+  for (const c of cells) {
+    if (c.heading && (fromFile ? c.collapsed : sectionFolded(c))) lines.push(c.line);
     if (c.block >= 0) {
-      if (fromFile ? c.collapsed : blockFolded(e, "code")) lines.push(c.line);
-      if (c.outputLine && (fromFile ? c.collapsedOutput : blockFolded(e, "output"))) lines.push(c.outputLine);
+      if (fromFile ? c.collapsed : blockFolded(c, "code")) lines.push(c.line);
+      if (c.outputLine && (fromFile ? c.collapsedOutput : blockFolded(c, "output"))) lines.push(c.outputLine);
     }
   }
   return lines;
-}
-
-// cellsByLine finds the cells by their cards' data-line. Looking each
-// card's cell up in the list took time that grew with the square of the
-// document's length.
-function cellsByLine(): Map<string, Cell> {
-  return new Map(cells.map((c) => [String(c.line), c]));
 }
 
 async function foldsToSource() {
@@ -1993,20 +2173,17 @@ async function foldsToRendered() {
   const lines = new Set(nvimDoc ? ((await nvimCall<number[]>("folds").catch(fail)) ?? []) : source ? sourceFolds(source.view) : []);
   if (!source && !nvimDoc) return status("open the source view to copy its folds");
   const list: Fold[] = [];
-  const at = cellsByLine();
-  for (const e of $("doc").children as HTMLCollectionOf<HTMLElement>) {
-    const c = at.get(e.dataset.line ?? "");
-    if (!c) continue;
-    if (c.heading && e.dataset.fold) {
+  for (const c of cells) {
+    if (c.heading) {
       const on = lines.has(c.line);
-      if (sectionFolded(e) !== on) list.push({ block: -1, output: false, heading: c.from, on });
-      folds.set(e.dataset.fold, on);
+      if (sectionFolded(c) !== on) list.push({ block: -1, output: false, heading: c.from, on });
+      folds.set(foldKeys.get(c) ?? "", on);
     }
     if (c.block >= 0) {
       const on = { code: lines.has(c.line), output: !!c.outputLine && lines.has(c.outputLine) };
       for (const part of ["code", "output"] as const) {
-        if (blockFolded(e, part) !== on[part]) list.push(blockFold(e, part, on[part]));
-        folds.set(partKey(e, part), on[part]);
+        if (blockFolded(c, part) !== on[part]) list.push(blockFold(c, part, on[part]));
+        folds.set(partKey(c, part), on[part]);
       }
     }
   }
@@ -2070,10 +2247,15 @@ function scrollToHeading(fragment: string) {
   try {
     id = decodeURIComponent(fragment);
   } catch {}
-  const h = [...document.querySelectorAll<HTMLElement>("#doc :is(h1, h2, h3, h4, h5, h6)")].find(
-    (h) => h.id === id || slug(h.textContent ?? "") === id.toLowerCase(),
-  );
-  h?.scrollIntoView({ block: "start" });
+  // A heading drawn has the id goldmark gave it; any heading, the one
+  // GitHub would, from its text.
+  const drawnHeading = [...document.querySelectorAll<HTMLElement>("#doc :is(h1, h2, h3, h4, h5, h6)")].find((h) => h.id === id);
+  const c = (drawnHeading && cellOf.get(drawnHeading.closest<HTMLElement>("#doc > *")!)) ?? cells.find((c) => c.heading && slug(c.title ?? "") === id.toLowerCase());
+  const i = c ? cellIndex.get(c) : undefined;
+  if (c && i !== undefined) {
+    reveal(c);
+    scrollToCell(i, 0);
+  }
 }
 
 followLinks();
@@ -2107,21 +2289,15 @@ function viewSrc(src: string, alt: string) {
   viewer.showModal();
 }
 
-// blocks are the blocks j and k move between: those no fold hides.
-// blocks are the block cards in sight, not folded away. They are kept
-// until a card comes, goes or changes its classes: selecting, marking
-// and the outline each ask, and asking a long document's page took long
-// enough to show in typing.
-function blocks(): HTMLElement[] {
-  if (cardsChanged.takeRecords().length || !shownBlocks) {
-    shownBlocks = [...document.querySelectorAll<HTMLElement>("#doc .block:not(.in-fold)")];
-    cardsChanged.observe($("doc"), { childList: true, attributes: true, attributeFilter: ["class"] });
-  }
+// blocks are the blocks j and k move between: those no fold hides. They
+// are kept until the cells or the folds change: selecting, marking and
+// the outline each ask.
+function blocks(): Cell[] {
+  shownBlocks ??= cells.filter((c, i) => renumbered(c) && !hidden[i]);
   return shownBlocks;
 }
 
-let shownBlocks: HTMLElement[] | null = null;
-const cardsChanged = new MutationObserver(() => (shownBlocks = null));
+let shownBlocks: Cell[] | null = null;
 
 function select(i: number, scroll = true) {
   const all = blocks();
@@ -2132,9 +2308,10 @@ function select(i: number, scroll = true) {
     markSection();
   }
   markOutline();
-  litDeps(i >= 0 && i < all.length ? Number(all[i].dataset.block) : -1);
+  litDeps(i >= 0 && i < all.length ? all[i].block : -1);
   if (i < 0 || i >= all.length) return;
-  const card = real(all[i]);
+  const card = cardFor(all[i]);
+  if (!card) return;
   card.classList.add("selected");
   if (scroll) card.scrollIntoView({ block: "nearest" });
   // j and k move the focus with the selection, so a screen reader
@@ -2143,12 +2320,13 @@ function select(i: number, scroll = true) {
   if (scroll && (at === document.body || at?.closest("#doc > .block"))) card.focus({ preventScroll: true });
 }
 
-// selectSection selects the heading cell, so its play button shows in
-// the outline and s and Run Section run its section.
-function selectSection(cell: HTMLElement) {
-  if (!cell.dataset.fold) return;
+// selectSection selects the heading c, so its play button shows in the
+// outline and s and Run Section run its section.
+function selectSection(c: Cell) {
+  const key = foldKeys.get(c);
+  if (!key) return;
   select(-1, false);
-  selectedSection = cell.dataset.fold;
+  selectedSection = key;
   markSection();
 }
 
@@ -2162,44 +2340,46 @@ function markSection() {
 // sectionCell is the heading whose section runs for Run Section and s:
 // the selected heading, or else the innermost section holding line, by
 // default the selected block's.
-function sectionCell(line?: number): HTMLElement | null {
-  const headings = [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")];
+function sectionCell(line?: number): Cell | null {
   if (line === undefined) {
-    const h = selectedSection ? headings.find((e) => e.dataset.fold === selectedSection) : undefined;
+    const h = selectedSection ? headingByKey.get(selectedSection) : undefined;
     if (h) return h;
     const b = blocks()[selected];
     if (!b) return null;
-    line = Number(b.dataset.line);
+    line = b.line;
   }
-  let found: HTMLElement | null = null;
-  for (const e of headings) {
-    if (Number(e.dataset.line) > line) break;
-    found = e;
+  let found: Cell | null = null;
+  for (const c of cells) {
+    if (c.line > line) break;
+    if (c.heading) found = c;
   }
   return found;
 }
 
 // runSection runs the blocks of cell's section and its subsections, as
 // Run all runs them: confirm, run=once, depends= and on_error apply.
-async function runSection(cell: HTMLElement | null) {
+async function runSection(cell: Cell | null) {
   if (running || !doc.file) return;
   if (!cell) {
     status("no section selected");
     return;
   }
-  if (!cell.dataset.sectionTo) {
+  if (!cell.sectionTo) {
     status("no block in this section runs");
     return;
   }
   // What was typed is applied first, which can draw the cells anew.
-  const key = cell.dataset.fold;
+  const key = foldKeys.get(cell) ?? "";
   await applySource();
-  const now = [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")].find((e) => e.dataset.fold === key);
-  if (!now?.dataset.sectionTo) return;
+  const now = headingByKey.get(key);
+  if (!now?.sectionTo) return;
   // The view comes back to the heading, as Run this block comes back to
   // its block.
-  const home = () => [...document.querySelectorAll<HTMLElement>("#doc > .heading-cell")].find((e) => e.dataset.fold === key) ?? null;
-  await run(() => App.RunSection(Number(now.dataset.sectionFrom), Number(now.dataset.sectionTo)), home);
+  const home = () => {
+    const h = headingByKey.get(key);
+    return h ? cardFor(h) : null;
+  };
+  await run(() => App.RunSection(now.sectionFrom ?? 0, now.sectionTo!), home);
 }
 
 function runAllButton() {
@@ -2281,7 +2461,7 @@ function busy(on: boolean) {
 function start(method: "RunBlock" | "RunBlockSide" | "RunFrom", block: number) {
   // Run this block comes back to the block when it's done, though its
   // depends= ran first above it. Run from here ends where the run does.
-  const home = method !== "RunFrom" ? () => document.getElementById("block-" + block) : undefined;
+  const home = method !== "RunFrom" ? () => blockCard(block) : undefined;
   return run(() => App[method](block), home);
 }
 
@@ -2324,10 +2504,11 @@ async function run(call: () => Promise<void>, home?: () => HTMLElement | null) {
   if (card) {
     following = null;
     if (!scrolledByHand) goHome(card, back);
-    if (card.classList.contains("block")) {
-      const i = blocks().indexOf(card);
+    const c = cellOf.get(card);
+    if (c && renumbered(c)) {
+      const i = blocks().indexOf(c);
       if (i >= 0) select(i, false);
-    } else selectSection(card);
+    } else if (c) selectSection(c);
   }
   // The output is drawn in full now, and may be longer than it was.
   if (following) showEnd(following, false);
@@ -2404,8 +2585,9 @@ async function showInSource(card: HTMLElement, line: number, open: boolean) {
 // need be, with the rendered view brought to the cell holding it.
 async function goToLine(line: number) {
   if (!doc.file) return;
-  const card = cellAt(line);
-  if (card && view.rendered) card.scrollIntoView({ block: "nearest" });
+  const c = cellAt(line);
+  const card = c && view.rendered ? cardFor(c) : null;
+  card?.scrollIntoView({ block: "nearest" });
   await showInSource(card ?? $("doc"), line, true);
 }
 
@@ -3111,7 +3293,7 @@ async function runCurrent(side = false) {
   }
   if (!source) {
     const all = blocks();
-    if (selected >= 0 && selected < all.length) await start(method, Number(all[selected].dataset.block));
+    if (selected >= 0 && selected < all.length) await start(method, all[selected].block);
     else status("no block selected");
     return;
   }
@@ -3139,54 +3321,23 @@ function blockAtLine(text: string, line: number): Cell | undefined {
   });
 }
 
-// cellAt is the drawn cell holding line, or the last one before it.
-function cellAt(line: number): HTMLElement | null {
-  const kids = $("doc").children;
-  // The last cell at or before line is the one before the first after it.
-  let i = firstCell((e) => Number(e.dataset.line) > line, false) - 1;
-  while (i >= 0 && !kids[i].hasAttribute("data-line")) i--;
-  return i >= 0 ? (kids[i] as HTMLElement) : null;
-}
-
-// cellBelow is the first of the rendered view's cells whose bottom is
-// below top, in the pane's content coordinates, or undefined. A cell
-// that isn't shown, as in a folded section, has no box and is never it.
-function cellBelow(top: number): HTMLElement | undefined {
-  const kids = $("doc").children;
-  let i = firstCell((e) => e.offsetTop + e.offsetHeight > top, true);
-  while (i < kids.length && !shownCell(kids[i])) i++;
-  return kids[i] as HTMLElement | undefined;
-}
-
-// shownCell is whether e is a cell that starts on a line of the file and
-// has a box.
-function shownCell(e: Element): boolean {
-  return e.hasAttribute("data-line") && (e as HTMLElement).offsetParent !== null;
-}
-
-// firstCell is the index, among the rendered view's children, of the
-// first cell that starts on a line of the file (and, if shown is set, is
-// shown) for which past holds, or an index at or before it with no such
-// cell between, or the number of children when none does.
-// The cells are in order, of their lines and down the page, so past is
-// false up to some cell and true from there on, and the search halves
-// the children each step. Going through every one instead, as each
-// scroll of the split view does, is too slow on a long document.
-function firstCell(past: (e: HTMLElement) => boolean, shown: boolean): number {
-  const kids = $("doc").children;
-  const counts = (e: Element) => (shown ? shownCell(e) : e.hasAttribute("data-line"));
+// cellAt is the cell holding line, or the last one before it. The
+// cells are in the order of their lines, so the search halves them each
+// step: going through every one, as each scroll of the split view does,
+// is too slow on a long document.
+function cellAt(line: number): Cell | null {
   let lo = 0;
-  let hi = kids.length;
+  let hi = cells.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    let j = mid;
-    while (j < hi && !counts(kids[j])) j++;
-    if (j === hi) hi = mid;
-    else if (past(kids[j] as HTMLElement)) hi = j;
-    else lo = j + 1;
+    if (cells[mid].line > line) hi = mid;
+    else lo = mid + 1;
   }
-  return lo;
+  return lo > 0 ? cells[lo - 1] : null;
 }
+
+// currentCell is the cell the source pane's cursor is in.
+let currentCell: Cell | null = null;
 
 // markCurrent marks the cell the source pane's cursor is in. A block
 // the cursor is in becomes the selected one, so the rendered view, the
@@ -3196,10 +3347,11 @@ function markCurrent(line: number) {
   const mark = [line, drawn, selected, selectedSection].join(" ");
   if (mark === marked) return;
   for (const e of document.querySelectorAll("#doc > .current")) e.classList.remove("current");
-  const cell = cellAt(line);
-  cell?.classList.add("current");
-  if (cell?.classList.contains("block")) select(blocks().indexOf(cell), false);
-  else if (cell?.classList.contains("heading-cell") && Number(cell.dataset.line) === line) selectSection(cell);
+  const c = cellAt(line);
+  currentCell = c;
+  if (c) cardOf.get(c)?.classList.add("current");
+  if (c && renumbered(c)) select(blocks().indexOf(c), false);
+  else if (c?.heading && c.line === line) selectSection(c);
   marked = [line, drawn, selected, selectedSection].join(" ");
 }
 
@@ -3236,29 +3388,30 @@ function syncScroll(from: "source" | "doc", nvimTop?: number) {
   clearTimeout(scrollingTimer);
   scrollingTimer = window.setTimeout(() => (scrolling = null), 150);
   const pane = $("doc-scroll");
+  // The pane is positioned, for the dependency lines, so a cell's
+  // offsetTop is from the pane's top.
+  const toCell = (line: number) => {
+    const c = cellAt(line);
+    const i = c ? cellIndex.get(c) : undefined;
+    if (i !== undefined) scrollToCell(i);
+  };
   if (!source) {
     if (from === "source") {
-      const cell = nvimTop ? cellAt(nvimTop) : null;
-      if (cell) pane.scrollTop = cell.offsetTop - 8;
+      if (nvimTop) toCell(nvimTop);
       return;
     }
-    const cell = cellBelow(pane.scrollTop);
-    if (cell) void nvimCall("jump", Number(cell.dataset.line), 0, false, 0).catch(() => {});
+    const i = indexAt(pane.scrollTop);
+    if (i >= 0) void nvimCall("jump", cells[i].line, 0, false, 0).catch(() => {});
     return;
   }
   const cm = source.view;
   if (from === "source") {
-    const line = cm.state.doc.lineAt(cm.lineBlockAtHeight(cm.scrollDOM.scrollTop).from).number;
-    const cell = cellAt(line);
-    // The pane is positioned, for the dependency lines, so a cell's
-    // offsetTop is from the pane's top.
-    if (cell) pane.scrollTop = cell.offsetTop - 8;
+    toCell(cm.state.doc.lineAt(cm.lineBlockAtHeight(cm.scrollDOM.scrollTop).from).number);
     return;
   }
-  const top = pane.scrollTop;
-  const cell = cellBelow(top);
-  if (!cell) return;
-  const line = Math.min(Number(cell.dataset.line), cm.state.doc.lines);
+  const i = indexAt(pane.scrollTop);
+  if (i < 0) return;
+  const line = Math.min(cells[i].line, cm.state.doc.lines);
   cm.scrollDOM.scrollTop = cm.lineBlockAt(cm.state.doc.line(line).from).top;
 }
 
@@ -3273,73 +3426,70 @@ function drawOutline() {
   if (!view.outline) return;
   const items: HTMLElement[] = [];
   let level = 0;
-  for (const e of document.querySelectorAll<HTMLElement>("#doc > section:not(.in-fold)")) {
-    if (e.classList.contains("input-cell")) {
+  cells.forEach((c, i) => {
+    if (hidden[i]) return;
+    const box = c.textbox ?? c.choice;
+    if (box) {
       // An input whose var= binds nothing is marked !.
-      const taken = e.classList.contains("taken");
-      const name = e.querySelector(".name")?.textContent ?? "";
-      const kind = e.classList.contains("choice-cell") ? "choice" : "textbox";
-      const item = outlineItem(name, level + 1, e, "step input" + (taken ? " bad" : ""), taken ? "!" : "", kind);
-      items.push(outlineRow(item, e, 0));
-      continue;
+      const taken = !!box.problem;
+      const item = outlineItem(box.id, level + 1, c, "step input" + (taken ? " bad" : ""), taken ? "!" : "", c.choice ? "choice" : "textbox");
+      items.push(outlineRow(item, c, 0));
+      return;
     }
-    if (e.classList.contains("block")) {
-      const ask = e.querySelector<HTMLElement>(".ask");
-      const mark = blockMark(e);
-      const name = cardName(e) ?? "";
-      const item = outlineItem(name, level + 1, e, "step" + markClass(mark), mark, "mdsh", blockTitle(name));
+    if (renumbered(c)) {
+      const card = cardOf.get(c);
+      const mark = card ? blockMark(card) : cellMark(c);
+      const name = cellName(c);
+      const item = outlineItem(name, level + 1, c, "step" + markClass(mark), mark, "mdsh", blockTitle(name));
       if (mark === "▶") item.title = name + " (running now)";
       else if (mark === "◐") item.title = name + " (running in the background)";
-      const block = Number(e.dataset.block);
+      const block = c.block;
       const play = iconButton("play", hinted(playHint, "Enter"), (e) => start(e.altKey ? "RunBlockSide" : "RunBlock", block));
       play.classList.add("run");
       play.disabled = running || !!noRun;
-      const row = outlineRow(item, e, 0);
+      const row = outlineRow(item, c, 0);
       // The block waiting for an answer is ringed, to be found at a glance.
       row.classList.toggle("asking", mark === "?");
       row.append(play);
       row.dataset.block = String(block);
       items.push(row);
-      continue;
+      return;
     }
-    for (const h of e.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")) {
-      level = Number(h.tagName[1]);
-      const item = outlineItem(h.textContent ?? "", level, h, "heading", "", "heading");
-      if (e.dataset.fold) {
-        // The mark folds the section, in the outline and the view.
-        const mark = item.querySelector<HTMLElement>(".mark")!;
-        mark.replaceChildren(svg(icons.chevron));
-        mark.classList.add("fold");
-        mark.classList.toggle("closed", shownFolded(e));
-        mark.title = "Fold or unfold this section";
-        // The mark is a mouse target; the heading's own fold button and
-        // the Folding menu do the same from the keyboard.
-        item.setAttribute("aria-label", item.getAttribute("aria-label") + (shownFolded(e) ? ", folded" : ""));
-        mark.onclick = (ev) => {
-          ev.stopPropagation();
-          foldSection(e);
-        };
-      }
-      // From the keyboard, left folds the section and right unfolds it.
-      if (e.dataset.fold) {
-        item.onkeydown = (ev) => {
-          if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
-          ev.preventDefault();
-          foldSection(e, ev.key === "ArrowLeft");
-        };
-      }
-      const row = outlineRow(item, e, level);
-      row.dataset.section = "";
-      if (e.dataset.sectionTo) {
-        const play = iconButton("play", "Run this section (s)", () => void runSection(e));
-        play.classList.add("run");
-        play.disabled = running || !!noRun;
-        row.append(play);
-        row.dataset.section = e.dataset.fold ?? "";
-      }
-      items.push(row);
+    if (!c.heading) return;
+    level = c.heading;
+    const item = outlineItem(c.title ?? "", level, c, "heading", "", "heading");
+    const key = foldKeys.get(c) ?? "";
+    const folded = shownFolded(c);
+    // The mark folds the section, in the outline and the view.
+    const mark = item.querySelector<HTMLElement>(".mark")!;
+    mark.replaceChildren(svg(icons.chevron));
+    mark.classList.add("fold");
+    mark.classList.toggle("closed", folded);
+    mark.title = "Fold or unfold this section";
+    // The mark is a mouse target; the heading's own fold button and the
+    // Folding menu do the same from the keyboard.
+    item.setAttribute("aria-label", item.getAttribute("aria-label") + (folded ? ", folded" : ""));
+    mark.onclick = (ev) => {
+      ev.stopPropagation();
+      foldSection(c);
+    };
+    // From the keyboard, left folds the section and right unfolds it.
+    item.onkeydown = (ev) => {
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+      ev.preventDefault();
+      foldSection(c, ev.key === "ArrowLeft");
+    };
+    const row = outlineRow(item, c, level);
+    row.dataset.section = "";
+    if (c.sectionTo) {
+      const play = iconButton("play", "Run this section (s)", () => void runSection(c));
+      play.classList.add("run");
+      play.disabled = running || !!noRun;
+      row.append(play);
+      row.dataset.section = key;
     }
-  }
+    items.push(row);
+  });
   // Drawing the outline anew would lose the focus; it comes back to the
   // same entry.
   const focused = nav.contains(document.activeElement) ? (document.activeElement as HTMLElement).closest<HTMLElement>(".row")?.dataset.line : undefined;
@@ -3377,7 +3527,7 @@ $("outline").addEventListener("keydown", (e) => {
 // outline is scrolled by hand it stays there until something else is
 // selected.
 function markOutline() {
-  const b = blocks()[selected]?.dataset.block;
+  const b = blocks()[selected]?.block;
   const key = selectedSection ? "s" + selectedSection : b !== undefined ? "b" + b : "";
   const rows = (key && outlineRows.get(key)) || [];
   for (const row of activeRows) {
@@ -3442,6 +3592,12 @@ function blockMark(e: HTMLElement): string {
   return e.classList.contains("ran") ? "✓" : "";
 }
 
+// cellMark is the mark for block c's state, as its cell has it, for a
+// block whose card isn't drawn.
+function cellMark(c: Cell): string {
+  return c.running ? "◐" : c.failed ? "✗" : c.ran ? "✓" : "";
+}
+
 function markClass(mark: string): string {
   return { "✗": " bad", "✓": " ok", "▶": " now", "◐": " bg", "?": " now" }[mark] ?? "";
 }
@@ -3453,18 +3609,18 @@ function blockTitle(name: string): string {
   return name.replaceAll("_", " ");
 }
 
-// outlineRow holds an outline entry for cell, with a grip to drag the
+// outlineRow holds an outline entry for c, with a grip to drag the
 // block, or with level the heading's whole section, when it can move.
-function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLElement {
+function outlineRow(item: HTMLElement, c: Cell, level: number): HTMLElement {
   const row = el("div", { className: "row" }, item);
-  row.dataset.from = cell.dataset.from ?? "";
+  row.dataset.from = String(c.from);
   // The cell's line, so the dependency rings find its row.
-  row.dataset.line = cell.dataset.line ?? "";
-  if (cell.dataset.drop) row.dataset.drop = "1";
-  if (cell.dataset.dropAfter) row.dataset.dropAfter = cell.dataset.dropAfter;
-  if (cell.dataset.dropBefore) row.dataset.dropBefore = cell.dataset.dropBefore;
+  row.dataset.line = String(c.line);
+  if (c.drop) row.dataset.drop = "1";
+  if (c.dropAfter >= 0) row.dataset.dropAfter = String(c.dropAfter);
+  if (c.dropBefore >= 0) row.dataset.dropBefore = String(c.dropBefore);
   if (level) row.dataset.level = String(level);
-  const movable = level ? cell.dataset.drop === "1" : !!cell.querySelector(".grip");
+  const movable = level ? !!c.drop : !!c.movable;
   if (movable) {
     const title = level ? "Drag to move this section, with all that is in it" : "Drag to move this block";
     row.prepend(grip(title, (ev, handle) => startDrag(ev, handle, row, Number(row.dataset.from), level, "outline")));
@@ -3475,7 +3631,7 @@ function outlineRow(item: HTMLElement, cell: HTMLElement, level: number): HTMLEl
 // outlineItem is an outline entry for target, named text, or shown as
 // label. Its mark is its state, or a heading's fold, and icon says what
 // it is: a block, a heading, a textbox or a choice.
-function outlineItem(text: string, level: number, target: HTMLElement, kind: string, mark: string, icon: keyof typeof icons, label = text): HTMLElement {
+function outlineItem(text: string, level: number, target: Cell, kind: string, mark: string, icon: keyof typeof icons, label = text): HTMLElement {
   const b = el("button", { className: "item " + kind, title: text }, el("span", { className: "mark", ariaHidden: "true" }, mark), el("span", { className: "kind" }, svg(icons[icon])), el("span", { className: "text" }, label));
   b.style.paddingLeft = 8 + (level - 1) * 12 + "px";
   // The mark is said in words, and what the entry is, after its name.
@@ -3486,30 +3642,37 @@ function outlineItem(text: string, level: number, target: HTMLElement, kind: str
   return b;
 }
 
-// jumpTo brings target to the top of the rendered view and its markdown
-// to the top of the source pane, and selects it if it is a block.
-function jumpTo(target: HTMLElement) {
-  reveal(target.closest<HTMLElement>("#doc > *") ?? target);
+// jumpTo brings target, a cell or a card or what is in one, to the top
+// of the rendered view and its markdown to the top of the source pane,
+// and selects it if it is a block.
+function jumpTo(target: HTMLElement | Cell) {
+  const c = target instanceof HTMLElement ? cellOf.get(target.closest<HTMLElement>("#doc > *") ?? target) : target;
+  const i = c ? cellIndex.get(c) : undefined;
+  if (!c || i === undefined) return;
+  reveal(c);
   // Both panes go to the entry, so neither follows the other meanwhile.
   holdScroll();
+  const pane = $("doc-scroll");
+  const near = cardOf.get(c);
   // A block waiting for an answer shows its question, in the middle.
-  const ask = target.querySelector<HTMLElement>(":scope > .ask");
+  const ask = near?.querySelector<HTMLElement>(":scope > .ask");
   if (ask && !ask.hidden) {
     handScrollAt = 0;
     centerAsk(ask, scrollBehavior());
+  } else if (near && Math.abs(near.getBoundingClientRect().top - pane.getBoundingClientRect().top) <= pane.clientHeight) {
+    near.scrollIntoView({ block: "start", behavior: scrollBehavior() });
   } else {
-    const d = target.getBoundingClientRect().top - $("doc-scroll").getBoundingClientRect().top;
-    jump(d, scrollBehavior(), (behavior) => target.scrollIntoView({ block: "start", behavior }));
+    // Far, it goes at once, drawing the cards around it.
+    scrollToCell(i, 0);
+    repaint(pane);
   }
-  const i = blocks().indexOf(target);
-  if (i >= 0) select(i, false);
-  const heading = target.closest<HTMLElement>("#doc > .heading-cell");
-  if (heading) selectSection(heading);
-  const cell = target.closest<HTMLElement>("[data-line]");
-  if (nvimDoc && cell) void nvimCall("jump", Number(cell.dataset.line), 0, true, 0).catch(fail);
-  if (source && cell) {
+  const k = blocks().indexOf(c);
+  if (k >= 0) select(k, false);
+  if (c.heading) selectSection(c);
+  if (nvimDoc) void nvimCall("jump", c.line, 0, true, 0).catch(fail);
+  if (source) {
     const cm = source.view;
-    const line = cm.state.doc.line(Math.min(Number(cell.dataset.line), cm.state.doc.lines));
+    const line = cm.state.doc.line(Math.min(c.line, cm.state.doc.lines));
     cm.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: "start" }) });
   }
 }
@@ -3527,7 +3690,7 @@ function drawRunning() {
   const bg = some.filter((e) => blockMark(e) === "◐");
   const chip = (e: HTMLElement) => {
     const mark = blockMark(e);
-    const name = cardName(e) || "block " + ([...document.querySelectorAll("#doc .block")].indexOf(e) + 1);
+    const name = cardName(e) || "block " + (Number(e.dataset.block) + 1);
     const why = mark === "?" ? "waiting for an answer" : mark === "▶" ? "running now" : "running in the background";
     const b = el("button", { className: "chip" + markClass(mark), title: name + ": " + why + ". Click to go to it." }, el("span", { className: "mark", ariaHidden: "true" }, mark), name);
     b.setAttribute("aria-label", name + ", " + why + ". Go to it");
@@ -3738,7 +3901,7 @@ function moveAction(dir: number, byBlock: boolean, key = false): boolean {
   }
   if (key && at?.tagName === "SELECT") return false; // alt+↓ opens a dropdown
   const input = at?.closest<HTMLElement>("#doc [data-input]")?.dataset.input;
-  const i = input != null ? Number(input) : selected >= 0 ? Number(blocks()[selected]?.dataset.block ?? -1) : -1;
+  const i = input != null ? Number(input) : selected >= 0 ? (blocks()[selected]?.block ?? -1) : -1;
   if (i < 0 || !cells.some((c) => c.movable && (c.block === i || c.textbox?.block === i || c.choice?.block === i))) return false;
   void moveRendered(i, dir, byBlock);
   return true;
@@ -3792,7 +3955,7 @@ async function moveRendered(i: number, dir: number, byBlock: boolean) {
   await refresh();
   if (input) document.querySelector<HTMLElement>(`#doc [data-input="${m.block}"]`)?.focus();
   else {
-    const k = blocks().findIndex((b) => Number(b.dataset.block) === m.block);
+    const k = blocks().findIndex((b) => b.block === m.block);
     if (k >= 0) select(k);
   }
   showMoved(m, () => undoEdit(false));
@@ -3971,7 +4134,7 @@ async function deleteBlock(i: number) {
   const id = c.name ?? c.id ?? "";
   if (!c.history && !(await confirmDelete(id ? "#" + id : `the block at line ${c.line}`))) return;
   await applySource();
-  const k = blocks().findIndex((b) => Number(b.dataset.block) === i);
+  const k = blocks().findIndex((b) => b.block === i);
   let d: Deleted;
   try {
     d = await App.DeleteBlock(i);
@@ -4098,8 +4261,10 @@ function startDrag(ev: PointerEvent, handle: HTMLElement, item: HTMLElement, fro
   if (running) return void status("can't change the file while a block runs");
   ev.preventDefault();
   const scroller = pane === "doc" ? $("doc-scroll") : $("outline");
-  const all = spots(pane, level, item);
-  const open = all.filter((s) => !s.blocked);
+  // The rendered view draws other cards as it scrolls, so the spots are
+  // found again each time the line moves.
+  let all = spots(pane, level, item);
+  let open = all.filter((s) => !s.blocked);
   if (!open.length) return;
   handle.setPointerCapture(ev.pointerId);
   const line = el("div", { className: "drop-line", hidden: true });
@@ -4111,6 +4276,10 @@ function startDrag(ev: PointerEvent, handle: HTMLElement, item: HTMLElement, fro
   let warned: Spot["blocked"]; // the limit the status line says, if any
   let frame = 0;
   const place = () => {
+    if (pane === "doc") {
+      all = spots(pane, level, item);
+      open = all.filter((s) => !s.blocked);
+    }
     const box = scroller.getBoundingClientRect();
     const nearest = (list: Spot[]) => {
       let near: Spot | null = null;
@@ -4198,10 +4367,11 @@ async function moveTo(from: number, at: number) {
   if (m.text === m.base) return;
   await refresh();
   if (m.block >= 0) {
-    const k = blocks().findIndex((b) => Number(b.dataset.block) === m.block);
+    const k = blocks().findIndex((b) => b.block === m.block);
     if (k >= 0) select(k);
   }
-  [...$("doc").children].find((e) => Number((e as HTMLElement).dataset.line) === m.line)?.scrollIntoView({ block: "nearest" });
+  const moved = cells.find((c) => c.line === m.line);
+  if (moved) cardFor(moved)?.scrollIntoView({ block: "nearest" });
   showMoved(m, () => undoEdit(false));
 }
 
@@ -4261,7 +4431,7 @@ async function openDepends() {
     if (!source) return;
     const cm = source.view.state;
     i = blockAtLine(cm.doc.toString(), cm.doc.lineAt(cm.selection.main.head).number)?.block ?? -1;
-  } else if (selected >= 0) i = Number(blocks()[selected]?.dataset.block ?? -1);
+  } else if (selected >= 0) i = blocks()[selected]?.block ?? -1;
   const c = cells.find((c) => c.block === i);
   if (!c || c.textbox || c.choice) return status("select a block that runs first");
   const canRun = (x: Cell) => x.block >= 0 && !!x.id && !x.textbox && !x.choice;
@@ -4810,7 +4980,7 @@ function onBlock(e: BlockEvent) {
     case "started":
       for (const b of document.querySelectorAll("#doc .block.now")) b.classList.remove("now");
       block.classList.add("now");
-      closeAsks(block);
+      closeAsks(cellOf.get(block));
       block.querySelector<HTMLElement>(".ask")!.hidden = true;
       setOutput(out, el("pre", { className: "live" }));
       // The last run's exit would sit by the new run's timer.
@@ -4826,7 +4996,7 @@ function onBlock(e: BlockEvent) {
       const streams = (liveColors.get(live) ?? liveColors.set(live, {}).get(live))!;
       const ansi = (streams[e.kind] ??= new Ansi());
       live.append(el("span", { className: e.kind }, ...ansi.write(e.data ?? "")));
-      if (blockFolded(block, "output")) drawPart(block, "output");
+      if (blockFolded(cellOf.get(block)!, "output")) drawPart(block, "output");
       if (block === following) followOutput();
       break;
     }
@@ -4949,8 +5119,9 @@ function onConfirm({ block, question, of }: Question) {
   ask.setAttribute("role", "group");
   ask.setAttribute("aria-label", question);
   ask.hidden = false;
-  closeAsks(card);
-  peekAsk(card);
+  const cell = cellOf.get(card)!;
+  closeAsks(cell);
+  peekAsk(cell);
   // The run waits now, so the block it last followed is done; its
   // output mustn't scroll the view away from the question.
   following = null;
@@ -5119,7 +5290,21 @@ window.addEventListener("resize", () => {
 });
 applyKeyHints();
 initSplitGrip();
-initDeps($("doc-scroll"), { jump: jumpTo, setDepends, peek, endPeek });
+initDeps($("doc-scroll"), {
+  jump: (block) => {
+    const c = blockCells.get(block);
+    if (c) jumpTo(c);
+  },
+  setDepends,
+  peek,
+  endPeek,
+  shown: shownCard,
+  places: placesNow,
+  name: (block) => {
+    const c = blockCells.get(block);
+    return (c && cellName(c)) || "block " + (block + 1);
+  },
+});
 initHistory({
   canRun: () => !running,
   async enter(call, added) {
@@ -5170,10 +5355,10 @@ $("outline-toggle").onclick = () => toggle("outline");
 $("view-split").onclick = () => toggle("split");
 $("view-rendered").onclick = () => toggle("rendered");
 $("doc-scroll").addEventListener("scroll", () => syncScroll("doc"));
-$("doc-scroll").addEventListener("scroll", fillSoon, { passive: true });
+$("doc-scroll").addEventListener("scroll", () => virtual && placeSoon(), { passive: true });
 // Folding, hiding code or output, and resizing the window bring other
 // cards into sight.
-const sized = new ResizeObserver(() => fillSoon());
+const sized = new ResizeObserver(() => virtual && placeSoon());
 sized.observe($("doc"));
 sized.observe($("doc-scroll"));
 for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) $("doc-scroll").addEventListener(type, leadFrom("doc"), { capture: true, passive: true });
@@ -5198,7 +5383,7 @@ document.addEventListener("keydown", (e) => {
   // These keys move around the rendered view, so it leads the scrolling.
   lead = "doc";
   const all = blocks();
-  const current = () => Number(all[selected].dataset.block);
+  const current = () => all[selected].block;
   switch (e.key) {
     case "j":
       if (all.length) select(Math.min(selected + 1, all.length - 1));
@@ -5222,8 +5407,9 @@ document.addEventListener("keydown", (e) => {
       break;
     case "e":
       if (selected >= 0) {
-        const c = cells.find((c) => c.block === current());
-        if (c) void editBlock(all[selected], c);
+        const c = all[selected];
+        const card = c && cardFor(c);
+        if (card) void editBlock(card, c);
       }
       break;
     case "c":
