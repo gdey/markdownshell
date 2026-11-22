@@ -12,7 +12,7 @@
 
 import { Terminal } from "@xterm/xterm";
 import { Clipboard } from "/wails/runtime.js";
-import { App, message } from "./api.js";
+import { App, message, type HistoryEnv } from "./api.js";
 import { confirmShells, lostWarning } from "./confirm.js";
 import { $ } from "./dom.js";
 import { Ansi } from "./highlight.js";
@@ -347,6 +347,7 @@ async function goLive(): Promise<boolean> {
   } catch (err) {
     say(`\x1b[31m${message(err)}\x1b[0m`);
   }
+  void drawEnvs();
   term?.focus();
   return true;
 }
@@ -365,6 +366,7 @@ function setLive(on: boolean) {
   if (!on) {
     jobs = [];
     drawJobs();
+    $("history-env").hidden = true;
   }
 }
 
@@ -410,8 +412,25 @@ export function historyLive(kind: string, data: string | undefined, bytes: strin
     case "live":
       liveRunning = data === "running";
       if (liveRunning) startClock();
-      else stopClock();
+      else {
+        stopClock();
+        // A block typed here may have named a new env, or stopped a job.
+        void drawEnvs();
+      }
       historyBusy(false);
+      return true;
+    case "shell-env":
+      // Moved to another env's shell: its screen so far, then what it
+      // shows from now on.
+      if (live && term) {
+        term.reset();
+        if (bytes) term.write(decode(bytes));
+        term.focus();
+      }
+      liveRunning = false;
+      jobs = [];
+      drawJobs();
+      void drawEnvs();
       return true;
     case "jobs":
       try {
@@ -420,9 +439,69 @@ export function historyLive(kind: string, data: string | undefined, bytes: strin
         jobs = [];
       }
       drawJobs();
+      // A job stopped or brought back changes the picker's counts.
+      void drawEnvs();
       return true;
   }
   return false;
+}
+
+// envLabel names an env for the picker.
+function envLabel(e: HistoryEnv): string {
+  const name = e.name === "" ? "top level" : `env=${e.name}`;
+  const notes: string[] = [];
+  if (e.stopped) notes.push(`${e.stopped} stopped`);
+  if (e.scripted) notes.push("scripted");
+  return notes.length ? `${name} (${notes.join(", ")})` : name;
+}
+
+// drawEnvs fills the env picker with the envs the file names, the one
+// the pane is on picked, and shows it only while the pane is live and
+// the file has an env besides the top level.
+export async function drawEnvs() {
+  const pick = $<HTMLSelectElement>("history-env");
+  const envs = live ? ((await App.HistoryEnvs().catch(() => null)) ?? []) : [];
+  pick.hidden = envs.length < 2;
+  pick.replaceChildren(
+    ...envs.map((e) => {
+      const opt = document.createElement("option");
+      opt.value = e.name;
+      opt.textContent = envLabel(e);
+      opt.selected = e.current;
+      return opt;
+    }),
+  );
+}
+
+// pickEnv moves the pane to the env picked, asking first when its shell
+// runs scripted, which moving there ends.
+async function pickEnv() {
+  const name = $<HTMLSelectElement>("history-env").value;
+  try {
+    await App.SetHistoryEnv(name, false);
+    return;
+  } catch (err) {
+    if (!message(err).startsWith("scripted:")) {
+      say(`\x1b[31m${message(err)}\x1b[0m`);
+      await drawEnvs();
+      return;
+    }
+  }
+  const ok = await confirmShells(
+    `Move History to env=${name}?`,
+    `Blocks have started env=${name}'s shell without a terminal. Moving History there starts it again, interactively, from its parent. What blocks set in it will be gone.`,
+    "Start It Again",
+  );
+  if (!ok) {
+    await drawEnvs();
+    return;
+  }
+  try {
+    await App.SetHistoryEnv(name, true);
+  } catch (err) {
+    say(`\x1b[31m${message(err)}\x1b[0m`);
+    await drawEnvs();
+  }
 }
 
 // decode turns base64 into the bytes it holds.
@@ -953,6 +1032,7 @@ export function initHistory(h: HistoryHooks) {
   $("history-toggle").onclick = () => hooks.toggle();
   $("history-full").onclick = () => setFull(!full);
   $("history-record").onclick = () => setRecord(!record);
+  $("history-env").onchange = () => void pickEnv();
   // A command typed here gets ctrl+c, as in a terminal, so the shell
   // and what blocks set in it live on; anything else stops as Run ›
   // Stop does. So does pressing Stop again on the same command, for one

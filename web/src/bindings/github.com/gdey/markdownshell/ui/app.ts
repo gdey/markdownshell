@@ -420,6 +420,15 @@ export function HistoryEnter(input: string, record: boolean): $CancellablePromis
 }
 
 /**
+ * HistoryEnvs lists the envs the live History pane can be moved to,
+ * for its env picker: the top level, then each env the file's blocks
+ * name.
+ */
+export function HistoryEnvs(): $CancellablePromise<notebook$0.HistoryEnv[] | null> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.HistoryEnvs");
+}
+
+/**
  * HistoryLive reports whether the History pane is a terminal on the
  * file's interactive shell: keys go to TypeShell, and the shell's
  * screen comes as "shell" events, rather than lines being edited for
@@ -943,6 +952,16 @@ export function SetFrontMatter(f: notebook$0.FrontMatter): $CancellablePromise<v
  */
 export function SetHistory(on: boolean, restart: boolean): $CancellablePromise<boolean> {
     return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetHistory", on, restart);
+}
+
+/**
+ * SetHistoryEnv moves the live History pane to env name's shell, which
+ * runs interactively from then on; see notebook.SetHistoryEnv. Its
+ * error for an env whose shell runs scripted starts with "scripted:",
+ * so the page can ask, then call it again with restart.
+ */
+export function SetHistoryEnv(name: string, restart: boolean): $CancellablePromise<void> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SetHistoryEnv", name, restart);
 }
 
 /**

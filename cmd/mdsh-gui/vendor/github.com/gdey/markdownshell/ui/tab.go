@@ -134,7 +134,7 @@ func (t *docTab) emit(name string, data any) {
 // its screen again on the next key.
 func liveShell(data any) bool {
 	e, ok := data.(notebook.Event)
-	return ok && e.Block == -1 && (e.Kind == "shell" || e.Kind == "jobs")
+	return ok && e.Block == -1 && (e.Kind == "shell" || e.Kind == "jobs" || e.Kind == "shell-env")
 }
 
 // window is the window holding the tab, or nil once it has closed.

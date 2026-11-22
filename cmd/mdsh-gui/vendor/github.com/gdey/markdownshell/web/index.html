@@ -180,6 +180,7 @@
         <textarea id="history-input" rows="1" spellcheck="false" autocomplete="off" aria-label="Command to run and add to the file, or a note starting with #" placeholder="A command to run and add to the file, or # a note"></textarea>
         <span id="history-timer" role="timer" aria-label="Time the command has run" hidden><span class="label">running</span> <span id="history-time">0.0s</span></span>
         <span id="history-cursor" aria-hidden="true" hidden></span>
+        <select id="history-env" title="The env whose shell History is on: commands typed here run there, and are added to the file with its env=" aria-label="Env of the History shell" hidden></select>
         <span id="history-jobs" role="list" aria-label="Jobs of the History shell" hidden></span>
         <span id="history-status" role="status"></span>
         <span class="history-controls">

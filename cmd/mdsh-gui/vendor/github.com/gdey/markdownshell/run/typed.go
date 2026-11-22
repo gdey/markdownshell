@@ -61,6 +61,13 @@ func (s *Session) SetInteractive(name string) bool {
 	return s.stack.SetInteractive(name)
 }
 
+// Interactive reports whether env name runs, or will run,
+// interactively: the top level with Options.InteractiveShell, a
+// sub-env once SetInteractive names it.
+func (s *Session) Interactive(name string) bool {
+	return s.stack.Interactive(name)
+}
+
 // Scripted reports whether a scripted shell runs for env name now, so
 // SetInteractive would end it.
 func (s *Session) Scripted(name string) bool {

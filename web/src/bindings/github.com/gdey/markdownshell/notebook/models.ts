@@ -586,6 +586,39 @@ export interface Heads {
 }
 
 /**
+ * HistoryEnv is an env the live pane can be moved to, for the pane's
+ * env picker.
+ */
+export interface HistoryEnv {
+    /**
+     * Name is the env, "" for the top level.
+     */
+    "name": string;
+
+    /**
+     * Current is set for the env the pane is on.
+     */
+    "current": boolean;
+
+    /**
+     * Live is set when an interactive shell runs for it that the pane
+     * has been on, which keeps its screen and jobs.
+     */
+    "live": boolean;
+
+    /**
+     * Scripted is set when a scripted shell runs for it, which moving
+     * the pane there ends, losing what blocks set there.
+     */
+    "scripted": boolean;
+
+    /**
+     * Stopped counts its shell's stopped jobs.
+     */
+    "stopped": number;
+}
+
+/**
  * IncludeCell is an include block, as the frontend draws it: a grip
  * above and below its lines drags From and To, and a button shows the
  * whole file.

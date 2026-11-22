@@ -20,7 +20,7 @@ import { type MarkdownEditor, insertAction, insertCommand, markdownBar, markdown
 import { confirmShells, dismissShells, lostWarning } from "./confirm.js";
 import { addEvent, consoleFile, initConsole, loadEvents, showConsole } from "./console.js";
 import { bugReportPage, copyBugReport } from "./bugreport.js";
-import { copyHistory, fitHistory, focusHistory, historyBusy, historyEnd, historyLive, historyStatus, historyTerminal, historyWrite, initHistory, jobLabel, selectAllHistory, shellJobs, showBar, showHistory } from "./history.js";
+import { copyHistory, drawEnvs, fitHistory, focusHistory, historyBusy, historyEnd, historyLive, historyStatus, historyTerminal, historyWrite, initHistory, jobLabel, selectAllHistory, shellJobs, showBar, showHistory } from "./history.js";
 import { NvimPane, nvimColors } from "./nvim.js";
 import { offsetOf, posOf, stateOf } from "./nvimtext.js";
 import { initReport, openReport } from "./report.js";
@@ -5283,13 +5283,20 @@ function onBlock(e: BlockEvent) {
   if (e.data === "background" && (e.kind === "terminal" || e.kind === "tty" || e.kind === "terminal-end")) return onBackgroundTerminal(e);
   // The live History pane's shell, and what was typed at its prompt.
   if (e.block === -1 && historyLive(e.kind, e.data, e.bytes)) return;
-  if (e.kind === "changed") return changedSoon();
+  if (e.kind === "changed") {
+    // A new env= block adds to the History pane's env picker.
+    void drawEnvs();
+    return changedSoon();
+  }
   if (e.kind === "error" && e.block === -1) return status(e.data ?? "");
   // A command typed in the History pane runs there, before its card is
   // drawn.
   if (e.kind === "terminal" && historyTerminal(e.block, e.data)) return;
   if (e.kind === "tty" && historyWrite(e.block, e.bytes)) return;
   if (e.kind === "terminal-end" && historyEnd(e.block)) return;
+  // A block that started an env's shell has it marked scripted in the
+  // History pane's env picker.
+  if (e.kind === "done") void drawEnvs();
   const block = blockCard(e.block);
   if (!block) return;
   const out = block.querySelector<HTMLElement>(".output")!;

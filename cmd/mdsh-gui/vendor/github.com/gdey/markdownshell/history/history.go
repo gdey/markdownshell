@@ -263,10 +263,21 @@ func NextID(d *doc.Document) string {
 // by hand; links, so the web addresses it prints are clickable; and
 // background if it was typed with a trailing &.
 func Info(lang, id string, background bool) string {
-	if background {
-		return lang + " {#" + id + " skip background links}"
+	return InfoIn(lang, id, background, "")
+}
+
+// InfoIn is Info for a command typed in env's shell, as the History
+// pane is on once moved to a sub-env: its block names the env, so
+// running it again runs it there. env "" is the top level, as Info.
+func InfoIn(lang, id string, background bool, env string) string {
+	at := ""
+	if env = strings.Trim(env, "/"); env != "" {
+		at = " env=" + env
 	}
-	return lang + " {#" + id + " skip links}"
+	if background {
+		return lang + " {#" + id + at + " skip background links}"
+	}
+	return lang + " {#" + id + at + " skip links}"
 }
 
 // incomplete matches what sh, bash and zsh say about input that ends
@@ -342,12 +353,19 @@ func openHeredoc(input string) bool {
 // for a command not typed before. With History's reuse setting on, the
 // command runs that block again rather than adding another.
 func Reuse(d *doc.Document, lang, body string, bg bool) *doc.Block {
+	return ReuseIn(d, lang, body, bg, "")
+}
+
+// ReuseIn is Reuse for a command typed in env's shell: only a History
+// block that runs in env is reused.
+func ReuseIn(d *doc.Document, lang, body string, bg bool, env string) *doc.Block {
 	if !strings.HasSuffix(body, "\n") {
 		body += "\n"
 	}
+	env = strings.Trim(env, "/")
 	for i := len(d.Blocks) - 1; i >= 0; i-- {
 		b := d.Blocks[i]
-		if historyID.MatchString(b.ID) && b.Lang == lang && b.Body == body && b.Attrs.Has("background") == bg {
+		if historyID.MatchString(b.ID) && b.Lang == lang && b.Body == body && b.Attrs.Has("background") == bg && strings.Trim(b.Attrs["env"], "/") == env {
 			return b
 		}
 	}
