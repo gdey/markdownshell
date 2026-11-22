@@ -126,7 +126,7 @@ follow [Semantic Versioning](https://semver.org/).
   cell.
 
   ![A 1M-line runbook scrolled to its middle, at step 29,998, drawn as soon as the view got there](docs/changelog/scroll-1m.png)
-- Typing in a long runbook shows in the rendered view in about 0.9 s
+- Typing in a long runbook shows in the rendered view in about 0.4 s
   at 1M lines, against 7.8 s. The source pane's check of `depends=`
   names looked each one up through every block, which took 4.5 s and
   held up the edit behind it; it takes 15 ms now. Laying the cells out
@@ -138,7 +138,9 @@ follow [Semantic Versioning](https://semver.org/).
   Typing in prose lays out only the prose between the two blocks
   around it; the cells above and below are kept, moved. And the edit
   parses only that prose, from the block above it to the one below,
-  where it parsed the whole file.
+  where it parsed the whole file. The page, too, goes through only the
+  cells a keystroke changed, and the source pane keeps its run buttons
+  and looks again only at the fences in the lines that changed.
 - An edit in a long file costs less to draw: after typing, a fold or a
   textbox, Go sends the page every cell's head and the bodies of only
   the cards drawn, where it sent every cell whole. At 1M lines that is
