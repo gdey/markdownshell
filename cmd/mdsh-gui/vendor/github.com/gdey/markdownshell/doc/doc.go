@@ -159,6 +159,72 @@ func Parse(src []byte) (*Document, error) {
 		pos = fm.End
 	}
 
+	ids, err := parseLines(d, pos, len(src))
+	if err != nil {
+		return nil, err
+	}
+	for _, b := range d.Blocks {
+		if b.IsInclude() {
+			if _, err := b.Include(); err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNo(src, b.Span.Start), err)
+			}
+		}
+		for _, a := range condAttrs {
+			if v, ok := b.Attrs[a]; ok {
+				c, err := ParseCond(v)
+				if err == nil && c.Once && a != "run" {
+					err = errOnce
+				}
+				if err != nil {
+					return nil, fmt.Errorf("line %d: block %s: %s=: %w", lineNo(src, b.Span.Start), b.ID, a, err)
+				}
+			}
+		}
+	}
+	if err := checkHTTP(d); err != nil {
+		return nil, err
+	}
+	if err := checkTapes(d); err != nil {
+		return nil, err
+	}
+	// A background tty block runs on a terminal of its own that someone
+	// types at while other blocks run; a tape would type for it on the
+	// shell's terminal, which other blocks use meanwhile.
+	for _, b := range d.Blocks {
+		if b.Attrs.Has("background") && b.Attrs.Has("tty") && d.Tape(b) != nil {
+			return nil, fmt.Errorf("line %d: block %s: a tape can't type for a background block", lineNo(src, b.Span.Start), b.ID)
+		}
+	}
+	if err := checkDepends(d); err != nil {
+		return nil, err
+	}
+	for _, p := range d.Placeholders {
+		if p.BlockID != "" && !ids[p.BlockID] {
+			return nil, fmt.Errorf("line %d: placeholder refers to unknown block %q", lineNo(src, p.Span.Start), p.BlockID)
+		}
+	}
+	for _, c := range d.Copies {
+		if b := d.Block(c.For); b == nil || b.IsInclude() || b.IsTape() {
+			d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(src, c.Span.Start), copyWarning(c.For)))
+		}
+	}
+	for _, r := range d.Refs() {
+		if r.BlockID != "" && !ids[r.BlockID] {
+			return nil, fmt.Errorf("%s refers to unknown block %q", r, r.BlockID)
+		}
+	}
+	if err := checkResponseRefs(d); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+// parseLines parses the lines of d.Src from pos, which starts a line, on
+// to the line that starts at or after stop, into d, and returns the ids
+// of the blocks it found. A fence it finds is read to its end, past
+// stop if it goes there.
+func parseLines(d *Document, pos, stop int) (map[string]bool, error) {
+	src := d.Src
 	ids := map[string]bool{}
 	vars := map[string]*Block{} // var= names, and the input that binds each
 	includes, tapes := 0, 0
@@ -166,7 +232,7 @@ func Parse(src []byte) (*Document, error) {
 	var open []*Section
 	var lists []int // content columns of the open list items
 	quote := 0      // block quote depth of the current line
-	for pos < len(src) {
+	for pos < stop {
 		end := lineEnd(src, pos)
 		line := src[pos:end]
 		rest, q := stripQuotes(line, -1)
@@ -357,60 +423,7 @@ func Parse(src []byte) (*Document, error) {
 	if len(open) > 0 {
 		return nil, fmt.Errorf("line %d: mdsh:if without mdsh:end", lineNo(src, open[len(open)-1].If.Start))
 	}
-	for _, b := range d.Blocks {
-		if b.IsInclude() {
-			if _, err := b.Include(); err != nil {
-				return nil, fmt.Errorf("line %d: %w", lineNo(src, b.Span.Start), err)
-			}
-		}
-		for _, a := range condAttrs {
-			if v, ok := b.Attrs[a]; ok {
-				c, err := ParseCond(v)
-				if err == nil && c.Once && a != "run" {
-					err = errOnce
-				}
-				if err != nil {
-					return nil, fmt.Errorf("line %d: block %s: %s=: %w", lineNo(src, b.Span.Start), b.ID, a, err)
-				}
-			}
-		}
-	}
-	if err := checkHTTP(d); err != nil {
-		return nil, err
-	}
-	if err := checkTapes(d); err != nil {
-		return nil, err
-	}
-	// A background tty block runs on a terminal of its own that someone
-	// types at while other blocks run; a tape would type for it on the
-	// shell's terminal, which other blocks use meanwhile.
-	for _, b := range d.Blocks {
-		if b.Attrs.Has("background") && b.Attrs.Has("tty") && d.Tape(b) != nil {
-			return nil, fmt.Errorf("line %d: block %s: a tape can't type for a background block", lineNo(src, b.Span.Start), b.ID)
-		}
-	}
-	if err := checkDepends(d); err != nil {
-		return nil, err
-	}
-	for _, p := range d.Placeholders {
-		if p.BlockID != "" && !ids[p.BlockID] {
-			return nil, fmt.Errorf("line %d: placeholder refers to unknown block %q", lineNo(src, p.Span.Start), p.BlockID)
-		}
-	}
-	for _, c := range d.Copies {
-		if b := d.Block(c.For); b == nil || b.IsInclude() || b.IsTape() {
-			d.Warnings = append(d.Warnings, fmt.Sprintf("line %d: %s", lineNo(src, c.Span.Start), copyWarning(c.For)))
-		}
-	}
-	for _, r := range d.Refs() {
-		if r.BlockID != "" && !ids[r.BlockID] {
-			return nil, fmt.Errorf("%s refers to unknown block %q", r, r.BlockID)
-		}
-	}
-	if err := checkResponseRefs(d); err != nil {
-		return nil, err
-	}
-	return d, nil
+	return ids, nil
 }
 
 // TapeLang is the language of a tape fence, which types the input for

@@ -136,7 +136,9 @@ follow [Semantic Versioning](https://semver.org/).
   changed, a few hundred bytes where it sent every cell's head, 7 MB.
   The check of fence attributes waits only on the fences that changed.
   Typing in prose lays out only the prose between the two blocks
-  around it; the cells above and below are kept, moved.
+  around it; the cells above and below are kept, moved. And the edit
+  parses only that prose, from the block above it to the one below,
+  where it parsed the whole file.
 - An edit in a long file costs less to draw: after typing, a fold or a
   textbox, Go sends the page every cell's head and the bodies of only
   the cards drawn, where it sent every cell whole. At 1M lines that is
