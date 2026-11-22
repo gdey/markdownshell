@@ -3,6 +3,7 @@ package notebook
 import (
 	"bytes"
 	"fmt"
+	"hash/fnv"
 	"regexp"
 	"slices"
 	"sort"
@@ -89,10 +90,10 @@ type layout struct {
 	refs   []byte
 	tasks  []int // taskMarks
 	cells  []Cell
-	// root is the parse of src[rootFrom:rootTo], the prose prose last
-	// laid out.
-	root             ast.Node
-	rootFrom, rootTo int
+	// parsed is the parse of src[parsedFrom:parsedTo], the prose prose
+	// last laid out.
+	parsed               *proseParse
+	parsedFrom, parsedTo int
 	// pending is the markdown of the prose cells prose added, in order,
 	// for their bodies, refs left off, and kept the spans of the source
 	// each draws, for its tasks.
@@ -135,10 +136,46 @@ func (l *layout) prose(from, to int) {
 	if from >= to {
 		return
 	}
-	starts := []int{from + leadingBlank(src[from:to])}
-	headings := map[int]heading{} // by start
-	root := l.n.md.Parser().Parse(text.NewReader(src[from:to]))
-	l.root, l.rootFrom, l.rootTo = root, from, to
+	p := l.n.parseProse(src[from:to])
+	l.parsed, l.parsedFrom, l.parsedTo = p, from, to
+	for i, s := range p.starts {
+		s += from
+		e := to
+		if i+1 < len(p.starts) {
+			e = from + p.starts[i+1]
+		}
+		e = s + trimBlankLines(src[s:e])
+		if e > s {
+			l.part(doc.Span{Start: s, End: e}, p.headings[s-from])
+		}
+	}
+}
+
+// proseParse is what the layout takes from goldmark's parse of a piece
+// of prose, by offset in it: where each of its cells starts, the
+// headings among them, and its task marks.
+type proseParse struct {
+	starts   []int
+	headings map[int]heading
+	marks    []int
+}
+
+// parseProse is md's proseParse, from the notebook's cache of them by
+// md where it is there. Each layout parsed the whole document's prose
+// again, which, at a few seconds for a long one, was most of the time a
+// keystroke took to show; a keystroke changes one piece of it. The cache
+// holds the pieces of the last two layouts.
+func (n *Notebook) parseProse(md []byte) *proseParse {
+	key := proseKey(md)
+	if p, ok := n.parses[key]; ok {
+		return p
+	}
+	if p, ok := n.oldParses[key]; ok {
+		n.parses[key] = p
+		return p
+	}
+	root := n.md.Parser().Parse(text.NewReader(md))
+	p := &proseParse{starts: []int{leadingBlank(md)}, headings: map[int]heading{}, marks: marksOf(root, md)}
 	var inside ast.Node // the last block of HTML the block is inside
 	for c := root.FirstChild(); c != nil; c = c.NextSibling() {
 		if inside != nil {
@@ -147,27 +184,38 @@ func (l *layout) prose(from, to int) {
 			}
 			continue
 		}
-		inside = htmlEnd(c, src[from:to])
-		if s, ok := firstLine(c, src[from:to]); ok {
-			start := from + lineStart(src[from:to], s)
-			starts = append(starts, start)
+		inside = htmlEnd(c, md)
+		if s, ok := firstLine(c, md); ok {
+			start := lineStart(md, s)
+			p.starts = append(p.starts, start)
 			if h, ok := c.(*ast.Heading); ok {
-				headings[start] = heading{h.Level, html.UnescapeString(string(nodeText(h, src[from:to])))}
+				p.headings[start] = heading{h.Level, html.UnescapeString(string(nodeText(h, md)))}
 			}
 		}
 	}
-	slices.Sort(starts)
-	starts = slices.Compact(starts)
-	for i, s := range starts {
-		e := to
-		if i+1 < len(starts) {
-			e = starts[i+1]
-		}
-		e = s + trimBlankLines(src[s:e])
-		if e > s {
-			l.part(doc.Span{Start: s, End: e}, headings[s])
-		}
+	slices.Sort(p.starts)
+	p.starts = slices.Compact(p.starts)
+	if n.parses == nil {
+		n.parses = map[[16]byte]*proseParse{}
 	}
+	n.parses[key] = p
+	return p
+}
+
+// newParses starts the cache of prose parses afresh for a new layout,
+// keeping the last one's, for the pieces that didn't change.
+func (n *Notebook) newParses() {
+	n.oldParses, n.parses = n.parses, map[[16]byte]*proseParse{}
+}
+
+// proseKey is a key for md in the cache of parses: its hash, as holding
+// a long document's prose twice over as keys took as much memory again.
+func proseKey(md []byte) [16]byte {
+	h := fnv.New128a()
+	h.Write(md)
+	var k [16]byte
+	h.Sum(k[:0])
+	return k
 }
 
 // htmlEnd is the block of HTML that closes the elements node opens,

@@ -182,6 +182,10 @@ function checkDepends(bad: Map<string, boolean>, from: number, info: string, out
 // long document has thousands of fences, and their info strings rarely
 // change. A check that starts while another waits shares its answers.
 let checked = new Map<string, Promise<Problem[]>>();
+// answered are the answers of checked that came, by info string: waiting
+// on each of a long document's tens of thousands of answers again at
+// every check took longer than the rest of it.
+let answered = new Map<string, Problem[]>();
 
 // checkInfo checks the attributes of every fence with some, as mdsh's
 // language server (the lsp package) does for the Neovim source pane.
@@ -224,7 +228,15 @@ async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
   }
   checked = now;
   const problems = new Map<string, Problem[]>();
-  for (const [text, p] of now) problems.set(text, await p);
+  const waits: Promise<void>[] = [];
+  for (const [text, p] of now) {
+    const got = answered.get(text);
+    if (got) problems.set(text, got);
+    else waits.push(p.then((got) => void problems.set(text, got)));
+  }
+  await Promise.all(waits);
+  // A check that failed gave [] and is asked again, so it isn't kept.
+  answered = new Map([...problems].filter(([text]) => checked.has(text) && checked.get(text) === now.get(text)));
   const vars = new Map<string, number>(); // var= names, and the line binding each
   for (const r of infos) {
     for (const p of problems.get(r.text) ?? []) {

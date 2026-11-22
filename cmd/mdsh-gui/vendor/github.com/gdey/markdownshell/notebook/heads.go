@@ -217,7 +217,9 @@ type cellLayout struct {
 	x     *doc.Index
 	xd    *doc.Document
 	index chan indexed
-	moved int
+	// indexed is closed once index has the index.
+	indexed chan struct{}
+	moved   int
 	// folds is how many of d.Folds have folded their heading, and
 	// headings are the heading cells, in order; open are those whose
 	// sections are still open, from the outermost. folded are those an
@@ -233,6 +235,12 @@ type cellLayout struct {
 	step    int
 	changes []headChange
 	done    bool
+	// lazyIndex has the layout's last chunk not wait for the index:
+	// Relayout's cells keep the move limits they had until it comes, as
+	// it takes a parse of the whole file. blocks is how many blocks the
+	// document had when the layout started.
+	lazyIndex bool
+	blocks    int
 }
 
 type headChange struct{ step, cell int }
@@ -256,6 +264,7 @@ type bodySrc struct {
 // newCellLayout starts laying out n's cells. The caller holds n.mu.
 func (n *Notebook) newCellLayout() *cellLayout {
 	d := n.d
+	n.newParses()
 	l := &cellLayout{
 		layout: layout{
 			n:      n,
@@ -264,6 +273,7 @@ func (n *Notebook) newCellLayout() *cellLayout {
 		},
 		gen:     layouts.Add(1),
 		src:     d.Src,
+		blocks:  len(d.Blocks),
 		pieces:  render.Pieces(d, n.results, render.Options{Env: environ(), PlainIncludes: true}),
 		stale:   run.Stale(d, n.results),
 		secrets: n.sess.SecretVars(),
@@ -276,7 +286,9 @@ func (n *Notebook) newCellLayout() *cellLayout {
 	l.markPos = l.pos
 	l.cuts = cuts(d, n.results, l.lookup)
 	l.index = make(chan indexed, 1)
+	l.indexed = make(chan struct{})
 	go func(src []byte) {
+		defer close(l.indexed)
 		// The source is never changed in place, so it can be parsed
 		// again here while the document goes on.
 		d, err := doc.Parse(src)
@@ -327,10 +339,10 @@ func (l *cellLayout) addMarks(from, to int) {
 	if from < to {
 		md := l.n.d.Src[from:to]
 		var marks []int
-		if l.root != nil && l.rootFrom == from && l.rootTo == to {
-			marks = marksOf(l.root, md)
+		if l.parsed != nil && l.parsedFrom == from && l.parsedTo == to {
+			marks = l.parsed.marks
 		} else {
-			marks = l.n.marksIn(md)
+			marks = l.n.parseProse(md).marks
 		}
 		for _, p := range marks {
 			l.marks = append(l.marks, from+p)
@@ -374,7 +386,7 @@ func (l *cellLayout) chunk(want int) {
 		l.pos = len(d.Src)
 		l.done = true
 	}
-	if l.done {
+	if l.done && !l.lazyIndex {
 		l.waitIndex(true)
 	}
 	l.lines(first)
@@ -608,6 +620,9 @@ func (l *cellLayout) moves(first int) {
 	for ; l.moved < len(l.cells); l.moved++ {
 		i := l.moved
 		c := &l.cells[i]
+		was := moveOf(c)
+		c.Drop, c.Movable, c.LastLine, c.History, c.Undeletable = false, false, 0, false, ""
+		c.DropAfter, c.DropBefore = -1, -1
 		c.Drop = x.IsBoundary(c.From)
 		if c.Heading > 0 && c.Drop {
 			if span, _, err := x.Section(c.From); err == nil {
@@ -640,9 +655,39 @@ func (l *cellLayout) moves(first int) {
 				}
 			}
 		}
-		if (c.Drop || c.Movable || c.DropAfter >= 0 || c.DropBefore >= 0) && i < first {
+		if moveOf(c) != was {
 			l.changed(i, first)
 		}
+	}
+}
+
+// moveLimits are a cell's move limits, which moves sets.
+type moveLimits struct {
+	drop, movable, history  bool
+	lastLine, after, before int
+	undeletable             string
+}
+
+func moveOf(c *Cell) moveLimits {
+	return moveLimits{c.Drop, c.Movable, c.History, c.LastLine, c.DropAfter, c.DropBefore, c.Undeletable}
+}
+
+// carryMoves gives c, a cell of a layout whose index isn't made yet,
+// the move limits of was, the cell of the layout before that it is, as
+// far as can be told without the index: the edit, which took the text
+// from at on line on, moved what was after it by lines and bytes. The
+// index sets them as they are once it comes.
+func carryMoves(c, was *Cell, at, line, lines, bytes int) {
+	c.Drop, c.Movable, c.History, c.Undeletable = was.Drop, was.Movable, was.History, was.Undeletable
+	c.LastLine, c.DropAfter, c.DropBefore = was.LastLine, was.DropAfter, was.DropBefore
+	if c.LastLine > 0 && c.LastLine >= line {
+		c.LastLine += lines
+	}
+	if c.DropAfter > at {
+		c.DropAfter += bytes
+	}
+	if c.DropBefore > at {
+		c.DropBefore += bytes
 	}
 }
 
@@ -782,6 +827,16 @@ func (n *Notebook) MoreHeads(gen int64, at, since, want int) (Heads, error) {
 	if l == nil || l.gen != gen || !l.current() {
 		return Heads{}, ErrLayoutStale
 	}
+	if l.done && l.x == nil {
+		// The index Relayout didn't wait for is waited for without
+		// n.mu, so typing goes on while the file is parsed.
+		n.mu.Unlock()
+		<-l.indexed
+		n.mu.Lock()
+		if n.lay != l || !l.current() {
+			return Heads{}, ErrLayoutStale
+		}
+	}
 	if at > len(l.cells) {
 		return Heads{}, fmt.Errorf("cell %d isn't laid out", at)
 	}
@@ -792,6 +847,14 @@ func (n *Notebook) MoreHeads(gen int64, at, since, want int) (Heads, error) {
 func (l *cellLayout) next(at, since, want int) Heads {
 	if len(l.cells) < at+want {
 		l.chunk(at + want - len(l.cells))
+	}
+	if l.done && l.x == nil {
+		// Relayout left the move limits as they were; they come now,
+		// as fixes where they changed.
+		l.waitIndex(true)
+		l.step++
+		l.moved = 0
+		l.moves(len(l.cells))
 	}
 	end := min(len(l.cells), at+want)
 	h := Heads{Gen: l.gen, At: at, Heads: make(HeadList, 0, end-at), Step: l.step, Laid: l.pos, Size: len(l.n.d.Src), Done: l.done && end == len(l.cells)}
@@ -830,4 +893,147 @@ func (n *Notebook) Bodies(gen int64, cells []int) ([]Cell, error) {
 		out[k] = l.body(i)
 	}
 	return out, nil
+}
+
+// Splice is how the cells of layout Gen differ from those of layout
+// From, the page's, after an edit: cells [At, At+Remove) of From's are
+// replaced by Heads, and the cells after them are From's moved, in the
+// file, by Line lines and Pos bytes, and in the document's blocks by
+// Block, as the edit added or took them away. Fixes are the heads of the
+// cells outside Heads, by their index in Gen, FixAt, that changed
+// otherwise, as a heading's section does when a block goes into it.
+// Reset is set when From isn't the layout Go had, or wasn't laid out
+// to its end: Heads are then every cell's, for the page to start again
+// from.
+type Splice struct {
+	Gen    int64    `json:"gen"`
+	Reset  bool     `json:"reset,omitempty"`
+	At     int      `json:"at"`
+	Remove int      `json:"remove"`
+	Heads  HeadList `json:"heads"`
+	Line   int      `json:"line"`
+	Pos    int      `json:"pos"`
+	Block  int      `json:"block"`
+	FixAt  []int    `json:"fixAt,omitempty"`
+	Fixes  HeadList `json:"fixes,omitempty"`
+	Step   int      `json:"step"`
+	Size   int      `json:"size"`
+	// Moving is set while the move limits are still those of From's
+	// cells: MoreHeads from Step brings the fixes once they are known.
+	Moving bool `json:"moving,omitempty"`
+}
+
+// Relayout lays the document out afresh, as Attach does, after an edit
+// to the document of layout from, the one whose heads the page has, and
+// returns how the cells changed, so a keystroke in a long file sends
+// the page the few cells it changed, not every head.
+func (n *Notebook) Relayout(from int64) Splice {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	old := n.lay
+	n.lay = n.newCellLayout()
+	l := n.lay
+	reuse := old != nil && old.gen == from && old.done
+	// The index's parse of the whole file, for the move limits, is most
+	// of a long file's layout: the cells keep their old limits until it
+	// comes, when the page asks for them with MoreHeads.
+	l.lazyIndex = reuse
+	for !l.done {
+		l.chunk(1 << 30)
+	}
+	s := Splice{Gen: l.gen, Size: len(n.d.Src), Moving: l.x == nil}
+	if !reuse {
+		s.Reset = true
+		s.Heads = make(HeadList, 0, len(l.cells))
+		for i := range l.cells {
+			s.Heads = append(s.Heads, headOf(&l.cells[i]))
+		}
+		return s
+	}
+	was, now := old.cells, l.cells
+	head := 0
+	for head < len(was) && head < len(now) && sameCell(&was[head], &now[head]) {
+		head++
+	}
+	tail := 0
+	for tail < len(was)-head && tail < len(now)-head && sameCell(&was[len(was)-1-tail], &now[len(now)-1-tail]) {
+		tail++
+	}
+	s.At, s.Remove = head, len(was)-head-tail
+	s.Line = bytes.Count(n.d.Src, []byte{'\n'}) - bytes.Count(old.src, []byte{'\n'})
+	s.Pos = len(n.d.Src) - len(old.src)
+	s.Block = l.blocks - old.blocks
+	if l.x == nil {
+		at, line := len(old.src), 1<<62
+		if head < len(was) {
+			at, line = was[head].From, was[head].Line
+		}
+		for i := range head {
+			carryMoves(&now[i], &was[i], at, line, s.Line, s.Pos)
+		}
+		// A cell typed in takes the limits of the one it replaces.
+		for k := 0; k < len(now)-head-tail && k < s.Remove; k++ {
+			carryMoves(&now[head+k], &was[head+k], at, line, s.Line, s.Pos)
+		}
+		for k := tail; k > 0; k-- {
+			c, w := &now[len(now)-k], &was[len(was)-k]
+			carryMoves(c, w, at, line, s.Line, s.Pos)
+			if w.LastLine > 0 {
+				// It is after the edit, all of it.
+				c.LastLine = w.LastLine + s.Line
+			}
+		}
+	}
+	s.Step = l.step
+	s.Heads = make(HeadList, 0, len(now)-head-tail)
+	for i := head; i < len(now)-tail; i++ {
+		s.Heads = append(s.Heads, headOf(&now[i]))
+	}
+	fix := func(i int, want Head) {
+		if h := headOf(&now[i]); !sameHeadAs(h, want) {
+			s.FixAt = append(s.FixAt, i)
+			s.Fixes = append(s.Fixes, h)
+		}
+	}
+	for i := range head {
+		fix(i, headOf(&was[i]))
+	}
+	for k := tail; k > 0; k-- {
+		fix(len(now)-k, s.moved(headOf(&was[len(was)-k])))
+	}
+	return s
+}
+
+// sameCell says a and b are the same cell, as far as lining two layouts
+// up goes: alike in what they draw and their state, wherever they are.
+func sameCell(a, b *Cell) bool {
+	x, y := headOf(a), headOf(b)
+	// Whether a cell moves is left out, as it can be unknown yet.
+	return x.Hash != "" && x.Hash == y.Hash && x.Kind == y.Kind && x.Flags&^HeadMovable == y.Flags&^HeadMovable && x.Level == y.Level && x.Title == y.Title
+}
+
+// moved is h, a head of a cell after the edit, moved as s says.
+func (s Splice) moved(h Head) Head {
+	h.Line += s.Line
+	h.From += s.Pos
+	h.To += s.Pos
+	if h.LastLine > 0 {
+		h.LastLine += s.Line
+	}
+	if h.Block >= 0 {
+		h.Block += s.Block
+	}
+	if h.SectionTo > 0 {
+		h.SectionFrom += s.Block
+		h.SectionTo += s.Block
+	}
+	return h
+}
+
+// sameHeadAs says heads a and b are alike in every field.
+func sameHeadAs(a, b Head) bool {
+	return a.Block == b.Block && a.Kind == b.Kind && a.Flags == b.Flags && a.Level == b.Level && a.Title == b.Title &&
+		a.Line == b.Line && a.From == b.From && a.To == b.To && a.CodeLines == b.CodeLines && a.OutputLines == b.OutputLines &&
+		a.SectionFrom == b.SectionFrom && a.SectionTo == b.SectionTo && a.ID == b.ID && a.Name == b.Name &&
+		slices.Equal(a.Depends, b.Depends) && a.LastLine == b.LastLine && a.Hash == b.Hash
 }

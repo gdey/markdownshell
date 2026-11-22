@@ -114,6 +114,17 @@ func (a *App) Attach(ctx context.Context, want int) (notebook.Heads, error) {
 	return n.Attach(want), nil
 }
 
+// Relayout lays the document out again after an edit, as Attach does,
+// and returns how its cells changed from those of layout from, the
+// page's. See notebook.Splice.
+func (a *App) Relayout(ctx context.Context, from int64) (notebook.Splice, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.Splice{}, err
+	}
+	return n.Relayout(from), nil
+}
+
 // MoreHeads is the heads of layout gen from cell at on, want of them
 // if there are that many, with the fixes to earlier heads since step
 // since. It fails when the document changed since the layout started:

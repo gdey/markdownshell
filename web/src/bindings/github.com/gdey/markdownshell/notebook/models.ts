@@ -822,6 +822,39 @@ export interface SourceBlock {
 }
 
 /**
+ * Splice is how the cells of layout Gen differ from those of layout
+ * From, the page's, after an edit: cells [At, At+Remove) of From's are
+ * replaced by Heads, and the cells after them are From's moved, in the
+ * file, by Line lines and Pos bytes, and in the document's blocks by
+ * Block, as the edit added or took them away. Fixes are the heads of the
+ * cells outside Heads, by their index in Gen, FixAt, that changed
+ * otherwise, as a heading's section does when a block goes into it.
+ * Reset is set when From isn't the layout Go had, or wasn't laid out
+ * to its end: Heads are then every cell's, for the page to start again
+ * from.
+ */
+export interface Splice {
+    "gen": number;
+    "reset"?: boolean;
+    "at": number;
+    "remove": number;
+    "heads": HeadList;
+    "line": number;
+    "pos": number;
+    "block": number;
+    "fixAt"?: number[] | null;
+    "fixes"?: HeadList;
+    "step": number;
+    "size": number;
+
+    /**
+     * Moving is set while the move limits are still those of From's
+     * cells: MoreHeads from Step brings the fixes once they are known.
+     */
+    "moving"?: boolean;
+}
+
+/**
  * TextboxCell is a textbox, as the frontend draws it.
  */
 export interface TextboxCell {
