@@ -40,7 +40,9 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   With `--interactive-shell` (experimental), the pane is a terminal on
   the shell, which reads your rc files: every key goes to it, so vim,
   ctrl+z, `fg` and `jobs` work, the rule lists its jobs, and ctrl+g
-  gives the keys back to the file.
+  gives the keys back to the file. `@` then moves the pane to another
+  env the file names, such as `env=build`, whose shell runs
+  interactively too; commands typed there become `env=build` blocks.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
   `i` types a new block at a prompt.

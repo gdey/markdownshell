@@ -63,6 +63,10 @@ func TestLiveHistory(t *testing.T) {
 					}
 					time.Sleep(20 * time.Millisecond)
 				}
+				// As a person would, let the next prompt draw before
+				// typing on: sh echoes a line typed ahead of its prompt
+				// before the prompt, where it isn't read as the line.
+				time.Sleep(300 * time.Millisecond)
 			}
 			has := func(s string) func(string) bool {
 				return func(text string) bool { return strings.Contains(text, s) }

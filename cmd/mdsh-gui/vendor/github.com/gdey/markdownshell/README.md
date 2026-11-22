@@ -254,7 +254,9 @@ goes to it, so vim, ctrl+z, `fg`, `bg` and `jobs` work, and ctrl+g
 gives the keys back to the document. Commands still become blocks as
 they run; the pane's rule lists the shell's jobs. A block run while a
 command holds the shell stops it, as ctrl+z would, runs, and brings it
-back. `--login-shell` starts it as a login shell. Blocks such as `fg`
+back. `@` moves the pane to another env the file names (`env=build`),
+whose shell then runs interactively too; commands typed there become
+`env=build` blocks. `--login-shell` starts it as a login shell. Blocks such as `fg`
 or a stopped `vim` are a record of the session, not steps to repeat,
 which is why History blocks are `skip`.
 If the file is read-only, `w` opens save as instead; with `--autosave`,
