@@ -229,11 +229,14 @@ function drawOptions() {
 const firstHeads = 300;
 const moreHeads = 2000;
 
-// layout is the layout of Go's that the cells came from, while some of
-// them are partial: their bodies are asked for by its gen. It is null
-// once the cells all came whole, from Cells, as after an edit.
+// layout is the layout of Go's that the cells came from: the bodies of
+// the partial ones are asked for by its gen. An edit has Go lay the
+// document out again, as opening it does.
 let layout: { gen: number; done: boolean } | null = null;
-// headIndex is each partial cell's index in the layout.
+// lastGen is the gen of the layout Go started last. Bodies of an
+// earlier one, asked for before it, are of a document since changed.
+let lastGen = 0;
+// headIndex is each cell's index in the layout.
 const headIndex = new WeakMap<Cell, number>();
 
 // openCells draws the document from the heads of its first cells and
@@ -244,6 +247,7 @@ async function openCells() {
   const fresh = decodeHeads(h.heads as HeadRow[]);
   fresh.forEach((c, i) => headIndex.set(c, i));
   layout = { gen: h.gen, done: h.done };
+  lastGen = h.gen;
   const want = h.done && fresh.length <= lazyCells ? fresh : fresh.slice(0, firstBodies);
   if (!(await takeBodies(want))) return;
   cells = fresh;
@@ -307,13 +311,8 @@ function fixHeads(at: number[], heads: Cell[]) {
   at.forEach((i, k) => {
     const c = cells[i];
     if (!c) return;
-    const h = heads[k];
-    // The cell keeps what it has, but for what the head says now, and
-    // its body is asked for again.
-    for (const key of ["collapsed", "collapsedOutput", "ran", "failed", "stale", "running", "secret", "terminal", "nosave", "sectionFrom", "sectionTo", "movable", "lastLine"] as const) delete c[key];
-    Object.assign(c, h);
+    takeHead(c, heads[k]);
     headIndex.set(c, i);
-    partial.add(c);
     const card = cardOf.get(c);
     if (!card) return;
     if (c.heading) {
@@ -326,20 +325,28 @@ function fixHeads(at: number[], heads: Cell[]) {
   if (redraw.length) void bodiesFor(redraw);
 }
 
-// takeBodies asks Go for the bodies of the partial ones of these cells
-// and puts them in, saying whether the layout is still the page's.
-async function takeBodies(list: Cell[]): Promise<boolean> {
-  const l = layout;
+// takeHead has cell c take head h, which Go laid out since c was: c
+// keeps what it has, but for what the head says now, and its body is
+// asked for again.
+function takeHead(c: Cell, h: Cell) {
+  for (const key of ["collapsed", "collapsedOutput", "ran", "failed", "stale", "running", "secret", "terminal", "nosave", "sectionFrom", "sectionTo", "movable", "lastLine"] as const) delete c[key];
+  Object.assign(c, h);
+  partial.add(c);
+}
+
+// takeBodies asks Go for the bodies of the partial ones of these cells,
+// of layout l, and puts them in, saying whether l is still the latest.
+async function takeBodies(list: Cell[], l = layout): Promise<boolean> {
   const want = list.filter((c) => partial.has(c));
-  if (!want.length) return !!l;
-  if (!l) return false;
+  if (!want.length) return !!l && l.gen === lastGen;
+  if (!l || l.gen !== lastGen) return false;
   let got: Cell[];
   try {
     got = (await App.Bodies(l.gen, want.map((c) => headIndex.get(c)!))) ?? [];
   } catch {
     return false;
   }
-  if (layout !== l) return false;
+  if (l.gen !== lastGen) return false;
   want.forEach((c, k) => {
     // Go leaves out fields that are false.
     for (const key of ["collapsed", "collapsedOutput", "hidden"] as const) delete c[key];
@@ -347,6 +354,49 @@ async function takeBodies(list: Cell[]): Promise<boolean> {
     partial.delete(c);
   });
   return true;
+}
+
+// allHeads asks Attach for every cell's head.
+const allHeads = 1 << 30;
+
+// A Relayout is the cells Go laid out after an edit, and their layout,
+// for the page to make its own as it takes them in.
+interface Relayout {
+  fresh: Cell[];
+  l: { gen: number; done: boolean };
+}
+
+// relayout has Go lay the document out again, after an edit, and is
+// the heads of its cells.
+async function relayout(): Promise<Relayout> {
+  const h = await App.Attach(allHeads);
+  const fresh = decodeHeads(h.heads as HeadRow[]);
+  fresh.forEach((c, i) => headIndex.set(c, i));
+  lastGen = h.gen;
+  return { fresh, l: { gen: h.gen, done: h.done } };
+}
+
+// drawnBodies takes the bodies of the cells of r that are drawn as it
+// is taken in: all of them, in a document drawn whole; else those of
+// the cells kept whose cards are drawn, and of the cells new in place
+// of others, when there are a few, as typing makes.
+async function drawnBodies({ fresh, l }: Relayout): Promise<Relayout> {
+  if (fresh.length <= lazyCells) {
+    await takeBodies(fresh, l);
+    return { fresh, l };
+  }
+  const { head, tail } = unchanged(fresh);
+  const few = fresh.length - head - tail <= manyCards;
+  const want = fresh.filter((_, j) => {
+    const inMiddle = j >= head && j < fresh.length - tail;
+    if (inMiddle && few) return true;
+    // The cell drawn now in j's place: the same one, kept, or at the
+    // same index where as many cells came as went.
+    const i = !inMiddle ? (j < head ? j : j - fresh.length + cells.length) : fresh.length === cells.length ? j : -1;
+    return i >= 0 && cardOf.has(cells[i]);
+  });
+  await takeBodies(want, l);
+  return { fresh, l };
 }
 
 // bodiesFor draws again, from their bodies, cards drawn before their
@@ -454,27 +504,24 @@ function sameJSON(a: unknown, b: unknown, skip?: Set<string>): boolean {
 // can change.
 const renumbered = (c: Cell) => c.block >= 0 && !c.textbox && !c.choice;
 
-// updateDoc draws the cells Go has after an edit in the source pane,
-// fresh, drawing again only the cards whose cells changed. Typing
+// updateDoc draws the cells Go laid out after an edit in the source
+// pane, r, drawing again only the cards whose cells changed. Typing
 // changes a cell or two, and drawing every card of a long document
 // again, as drawDoc does, took long enough to stall the typing. The
 // cards before and after the cells that changed are kept, with their
 // places in the file brought up to date. Their handlers hold their
 // cells, so those are updated in place.
-function updateDoc(fresh: Cell[]) {
-  // The cells come whole from now on.
-  layout = null;
+function updateDoc({ fresh, l }: Relayout) {
+  layout = l;
   behind = false;
   const { head, tail } = unchanged(fresh);
   const at = anchor();
-  // Cards drawn from heads alone are drawn again, from the cells whole.
-  const bodies: Cell[] = [];
   const keep = (i: number, j: number): Cell => {
     const c = cells[i];
     const f = fresh[j];
     const card = cardOf.get(c);
-    if (card && bare.has(card)) bodies.push(c);
-    if (partial.has(c)) {
+    headIndex.set(c, j);
+    if (partial.has(c) && !partial.has(f)) {
       // Its head was all it had: it takes the rest from f. What says
       // where it is, and its numbers, stay as drawn, for the lines
       // below to bring up to date.
@@ -513,7 +560,7 @@ function updateDoc(fresh: Cell[]) {
       c.sectionFrom = f.sectionFrom;
       c.sectionTo = f.sectionTo;
     }
-    if (placeFields.every((k) => c[k] === f[k])) return c;
+    if (placeFields.every((k) => c[k] === f[k])) return keepHead(c, f, card);
     // Only what changed is written: writing every card's place, though
     // the same, made the page work out every card's style again. It is
     // told from the cell, as reading the card's took longer.
@@ -528,6 +575,15 @@ function updateDoc(fresh: Cell[]) {
     set("dropAfter", c.dropAfter >= 0 ? String(c.dropAfter) : undefined, f.dropAfter >= 0 ? String(f.dropAfter) : undefined);
     set("dropBefore", c.dropBefore >= 0 ? String(c.dropBefore) : undefined, f.dropBefore >= 0 ? String(f.dropBefore) : undefined);
     Object.assign(c, Object.fromEntries(placeFields.map((k) => [k, f[k]])));
+    return keepHead(c, f, card);
+  };
+  // A cell kept whose body didn't come, as one out of sight, takes its
+  // head, and its body when it is drawn: what is drawn of a block, as
+  // whether it can be dragged, can change with cells far from it.
+  const keepHead = (c: Cell, f: Cell, card: HTMLElement | undefined): Cell => {
+    if (!partial.has(f)) return c;
+    takeHead(c, f);
+    if (card) bare.add(card);
     return c;
   };
   const middle = fresh.slice(head, fresh.length - tail);
@@ -539,7 +595,7 @@ function updateDoc(fresh: Cell[]) {
   drawn++;
   if (!gone.length && !middle.length) {
     cells = next;
-    for (const c of bodies) redrawCard(cardOf.get(c)!, c);
+    bareBodies();
     return;
   }
   measureCards();
@@ -554,10 +610,7 @@ function updateDoc(fresh: Cell[]) {
   virtual = cells.length > lazyCells;
   $("doc").classList.toggle("virtual", virtual);
   indexCells();
-  for (const c of bodies) {
-    const card = cardOf.get(c);
-    if (card) redrawCard(card, c);
-  }
+  bareBodies();
   // A few new cards, as typing makes, are drawn as typing's; many, as
   // a fence opened above them makes, are drawn as the view's, like
   // those that scrolling brings into it.
@@ -569,6 +622,18 @@ function updateDoc(fresh: Cell[]) {
   setDeps(cells);
   // Many new cards can leave the view blank, as drawing every one can.
   if (middle.length > 20) repaint($("doc-scroll"));
+}
+
+// bareBodies draws again the cards drawn from heads, from their cells'
+// bodies: those that came with the cells, or else asked for now.
+function bareBodies() {
+  const want: HTMLElement[] = [];
+  for (const card of [...cardOf.values()].filter((e) => bare.has(e))) {
+    const c = cellOf.get(card);
+    if (c && partial.has(c)) want.push(card);
+    else if (c) redrawCard(card, c);
+  }
+  if (want.length) void bodiesFor(want);
 }
 
 // renumberInput writes a textbox's or a choice's new block index, to,
@@ -1606,11 +1671,18 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   // A var= input can change what prose and sections show, so cells
   // whose prose changed are drawn again, and all of them when sections
   // came or went, keeping the focus in the input being typed in.
-  const fresh = (await App.Cells()) ?? [];
+  let r: Relayout;
+  try {
+    r = await drawnBodies(await relayout());
+  } catch (err) {
+    fail(err);
+    return false;
+  }
+  const { fresh } = r;
   const focused = document.activeElement as HTMLTextAreaElement | null;
   const input = focused?.closest<HTMLElement>("[data-input]")?.dataset.input;
   const [from, to] = [focused?.selectionStart, focused?.selectionEnd];
-  layout = null;
+  layout = r.l;
   if (fresh.length !== cells.length) {
     cells = fresh;
     drawDoc();
@@ -1623,10 +1695,18 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
     // Each card's handlers hold its cell, so update them in place.
     fresh.forEach((c, i) => {
       const cell = cells[i];
+      headIndex.set(cell, i);
+      const card = cardOf.get(cell);
+      // A cell whose body didn't come, as one out of sight, takes its
+      // head, and its body when it is drawn.
+      if (partial.has(c)) {
+        takeHead(cell, c);
+        if (card) bare.add(card);
+        return;
+      }
       // An input is drawn again when its value changed, as a copy of the
       // one being typed in does, but not the one that has the focus.
       const inputChanged = (c.textbox && c.textbox.text !== cell.textbox?.text) || (c.choice && JSON.stringify(c.choice.options) !== JSON.stringify(cell.choice?.options));
-      const card = cardOf.get(cell);
       const holdsFocus = !!focused && !!card?.contains(focused);
       const changed = c.block < 0 && (c.textbox || c.choice ? inputChanged && !holdsFocus : c.html !== cell.html);
       // Go leaves out fields that are false, so clear the fold flags first.
@@ -1647,6 +1727,7 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
     indexCells();
     if (was) select(blocks().indexOf(was), false);
     place();
+    bareBodies();
     drawOutline();
   }
   await loadSource();
@@ -2733,7 +2814,14 @@ function applySource(typing = false): Promise<void> {
         forceLinting(ed.view);
       }
     }
-    const fresh = (await App.Cells()) ?? [];
+    let r: Relayout;
+    try {
+      r = await relayout();
+    } catch (err) {
+      fail(err);
+      return;
+    }
+    const { fresh } = r;
     const settles = typedAt + settle - Date.now();
     if (typing && settles > 0) {
       const { head, tail } = unchanged(fresh);
@@ -2743,8 +2831,9 @@ function applySource(typing = false): Promise<void> {
         return;
       }
     }
+    r = await drawnBodies(r);
     const t = performance.now();
-    updateDoc(fresh);
+    updateDoc(r);
     drawTook = performance.now() - t;
     if (source !== ed) return;
     markRunLines();
@@ -2975,7 +3064,12 @@ async function applyNvim(d: NvimDoc) {
     return;
   }
   $("dirty").hidden = false;
-  updateDoc((await App.Cells()) ?? []);
+  try {
+    updateDoc(await drawnBodies(await relayout()));
+  } catch (err) {
+    fail(err);
+    return;
+  }
   markRunLines();
 }
 

@@ -102,15 +102,6 @@ func (a *App) Live(ctx context.Context) ([]liveEvent, error) {
 	return slices.Clone(t.live), nil
 }
 
-// Cells is the document laid out for drawing.
-func (a *App) Cells(ctx context.Context) ([]notebook.Cell, error) {
-	_, n, err := a.notebook(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return n.Cells(), nil
-}
-
 // Attach starts laying the document's cells out afresh and returns the
 // heads of the first want: what the page needs of every cell to place
 // it, without its body. A 1M-line document's first screen is drawn from
