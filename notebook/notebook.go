@@ -323,6 +323,9 @@ type Notebook struct {
 	lay       *cellLayout
 	prose     map[string]string
 	proseFile string
+	// parses are the prose parses of the layout being made, and
+	// oldParses those of the one before; see parseProse.
+	parses, oldParses map[[16]byte]*proseParse
 }
 
 // reapEvery is how often a notebook checks on background blocks while

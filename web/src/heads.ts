@@ -97,3 +97,51 @@ export function sameHead(a: Cell, b: Cell): boolean {
     flags.every((k) => !!a[k] === !!b[k])
   );
 }
+
+// headOf is the cell made from c's head alone, as decodeHeads makes it
+// from Go's: what the page has of a cell Go sends no head for again, as
+// one an edit only moved.
+export function headOf(c: Cell): Cell {
+  const h: Cell = { block: c.block, ran: false, status: 0, failed: false, running: false, from: c.from, to: c.to, line: c.line, dropAfter: -1, dropBefore: -1, hash: c.hash };
+  for (const k of flags) {
+    if (!c[k]) continue;
+    if (k === "hidden") h.hidden = hiddenWhy;
+    else (h as unknown as Record<string, boolean>)[k] = true;
+  }
+  if (c.heading) {
+    h.heading = c.heading;
+    h.title = c.title;
+  }
+  if (c.codeLines) h.codeLines = c.codeLines;
+  if (c.outputLines) h.outputLines = c.outputLines;
+  if (c.sectionTo) {
+    h.sectionFrom = c.sectionFrom;
+    h.sectionTo = c.sectionTo;
+  }
+  if (c.textbox) h.textbox = { block: c.textbox.block, id: c.textbox.id } as Cell["textbox"];
+  else if (c.choice) h.choice = { block: c.choice.block, id: c.choice.id } as Cell["choice"];
+  else if (c.block >= 0) {
+    h.id = c.id;
+    h.name = c.name;
+    if (c.depends?.length) h.depends = c.depends;
+  }
+  if (c.movable) h.lastLine = c.lastLine;
+  partial.add(h);
+  return h;
+}
+
+// moveHead moves head h, of a cell after an edit, by s's lines, bytes
+// and blocks, as notebook.Splice.moved does.
+export function moveHead(h: Cell, s: { line: number; pos: number; block: number }) {
+  h.line += s.line;
+  h.from += s.pos;
+  h.to += s.pos;
+  if (h.lastLine) h.lastLine += s.line;
+  if (h.block >= 0) h.block += s.block;
+  const input = h.textbox ?? h.choice;
+  if (input) input.block += s.block;
+  if (h.sectionTo) {
+    h.sectionFrom = (h.sectionFrom ?? 0) + s.block;
+    h.sectionTo += s.block;
+  }
+}

@@ -328,12 +328,22 @@ func (n *Notebook) DependsAt() ([]DependsProblem, Version) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	out := []DependsProblem{}
+	// The blocks by id, the first of each as Document.Block finds it:
+	// looking each depends= up through every block took seconds in a
+	// long runbook, with typing held up behind it.
+	byID := make(map[string]*doc.Block, len(n.d.Blocks))
+	for _, b := range n.d.Blocks {
+		if _, ok := byID[b.ID]; !ok {
+			byID[b.ID] = b
+		}
+	}
 	n.eachFence(func(line int, b *doc.Block) {
 		for _, id := range b.Depends() {
-			if n.d.Dep(id) != nil {
+			dep := byID[id]
+			// As Document.Dep says: a block that runs.
+			if dep != nil && !dep.IsInclude() && !dep.IsTape() && !dep.IsInput() {
 				continue
 			}
-			dep := n.d.Block(id)
 			out = append(out, DependsProblem{Line: line, Name: id, Input: dep != nil && dep.IsInput() && !dep.IsInclude() && !dep.IsTape()})
 		}
 	})

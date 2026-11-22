@@ -24,7 +24,7 @@ export const App: typeof Bound = Object.fromEntries(
   }),
 ) as typeof Bound;
 export type { ConsoleEntry, Doc, OutsideFiles, ReportStart, Start, Tab, Tabs } from "./bindings/github.com/gdey/markdownshell/ui/models.js";
-export type { AuditEvent, Cell, Deleted, Heads, EarlierRun, Fold, FrontMatter, HTTPCell, Move, Names, Problem, Report, RunOptions, SourceBlock } from "./bindings/github.com/gdey/markdownshell/notebook/models.js";
+export type { AuditEvent, Cell, Deleted, Heads, Splice, EarlierRun, Fold, FrontMatter, HTTPCell, Move, Names, Problem, Report, RunOptions, SourceBlock } from "./bindings/github.com/gdey/markdownshell/notebook/models.js";
 export type { Settings } from "./bindings/github.com/gdey/markdownshell/settings/models.js";
 export type { File } from "./bindings/github.com/gdey/markdownshell/library/models.js";
 export type { Proc, ShellProcs } from "./bindings/github.com/gdey/markdownshell/env/models.js";

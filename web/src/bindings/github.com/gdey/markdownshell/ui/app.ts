@@ -742,6 +742,15 @@ export function RedrawBackground(block: number): $CancellablePromise<void> {
 }
 
 /**
+ * Relayout lays the document out again after an edit, as Attach does,
+ * and returns how its cells changed from those of layout from, the
+ * page's. See notebook.Splice.
+ */
+export function Relayout($from: number): $CancellablePromise<notebook$0.Splice> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Relayout", $from);
+}
+
+/**
  * Reload reads the file from disk again, dropping output not saved.
  * The shells keep what blocks set in them, unless the front matter
  * changed the shell, env.share or env.source.

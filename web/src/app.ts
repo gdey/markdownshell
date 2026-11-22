@@ -36,7 +36,7 @@ import { adoptBackground, closeBackgrounds, closeTerminal, endBackground, endTer
 import { applyTheme } from "./theme.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 import { drawn as startupDrawn, mark as startupMark } from "./startup.js";
-import { type HeadRow, decodeHeads, partial, sameHead } from "./heads.js";
+import { type HeadRow, decodeHeads, headOf, moveHead, partial, sameHead } from "./heads.js";
 import { Heights } from "./heights.js";
 
 let me = ""; // this window's name; events from other windows are ignored
@@ -356,34 +356,136 @@ async function takeBodies(list: Cell[], l = layout): Promise<boolean> {
   return true;
 }
 
-// allHeads asks Attach for every cell's head.
-const allHeads = 1 << 30;
-
 // A Relayout is the cells Go laid out after an edit, and their layout,
-// for the page to make its own as it takes them in.
+// for the page to make its own as it takes them in: every one, fresh,
+// or, for a long document, how they changed from those the page has.
 interface Relayout {
-  fresh: Cell[];
+  fresh?: Cell[];
+  splice?: SpliceIn;
   l: { gen: number; done: boolean };
+  // moving is the step to ask Go for the move limits from, when they
+  // came as the cells had them before.
+  moving?: number;
+}
+
+// A SpliceIn is a Splice as the page takes it in: cells [at, at+remove)
+// are replaced by heads, those after are moved as move says, and fixes
+// are the heads of the others that changed, by their new index. drawn
+// are the cells Go laid out in the place of the kept cells whose cards
+// are drawn, by those cells, for them to take their bodies from.
+interface SpliceIn {
+  at: number;
+  remove: number;
+  heads: Cell[];
+  move: { line: number; pos: number; block: number };
+  fixes: Map<number, Cell>;
+  drawn: Map<Cell, Cell>;
 }
 
 // relayout has Go lay the document out again, after an edit, and is
 // the heads of its cells.
 async function relayout(): Promise<Relayout> {
-  const h = await App.Attach(allHeads);
-  const fresh = decodeHeads(h.heads as HeadRow[]);
+  // Go says how the cells changed from those the page has, when it has
+  // them all: a keystroke changes one or two of a long file's cells,
+  // and every head of it was megabytes to send and to read.
+  const was = layout?.done ? layout.gen : 0;
+  const s = await App.Relayout(was);
+  lastGen = s.gen;
+  const heads = decodeHeads(s.heads as HeadRow[]);
+  const l = { gen: s.gen, done: true };
+  const moving = s.moving ? s.step : undefined;
+  if (s.reset || !was) {
+    heads.forEach((c, i) => headIndex.set(c, i));
+    return { fresh: heads, l, moving };
+  }
+  const fixes = new Map<number, Cell>();
+  const fixed = decodeHeads(s.fixes as HeadRow[]);
+  (s.fixAt ?? []).forEach((i, k) => fixes.set(i, fixed[k]));
+  heads.forEach((c, k) => headIndex.set(c, s.at + k));
+  const splice: SpliceIn = { at: s.at, remove: s.remove, heads, move: s, fixes, drawn: new Map() };
+  // A short document is drawn whole, its cells compared one by one.
+  if (cells.length - s.remove + heads.length <= lazyCells) return { fresh: spliced(splice), l, moving };
+  return { splice, l, moving };
+}
+
+// takeMoves asks Go for the move limits of r's cells, once they are
+// known, and takes in the cells whose limits changed, as a block that
+// can be dragged now, after r was drawn.
+async function takeMoves(r: Relayout) {
+  if (r.moving === undefined) return;
+  let h: Heads;
+  try {
+    h = await App.MoreHeads(r.l.gen, cells.length, r.moving, 0);
+  } catch {
+    // The document changed again; its next layout brings them.
+    return;
+  }
+  if (layout?.gen !== r.l.gen || !h.fixAt?.length) return;
+  fixHeads(h.fixAt, decodeHeads(h.fixes as HeadRow[]));
+  drawOutline();
+}
+
+// changedCells is how many cells r lays out anew.
+function changedCells(r: Relayout): number {
+  if (r.splice) return Math.max(r.splice.heads.length, r.splice.remove);
+  const fresh = r.fresh ?? [];
+  const { head, tail } = unchanged(fresh);
+  return fresh.length - head - tail;
+}
+
+// newIndex is where cell i of the page's goes in sp, or -1 if it goes.
+function newIndex(sp: SpliceIn, i: number): number {
+  if (i < sp.at) return i;
+  if (i < sp.at + sp.remove) return -1;
+  return i - sp.remove + sp.heads.length;
+}
+
+// headAfter is the head of the cell Go laid out in the place of c, cell
+// i of the page's, kept, at j in sp.
+function headAfter(sp: SpliceIn, c: Cell, i: number, j: number): Cell {
+  const fix = sp.fixes.get(j);
+  if (fix) return fix;
+  const h = headOf(c);
+  if (i >= sp.at) moveHead(h, sp.move);
+  return h;
+}
+
+// spliced is every cell of sp, the page's cells as heads, spliced.
+function spliced(sp: SpliceIn): Cell[] {
+  const fresh = new Array<Cell>(cells.length - sp.remove + sp.heads.length);
+  for (let i = 0; i < cells.length; i++) {
+    const j = newIndex(sp, i);
+    if (j >= 0) fresh[j] = headAfter(sp, cells[i], i, j);
+  }
+  sp.heads.forEach((c, k) => (fresh[sp.at + k] = c));
   fresh.forEach((c, i) => headIndex.set(c, i));
-  lastGen = h.gen;
-  return { fresh, l: { gen: h.gen, done: h.done } };
+  return fresh;
 }
 
 // drawnBodies takes the bodies of the cells of r that are drawn as it
 // is taken in: all of them, in a document drawn whole; else those of
 // the cells kept whose cards are drawn, and of the cells new in place
 // of others, when there are a few, as typing makes.
-async function drawnBodies({ fresh, l }: Relayout): Promise<Relayout> {
+async function drawnBodies(r: Relayout): Promise<Relayout> {
+  const { fresh, splice: sp, l } = r;
+  if (sp) {
+    const want = sp.heads.length <= manyCards ? [...sp.heads] : [];
+    for (const c of cardOf.keys()) {
+      const i = cellIndex.get(c);
+      const j = i === undefined ? -1 : newIndex(sp, i);
+      if (j < 0) continue;
+      const f = headAfter(sp, c, i!, j);
+      headIndex.set(f, j);
+      sp.drawn.set(c, f);
+      want.push(f);
+    }
+    await takeBodies(want, l);
+    return r;
+  }
+  if (!fresh) return r;
   if (fresh.length <= lazyCells) {
     await takeBodies(fresh, l);
-    return { fresh, l };
+    return r;
   }
   const { head, tail } = unchanged(fresh);
   const few = fresh.length - head - tail <= manyCards;
@@ -396,7 +498,7 @@ async function drawnBodies({ fresh, l }: Relayout): Promise<Relayout> {
     return i >= 0 && cardOf.has(cells[i]);
   });
   await takeBodies(want, l);
-  return { fresh, l };
+  return r;
 }
 
 // bodiesFor draws again, from their bodies, cards drawn before their
@@ -511,87 +613,12 @@ const renumbered = (c: Cell) => c.block >= 0 && !c.textbox && !c.choice;
 // cards before and after the cells that changed are kept, with their
 // places in the file brought up to date. Their handlers hold their
 // cells, so those are updated in place.
-function updateDoc({ fresh, l }: Relayout) {
-  layout = l;
+function updateDoc(r: Relayout) {
+  layout = r.l;
   behind = false;
-  const { head, tail } = unchanged(fresh);
+  queueMicrotask(() => void takeMoves(r));
   const at = anchor();
-  const keep = (i: number, j: number): Cell => {
-    const c = cells[i];
-    const f = fresh[j];
-    const card = cardOf.get(c);
-    headIndex.set(c, j);
-    if (partial.has(c) && !partial.has(f)) {
-      // Its head was all it had: it takes the rest from f. What says
-      // where it is, and its numbers, stay as drawn, for the lines
-      // below to bring up to date.
-      const input = (c.textbox ?? c.choice)?.block;
-      const was = { block: c.block, name: c.name, id: c.id, sectionFrom: c.sectionFrom, sectionTo: c.sectionTo, ...Object.fromEntries(placeFields.map((k) => [k, c[k]])) };
-      for (const key of ["collapsed", "collapsedOutput", "hidden"] as const) delete c[key];
-      Object.assign(c, f, was, { textbox: f.textbox && { ...f.textbox }, choice: f.choice && { ...f.choice } });
-      const box = c.textbox ?? c.choice;
-      if (box && input !== undefined) box.block = input;
-      partial.delete(c);
-    }
-    if (renumbered(c) && (c.block !== f.block || c.name !== f.name || c.id !== f.id)) {
-      if (card) {
-        card.id = "block-" + f.block;
-        card.dataset.block = String(f.block);
-        if (c.secret) card.classList.toggle("masked", !revealed.has(f.block));
-        const id = card.querySelector(":scope > .head .id");
-        if (id) id.textContent = f.name ?? f.id ?? "";
-      }
-      c.block = f.block;
-      c.name = f.name;
-      c.id = f.id;
-      if (card) labelBlock(card);
-    }
-    const input = c.textbox ?? c.choice;
-    const to = (f.textbox ?? f.choice)?.block;
-    if (input && to !== undefined && input.block !== to) {
-      if (card) renumberInput(card, input.block, to);
-      input.block = to;
-    }
-    if (c.heading && f.sectionTo && (c.sectionFrom !== f.sectionFrom || c.sectionTo !== f.sectionTo)) {
-      if (card) {
-        card.dataset.sectionFrom = String(f.sectionFrom ?? 0);
-        card.dataset.sectionTo = String(f.sectionTo);
-      }
-      c.sectionFrom = f.sectionFrom;
-      c.sectionTo = f.sectionTo;
-    }
-    if (placeFields.every((k) => c[k] === f[k])) return keepHead(c, f, card);
-    // Only what changed is written: writing every card's place, though
-    // the same, made the page work out every card's style again. It is
-    // told from the cell, as reading the card's took longer.
-    const set = (key: string, was: string | undefined, v: string | undefined) => {
-      if (was === v || !card) return;
-      if (v === undefined) delete card.dataset[key];
-      else card.dataset[key] = v;
-    };
-    set("line", String(c.line), String(f.line));
-    set("from", String(c.from), String(f.from));
-    set("drop", c.drop ? "1" : undefined, f.drop ? "1" : undefined);
-    set("dropAfter", c.dropAfter >= 0 ? String(c.dropAfter) : undefined, f.dropAfter >= 0 ? String(f.dropAfter) : undefined);
-    set("dropBefore", c.dropBefore >= 0 ? String(c.dropBefore) : undefined, f.dropBefore >= 0 ? String(f.dropBefore) : undefined);
-    Object.assign(c, Object.fromEntries(placeFields.map((k) => [k, f[k]])));
-    return keepHead(c, f, card);
-  };
-  // A cell kept whose body didn't come, as one out of sight, takes its
-  // head, and its body when it is drawn: what is drawn of a block, as
-  // whether it can be dragged, can change with cells far from it.
-  const keepHead = (c: Cell, f: Cell, card: HTMLElement | undefined): Cell => {
-    if (!partial.has(f)) return c;
-    takeHead(c, f);
-    if (card) bare.add(card);
-    return c;
-  };
-  const middle = fresh.slice(head, fresh.length - tail);
-  const next: Cell[] = [];
-  for (let i = 0; i < head; i++) next.push(keep(i, i));
-  for (const c of middle) next.push(c);
-  for (let k = tail; k > 0; k--) next.push(keep(cells.length - k, fresh.length - k));
-  const gone = cells.slice(head, cells.length - tail);
+  const { next, middle, gone } = r.splice ? takeSplice(r.splice) : takeFresh(r.fresh ?? []);
   drawn++;
   if (!gone.length && !middle.length) {
     cells = next;
@@ -622,6 +649,121 @@ function updateDoc({ fresh, l }: Relayout) {
   setDeps(cells);
   // Many new cards can leave the view blank, as drawing every one can.
   if (middle.length > 20) repaint($("doc-scroll"));
+}
+
+// takeFresh lines fresh, every cell Go laid out, up with the cells the
+// page has, keeping those alike at the head and the tail. It is the
+// cells as they are now, those new among them, and those gone.
+function takeFresh(fresh: Cell[]): { next: Cell[]; middle: Cell[]; gone: Cell[] } {
+  const { head, tail } = unchanged(fresh);
+  const middle = fresh.slice(head, fresh.length - tail);
+  const next: Cell[] = [];
+  for (let i = 0; i < head; i++) next.push(keepCell(cells[i], fresh[i], i));
+  for (const c of middle) next.push(c);
+  for (let k = tail; k > 0; k--) next.push(keepCell(cells[cells.length - k], fresh[fresh.length - k], fresh.length - k));
+  return { next, middle, gone: cells.slice(head, cells.length - tail) };
+}
+
+// takeSplice is takeFresh for a splice: the cells kept are moved where
+// they are, rather than each compared with a copy, which for a long
+// document took most of the time a keystroke spent on the page. Those
+// out of sight take their bodies again when drawn, as what a block's
+// body says of where it can be dragged can change with any edit.
+function takeSplice(sp: SpliceIn): { next: Cell[]; middle: Cell[]; gone: Cell[] } {
+  const next = new Array<Cell>(cells.length - sp.remove + sp.heads.length);
+  for (let i = 0; i < cells.length; i++) {
+    const j = newIndex(sp, i);
+    if (j < 0) continue;
+    const c = cells[i];
+    next[j] = c;
+    if (cardOf.has(c)) {
+      keepCell(c, sp.drawn.get(c) ?? headAfter(sp, c, i, j), j);
+      continue;
+    }
+    if (i >= sp.at) {
+      moveHead(c, sp.move);
+      if (c.outputLine) c.outputLine += sp.move.line;
+      headIndex.set(c, j);
+    }
+    const fix = sp.fixes.get(j);
+    if (fix) takeHead(c, fix);
+    else partial.add(c);
+  }
+  sp.heads.forEach((c, k) => (next[sp.at + k] = c));
+  return { next, middle: sp.heads, gone: cells.slice(sp.at, sp.at + sp.remove) };
+}
+
+// keepCell has cell c, drawn now, take f, the cell Go laid out in its
+// place, j, after an edit, writing what changed into its card.
+function keepCell(c: Cell, f: Cell, j: number): Cell {
+  const card = cardOf.get(c);
+  headIndex.set(c, j);
+  if (partial.has(c) && !partial.has(f)) {
+    // Its head was all it had: it takes the rest from f. What says
+    // where it is, and its numbers, stay as drawn, for the lines
+    // below to bring up to date.
+    const input = (c.textbox ?? c.choice)?.block;
+    const was = { block: c.block, name: c.name, id: c.id, sectionFrom: c.sectionFrom, sectionTo: c.sectionTo, ...Object.fromEntries(placeFields.map((k) => [k, c[k]])) };
+    for (const key of ["collapsed", "collapsedOutput", "hidden"] as const) delete c[key];
+    Object.assign(c, f, was, { textbox: f.textbox && { ...f.textbox }, choice: f.choice && { ...f.choice } });
+    const box = c.textbox ?? c.choice;
+    if (box && input !== undefined) box.block = input;
+    partial.delete(c);
+  }
+  if (renumbered(c) && (c.block !== f.block || c.name !== f.name || c.id !== f.id)) {
+    if (card) {
+      card.id = "block-" + f.block;
+      card.dataset.block = String(f.block);
+      if (c.secret) card.classList.toggle("masked", !revealed.has(f.block));
+      const id = card.querySelector(":scope > .head .id");
+      if (id) id.textContent = f.name ?? f.id ?? "";
+    }
+    c.block = f.block;
+    c.name = f.name;
+    c.id = f.id;
+    if (card) labelBlock(card);
+  }
+  const input = c.textbox ?? c.choice;
+  const to = (f.textbox ?? f.choice)?.block;
+  if (input && to !== undefined && input.block !== to) {
+    if (card) renumberInput(card, input.block, to);
+    input.block = to;
+  }
+  if (c.heading && f.sectionTo && (c.sectionFrom !== f.sectionFrom || c.sectionTo !== f.sectionTo)) {
+    if (card) {
+      card.dataset.sectionFrom = String(f.sectionFrom ?? 0);
+      card.dataset.sectionTo = String(f.sectionTo);
+    }
+    c.sectionFrom = f.sectionFrom;
+    c.sectionTo = f.sectionTo;
+  }
+  if (placeFields.every((k) => c[k] === f[k])) return keepHead(c, f, card);
+  // Only what changed is written: writing every card's place, though
+  // the same, made the page work out every card's style again. It is
+  // told from the cell, as reading the card's took longer.
+  const set = (key: string, was: string | undefined, v: string | undefined) => {
+    if (was === v || !card) return;
+    if (v === undefined) delete card.dataset[key];
+    else card.dataset[key] = v;
+  };
+  set("line", String(c.line), String(f.line));
+  set("from", String(c.from), String(f.from));
+  set("drop", c.drop ? "1" : undefined, f.drop ? "1" : undefined);
+  set("dropAfter", c.dropAfter >= 0 ? String(c.dropAfter) : undefined, f.dropAfter >= 0 ? String(f.dropAfter) : undefined);
+  set("dropBefore", c.dropBefore >= 0 ? String(c.dropBefore) : undefined, f.dropBefore >= 0 ? String(f.dropBefore) : undefined);
+  Object.assign(c, Object.fromEntries(placeFields.map((k) => [k, f[k]])));
+  return keepHead(c, f, card);
+}
+
+// keepHead has a cell kept whose body didn't come, as one out of sight,
+// take its head, and its body when it is drawn: what is drawn of a
+// block, as whether it can be dragged, can change with cells far from
+// it.
+function keepHead(c: Cell, f: Cell, card: HTMLElement | undefined): Cell {
+  if (!partial.has(f)) return c;
+  takeHead(c, f);
+  if (card) bare.add(card);
+  return c;
 }
 
 // bareBodies draws again the cards drawn from heads, from their cells'
@@ -1673,16 +1815,19 @@ async function edit(call: () => Promise<void>): Promise<boolean> {
   // came or went, keeping the focus in the input being typed in.
   let r: Relayout;
   try {
-    r = await drawnBodies(await relayout());
+    // An input's edit is drawn cell by cell, from every cell.
+    const got = await relayout();
+    r = await drawnBodies(got.splice ? { fresh: spliced(got.splice), l: got.l, moving: got.moving } : got);
   } catch (err) {
     fail(err);
     return false;
   }
-  const { fresh } = r;
+  const fresh = r.fresh ?? [];
   const focused = document.activeElement as HTMLTextAreaElement | null;
   const input = focused?.closest<HTMLElement>("[data-input]")?.dataset.input;
   const [from, to] = [focused?.selectionStart, focused?.selectionEnd];
   layout = r.l;
+  queueMicrotask(() => void takeMoves(r));
   if (fresh.length !== cells.length) {
     cells = fresh;
     drawDoc();
@@ -2821,11 +2966,9 @@ function applySource(typing = false): Promise<void> {
       fail(err);
       return;
     }
-    const { fresh } = r;
     const settles = typedAt + settle - Date.now();
     if (typing && settles > 0) {
-      const { head, tail } = unchanged(fresh);
-      if (fresh.length - head - tail > manyCards) {
+      if (changedCells(r) > manyCards) {
         behind = true;
         sourceTimer = window.setTimeout(() => void applySource(true), settles);
         return;
