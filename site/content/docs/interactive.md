@@ -37,6 +37,10 @@ mdsh -i deploy.md staging       # block arguments work as usual: $1 is staging
   ctrl+o again or the pane closes. The pane's rule shows the shell's
   working directory, and `Z` has the pane fill the screen. Shift+↑ in
   the pane, or `V`, selects lines of its output, and `y` copies them.
+  With `--interactive-shell` (experimental), the pane is a terminal on
+  the shell, which reads your rc files: every key goes to it, so vim,
+  ctrl+z, `fg` and `jobs` work, the rule lists its jobs, and ctrl+g
+  gives the keys back to the file.
 - **Edit** a block in `$EDITOR` with `e`, or the whole file with `E`.
   `J` and `K` (or alt+arrows) move a block, and `u` undoes the move.
   `i` types a new block at a prompt.

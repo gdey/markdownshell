@@ -33,6 +33,7 @@ behaves.
 | `mdsh --show-secrets --pdf out.pdf doc.md` | Put `secret` blocks' code and output in the report; without it they read `(secret)` |
 | `mdsh --color=never doc.md` | No styling on a terminal; `--no-color` and `NO_COLOR` too (`auto`, `always`, `never`) |
 | `mdsh -i doc.md` | The terminal UI; `--autosave` saves after every block that runs; `--history-reuse` runs a command typed in History again in its `#history-N` block, keeping earlier runs |
+| `mdsh -i --interactive-shell doc.md` | History's shell runs interactively, reading your rc files, and its pane is a terminal: vim, ctrl+z, `fg` and `jobs` work, ctrl+g gives the keys back; `--login-shell` starts it as a login shell (experimental) |
 | `mdsh -i [folder]` | A start screen listing the markdown files under this folder, or that one |
 | `mdsh --serve [doc.md \| folder]` | The desktop app's notebook in a web browser, at 127.0.0.1:8080; `--serve=host:port` listens elsewhere. Anyone with the printed address can run commands as you. Only in an mdsh built with `-tags serve` |
 | `mdsh --serve=stdio doc.md` | The same notebook to the program that started mdsh, such as an editor plugin, as JSON lines on stdin and stdout |
@@ -324,6 +325,7 @@ ctrl on Linux.
 | `d` | Depends On…: edit the block's `depends=` as a list |
 | delete, backspace | Delete the selected block |
 | ⌘↩ / ⌘⇧↩ / ⌘R / ⌘. | Run Current Block / Run Section / Run All / Stop |
+| ⌘⌥↩, ⌥-click play | Run Current Block in a Side Shell, leaving a command in History running (interactive shell) |
 | ⌘⌥K | Clear All Outputs… |
 | ⌘\ / ⌘⇧\ | Source View / Rendered View |
 | ⌘⇧O / ⌘⇧H / ⌘⇧Y | Outline / History / Console |
@@ -348,7 +350,9 @@ turns it back on. A `background` block that outlives its run shows
 Stop in place of its play button. Its separator shows the shell's working
 directory, and the button beside its close button has it fill the tab. With Vim keys on, `:w`
 saves and `:RunBlock` and `:RunSection` run; in the Neovim pane `K`
-explains an attribute and `zc`/`zo` fold.
+explains an attribute and `zc`/`zo` fold. With Settings › Shell ›
+Interactive shell, the pane is a terminal on the shell, every key goes
+to it, and the bar under it lists the shell's jobs.
 
 ### Menus
 
@@ -357,7 +361,7 @@ explains an attribute and `zc`/`zo` fold.
 | mdsh (macOS) | About mdsh · Settings… · Install / Uninstall Command Line Tool… · Hide · Quit |
 | File | New File… · New Tab · New Window · Open… · Open Recent · Save · Save As… · Create Report… · Reload · Serve in Browser (with Settings › Shell › Serve notebooks on) · Close Tab · Close Window · Quit (Linux) |
 | Edit | Undo · Redo · Move Block Up · Move Block Down · Move Block Above Previous Block · Move Block Below Next Block · Depends On… · Front Matter · Cut · Copy · Paste · Select All · Preferences… (Linux) |
-| Run | Run Current Block · Run Section · Run All · Stop · Clear All Outputs… · Run Options… |
+| Run | Run Current Block · Run Current Block in a Side Shell · Run Section · Run All · Stop · Clear All Outputs… · Run Options… |
 | View | Source View · Rendered View · Outline · History · Console · Show Code · Show Output · Folding › Collapse All Blocks, Collapse All Sections, Expand All, Copy Folds to Source View, Copy Folds to Rendered View · Zoom In · Zoom Out · Actual Size · Toggle Full Screen · Show Next Tab · Show Previous Tab |
 | Help | Cheat Sheet · Changelog · Copy Bug Report |
 | Insert (right-click in the source view) | Heading · Bold · Italic · Code · Link · Image · Bulleted List · Numbered List · Task List · Quote · Table · Code Block · sh Block · sh Block, Confirm First · zsh Block · http Request · Textbox · Choice |
