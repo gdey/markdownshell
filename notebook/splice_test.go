@@ -2,6 +2,10 @@ package notebook
 
 import (
 	"math/rand"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -21,8 +25,10 @@ func TestRelayoutSplice(t *testing.T) {
 			h := n.Attach(1 << 30)
 			have := slicesClone(h.Heads)
 			gen := h.Gen
-			moving := 0
-			defer func() { t.Logf("%d of 60 splices came before the index", moving) }()
+			moving, reused := 0, 0
+			defer func() {
+				t.Logf("%d of 60 splices came before the index, %d reused the cells", moving, reused)
+			}()
 			for k := 0; k < 60; k++ {
 				lines := strings.SplitAfter(text, "\n")
 				i := r.Intn(len(lines))
@@ -48,6 +54,9 @@ func TestRelayoutSplice(t *testing.T) {
 				if s.Reset {
 					t.Fatalf("edit %d: reset", k)
 				}
+				if n.lay.reused {
+					reused++
+				}
 				have = applySplice(have, s)
 				if s.Moving {
 					moving++
@@ -72,12 +81,22 @@ func TestRelayoutSplice(t *testing.T) {
 						t.Fatalf("edit %d (line %d %q): head %d is\n%+v\nwant\n%+v", k, i, next, j, have[j], w)
 					}
 				}
-				// And the move limits, which bodies carry, are a fresh
-				// layout's.
-				for j, c := range n.cells() {
-					if moveOf(&c) != moveOf(&want[j]) {
-						t.Fatalf("edit %d: cell %d moves %+v, want %+v", k, j, moveOf(&want[j]), moveOf(&c))
+				// And the cells, move limits and all, and their bodies,
+				// are a fresh layout's.
+				fresh := n.newCellLayout()
+				for !fresh.done {
+					fresh.chunk(1 << 30)
+				}
+				for j := range fresh.cells {
+					if c, w := fresh.cells[j], want[j]; !reflect.DeepEqual(c, w) {
+						t.Fatalf("edit %d (line %d %q, reused %t): cell %d is\n%+v\nwant\n%+v", k, i, next, n.lay.reused, j, w, c)
 					}
+					if c, w := fresh.body(j), n.lay.body(j); !reflect.DeepEqual(c, w) {
+						t.Fatalf("edit %d (reused %t): body %d is\n%+v\nwant\n%+v", k, n.lay.reused, j, w, c)
+					}
+				}
+				if !slices.Equal(fresh.marks, n.lay.marks) {
+					t.Fatalf("edit %d: marks differ", k)
 				}
 				gen = s.Gen
 			}
@@ -101,3 +120,53 @@ func applySplice(heads HeadList, s Splice) HeadList {
 }
 
 func slicesClone(l HeadList) HeadList { return append(HeadList(nil), l...) }
+
+// TestRelayoutReuse checks which edits Relayout lays out by reusing the
+// cells around them: typing in prose does, while an edit that turns a
+// heading into a paragraph or changes a block lays out afresh.
+func TestRelayoutReuse(t *testing.T) {
+	src := "# Top\n\nSome prose.\n\n```sh {#one}\necho one\n```\n\nMore prose, and a [link][ref].\n\n## Next\n\n- [ ] a task\n\n```sh {#two}\necho two\n```\n\nThe end.\n\n[ref]: https://example.com\n"
+	file := filepath.Join(t.TempDir(), "doc.md")
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	gen := n.Attach(1 << 30).Gen
+	for _, e := range []struct {
+		old, text string
+		reuse     bool
+	}{
+		{"More prose, and a [link][ref].\n", "More prose, typed, and a [link][ref].\n", true},
+		{"More prose, typed, and a [link][ref].\n", "More prose,\nover two lines.\n", true},
+		{"Some prose.\n", "Some prose.\nAnd more.\n", true},
+		{"- [ ] a task\n", "- [x] a task\n", true},
+		{"# Top\n", "Top\n", false},                                             // a heading no longer
+		{"echo one\n", "echo uno\n", false},                                     // a block's code
+		{"- [x] a task\n", "- [x] a task\n- [ ] another\n", false},              // a task more
+		{"[ref]: https://example.com\n", "[ref]: https://example.org\n", false}, // a link reference
+	} {
+		lines := strings.SplitAfter(string(n.d.Src), "\n")
+		i := slices.Index(lines, e.old)
+		if i < 0 {
+			t.Fatalf("no line %q", e.old)
+		}
+		re, err := n.Edit(n.Version(), []LineEdit{{First: i, Last: i + 1, Text: e.text}})
+		if err != nil || !re.Applied {
+			t.Fatal(err, re)
+		}
+		s := n.Relayout(gen)
+		if n.lay.reused != e.reuse {
+			t.Errorf("%q to %q: reused %t, want %t", e.old, e.text, n.lay.reused, e.reuse)
+		}
+		if e.reuse && (s.Remove != 1 || len(s.Heads) > 2) {
+			// The cell typed in, and only that, goes to the page: two
+			// when a line of it became a cell of its own.
+			t.Errorf("%q to %q: splice replaces %d cells with %d", e.old, e.text, s.Remove, len(s.Heads))
+		}
+		gen = s.Gen
+	}
+}

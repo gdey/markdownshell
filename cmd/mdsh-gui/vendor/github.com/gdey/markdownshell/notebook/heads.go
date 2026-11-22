@@ -241,6 +241,13 @@ type cellLayout struct {
 	// document had when the layout started.
 	lazyIndex bool
 	blocks    int
+	// first is where the cells start, after the shebang and front
+	// matter, and states the blocks' states once the layout is done,
+	// for reuse to tell what an edit changed.
+	first  int
+	states []blockState
+	// reused says reuse laid it out.
+	reused bool
 }
 
 type headChange struct{ step, cell int }
@@ -283,7 +290,7 @@ func (n *Notebook) newCellLayout() *cellLayout {
 		folded:  map[int]bool{},
 		hidden:  map[int]bool{},
 	}
-	l.markPos = l.pos
+	l.markPos, l.first = l.pos, l.pos
 	l.cuts = cuts(d, n.results, l.lookup)
 	l.index = make(chan indexed, 1)
 	l.indexed = make(chan struct{})
@@ -385,6 +392,7 @@ func (l *cellLayout) chunk(want int) {
 		l.fillTasks()
 		l.pos = len(d.Src)
 		l.done = true
+		l.states = l.blockStates()
 	}
 	if l.done && !l.lazyIndex {
 		l.waitIndex(true)
@@ -450,7 +458,9 @@ func (l *cellLayout) blockCell(i int, b *doc.Block) {
 		}
 		if b.IsTape() {
 			hidden = strings.Replace(hidden, "Run all runs it unless its run= says otherwise.", "It still types into its block when that runs.", 1)
-			add(Cell{Block: -1, Hidden: hidden, From: span.Start, To: span.End}, bodySrc{md: d.Src[b.Span.Start:b.Span.End], block: -1})
+			// A copy, as every body's md is, so a layout reuse makes
+			// doesn't hold the source it was made from.
+			add(Cell{Block: -1, Hidden: hidden, From: span.Start, To: span.End}, bodySrc{md: bytes.Clone(d.Src[b.Span.Start:b.Span.End]), block: -1})
 			return
 		}
 	}
@@ -938,10 +948,15 @@ func (n *Notebook) Relayout(from int64) Splice {
 	// of a long file's layout: the cells keep their old limits until it
 	// comes, when the page asks for them with MoreHeads.
 	l.lazyIndex = reuse
+	s := Splice{Gen: l.gen, Size: len(n.d.Src)}
+	if reuse && l.reuse(old, &s) {
+		l.reused, s.Moving = true, l.x == nil
+		return s
+	}
 	for !l.done {
 		l.chunk(1 << 30)
 	}
-	s := Splice{Gen: l.gen, Size: len(n.d.Src), Moving: l.x == nil}
+	s.Moving = l.x == nil
 	if !reuse {
 		s.Reset = true
 		s.Heads = make(HeadList, 0, len(l.cells))
