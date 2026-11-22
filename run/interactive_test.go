@@ -137,3 +137,66 @@ func TestInteractiveShellSession(t *testing.T) {
 		})
 	}
 }
+
+// TestInteractiveSubEnvSession: a sub-env the session is told to run
+// interactively starts on a terminal of its own, made with the share of
+// its first block, and its blocks run there.
+func TestInteractiveSubEnvSession(t *testing.T) {
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash")
+	}
+	src := "---\nmdsh:\n  env:\n    share: [\"...\"]\n---\n" +
+		"```sh {#a}\nexport Y=from-a Z=dropped\n```\n\n" +
+		"```sh {#b env=build share=Y}\necho \"y=$Y z=${Z-}\"; echo e2 >&2\n```\n\n" +
+		"```sh {#c env=build/test}\ntrue\n```\n"
+	d := parse(t, src)
+	dir := t.TempDir()
+	home := t.TempDir()
+	var shown lockedBuf
+	s, err := run.NewSession(d, run.Options{
+		Dir:              dir,
+		File:             filepath.Join(dir, "d.md"),
+		Shell:            path,
+		Environ:          []string{"HOME=" + home, "PATH=" + os.Getenv("PATH"), "TERM=xterm"},
+		PTY:              true,
+		Terminal:         &env.Terminal{Keys: make(chan []byte), Out: &shown},
+		InteractiveShell: true,
+		KillAfter:        10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if got := strings.Join(s.Envs(), ","); got != ",build,build/test" {
+		t.Errorf("Envs: %q", got)
+	}
+	if _, err := s.RunBlock(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	if sh, err := s.Shell(ctx, "build"); err != nil || sh != nil {
+		t.Fatalf("build before SetInteractive: %v, %v", sh, err)
+	}
+	if !s.Scripted("build") || !s.SetInteractive("build") {
+		t.Fatal("SetInteractive didn't end build's scripted shell")
+	}
+	sh, err := s.Shell(ctx, "build")
+	if err != nil || sh == nil {
+		t.Fatalf("build: %v, %v", sh, err)
+	}
+	top, _ := s.TopShell(ctx)
+	if sh == top {
+		t.Fatal("build is the top level's shell")
+	}
+	r, err := s.RunBlock(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(r.Stdout); !strings.Contains(got, "y=from-a z=") || strings.Contains(got, "dropped") || !strings.Contains(got, "e2") {
+		t.Errorf("build's block showed %q", got)
+	}
+	if again, _ := s.Shell(ctx, "build"); again != sh {
+		t.Error("the block ran in another shell")
+	}
+}
