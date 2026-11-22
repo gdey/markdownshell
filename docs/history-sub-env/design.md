@@ -35,7 +35,8 @@ The pane is on one env at a time: the top level by default. An env
 picker on the pane's bar (mdsh-gui and `--serve`) lists the top level,
 then each env the document names (`env=` on any block, with its parents,
 `build` before `build/test`), each marked if its shell is running. In
-`mdsh -i`, `ctrl+g` then `e` opens the same list over the pane. The
+`mdsh -i`, `@` (after `ctrl+g` gives the keys back to the file) lists
+the same envs in the footer. The
 choice lasts until the pane closes or the file is reopened; it is not
 saved in the file.
 
@@ -106,7 +107,7 @@ the interactive shell setting, there is no picker.
 2. **notebook, ui, web:** `live` keyed by shell; `SetHistoryEnv`,
    `HistoryEnvs`; History blocks get `env=`; the picker, screens and
    jobs per shell. Screenshots.
-3. **tui:** the same in `mdsh -i`, with ctrl+g e. Screenshot.
+3. **tui:** the same in `mdsh -i`, with `@`. Screenshot.
 4. **Docs.**
 
 ## Decisions (2026-11-22)

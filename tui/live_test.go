@@ -113,3 +113,69 @@ func TestLiveHistoryTUI(t *testing.T) {
 		})
 	}
 }
+
+// TestLiveSubEnvTUI: @ moves the live pane to a sub-env's shell, whose
+// typed commands get its env=, and back to the top level's, whose
+// screen is as it was; a scripted shell takes enter twice.
+func TestLiveSubEnvTUI(t *testing.T) {
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash")
+	}
+	t.Setenv("HOME", t.TempDir())
+	src := "---\nmdsh:\n  shell: " + path + "\n  env:\n    share: [\"...\"]\n---\n# Log\n\n```sh {#a env=build share=Y}\necho \"played in build: ${Y-}\"\n```\n"
+	m, file := newModel(t, src, Options{AutoSave: true, Run: run.Options{InteractiveShell: true}})
+	m.opts.Run.Environ = append(m.opts.Run.Environ, "HOME="+t.TempDir())
+	press(m, "h")
+	if !m.isLive() || m.lterm.sh == nil {
+		t.Fatalf("live %v", m.isLive())
+	}
+	top := m.lterm.sh
+	keys := func(s string) { m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}) }
+	enter := func() { m.Update(tea.KeyMsg{Type: tea.KeyEnter}) }
+	keys("export Y=from-top; echo top-marker")
+	enter()
+	drive(t, m, "top command", func() bool { return strings.Contains(read(t, file), "top-marker\n```") && !m.lterm.busy })
+	// Play build's block: its shell starts scripted.
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	press(m, "g", "enter")
+	drive(t, m, "played block", func() bool { return !m.running && m.results[0] != nil && m.results[0].Ran })
+	if !m.sess.Scripted("build") {
+		t.Fatal("build isn't scripted")
+	}
+	press(m, "@")
+	if m.envPick == nil {
+		t.Fatalf("no env list: %s", m.status)
+	}
+	press(m, "l", "enter")
+	if m.envPick == nil || m.envPick.armed != "build" || m.lterm.env != "" {
+		t.Fatalf("moved without asking: %+v env %q", m.envPick, m.lterm.env)
+	}
+	if v := m.View(); !strings.Contains(v, "enter again starts it over") {
+		t.Errorf("footer:\n%s", v)
+	}
+	press(m, "enter")
+	if m.envPick != nil || m.lterm.env != "build" || m.lterm.sh == nil || m.lterm.sh == top {
+		t.Fatalf("not on build: env %q", m.lterm.env)
+	}
+	time.Sleep(300 * time.Millisecond)
+	keys("echo \"typed in build: $Y\"")
+	enter()
+	drive(t, m, "build command", func() bool {
+		return strings.Contains(read(t, file), " {#history-2 env=build skip links}\necho \"typed in build: $Y\"\n```") && !m.lterm.busy
+	})
+	if text := read(t, file); !strings.Contains(text, "typed in build: from-top") {
+		t.Errorf("file:\n%s", text)
+	}
+	if v := m.View(); !strings.Contains(v, "env=build") {
+		t.Errorf("rule doesn't name the env:\n%s", v)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	press(m, "@", "h", "enter")
+	if m.lterm.env != "" || m.lterm.sh != top {
+		t.Fatalf("not back on the top level: %q", m.lterm.env)
+	}
+	if screen := m.lterm.p.screen(); !strings.Contains(screen, "top-marker") || strings.Contains(screen, "typed in build") {
+		t.Errorf("top level's screen:\n%s", screen)
+	}
+}

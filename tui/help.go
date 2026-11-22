@@ -140,6 +140,15 @@ var helpItems = []helpItem{
 		}
 		return ""
 	}},
+	{group: "View", keys: "@", key: runeKey("@"), what: says("move History to another env's shell, which starts interactively"), off: func(m *Model) string {
+		switch {
+		case !m.isLive():
+			return "needs --interactive-shell and History open"
+		case len(m.sess.Envs()) < 2:
+			return "no block names an env="
+		}
+		return ""
+	}},
 	{group: "View", keys: "?", key: runeKey("?"), what: says("this help")},
 
 	{group: "Tabs", keys: "]/[", key: runeKey("]"), what: says("next tab ([: the one before)"), off: func(m *Model) string {

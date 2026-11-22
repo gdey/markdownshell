@@ -31,6 +31,11 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The History pane on env=build: the picker reads env=build (1 stopped), echo shows the TARGET the env shares from the top level, and vim is stopped with ctrl+z](docs/changelog/history-sub-env.png)
 
+  In `mdsh -i --interactive-shell`, `@` lists the envs in the footer;
+  enter moves History to the one picked, and the pane's rule names it.
+
+  ![mdsh -i: History on env=build, its rule reading env=build · jobs: %1 vim, the typed echo and vim added as env=build History blocks](docs/changelog/history-sub-env-tui.png)
+
 - With the experimental interactive shell on (Settings › Shell), the
   History pane is a terminal on the document's shell, in mdsh-gui and
   `mdsh --serve`: the shell draws its own prompt, reads your rc file's

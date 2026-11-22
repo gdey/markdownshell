@@ -126,6 +126,8 @@ type Model struct {
 	// or zero when none shows; the file check draws the view again then.
 	agoNext time.Time
 	prompt  *confirmMsg
+	// envPick is the env list @ opens, to move the live History pane.
+	envPick *envPicker
 	// asks are the questions blocks put with mdsh ctl ask and confirm,
 	// asked one at a time, the first in its block's card with askIn or
 	// askPick.
@@ -786,6 +788,9 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, nil
 	}
+	if m.envPick != nil {
+		return m, m.envKey(k)
+	}
 	if m.asking() != nil {
 		cmd := m.askKey(k)
 		m.refresh()
@@ -909,6 +914,8 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		return m, m.askSaveAs(nil)
+	case "@":
+		m.openEnvPicker()
 	case "R":
 		switch {
 		case m.running:
@@ -1737,8 +1744,14 @@ func (m *Model) footer() string {
 		help = m.askHelp()
 	case m.hist.sel != nil:
 		help = helpStyle.Render("↑/↓ j/k move the end · g/G first/last · o other end · y enter copy · esc cancel")
+	case m.envPick != nil:
+		help = m.envHelp()
 	case m.hist.focus && m.isLive():
-		help = helpStyle.Render("the file's shell: what runs there goes into the file · ctrl+z, fg, jobs work · ctrl+g back to the file")
+		whose := "the file's shell"
+		if m.lterm.env != "" {
+			whose = termsafe.Visible(envName(m.lterm.env)) + "'s shell"
+		}
+		help = helpStyle.Render(whose + ": what runs there goes into the file · ctrl+z, fg, jobs work · ctrl+g back to the file, @ there for another env")
 	case m.hist.focus:
 		help = helpStyle.Render("shift+↑ select lines · enter run · tab complete · ↑/↓ earlier commands · # adds a note · esc back to the file · ctrl+d close")
 	case len(m.nav) > 0 && m.bg[m.cur()]:
