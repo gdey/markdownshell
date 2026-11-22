@@ -130,13 +130,6 @@ export function CLIState(): $CancellablePromise<$models.CLI> {
 }
 
 /**
- * Cells is the document laid out for drawing.
- */
-export function Cells(): $CancellablePromise<notebook$0.Cell[] | null> {
-    return $Call.ByName("github.com/gdey/markdownshell/ui.App.Cells");
-}
-
-/**
  * Changelog is the app's changelog, rendered, for its tab.
  */
 export function Changelog(): $CancellablePromise<string> {

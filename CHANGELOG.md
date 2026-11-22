@@ -126,6 +126,10 @@ follow [Semantic Versioning](https://semver.org/).
   cell.
 
   ![A 1M-line runbook scrolled to its middle, at step 29,998, drawn as soon as the view got there](docs/changelog/scroll-1m.png)
+- An edit in a long file costs less to draw: after typing, a fold or a
+  textbox, Go sends the page every cell's head and the bodies of only
+  the cards drawn, where it sent every cell whole. At 1M lines that is
+  6 MB laid out in 1.5 s, against 65 MB in 3.6 s.
 - The `.dmg` window shows the newest look, Green Tea, in the app rising
   from its bottom edge. `build/darwin/dmg/render.sh` takes the newest
   look's picture from `site/data/looks.toml`, so running it again when a
