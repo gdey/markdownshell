@@ -330,7 +330,7 @@ function attrCompletions(attrs: AttrSpec[], names: () => Names) {
       return { from: tok.start, options, validFor: /^[#<\w-]*$/ };
     }
     const key = tok.text.slice(0, eq);
-    const spec = attrs.find((a) => a.name === key);
+    const spec = findAttr(attrs, key, isInclude(infoRange(ctx.state, ctx.pos)?.text ?? ""));
     if (!spec) return null;
     if (key === "depends") return dependsCompletions(ctx, tok.start + eq + 1, tok.text.slice(eq + 1));
     const known = names();
@@ -410,6 +410,18 @@ async function dependsCompletions(ctx: CompletionContext, from: number, value: s
   return { from: start, options, validFor: /^[\w-]*$/ };
 }
 
+// findAttr is the spec for attribute key: on an include block, the
+// include's own one when another block's attribute has the same name,
+// as lines= does on a textbox.
+function findAttr(attrs: AttrSpec[], key: string, include: boolean): AttrSpec | undefined {
+  return attrs.find((a) => a.name === key && !!a.include === include) ?? attrs.find((a) => a.name === key);
+}
+
+// isInclude is whether info, a fence's info string, is an include's.
+function isInclude(info: string): boolean {
+  return /(^|[\s{])<include(\s|}|$)/.test(info);
+}
+
 // attrHelpAt is the attribute at pos in a fence's info string, with its
 // spec and where it is, or null.
 function attrHelpAt(attrs: AttrSpec[], state: EditorState, pos: number): { key: string; spec: AttrSpec; from: number; to: number } | null {
@@ -421,7 +433,7 @@ function attrHelpAt(attrs: AttrSpec[], state: EditorState, pos: number): { key: 
     const to = from + m[0].length;
     if (pos < from || pos > to) continue;
     const key = m[0].startsWith("#") ? "#" : m[0].split("=")[0];
-    const spec = attrs.find((a) => a.name === key);
+    const spec = findAttr(attrs, key, isInclude(r.text));
     return spec ? { key, spec, from, to } : null;
   }
   return null;

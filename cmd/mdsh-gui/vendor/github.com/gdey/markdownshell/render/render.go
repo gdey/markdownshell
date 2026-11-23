@@ -619,7 +619,7 @@ func writeInclude(buf *bytes.Buffer, src []byte, b *doc.Block, r *run.Result, pl
 	}
 	body := withNewline(string(r.Stdout))
 	if inc, _ := b.Include(); inc.Numbered && !plain {
-		body = NumberLines(body, max(inc.From, 1))
+		body = NumberLines(body, max(r.FirstLine, 1))
 	}
 	open := string(src[b.Span.Start:lineEnd(src, b.Span.Start)])
 	closing := string(src[b.BodySpan.End:b.Span.End])

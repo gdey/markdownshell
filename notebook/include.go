@@ -3,6 +3,7 @@ package notebook
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/run"
@@ -23,6 +24,42 @@ type IncludeCell struct {
 	// one it doesn't have, which means the first and the last line.
 	From int `json:"from"`
 	To   int `json:"to"`
+	// Window is how a match= or symbol= include picks its lines, as
+	// `match "^FAIL"`, or "" for one that picks them by from= and to=,
+	// whose grips then drag them.
+	Window string `json:"window,omitempty"`
+	// Last is the line in the file its lines end on, from its last
+	// read, 0 when that isn't known or nothing matched.
+	Last int `json:"last,omitempty"`
+	// Warning is why its lines are empty, as no line matching match=,
+	// from its last read.
+	Warning string `json:"warning,omitempty"`
+}
+
+// windowText is how inc picks its lines by content, for
+// IncludeCell.Window: "" for from= and to=.
+func windowText(inc doc.Include) string {
+	var parts []string
+	switch {
+	case inc.Match != "":
+		parts = append(parts, fmt.Sprintf("match %q", inc.Match))
+	case inc.Symbol != "":
+		parts = append(parts, "symbol "+inc.Symbol)
+	case inc.Before == 0 && inc.Lines == 0 && inc.Until == "":
+		return ""
+	case inc.From > 1:
+		parts = append(parts, fmt.Sprintf("from line %d", inc.From))
+	}
+	if inc.Before > 0 {
+		parts = append(parts, fmt.Sprintf("%d before", inc.Before))
+	}
+	switch {
+	case inc.Lines > 0:
+		parts = append(parts, fmt.Sprintf("%d lines", inc.Lines))
+	case inc.Until != "":
+		parts = append(parts, fmt.Sprintf("until %q", inc.Until))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // IncludeFile is the whole of an include's file, for showing it and
@@ -62,6 +99,9 @@ func (n *Notebook) SetIncludeRange(i, from, to int) error {
 	b, err := n.includeBlock(i)
 	if err != nil {
 		return err
+	}
+	if inc, err := b.Include(); err == nil && windowText(inc) != "" {
+		return fmt.Errorf("its lines are picked by %s, not by from= and to=", windowText(inc))
 	}
 	if from < 0 || to < 0 {
 		return fmt.Errorf("line numbers count from 1")

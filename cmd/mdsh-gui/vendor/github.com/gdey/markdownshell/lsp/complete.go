@@ -102,7 +102,7 @@ func Complete(text, file string, line, col int) (from int, items []Item) {
 	if !hasValue {
 		return start, attrItems(info, tok)
 	}
-	spec, ok := doc.LookupAttr(key)
+	spec, ok := doc.LookupAttrFor(key, strings.Contains(info, doc.IncludeAttr))
 	if !ok {
 		return 0, nil
 	}
@@ -304,7 +304,7 @@ func Help(text string, line, col int) (spec doc.AttrSpec, from, to int, ok bool)
 		if strings.HasPrefix(tok, "#") {
 			key = "#"
 		}
-		spec, ok := doc.LookupAttr(key)
+		spec, ok := doc.LookupAttrFor(key, strings.Contains(info, doc.IncludeAttr))
 		return spec, from, to, ok
 	}
 	return doc.AttrSpec{}, 0, 0, false

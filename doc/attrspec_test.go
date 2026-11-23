@@ -27,7 +27,7 @@ func TestBlockAttrsMatchSpec(t *testing.T) {
 		}
 		want = append(want, name)
 	}
-	want = append(want, IncludeAttr, "file", "from", "to", "number_on", "lines", "mode", "placeholder", "var")
+	want = append(want, IncludeAttr, "file", "from", "to", "number_on", "match", "symbol", "comment", "before", "lines", "until", "lines", "mode", "placeholder", "var")
 	var got []string
 	for _, s := range BlockAttrs {
 		got = append(got, s.Name)

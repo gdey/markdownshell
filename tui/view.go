@@ -157,7 +157,7 @@ func (m *Model) block(i int) string {
 	if b.IsInclude() && r.Ran && r.Err == nil {
 		body = strings.TrimRight(string(r.Stdout), "\n")
 		if inc, _ := b.Include(); inc.Numbered {
-			body = strings.TrimRight(render.NumberLines(body, max(inc.From, 1)), "\n")
+			body = strings.TrimRight(render.NumberLines(body, max(r.FirstLine, 1)), "\n")
 		}
 	}
 	w := max(m.docWidth()-4, 10)
@@ -282,7 +282,12 @@ func tagsOf(b *doc.Block) string {
 		}
 	}
 	if inc, err := b.Include(); err == nil && b.IsInclude() {
-		if inc.From > 0 || inc.To > 0 {
+		switch {
+		case inc.Match != "":
+			tags = append(tags, fmt.Sprintf("match %q", inc.Match))
+		case inc.Symbol != "":
+			tags = append(tags, "symbol "+inc.Symbol)
+		case inc.From > 0 || inc.To > 0:
 			tags = append(tags, fmt.Sprintf("lines %d-%d", max(inc.From, 1), inc.To))
 		}
 	}
@@ -304,6 +309,9 @@ func (m *Model) state(i int, r *run.Result) string {
 		return lipgloss.NewStyle().Foreground(failCol).Render("✗ " + r.Err.Error())
 	case r.Ran && r.Failed():
 		return lipgloss.NewStyle().Foreground(failCol).Render(fmt.Sprintf("✗ exit %d", r.ExitStatus())) + took(r) + m.ranAgo(r)
+	case r.Ran && r.Warning != "":
+		// An include whose match= or symbol= found nothing.
+		return lipgloss.NewStyle().Foreground(runningCol).Render("! " + termsafe.Visible(strings.TrimPrefix(r.Warning, "include: ")))
 	case r.Ran && !r.Block.IsInclude() && run.Stale(m.d, m.results)[i]:
 		// A block it depends on ran again, or was cleared, since.
 		return lipgloss.NewStyle().Foreground(runningCol).Render("✓ stale") + took(r) + m.ranAgo(r)

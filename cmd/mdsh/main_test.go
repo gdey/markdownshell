@@ -828,3 +828,24 @@ func TestQuestionContext(t *testing.T) {
 		t.Errorf("plain block's question has context:\n%s", s)
 	}
 }
+
+// TestIncludeNoMatch checks that an include whose match= finds no line
+// warns, with and without running, and doesn't fail.
+func TestIncludeNoMatch(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "d.md")
+	os.WriteFile(filepath.Join(dir, "b.log"), []byte("ok\n"), 0o644)
+	os.WriteFile(f, []byte("# Log\n\n```text {<include file=b.log match=^FAIL}\nold\n```\n"), 0o644)
+	for _, args := range [][]string{{"-n", f}, {"-w", f}} {
+		var out, errb bytes.Buffer
+		if rc := mdsh(args, nil, &out, &errb); rc != 0 {
+			t.Fatalf("%v: rc = %d, stderr %q", args, rc, errb.String())
+		}
+		if !strings.Contains(errb.String(), `d.md: warning: line 3: include: no line of b.log matches "^FAIL"`) {
+			t.Errorf("%v: stderr = %q", args, errb.String())
+		}
+	}
+	if got, _ := os.ReadFile(f); !strings.Contains(string(got), "```text {<include file=b.log match=^FAIL}\n```\n") {
+		t.Errorf("written:\n%s", got)
+	}
+}

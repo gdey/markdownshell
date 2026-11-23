@@ -49,7 +49,8 @@ func includeBlock(b *doc.Block, r *Result, opts Options) {
 		r.Err = err
 		return
 	}
-	r.Stdout, r.Err = Lines(data, inc.From, inc.To)
+	w, err := Window(data, inc, b.Lang)
+	r.Stdout, r.FirstLine, r.Warning, r.Err = w.Text, w.First, w.Warning, err
 }
 
 // IncludeFile reads the whole of the file include block b names, under

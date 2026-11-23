@@ -2,6 +2,7 @@ package doc
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -80,14 +81,35 @@ var BlockAttrs = []AttrSpec{
 	{Name: "from", Kind: AttrNumber, Include: true, Default: "the first line", Help: "The first line to include, counting from 1"},
 	{Name: "to", Kind: AttrNumber, Include: true, Default: "the last line", Help: "The last line to include"},
 	{Name: "number_on", Kind: AttrFlag, Include: true, Default: "off", Help: "Show each included line's number in the file"},
+	{Name: "match", Kind: AttrText, Include: true, Default: "none", Help: "Start at the first line matching this Go regexp, instead of from="},
+	{Name: "symbol", Kind: AttrText, Include: true, Default: "none", Help: "Show the definition of this Go function, method (T.Method), type, const or var, with its doc comment"},
+	{Name: "comment", Kind: AttrChoice, Values: []string{"true", "false"}, Include: true, Default: "true", Help: "With symbol=, false leaves out the definition's doc comment"},
+	{Name: "before", Kind: AttrNumber, Include: true, Default: "0", Help: "Also show this many lines above where the window starts"},
+	{Name: "lines", Kind: AttrNumber, Include: true, Default: "to the end", Help: "Show this many lines from where the window starts"},
+	{Name: "until", Kind: AttrText, Include: true, Default: "to the end", Help: "End at the first line matching this Go regexp, at or after the start"},
 	{Name: "lines", Kind: AttrNumber, Values: []string{LinesFit}, Inputs: []string{TextboxLang}, Default: "1", Help: "The most lines a textbox holds, 1 or less being one line; fit holds any number and sizes the box to the text"},
 	{Name: "mode", Kind: AttrChoice, Values: []string{ChoiceDropdown, ChoiceRadio, ChoiceMulti}, Inputs: []string{ChoiceLang}, Default: ChoiceDropdown, Help: "Pick one from a dropdown or radio buttons, or check any number of boxes"},
 	{Name: "placeholder", Kind: AttrText, Inputs: []string{TextboxLang, ChoiceLang}, Default: "none", Help: "What an empty textbox, or a dropdown with nothing chosen, shows in an interactive view"},
 	{Name: "var", Kind: AttrText, Inputs: []string{TextboxLang, ChoiceLang}, Default: "none", Help: "Bind the text, or the checked options one per line, to $MDSH_VAR_<name> for blocks and conditions"},
 }
 
-// LookupAttr finds the spec for an attribute name.
-func LookupAttr(name string) (AttrSpec, bool) {
+// LookupAttrFor finds the spec for an attribute name on an include
+// block, or on another block: lines= is one thing on an include and
+// another on a textbox.
+func LookupAttrFor(name string, include bool) (AttrSpec, bool) {
+	i := slices.IndexFunc(BlockAttrs, func(s AttrSpec) bool { return s.Name == name && s.Include == include })
+	if i < 0 {
+		return anyAttr(name)
+	}
+	return BlockAttrs[i], true
+}
+
+// LookupAttr finds the spec for an attribute name, as other blocks than
+// includes have it when the two differ.
+func LookupAttr(name string) (AttrSpec, bool) { return LookupAttrFor(name, false) }
+
+// anyAttr is the first spec named name.
+func anyAttr(name string) (AttrSpec, bool) {
 	i := slices.IndexFunc(BlockAttrs, func(s AttrSpec) bool { return s.Name == name })
 	if i < 0 {
 		return AttrSpec{}, false
@@ -149,6 +171,11 @@ func (s AttrSpec) Check(value string, set bool) error {
 		}
 		if s.Name == "var" && !ValidVar(value) {
 			return fmt.Errorf("var= is a name of letters, digits and _")
+		}
+		if s.Name == "match" || s.Name == "until" {
+			if _, err := regexp.Compile(value); err != nil {
+				return fmt.Errorf("%s=: %w", s.Name, err)
+			}
 		}
 	}
 	return nil
