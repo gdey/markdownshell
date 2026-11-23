@@ -488,6 +488,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `out=markdown` | Insert output as raw markdown |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image: SVG, or PNG if the path ends in `.png` |
+| `out=file[:path]` | Write stdout to a file (default `<doc>.assets/<id>.log`) and show a window of it; see Long output in a file below |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
 | `history[=N]` | Keep the block's N earlier runs under its output, newest first (bare: the front matter's `history:`, else 10); see Earlier runs below |
 
@@ -523,6 +524,37 @@ GITHUB_TOKEN is not set
 `<!-- mdsh:output for="id" -->` region copies `out=markdown` or image
 output. A copy keeps what it holds when its block doesn't run, and mdsh
 warns about a copy for a block that doesn't exist.
+
+## Long output in a file
+
+A block that prints a build log or a test run swamps the document.
+`out=file` sends its stdout to `<doc>.assets/<id>.log`, or the path given
+(`out=file:res://build.log`, `out=file:logs/build.txt`), and its output
+fence becomes an include of that file:
+
+````markdown
+```sh {#build out=file}
+make 2>&1
+```
+
+```output {for=build exit=2 <include file=res://build.log match="^FAIL" before=3 lines=20}
+… the lines around the first FAIL …
+```
+````
+
+The fence shows the first `fold_output` lines of the file (25, or all of
+it with `fold_output: 0`) until you add window attributes to it: `from=`,
+`to=`, `match=`, `before=`, `lines=`, `until=` and `number_on`, as for an
+include block (see Including files). mdsh rewrites the rest of the fence
+on every run but keeps those, so the document points at the part of the
+log that matters, and its diff is that window rather than the whole log.
+A copy, `output {for=build}`, keeps a window of its own, and an include
+block anywhere that names the file shows this run's log. The file is
+written only when it changed, even when the block failed, and output past
+16 MB is cut at a line and the fence marked `truncated`. stderr keeps its
+own fence. A `nosave` block writes no file; `secret` and `tty` can't have
+`out=file`. With `history=N`, earlier runs' logs are kept like images, as
+`build.2026-11-13T190800Z.log`.
 
 ## Including files
 

@@ -227,7 +227,7 @@ func Pieces(d *doc.Document, results []*run.Result, opts Options) [][]byte {
 			}
 			continue
 		}
-		out := Output(r, showStderr(d, b, r, after(b)))
+		out := output(r, showStderr(d, b, r, after(b)), !opts.WriteBack && !opts.PlainIncludes)
 		var earlier string
 		if cap := b.HistoryCap(d.Options); opts.WriteBack {
 			// A run of a block with a history pushes the output the
@@ -439,8 +439,11 @@ func copyText(d *doc.Document, c *doc.Copy, results []*run.Result, lookup doc.Lo
 		return string(d.Src[c.Span.Start:c.Span.End]), true
 	}
 	r := results[i]
-	main, stderr := outputParts(r, showStderr(d, b, r, run.LookupAt(lookup, d, results, b.Output.End)))
+	main, stderr := outputParts(r, showStderr(d, b, r, run.LookupAt(lookup, d, results, b.Output.End)), false)
 	out := main
+	if r.Spill != nil {
+		out = spillFence(r, c.Window, !opts.WriteBack && !opts.PlainIncludes)
+	}
 	if c.Stream == "stderr" {
 		out = stderr
 	}
@@ -526,7 +529,13 @@ func Prose(d *doc.Document, results []*run.Result, env []string) []byte {
 // stderr is included only when withStderr is set; mdsh's own errors
 // always are. It returns "" when there is nothing to show.
 func Output(r *run.Result, withStderr bool) string {
-	main, stderr := outputParts(r, withStderr)
+	return output(r, withStderr, false)
+}
+
+// output is Output, with an out=file window's lines numbered when its
+// fence asks with number_on and numbered is set, as for printing.
+func output(r *run.Result, withStderr, numbered bool) string {
+	main, stderr := outputParts(r, withStderr, numbered)
 	if main != "" && stderr != "" {
 		return main + "\n" + stderr
 	}
@@ -535,7 +544,7 @@ func Output(r *run.Result, withStderr bool) string {
 
 // outputParts renders r's output as Output does, in two parts: stdout
 // (a fence, or a region for markdown and images) and the stderr fence.
-func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
+func outputParts(r *run.Result, withStderr, numbered bool) (main, errFence string) {
 	var b strings.Builder
 	id := r.Block.ID
 	stderr := ""
@@ -558,7 +567,13 @@ func outputParts(r *run.Result, withStderr bool) (main, errFence string) {
 		// A recording swapped for the text of a frame of it.
 		kind = "text"
 	}
+	if kind == "file" && r.Spill == nil {
+		// The block didn't get as far as writing its file.
+		kind = "text"
+	}
 	switch kind {
+	case "file":
+		b.WriteString(spillFence(r, r.Block.OutWindow, numbered))
 	case "markdown":
 		if len(r.Stdout) > 0 {
 			b.WriteString(open + "\n")
@@ -724,4 +739,35 @@ func attrValue(s string) string {
 func hasKey(m map[string]string, k string) bool {
 	_, ok := m[k]
 	return ok
+}
+
+// spillFence is the output fence of r, a block with out=file: an include
+// of its file, with window, the fence's window attributes, and the lines
+// they pick as its body, numbered with number_on when numbered is set.
+func spillFence(r *run.Result, window doc.Attrs, numbered bool) string {
+	attrs := fmt.Sprintf("for=%s exit=%d", attrValue(r.Block.ID), r.Status)
+	if r.Exited {
+		attrs += " exited"
+	}
+	if r.Spill.Truncated {
+		attrs += " truncated"
+	}
+	if at := At(r); at != "" {
+		attrs += " at=" + at
+	}
+	attrs += " " + doc.IncludeAttr + " file=" + attrValue(r.Spill.File)
+	for _, k := range doc.WindowAttrs {
+		if v, ok := window[k]; ok {
+			attrs += " " + k
+			if v != "" {
+				attrs += "=" + attrValue(v)
+			}
+		}
+	}
+	w, inc, err := r.Spill.Window(r, window)
+	body := string(w.Text)
+	if err == nil && numbered && inc.Numbered && body != "" {
+		body = NumberLines(withNewline(body), max(w.First, 1))
+	}
+	return Fence("output", attrs, body)
 }

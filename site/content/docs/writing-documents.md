@@ -76,6 +76,7 @@ hello from a sub-env
 | `out=markdown` | Insert output as raw markdown |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG): save it and link it |
 | `out=screenshot[:path]` | Draw the text output as a terminal-style image |
+| `out=file[:path]` | Write stdout to a file, by default `<doc>.assets/<id>.log`, and make the output fence an include of it: the first `fold_output` lines, or the window its `match=`, `before=`, `lines=`, `until=`, `from=` or `to=` pick, which write-back keeps |
 | `out=recording:path` | With `tty`, where the cast goes; a path ending in `.gif` links an animated GIF too |
 | `embed=inline` | With `out=image` or `out=screenshot`, embed a data URI instead of a file |
 | `raw` | On an `http` block, save the response body as it came instead of pretty-printing JSON |

@@ -306,6 +306,9 @@ type Result struct {
 	// Warning is, for an include block, why its window is empty, or that
 	// symbol= named more than one definition. It doesn't fail the block.
 	Warning string
+	// Spill is set for a block with out=file once it ran: the file its
+	// stdout went to.
+	Spill *Spill
 }
 
 // Failed reports whether the block ran and did not succeed.
@@ -610,6 +613,12 @@ func runBlock(ctx context.Context, stack *env.Stack, d *doc.Document, b *doc.Blo
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, opts)
 	}
+	// A log is saved even when the block failed: that is when it is read.
+	if b.SpillsOutput() {
+		if err := spill(d, b, r, opts); err != nil && r.Err == nil {
+			r.Err = err
+		}
+	}
 	// A recording is saved even when the block failed, to show how.
 	if rec != nil {
 		img, err := saveRecording(b, rec.Recording(), opts)
@@ -732,6 +741,9 @@ func outKind(b *doc.Block) (kind, arg string) {
 	case b.Attrs.Has("tty"):
 		kind = "recording"
 	case kind == "":
+		kind = "text"
+	}
+	if kind == "file" && arg == "" && b.Attrs["out"] != "file" {
 		kind = "text"
 	}
 	return kind, arg

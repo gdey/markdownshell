@@ -475,6 +475,12 @@ func (s *Session) emit(e Event) {
 		if e.Result != nil && e.Result.Image != "" {
 			s.images.set(e.Block, e.Result.Image, e.Result.At())
 		}
+		if e.Result != nil && e.Result.Spill != nil && !e.Block.NoSave() {
+			if link := s.spillLink(e.Result.Spill); link != "" {
+				s.images.set(e.Block, link, e.Result.At())
+			}
+			defer s.refillIncludes(e.Block)
+		}
 		s.startMu.Lock()
 		if t, ok := s.started[e.Block]; ok {
 			delete(s.started, e.Block)

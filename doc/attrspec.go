@@ -73,7 +73,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "background", Kind: AttrFlag, Default: "off", Help: "Start the block and go on to the next; its output is kept apart, and the run waits for it at the end"},
 	{Name: "tty", Kind: AttrFlag, Default: "off", Help: "Run on a terminal, for commands that need one; the session is saved as an asciinema cast, or a GIF with out=recording:<name>.gif"},
 	{Name: "frame", Kind: AttrNumber, Default: "the last", Help: "With tty, or on a cast fence, the frame of the recording that still views show and the player opens at, counting from 1; mdsh-gui sets it where you leave the player"},
-	{Name: "out", Kind: AttrChoice, Values: []string{"text", "markdown", "image", "image:", "screenshot", "screenshot:", "recording:"}, Default: "text", Help: "How output is inserted: fenced text, raw markdown, or an image saved beside the file"},
+	{Name: "out", Kind: AttrChoice, Values: []string{"text", "markdown", "image", "image:", "screenshot", "screenshot:", "recording:", "file", "file:"}, Default: "text", Help: "How output is inserted: fenced text, raw markdown, an image saved beside the file, or a file in the assets folder that the output fence shows a window of"},
 	{Name: "raw", Kind: AttrFlag, Default: "off", Help: "On an http block, save the response body as it came instead of pretty-printing JSON"},
 	{Name: "embed", Kind: AttrChoice, Values: []string{"inline"}, Default: "off", Help: "With out=image or out=screenshot, write a data URI instead of a file"},
 	{Name: IncludeAttr, Kind: AttrFlag, Include: true, Help: "Fill the block with lines from another file; it never runs"},

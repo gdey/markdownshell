@@ -267,6 +267,11 @@ func (s *Session) finish(j *bgJob, status int, err error) {
 	if kind, _ := outKind(b); (kind == "image" || kind == "screenshot") && r.Err == nil && len(r.Stdout) > 0 {
 		r.Image, r.Err = saveImage(b, r.Stdout, s.opts)
 	}
+	if b.SpillsOutput() {
+		if err := spill(s.d, b, r, s.opts); err != nil && r.Err == nil {
+			r.Err = err
+		}
+	}
 	if j.rec != nil {
 		j.release()
 		img, err := saveRecording(b, j.rec.Recording(), s.opts)

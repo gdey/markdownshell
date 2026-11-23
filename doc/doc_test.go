@@ -491,7 +491,7 @@ func TestCopies(t *testing.T) {
 	for i, c := range d.Copies {
 		got := *c
 		got.Span = Span{}
-		if got != want[i] {
+		if !sameCopy(&got, &want[i]) {
 			t.Errorf("copy %d = %+v, want %+v", i, got, want[i])
 		}
 	}

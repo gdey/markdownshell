@@ -104,6 +104,7 @@ other languages are left alone. Unknown attributes are kept as written.
 | `out=markdown` | Output is inserted as markdown, between `<!-- mdsh:output for="id" -->` and `<!-- /mdsh:output -->` |
 | `out=image[:path]` | Output is image bytes (PNG, JPEG, GIF, SVG), saved beside the file and linked |
 | `out=screenshot[:path]` | The text output drawn as a terminal-style image: SVG, or PNG when the path ends in `.png` |
+| `out=file[:path]` | stdout to a file (`<doc>.assets/<id>.log`); the output fence is an include of it, whose window attributes (`match=`, `lines=`…) you set and mdsh keeps |
 | `out=recording:path` | With `tty`, where the cast goes; a path ending in `.gif` links an animated GIF too |
 | `embed=inline` | With `out=image` or `out=screenshot`, a data URI instead of a file |
 | `raw` | On an `http` block, save the response body as it came instead of pretty-printing JSON |

@@ -120,7 +120,9 @@ func (d *Document) rename(renames []Rename, named map[*Block]string, links bool)
 			rewrite{regexp.MustCompile(`\{\{#` + old + `/`), "{{#" + r.New + "/"},
 			rewrite{regexp.MustCompile(`(for=)("?)` + old + `("|[\s}]|$)`), "${1}${2}" + r.New + "${3}"})
 		if links {
-			assets = append(assets, rewrite{regexp.MustCompile(`(\.assets/)` + old + `\.`), "${1}" + r.New + "."})
+			assets = append(assets,
+				rewrite{regexp.MustCompile(`(\.assets/)` + old + `\.`), "${1}" + r.New + "."},
+				rewrite{regexp.MustCompile(`(<include\s+file="?res://)` + old + `\.`), "${1}" + r.New + "."})
 		}
 	}
 	news := map[string]string{}

@@ -83,7 +83,22 @@ func entryText(src []byte, parts []doc.Span, k int, at string, rename bool) stri
 		}
 		first, rest := text[:nl+1], text[nl+1:]
 		region := strings.Contains(first, "<!-- mdsh:output")
-		b.WriteString(retag(first, k, region))
+		first = retag(first, k, region)
+		if rename && !region {
+			first = spillFile.ReplaceAllStringFunc(first, func(m string) string {
+				sm := spillFile.FindStringSubmatch(m)
+				v := sm[2]
+				quoted := len(v) >= 2 && v[0] == '"'
+				if quoted {
+					v = strings.ReplaceAll(v[1:len(v)-1], `\"`, `"`)
+				}
+				if v == "" || strings.HasPrefix(v, "/") || strings.Contains(strings.TrimPrefix(v, run.ResScheme), ":") {
+					return m
+				}
+				return sm[1] + attrValue(run.HistoryAssetName(v, at))
+			})
+		}
+		b.WriteString(first)
 		if rename && region {
 			rest = imageTarget.ReplaceAllStringFunc(rest, func(m string) string {
 				link := imageTarget.FindStringSubmatch(m)[1]
@@ -102,6 +117,10 @@ func entryText(src []byte, parts []doc.Span, k int, at string, rename bool) stri
 	}
 	return b.String()
 }
+
+// spillFile matches the file= of an out=file output fence: the part
+// before the value, and the value, quoted or not.
+var spillFile = regexp.MustCompile(`(<include\s+file=)("(?:[^"\\]|\\.)*"|[^\s}]+)`)
 
 // imageTarget matches an image link, with its target.
 var imageTarget = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)\)`)
