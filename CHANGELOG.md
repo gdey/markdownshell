@@ -180,6 +180,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- With the experimental interactive shell, a message mdsh showed in the
+  History pane, such as why a link wasn't opened, was written at the
+  shell's cursor, behind its back, so the cursor and what you typed
+  after it landed in the wrong place. Such a message now goes above the
+  prompt, the prompt and what is typed moving down with it, or to the
+  status line while a command runs. Turning recording on or off no
+  longer prints a line in the pane, in mdsh-gui, `mdsh --serve` or
+  `mdsh -i`: the pane's bar already says when it isn't recording.
+
+  ![The History pane: the message about a link mdsh won't open sits above the prompt, and the X typed after it went where the cursor was, in echo aXbc](docs/changelog/history-message-above-prompt.png)
+
 - With the experimental interactive shell, a command typed in History
   in bash that wrapped past the pane's edge was added with a carriage
   return and a doubled character where it wrapped, and one edited with
