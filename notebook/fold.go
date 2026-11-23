@@ -26,7 +26,9 @@ const foldLine = "<!-- mdsh:collapse -->\n"
 // SetFolds writes folds to the file, so it opens with them: a block's
 // code folds with a bare collapse attribute and its output with a bare
 // collapse-output, and a section with an mdsh:collapse line under its
-// heading. Unfolding takes them out. Where the file folds by a
+// heading. Unfolding takes them out. An output longer than the front
+// matter's fold_output, which folds without an attribute, unfolds with
+// collapse-output=false instead, and folding it again takes that out. Where the file folds by a
 // condition, as with collapse={{$?}}!=0 or an mdsh:collapse line with a
 // condition in the section, it is left as it is. Undo takes the change
 // back.
@@ -44,6 +46,14 @@ func (n *Notebook) SetFolds(folds []Fold) error {
 	var edits []edit
 	infos := map[int]string{} // block: its new info string
 	var cells []Cell
+	// longOutput is whether block i's output folds by its length.
+	longOutput := func(i int) bool {
+		if cells == nil {
+			cells = n.cells()
+		}
+		j := slices.IndexFunc(cells, func(c Cell) bool { return c.Block == i })
+		return j >= 0 && cells[j].longOutput
+	}
 	on, off := 0, 0
 	for _, f := range folds {
 		if f.On {
@@ -67,7 +77,12 @@ func (n *Notebook) SetFolds(folds []Fold) error {
 			if !ok {
 				info = b.Info
 			}
-			infos[f.Block] = doc.SetFlag(info, key, f.On)
+			if f.Output && longOutput(f.Block) {
+				info = setLongOutputFold(info, b, f.On)
+			} else {
+				info = doc.SetFlag(info, key, f.On)
+			}
+			infos[f.Block] = info
 			continue
 		}
 		if cells == nil {
@@ -131,4 +146,19 @@ func (n *Notebook) SetFolds(folds []Fold) error {
 		what = "fold"
 	}
 	return n.change(what, "", src, nil)
+}
+
+// setLongOutputFold is info with the fold of b's output, one that folds
+// by its length, set to on: no collapse-output to fold it, as its length
+// does, and collapse-output=false to keep it open. A collapse-output=
+// with a condition is left as it is.
+func setLongOutputFold(info string, b *doc.Block, on bool) string {
+	const key = "collapse-output"
+	if c, ok := b.Cond(key); ok && c.Ref != nil {
+		return info
+	}
+	if on {
+		return doc.SetAttr(info, key, "")
+	}
+	return doc.SetAttr(info, key, "false")
 }

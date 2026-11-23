@@ -57,7 +57,7 @@ var BlockAttrs = []AttrSpec{
 	{Name: "show-output", Kind: AttrCond, Default: "shown", Help: "Print the output only if the condition holds"},
 	{Name: "show-stderr", Kind: AttrCond, Bare: true, Default: "front matter show_stderr, else only when the block fails", Help: "Show stderr, or only if the condition holds"},
 	{Name: "collapse", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the code folded to one line, or only if the condition holds"},
-	{Name: "collapse-output", Kind: AttrCond, Bare: true, Default: "expanded", Help: "In mdsh-gui, open with the output folded to one line, or only if the condition holds"},
+	{Name: "collapse-output", Kind: AttrCond, Bare: true, Default: "folded past front matter fold_output lines (25), else expanded", Help: "In mdsh-gui, open with the output folded to one line, or only if the condition holds; false keeps a long output open"},
 	{Name: "history", Kind: AttrNumber, Bare: true, Default: "off", Help: "Keep the outputs of this many earlier runs under the current one, newest first; bare keeps the front matter's history, else 10"},
 	{Name: "nosave", Kind: AttrFlag, Default: "off", Help: "Saving keeps what the file holds: the block's output, or a textbox's text or a choice's picks, lives in the session only"},
 	{Name: "links", Kind: AttrFlag, Default: "off", Help: "Make web addresses in the output clickable, in mdsh-gui and mdsh -i; History adds it to the commands typed there"},

@@ -33,6 +33,10 @@ type Options struct {
 	// History is how many earlier runs a block marked with a bare
 	// history keeps. 0 means DefaultHistory.
 	History int `yaml:"history"`
+	// FoldOutput is how many lines a block's output may have before
+	// mdsh-gui draws it folded, unless the block's collapse-output= says
+	// otherwise. Nil means DefaultFoldOutput; 0 never folds by length.
+	FoldOutput *int `yaml:"fold_output"`
 	// Terminal is the size, in cells, of the terminal tty blocks run on
 	// where mdsh draws it, as in the GUI. A zero cols fits the window;
 	// a zero rows is 24.
@@ -115,6 +119,21 @@ func (o Options) ShareBanner() string {
 	return "This file brings in " + strings.Join(names, ", ") + " from your environment"
 }
 
+// DefaultFoldOutput is how many lines of output a block may show before
+// mdsh-gui folds it, when the front matter's fold_output doesn't say.
+const DefaultFoldOutput = 25
+
+// FoldsOutput reports whether a block's output of lines lines opens
+// folded by its length alone: more than fold_output, else more than
+// DefaultFoldOutput. A fold_output of 0 never folds.
+func (o Options) FoldsOutput(lines int) bool {
+	limit := DefaultFoldOutput
+	if o.FoldOutput != nil {
+		limit = *o.FoldOutput
+	}
+	return limit > 0 && lines > limit
+}
+
 // Interpolating reports whether placeholders are filled in.
 func (o Options) Interpolating() bool { return o.Interpolate == nil || *o.Interpolate }
 
@@ -145,6 +164,9 @@ func parseFrontMatter(src []byte, pos int) (Span, Options, error) {
 			}
 			if fm.Mdsh.History < 0 {
 				return Span{pos, e}, opts, fmt.Errorf("front matter: history must be how many earlier runs to keep, 0 or more, got %d", fm.Mdsh.History)
+			}
+			if f := fm.Mdsh.FoldOutput; f != nil && *f < 0 {
+				return Span{pos, e}, opts, fmt.Errorf("front matter: fold_output must be how many lines of output show before it folds, 0 or more, got %d", *f)
 			}
 			if t := fm.Mdsh.Terminal; t.Cols < 0 || t.Rows < 0 || t.Cols > 1000 || t.Rows > 500 {
 				return Span{pos, e}, opts, fmt.Errorf("front matter: terminal cols must be 0 to 1000 and rows 0 to 500, got %d by %d", t.Cols, t.Rows)

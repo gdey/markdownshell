@@ -86,7 +86,7 @@ other languages are left alone. Unknown attributes are kept as written.
 | `show-output=COND` | Print the output only if the condition holds |
 | `show-stderr[=COND]` | Show stderr always, or if the condition holds; by default only when the block fails |
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
-| `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
+| `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line; output past 25 lines (front matter `fold_output:`) folds unless `collapse-output=false` |
 | `nosave` | Saving keeps what the file holds: the output, a textbox's text or a choice's picks live in the session only. On an `output` fence, just that fence |
 | `secret` | The code and output hold a secret: mdsh-gui and `mdsh -i` mask them until shown, and as with `nosave` the output isn't saved |
 | `links` | Make `http:`, `https:` and `mailto:` addresses in the output clickable in mdsh-gui and `mdsh -i` |

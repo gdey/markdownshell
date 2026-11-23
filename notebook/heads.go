@@ -494,7 +494,8 @@ func (l *cellLayout) blockCell(i int, b *doc.Block) {
 	add(Cell{
 		Collapsed:       hidden == "" && holds(b, "collapse", after),
 		Hidden:          hidden,
-		CollapsedOutput: holds(b, "collapse-output", after),
+		CollapsedOutput: foldsOutput(b, d.Options, after, out),
+		longOutput:      d.Options.FoldsOutput(shownLines(out)),
 		OutputLine:      outLine,
 		Block:           i,
 		ID:              b.ID,
@@ -522,6 +523,38 @@ func (l *cellLayout) blockCell(i int, b *doc.Block) {
 		From:            span.Start,
 		To:              span.End,
 	}, bodySrc{block: i, out: out})
+}
+
+// foldsOutput is whether b's output, out, opens folded: as its
+// collapse-output= says, else when it is longer than the front matter's
+// fold_output (doc.DefaultFoldOutput lines unless it says), so a long
+// output stays open only once someone unfolds it, which writes
+// collapse-output=false (SetFolds).
+func foldsOutput(b *doc.Block, opts doc.Options, lookup doc.Lookup, out []byte) bool {
+	if c, ok := b.Cond("collapse-output"); ok {
+		return c.Eval(lookup)
+	}
+	return opts.FoldsOutput(shownLines(out))
+}
+
+// shownLines is how many lines an output, as printed, shows: its
+// fences' lines, and the lines of what isn't fenced, such as a table,
+// that aren't blank, without the fences' own opening and closing lines.
+func shownLines(out []byte) int {
+	n := 0
+	fence := "" // the open fence's marker
+	for _, l := range strings.Split(string(out), "\n") {
+		t := strings.TrimSpace(l)
+		switch {
+		case fence == "" && (strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~")):
+			fence = t[:len(t)-len(strings.TrimLeft(t, t[:1]))]
+		case fence != "" && strings.HasPrefix(t, fence) && strings.Trim(t, t[:1]) == "":
+			fence = ""
+		case fence != "" || t != "":
+			n++
+		}
+	}
+	return n
 }
 
 // textLines is how many lines s has, not counting the newline that ends
