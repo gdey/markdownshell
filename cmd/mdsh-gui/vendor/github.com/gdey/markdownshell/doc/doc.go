@@ -159,7 +159,7 @@ func Parse(src []byte) (*Document, error) {
 		pos = fm.End
 	}
 
-	ids, err := parseLines(d, pos, len(src))
+	ids, err := parseLines(d, pos, len(src), counts{})
 	if err != nil {
 		return nil, err
 	}
@@ -219,15 +219,35 @@ func Parse(src []byte) (*Document, error) {
 	return d, nil
 }
 
+// counts are how many blocks, includes and tapes are above where a
+// parse starts, which their ids number from.
+type counts struct{ blocks, includes, tapes int }
+
+// countsOf counts bs.
+func countsOf(bs []*Block) counts {
+	var c counts
+	for _, b := range bs {
+		switch {
+		case b.IsInclude():
+			c.includes++
+		case b.IsTape():
+			c.tapes++
+		default:
+			c.blocks++
+		}
+	}
+	return c
+}
+
 // parseLines parses the lines of d.Src from pos, which starts a line, on
 // to the line that starts at or after stop, into d, and returns the ids
 // of the blocks it found. A fence it finds is read to its end, past
-// stop if it goes there.
-func parseLines(d *Document, pos, stop int) (map[string]bool, error) {
+// stop if it goes there. c counts the blocks above pos.
+func parseLines(d *Document, pos, stop int, c counts) (map[string]bool, error) {
 	src := d.Src
 	ids := map[string]bool{}
 	vars := map[string]*Block{} // var= names, and the input that binds each
-	includes, tapes := 0, 0
+	includes, tapes, blocks := c.includes, c.tapes, c.blocks
 	var last *Block
 	var open []*Section
 	var lists []int // content columns of the open list items
@@ -312,8 +332,9 @@ func parseLines(d *Document, pos, stop int) (map[string]bool, error) {
 				continue
 			}
 			if b.ID == "" {
-				b.ID = fmt.Sprintf("block-%d", len(d.Blocks)-includes-tapes+1)
+				b.ID = fmt.Sprintf("block-%d", blocks+1)
 			}
+			blocks++
 			if ids[b.ID] {
 				return nil, fmt.Errorf("line %d: duplicate block id %q", lineNo(src, pos), b.ID)
 			}

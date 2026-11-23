@@ -64,21 +64,33 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 	if p < l.first {
 		return false
 	}
-	// The prose it is in, gs to ge, between blocks k-1 and k.
+	// The prose it is in, gs to ge, between blocks k-1 and k; or the
+	// body of block j, k-1, from its fence to the end of its output.
 	k := sort.Search(len(d.Blocks), func(i int) bool { return d.Blocks[i].Span.Start >= p })
 	gs, ge := l.first, len(src)
+	j := -1
 	if k > 0 {
 		gs = d.Blocks[k-1].Output.End
+		if b := d.Blocks[k-1]; p < b.Span.End {
+			j, gs = k-1, b.Span.Start
+			if p < b.BodySpan.Start || end > b.BodySpan.End {
+				return false
+			}
+		}
 	}
-	if k < len(d.Blocks) {
+	if j < 0 && k < len(d.Blocks) {
 		ge = d.Blocks[k].Span.Start
+	}
+	if j >= 0 {
+		ge = d.Blocks[j].Output.End
 	}
 	if gs > p || end > ge {
 		return false
 	}
 	oldGe := ge - delta
 	// The blocks are those before, moved after the edit, and ran as
-	// they had; what the cuts leave out is too.
+	// they had; what the cuts leave out is too. An edited block is
+	// new, and never ran, as it was.
 	states := l.blockStates()
 	for i, s := range states {
 		w := old.states[i]
@@ -86,7 +98,16 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 			w.start += delta
 			w.end += delta
 		}
-		if s != w || !bytes.Equal(l.pieces[3*i+1], old.pieces[3*i+1]) || !bytes.Equal(l.pieces[3*i+2], old.pieces[3*i+2]) {
+		if i == j {
+			w.end += delta
+			if w.r == nil || s.r == nil || w.ran || w.running || w.skipped || w.bg {
+				return false
+			}
+			w.r = s.r
+		} else if !bytes.Equal(l.pieces[3*i+1], old.pieces[3*i+1]) {
+			return false
+		}
+		if s != w || !bytes.Equal(l.pieces[3*i+2], old.pieces[3*i+2]) {
 			return false
 		}
 	}
@@ -105,12 +126,17 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 		}
 	}
 	// The tasks after keep their numbers.
-	var marks []int
-	if gs < ge {
-		marks = n.parseProse(src[gs:ge]).marks
-	}
 	mk := sort.SearchInts(old.marks, gs)
 	mk2 := sort.SearchInts(old.marks, oldGe)
+	var marks []int
+	if j >= 0 {
+		// Those in its output, which is after the edit.
+		for _, m := range old.marks[mk:mk2] {
+			marks = append(marks, m+delta-gs)
+		}
+	} else if gs < ge {
+		marks = n.parseProse(src[gs:ge]).marks
+	}
 	if len(marks) != mk2-mk {
 		return false
 	}
@@ -128,11 +154,23 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 		l.marks[i] += delta
 	}
 	l.tasks = l.marks
-	l.proseCells(gs, ge)
-	l.fillTasks()
+	if j >= 0 {
+		// Its line, for its name, from the cell above.
+		l.at, l.line = 0, 1
+		if ca > 0 {
+			w := &old.cells[ca-1]
+			l.at, l.line = w.From, w.Line
+		}
+		l.blockCell(j, d.Blocks[j])
+	} else {
+		l.proseCells(gs, ge)
+		l.fillTasks()
+	}
 	gap, gapBodies := l.cells, l.bodies
 	// The headings' sections and folds are the same blocks and
-	// collapse lines as before if the headings are the same levels.
+	// collapse lines as before if the headings are the same levels;
+	// if not, every heading's are found again once the cells are.
+	resection := false
 	h := ca
 	for i := range gap {
 		c := &gap[i]
@@ -143,21 +181,17 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 			h++
 		}
 		if h == cb || old.cells[h].Heading != c.Heading {
-			l.undo()
-			return false
+			resection = true
+			break
 		}
 		w := &old.cells[h]
 		c.SectionFrom, c.SectionTo, c.Collapsed = w.SectionFrom, w.SectionTo, w.Collapsed
 		h++
 	}
-	for ; h < cb; h++ {
-		if old.cells[h].Heading > 0 {
-			l.undo()
-			return false
-		}
+	for ; h < cb && !resection; h++ {
+		resection = old.cells[h].Heading > 0
 	}
-	line := 1 + bytes.Count(src[:gs], []byte{'\n'})
-	at := gs
+	line, at := 1, 0
 	if ca > 0 {
 		w := &old.cells[ca-1]
 		line, at = w.Line, w.From
@@ -173,10 +207,12 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 
 	// Old's cells and bodies become l's, moved, as old is done with.
 	lines := bytes.Count(src[p:end], []byte{'\n'}) - bytes.Count(was[p:wasEnd], []byte{'\n'})
-	editLine := 1 + bytes.Count(src[:p], []byte{'\n'})
+	editLine := 0
 	if ca > 0 {
 		w := &old.cells[ca-1]
 		editLine = w.Line + bytes.Count(src[w.From:p], []byte{'\n'})
+	} else {
+		editLine = 1 + bytes.Count(src[:p], []byte{'\n'})
 	}
 	cells, bodies := old.cells, old.bodies
 	old.cells, old.bodies = nil, nil
@@ -267,11 +303,89 @@ func (l *cellLayout) reuse(old *cellLayout, s *Splice) bool {
 	for _, i := range named {
 		fix(i - (cb - ca) + len(gap))
 	}
+	if resection {
+		// The cells sent are as they are now, and the others whose
+		// sections changed are fixed.
+		sent := s.At + len(s.Heads)
+		for _, i := range l.resection(cells) {
+			if i < s.At || i >= sent {
+				s.FixAt = append(s.FixAt, i)
+			}
+		}
+		for k := range s.Heads {
+			s.Heads[k] = headOf(&cells[s.At+k])
+		}
+		slices.Sort(s.FixAt)
+		s.FixAt = slices.Compact(s.FixAt)
+		s.Fixes = s.Fixes[:0]
+		for _, i := range s.FixAt {
+			s.Fixes = append(s.Fixes, headOf(&cells[i]))
+		}
+	}
 	l.cells, l.bodies = cells, bodies
 	l.blk, l.pos, l.markPos, l.folds = len(d.Blocks), len(src), len(src), len(d.Folds)
 	l.step, l.done, l.states = 1, true, states
 	s.Step = l.step
 	return true
+}
+
+// resection sets the heading cells' sections and folds, as lines,
+// foldHeadings and closeSection do as the cells are laid out, and
+// returns the cells it changed.
+func (l *cellLayout) resection(cells []Cell) []int {
+	n, d := l.n, l.n.d
+	var heads, open, changed []int
+	hidden := map[int]bool{}
+	section := func(h, end int) {
+		c := &cells[h]
+		from, to := d.BlocksIn(doc.Span{Start: c.From, End: end})
+		if !slices.ContainsFunc(d.Blocks[from:to], run.Runnable) {
+			from, to = 0, 0
+		}
+		c.SectionFrom, c.SectionTo = from, to
+	}
+	type was struct {
+		from, to  int
+		collapsed bool
+	}
+	before := map[int]was{}
+	for i := range cells {
+		c := &cells[i]
+		if c.Heading > 0 {
+			before[i] = was{c.SectionFrom, c.SectionTo, c.Collapsed}
+			for len(open) > 0 && cells[open[len(open)-1]].Heading >= c.Heading {
+				section(open[len(open)-1], c.From)
+				open = open[:len(open)-1]
+			}
+			open = append(open, i)
+			heads = append(heads, i)
+		}
+		if c.Hidden != "" {
+			for _, h := range open {
+				hidden[h] = true
+			}
+		}
+	}
+	for _, h := range open {
+		section(h, len(d.Src))
+	}
+	folded := map[int]bool{}
+	for _, f := range d.Folds {
+		if !f.Cond.Eval(run.LookupAt(l.lookup, d, n.results, f.Span.Start)) {
+			continue
+		}
+		if k := sort.Search(len(heads), func(k int) bool { return cells[heads[k]].From > f.Span.Start }) - 1; k >= 0 {
+			folded[heads[k]] = true
+		}
+	}
+	for _, h := range heads {
+		c := &cells[h]
+		c.Collapsed = folded[h] && !hidden[h]
+		if (was{c.SectionFrom, c.SectionTo, c.Collapsed}) != before[h] {
+			changed = append(changed, h)
+		}
+	}
+	return changed
 }
 
 // undo leaves l as newCellLayout made it, for reuse to give up.

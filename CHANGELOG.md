@@ -141,6 +141,11 @@ follow [Semantic Versioning](https://semver.org/).
   where it parsed the whole file. The page, too, goes through only the
   cells a keystroke changed, and the source pane keeps its run buttons
   and looks again only at the fences in the lines that changed.
+  Typing in a block's code, or changing a heading's level, is as quick,
+  about 0.3 s at 1M lines, against 1 to 2 s: the edit parses only that
+  block, the layout makes only its cell again, or works out the
+  headings' sections again without laying out the cells, and the page
+  goes through only the cells that changed.
 - An edit in a long file costs less to draw: after typing, a fold or a
   textbox, Go sends the page every cell's head and the bodies of only
   the cards drawn, where it sent every cell whole. At 1M lines that is

@@ -9,11 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/internal/stress"
 )
 
 // TestRelayoutSplice makes random edits to each shape of document, the
-// kinds typing makes and some that change its blocks, and checks that
+// kinds typing makes, in prose, in blocks and to headings' levels, and
+// some that change its blocks, and checks that
 // the heads the page had, with Relayout's splice applied, are the heads
 // of the document laid out afresh.
 func TestRelayoutSplice(t *testing.T) {
@@ -27,13 +29,42 @@ func TestRelayoutSplice(t *testing.T) {
 			gen := h.Gen
 			moving, reused := 0, 0
 			defer func() {
-				t.Logf("%d of 60 splices came before the index, %d reused the cells", moving, reused)
+				t.Logf("%d of 100 splices came before the index, %d reused the cells", moving, reused)
 			}()
-			for k := 0; k < 60; k++ {
+			for k := 0; k < 100; k++ {
 				lines := strings.SplitAfter(text, "\n")
 				i := r.Intn(len(lines))
 				var next string
-				switch r.Intn(3) {
+				var heads, code []int
+				for j, l := range lines {
+					if strings.HasPrefix(l, "#") {
+						heads = append(heads, j)
+					}
+				}
+				if d, err := doc.Parse([]byte(text)); err == nil {
+					for _, b := range d.Blocks {
+						if b.BodySpan.End > b.BodySpan.Start {
+							code = append(code, strings.Count(text[:b.BodySpan.Start], "\n"))
+						}
+					}
+				}
+				switch r.Intn(5) {
+				case 3: // change a heading's level
+					if len(heads) > 0 {
+						i = heads[r.Intn(len(heads))]
+						if next = "#" + lines[i]; strings.HasPrefix(lines[i], "##") && r.Intn(2) == 0 {
+							next = lines[i][1:]
+						}
+						break
+					}
+					fallthrough
+				case 4: // type in a block
+					if len(code) > 0 {
+						i = code[r.Intn(len(code))]
+						next = strings.TrimSuffix(lines[i], "\n") + edits[r.Intn(3)] + "\n"
+						break
+					}
+					fallthrough
 				case 0: // insert at the end of a line
 					l := strings.TrimSuffix(lines[i], "\n")
 					next = l + edits[r.Intn(len(edits))]
@@ -44,6 +75,9 @@ func TestRelayoutSplice(t *testing.T) {
 					next = ""
 				default: // insert a line
 					next = edits[r.Intn(len(edits))] + lines[i]
+				}
+				if lines[i] == "" {
+					continue // past the last line
 				}
 				re, err := n.Edit(n.Version(), []LineEdit{{First: i, Last: i + 1, Text: next}})
 				if err != nil || !re.Applied {
@@ -122,8 +156,9 @@ func applySplice(heads HeadList, s Splice) HeadList {
 func slicesClone(l HeadList) HeadList { return append(HeadList(nil), l...) }
 
 // TestRelayoutReuse checks which edits Relayout lays out by reusing the
-// cells around them: typing in prose does, while an edit that turns a
-// heading into a paragraph or changes a block lays out afresh.
+// cells around them: typing in prose or a block's code, or changing a
+// heading, does, while an edit that changes a block's fences, the tasks'
+// count or a link reference lays out afresh.
 func TestRelayoutReuse(t *testing.T) {
 	src := "# Top\n\nSome prose.\n\n```sh {#one}\necho one\n```\n\nMore prose, and a [link][ref].\n\n## Next\n\n- [ ] a task\n\n```sh {#two}\necho two\n```\n\nThe end.\n\n[ref]: https://example.com\n"
 	file := filepath.Join(t.TempDir(), "doc.md")
@@ -144,8 +179,11 @@ func TestRelayoutReuse(t *testing.T) {
 		{"More prose, typed, and a [link][ref].\n", "More prose,\nover two lines.\n", true},
 		{"Some prose.\n", "Some prose.\nAnd more.\n", true},
 		{"- [ ] a task\n", "- [x] a task\n", true},
-		{"# Top\n", "Top\n", false},                                             // a heading no longer
-		{"echo one\n", "echo uno\n", false},                                     // a block's code
+		{"## Next\n", "# Next\n", true},                                         // a heading's level
+		{"# Top\n", "Top\n", true},                                              // a heading no longer
+		{"echo one\n", "echo uno\n", true},                                      // a block's code
+		{"echo uno\n", "echo uno\necho dos\n", true},                            // a line more of it
+		{"echo two\n", "echo two\n```\n", false},                                // a fence more
 		{"- [x] a task\n", "- [x] a task\n- [ ] another\n", false},              // a task more
 		{"[ref]: https://example.com\n", "[ref]: https://example.org\n", false}, // a link reference
 	} {

@@ -3,6 +3,7 @@ package doc
 import (
 	"math/rand"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -56,19 +57,25 @@ func TestSpliceParse(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				blocks := map[*Block]bool{}
-				for _, b := range c.Blocks {
-					blocks[b] = true
+				// And one reparsed, whose blocks keep their identities as
+				// the splice's must.
+				f, err := Parse([]byte(text))
+				if err != nil {
+					t.Fatal(err)
 				}
+				cWas, fWas := slices.Clone(c.Blocks), slices.Clone(f.Blocks)
 				if c.splice([]byte(edited)) {
 					spliced++
-					for _, b := range c.Blocks {
-						if !blocks[b] {
-							t.Fatalf("edit %d: a block is new", k)
-						}
-					}
 					if !reflect.DeepEqual(c, want) {
 						t.Fatalf("edit %d (line %d to %q): the spliced document isn't a parse's", k, i, next)
+					}
+					if err := f.reparse([]byte(edited)); err != nil {
+						t.Fatal(err)
+					}
+					for j := range c.Blocks {
+						if slices.Index(cWas, c.Blocks[j]) != slices.Index(fWas, f.Blocks[j]) {
+							t.Fatalf("edit %d (line %d to %q): block %d's identity isn't a parse's", k, i, next, j)
+						}
 					}
 				}
 				if err := d.SetSource([]byte(edited)); err != nil {
@@ -97,7 +104,8 @@ func TestSpliceTop(t *testing.T) {
 		{"The end.", "The very end.", true},
 		{"# Title\n", "", true},
 		{"title: T", "title: U", false},
-		{"echo one", "echo two", false},
+		{"echo one", "echo two", true},
+		{"echo one", "echo one\n```\n", false},
 		{"#!/usr/bin/env mdsh\n", "", false},
 	} {
 		edited := strings.Replace(src, e.old, e.text, 1)
@@ -139,5 +147,56 @@ func TestSpliceFrontMatter(t *testing.T) {
 	}
 	if err := d.SetSource([]byte(edited)); err != nil || !reflect.DeepEqual(d, want) {
 		t.Fatal("front matter not read", err)
+	}
+}
+
+// TestSpliceBody types in each block's body in turn, and checks that a
+// plain block's edit is spliced, to the document a parse has, with the
+// edited block new and the others kept.
+func TestSpliceBody(t *testing.T) {
+	for _, shape := range stress.Shapes {
+		t.Run(shape, func(t *testing.T) {
+			text := string(stress.Write(shape, 2000))
+			d, err := Parse([]byte(text))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, b := range d.Blocks {
+				if b.BodySpan.End <= b.BodySpan.Start {
+					continue
+				}
+				for _, typed := range []string{"x", "\nmore", ""} {
+					at := b.BodySpan.End - 1
+					edited := text[:at] + typed + text[at:]
+					if typed == "" {
+						edited = text[:at-1] + text[at:] // a backspace
+					}
+					want, err := Parse([]byte(edited))
+					if err != nil {
+						continue
+					}
+					c, err := Parse([]byte(text))
+					if err != nil {
+						t.Fatal(err)
+					}
+					was := slices.Clone(c.Blocks)
+					plain := !b.IsInput() && !b.IsInclude() && !b.IsTape() && !b.IsHTTP() && b.Prefix == "" && !c.twin(c.Blocks[i], want.Blocks[i]) &&
+						(i+1 == len(c.Blocks) || !c.Blocks[i+1].IsInput())
+					if got := c.splice([]byte(edited)); got != plain {
+						t.Fatalf("block %d (%s), %q: spliced %t", i, b.ID, typed, got)
+					} else if !got {
+						continue
+					}
+					if !reflect.DeepEqual(c, want) {
+						t.Fatalf("block %d (%s), %q: the spliced document isn't a parse's", i, b.ID, typed)
+					}
+					for j := range c.Blocks {
+						if (c.Blocks[j] == was[j]) != (j != i) {
+							t.Fatalf("block %d (%s), %q: block %d's identity is wrong", i, b.ID, typed, j)
+						}
+					}
+				}
+			}
+		})
 	}
 }
