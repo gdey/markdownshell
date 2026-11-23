@@ -712,3 +712,32 @@ func TestRegionAttrs(t *testing.T) {
 		t.Errorf("stamped region isn't a's output: output %v, copies %d", d.Blocks[0].Output, len(d.Copies))
 	}
 }
+
+func TestFoldOutput(t *testing.T) {
+	for _, tt := range []struct {
+		fm    string
+		lines int
+		want  bool
+	}{
+		{"", 25, false},
+		{"", 26, true},
+		{"  fold_output: 3\n", 3, false},
+		{"  fold_output: 3\n", 4, true},
+		{"  fold_output: 0\n", 1000, false},
+	} {
+		d, err := Parse([]byte("---\nmdsh:\n  shell: sh\n" + tt.fm + "---\n"))
+		if err != nil || d.FrontMatterErr != nil {
+			t.Fatal(err, d.FrontMatterErr)
+		}
+		if got := d.Options.FoldsOutput(tt.lines); got != tt.want {
+			t.Errorf("%q, %d lines: folds %v, want %v", tt.fm, tt.lines, got, tt.want)
+		}
+	}
+	d, err := Parse([]byte("---\nmdsh:\n  fold_output: -1\n---\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.FrontMatterErr == nil {
+		t.Error("fold_output: -1: want FrontMatterErr")
+	}
+}

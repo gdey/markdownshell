@@ -212,7 +212,9 @@ export interface Cell {
     /**
      * Collapsed is true when the view should open with a block's code, or
      * a heading's section, folded: collapse= holds, or an mdsh:collapse
-     * line in the section does. CollapsedOutput is collapse-output='s.
+     * line in the section does. CollapsedOutput is collapse-output='s,
+     * else whether the output is longer than the front matter's
+     * fold_output, as longOutput says.
      */
     "collapsed"?: boolean;
     "collapsedOutput"?: boolean;

@@ -18,6 +18,7 @@ mdsh:
   interpolate: true
   show_stderr: false
   history: 10
+  fold_output: 25
   terminal:
     cols: 100
     rows: 30
@@ -43,6 +44,7 @@ closing line, the `---` is just a thematic break.
 | `interpolate` | `true`, `false` | `true` | Whether `{{...}}` placeholders in prose are filled in |
 | `show_stderr` | `true`, `false` | unset | Show every block's stderr, or none of it |
 | `history` | a whole number | 10 | How many earlier runs a bare `history` on a block keeps |
+| `fold_output` | a whole number of lines | 25 | In mdsh-gui, fold a block's output that is longer than this; 0 never does |
 | `terminal.cols`, `terminal.rows` | cells | fit the window, 24 | In mdsh-gui, the size of the terminal `tty` blocks run on |
 | `http.secret_headers` | list of header names | none | Response headers, besides the built-in five, whose values `http` blocks save as `(secret)` |
 | `env.share` | list of variable names, `...`, `-NAME` | the base set | Variables passed from mdsh's environment into the shell, besides the base set (`PATH`, `HOME`, `USER`, ...), and the default `share=` for sub-envs |
@@ -126,6 +128,15 @@ How many earlier runs a block marked with a bare `history` keeps, 10
 when unset. A block's own `history=N` overrides it, and a block without
 `history` keeps none. See
 [Earlier runs]({{< relref "writing-documents#earlier-runs" >}}).
+
+### `fold_output`
+
+How many lines a block's output can have before mdsh-gui (and
+`mdsh --serve`) opens it folded to one line, 25 when unset; `0` folds
+nothing by length. A block's `collapse-output=` overrides it: unfolding a
+long output by hand writes `collapse-output=false`, so it stays open
+until you fold it again. See
+[Folding]({{< relref "writing-documents#folding" >}}).
 
 ### `env.share`
 

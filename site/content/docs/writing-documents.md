@@ -384,6 +384,12 @@ by a condition is left as it is. An `http` block's response folds as
 a whole with `collapse-output`, and its body on its own in mdsh-gui;
 see [HTTP requests]({{< relref "http#in-the-desktop-app-and-the-terminal" >}}).
 
+An output longer than 25 lines opens folded without any attribute, in
+mdsh-gui and `mdsh --serve`. `fold_output:` in the front matter sets
+how many lines that is, and `fold_output: 0` turns it off. Unfolding
+such an output by hand writes `collapse-output=false`, so it stays open,
+and folding it again takes that out.
+
 ## Terminal blocks
 
 Some commands need a terminal: `docker run -it`, `ssh`, `sudo`, an

@@ -8,6 +8,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A block's output longer than 25 lines opens folded to its first line,
+  in mdsh-gui and `mdsh --serve`, so a long log doesn't push the rest of
+  the file out of view; it shows as it streams and folds once the block
+  ends. `fold_output:` under `mdsh:` in the front matter sets how many
+  lines that is, and `fold_output: 0` turns it off. Unfolding one by hand
+  writes `collapse-output=false` on the block, so it stays open, and
+  folding it again takes that out.
+
+  ![A block that printed 40 lines, its output folded to "1 … 39 more lines", over a block whose three lines show](docs/changelog/fold-long-output.png)
+
 - With the experimental interactive shell on (Settings › Shell), the
   History pane is a terminal on the document's shell, in mdsh-gui and
   `mdsh --serve`: the shell draws its own prompt, reads your rc file's

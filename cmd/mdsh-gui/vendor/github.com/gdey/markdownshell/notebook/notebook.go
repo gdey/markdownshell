@@ -114,9 +114,12 @@ type Cell struct {
 	SectionTo   int `json:"sectionTo,omitempty"`
 	// Collapsed is true when the view should open with a block's code, or
 	// a heading's section, folded: collapse= holds, or an mdsh:collapse
-	// line in the section does. CollapsedOutput is collapse-output='s.
+	// line in the section does. CollapsedOutput is collapse-output='s,
+	// else whether the output is longer than the front matter's
+	// fold_output, as longOutput says.
 	Collapsed       bool `json:"collapsed,omitempty"`
 	CollapsedOutput bool `json:"collapsedOutput,omitempty"`
+	longOutput      bool
 	// OutputLine is the line a block's saved output starts on, counting
 	// from 1, or 0 when it has none, for folding it in the source.
 	OutputLine int `json:"outputLine,omitempty"`

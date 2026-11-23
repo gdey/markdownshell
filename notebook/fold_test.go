@@ -85,3 +85,47 @@ func TestSetFoldsAtEnd(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// TestFoldLongOutput: an output longer than fold_output opens folded
+// with no attribute, unfolding it writes collapse-output=false, and
+// folding it again takes that out.
+func TestFoldLongOutput(t *testing.T) {
+	src := "---\nmdsh:\n  fold_output: 2\n---\n\n" +
+		"```sh {#long}\nseq 3\n```\n\n```output {for=long}\n1\n2\n3\n```\n\n" +
+		"```sh {#short}\nseq 2\n```\n\n```output {for=short}\n1\n2\n```\n"
+	n, err := Open(write(t, src), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	folded := func() map[string]bool {
+		m := map[string]bool{}
+		for _, c := range n.Cells() {
+			if c.Block >= 0 {
+				m[c.ID] = c.CollapsedOutput
+			}
+		}
+		return m
+	}
+	if got := folded(); !got["long"] || got["short"] {
+		t.Fatalf("folded = %v, want only long", got)
+	}
+	if err := n.SetFolds([]Fold{{Block: 0, Output: true, On: false}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(n.Text(), "```sh {#long collapse-output=false}\n") {
+		t.Fatalf("unfolded:\n%s", n.Text())
+	}
+	if folded()["long"] {
+		t.Error("long is still folded")
+	}
+	if err := n.SetFolds([]Fold{{Block: 0, Output: true, On: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if n.Text() != src {
+		t.Fatalf("folded again:\n%s", n.Text())
+	}
+	if !folded()["long"] {
+		t.Error("long isn't folded again")
+	}
+}

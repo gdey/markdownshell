@@ -473,7 +473,7 @@ running it, so `setopt ignore_close_braces` in the block can't help.
 | `show-output=COND` | Print the output only if the condition holds |
 | `show-stderr[=COND]` | Show stderr (by default it only shows when the block fails) |
 | `collapse[=COND]` | In mdsh-gui, open with the code folded to one line |
-| `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line |
+| `collapse-output[=COND]` | In mdsh-gui, open with the output folded to one line; output past 25 lines (front matter `fold_output:`) folds unless `collapse-output=false` |
 | `nosave` | Keep the value out of the file: the block's output, or what is typed in a textbox or picked in a choice, lives in the session, and saving leaves what the file holds. On an `output` fence, keeps just that fence |
 | `secret` | The code and output hold a secret: mdsh-gui and `mdsh -i` mask them until you show them, reports print them as `(secret)` unless `--show-secrets`, and as with `nosave` the output isn't saved to the file |
 | `env=name` | Run in a named sub-env; `a/b` stacks `b` on `a` |
