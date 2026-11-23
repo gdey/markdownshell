@@ -30,6 +30,8 @@ func TestWindow(t *testing.T) {
 		{"until", log, doc.Include{Match: "^FAIL", Until: "^ok"}, "FAIL b\n  want 1\n  got 2\nok c\n", 3, ""},
 		{"until the start line", log, doc.Include{Match: "^FAIL", Until: "FAIL"}, "FAIL b\n", 3, ""},
 		{"until no match runs to the end", log, doc.Include{Match: "^FAIL d", Until: "^nope"}, "FAIL d\ndone\n", 7, ""},
+		{"from to before", log, doc.Include{From: 3, To: 4, Before: 1}, "ok a\nFAIL b\n  want 1\n", 2, ""},
+		{"to past the end", log, doc.Include{From: 7, To: 20, Before: 1}, "ok c\nFAIL d\ndone\n", 6, ""},
 		{"from lines", log, doc.Include{From: 4, Lines: 2}, "  want 1\n  got 2\n", 4, ""},
 		{"lines alone", log, doc.Include{Lines: 2}, "build\nok a\n", 1, ""},
 		{"no match", log, doc.Include{File: "b.log", Match: "^panic"}, "", 0, `include: no line of b.log matches "^panic"`},
@@ -44,6 +46,9 @@ func TestWindow(t *testing.T) {
 	}
 	if _, err := run.Window([]byte(log), doc.Include{From: 20, Lines: 1}, "text"); err == nil || !strings.Contains(err.Error(), "past the end") {
 		t.Errorf("from past the end: err = %v", err)
+	}
+	if _, err := run.Window([]byte(log), doc.Include{From: 20}, "text"); err == nil {
+		t.Errorf("from past the end, no window: err = nil")
 	}
 }
 
@@ -84,6 +89,12 @@ func init() {}
 func init() {
 	fmt.Println()
 }
+
+func (m *M[K, V]) Len() int { return 0 }
+
+func (p (P)) Name() {}
+
+func (s []int) Odd() {}
 `
 
 func TestWindowSymbol(t *testing.T) {
@@ -108,6 +119,9 @@ func TestWindowSymbol(t *testing.T) {
 		{"init", false, 0, "func init() {}\n", 33, "include: a.go defines init 2 times; showing the first"},
 		{"Nope", false, 0, "", 0, "include: a.go defines no Nope"},
 		{"Size.Get", false, 0, "", 0, "include: a.go defines no Size.Get"},
+		{"M.Len", false, 0, "func (m *M[K, V]) Len() int { return 0 }\n", 39, ""},
+		{"P.Name", false, 0, "func (p (P)) Name() {}\n", 41, ""},
+		{"Odd", false, 0, "func (s []int) Odd() {}\n", 43, ""},
 	}
 	for _, tt := range tests {
 		inc := doc.Include{File: "a.go", Symbol: tt.symbol, NoComment: tt.noComment, Lines: tt.lines}
@@ -116,11 +130,155 @@ func TestWindowSymbol(t *testing.T) {
 			t.Errorf("%s: got %q at %d, warning %q, err %v; want %q at %d, warning %q", tt.symbol, w.Text, w.First, w.Warning, err, tt.want, tt.first, tt.warn)
 		}
 	}
-	if w, _ := run.Window([]byte("def f():\n  pass\n"), doc.Include{File: "a.py", Symbol: "f"}, "python"); w.First != 0 || !strings.Contains(w.Warning, "only Go") {
-		t.Errorf("python: %+v", w)
-	}
-	if w, _ := run.Window([]byte("package a\nfunc {"), doc.Include{File: "a.go", Symbol: "f"}, "go"); w.First != 0 || !strings.Contains(w.Warning, "doesn't read as Go") {
+	if w, _ := run.Window([]byte("package a\nfunc {"), doc.Include{File: "a.go", Symbol: "f"}, "go"); w.First != 0 || w.Warning != "include: a.go defines no f" {
 		t.Errorf("broken Go: %+v", w)
+	}
+	broken := "package a\n\nfunc f() {\n\treturn\n}\n\nfunc g( {\n"
+	if w, _ := run.Window([]byte(broken), doc.Include{File: "a.go", Symbol: "f"}, "go"); w.First != 3 || string(w.Text) != "func f() {\n\treturn\n}\n" || !strings.Contains(w.Warning, "doesn't read as Go") {
+		t.Errorf("broken Go, best guess: %+v", w)
+	}
+	// Under a plain fence, a .go file is still Go.
+	if w, _ := run.Window([]byte(broken), doc.Include{File: "a.go", Symbol: "f"}, "text"); w.First != 3 || !strings.Contains(w.Warning, "doesn't read as Go") {
+		t.Errorf("broken Go, plain fence: %+v", w)
+	}
+	twice := broken + "\nfunc f() {}\n"
+	if w, _ := run.Window([]byte(twice), doc.Include{File: "a.go", Symbol: "f"}, "go"); w.First != 3 || !strings.HasSuffix(w.Warning, "best guess; a.go defines f 2 times; showing the first") {
+		t.Errorf("broken Go, two: %+v", w)
+	}
+}
+
+const pySrc = `import os
+
+
+# greet says hello.
+@cache
+def greet(name,
+          loud=False):
+    x = "}"
+
+    return x
+
+
+class Server:
+    """Serves."""
+
+    def handle(self):
+        pass
+
+    def stop(self):
+        pass
+
+
+def handle():
+    pass
+`
+
+const jsSrc = `// greet says hello.
+/* It says it
+   twice. */
+function greet(n) {
+  const s = ` + "`${n}}`" + `;
+  return s + "{";
+}
+
+class Server {
+  handle() { return 1 }
+}
+
+const arrow = (a) => a + 1;
+let late = 2
+`
+
+const rsSrc = `use std::fmt;
+
+/// A point.
+#[derive(Debug)]
+struct Point {
+    x: i32,
+}
+
+impl Point {
+    fn len(&self) -> i32
+    {
+        0
+    }
+}
+
+fn greet(n: &str) -> String {
+    format!("{}", n)
+}
+
+struct Unit;
+
+trait Shape {}
+`
+
+const shSrc = `#!/bin/sh
+
+# greet says hello.
+greet() {
+  echo "}"
+}
+
+function other {
+  if true; then
+    echo hi
+  fi
+}
+`
+
+const rbSrc = `class Foo
+  def greet(n)
+    n
+  end
+end
+`
+
+func TestWindowSymbolOther(t *testing.T) {
+	tests := []struct {
+		name, src, file, lang, symbol string
+		noComment                     bool
+		first, last                   int
+		warn                          string
+	}{
+		{"py func", pySrc, "a.py", "python", "greet", false, 4, 10, ""},
+		{"py no comment", pySrc, "a.py", "python", "greet", true, 5, 10, ""},
+		{"py class", pySrc, "a.py", "python", "Server", false, 13, 20, ""},
+		{"py method", pySrc, "a.py", "python", "Server.stop", false, 19, 20, ""},
+		{"py two", pySrc, "a.py", "python", "handle", false, 16, 17, "include: a.py defines handle 2 times; showing the first"},
+		{"py by name", pySrc, "a.py", "", "greet", false, 4, 10, ""},
+		{"py none", pySrc, "a.py", "python", "os", false, 0, 0, "include: a.py defines no os"},
+		{"js func", jsSrc, "a.js", "js", "greet", false, 1, 7, ""},
+		{"js class", jsSrc, "a.js", "javascript", "Server", false, 9, 11, ""},
+		{"js arrow", jsSrc, "a.js", "js", "arrow", false, 13, 13, ""},
+		{"js let", jsSrc, "a.js", "js", "late", false, 14, 14, ""},
+		{"rust struct", rsSrc, "a.rs", "rust", "Point", false, 3, 7, ""},
+		{"rust method", rsSrc, "a.rs", "rust", "Point.len", false, 10, 13, ""},
+		{"rust fn", rsSrc, "a.rs", "rust", "greet", false, 16, 18, ""},
+		{"rust unit", rsSrc, "a.rs", "rust", "Unit", false, 20, 20, ""},
+		{"rust trait", rsSrc, "a.rs", "rust", "Shape", false, 22, 22, ""},
+		{"sh func", shSrc, "a.sh", "sh", "greet", false, 3, 6, ""},
+		{"sh function", shSrc, "a.sh", "bash", "other", false, 8, 12, ""},
+		{"ruby end", rbSrc, "a.rb", "ruby", "greet", false, 2, 4, ""},
+		{"ruby class", rbSrc, "a.rb", "ruby", "Foo", false, 1, 5, ""},
+		{"yaml key", "a:\n  b: 1\n\n  c:\n    - x\nd: 2\n", "a.yaml", "yaml", "a", false, 1, 5, ""},
+		{"yaml nested", "a:\n  b: 1\n\n  c:\n    - x\nd: 2\n", "a.yaml", "yaml", "a.c", false, 4, 5, ""},
+		{"end of file, no body", "fn f()", "a.rs", "rust", "f", false, 1, 1, ""},
+		{"unclosed brace", "fn f() {\n    x\n\n", "a.rs", "rust", "f", false, 1, 3, ""},
+		{"unclosed head", "def f(\n    a,\n", "a.py", "python", "f", false, 1, 2, ""},
+		{"shell brace on a line of its own", "f()\n{\n  echo hi\n}\n", "a.sh", "sh", "f", false, 1, 4, ""},
+		{"no lexer", "x\n", "a.zzz", "", "x", false, 0, 0, "include: a.zzz defines no x that symbol= can find: it has no lexer for a.zzz"},
+	}
+	for _, tt := range tests {
+		inc := doc.Include{File: tt.file, Symbol: tt.symbol, NoComment: tt.noComment}
+		w, err := run.Window([]byte(tt.src), inc, tt.lang)
+		last := 0
+		if w.First > 0 {
+			last = w.First + strings.Count(strings.TrimSuffix(string(w.Text), "\n"), "\n")
+		}
+		if err != nil || w.First != tt.first || last != tt.last || w.Warning != tt.warn {
+			t.Errorf("%s: got lines %d-%d, warning %q, err %v; want %d-%d, %q\n%s", tt.name, w.First, last, w.Warning, err, tt.first, tt.last, tt.warn, w.Text)
+		}
 	}
 }
 

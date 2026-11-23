@@ -605,8 +605,12 @@ lines above it, `lines=N` shows N lines from it, and `until=` ends at the
 first line at or after it matching another regexp (else the window runs
 to the end of the file). `symbol=` shows a Go definition with its doc
 comment: a function, a method as `T.Method` or `(*T).Method`, a type, a
-const or a var; `comment=false` leaves the comment out. Only Go is read
-for `symbol=` so far. Line numbers start where the window does. When
+const or a var; `comment=false` leaves the comment out. Other languages
+are a best guess from the highlighter's tokens: the definition runs to
+its closing brace, or for Python and YAML to the end of what is indented
+under it, and `A.b` finds `b` inside `A` (a class's method, Rust's
+`impl` block). When the guess ends in the wrong place, `lines=` or
+`until=` fixes the end. Line numbers start where the window does. When
 nothing matches, the block is left empty and mdsh warns, without failing
 the run. `match=` and `symbol=` can't be combined with `from=` or `to=`,
 nor `lines=` with `until=`.
