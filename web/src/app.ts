@@ -637,9 +637,11 @@ function updateDoc(r: Relayout) {
   cells = next;
   virtual = cells.length > lazyCells;
   $("doc").classList.toggle("virtual", virtual);
-  // Typing in prose changes no block, so the lines between them stay.
-  const same = !!r.splice && reindex(r.splice, was) && !gone.some((c) => c.block >= 0) && !middle.some((c) => c.block >= 0);
-  if (!same) indexCells();
+  const re = !!r.splice && reindex(r.splice, was);
+  if (!re) indexCells();
+  // Typing in prose or a block's code changes no block's id or
+  // depends=, so the lines between them stay.
+  const same = re && sameDeps(gone, middle);
   bareBodies();
   // A few new cards, as typing makes, are drawn as typing's; many, as
   // a fence opened above them makes, are drawn as the view's, like
@@ -653,6 +655,20 @@ function updateDoc(r: Relayout) {
   else setDeps(cells);
   // Many new cards can leave the view blank, as drawing every one can.
   if (middle.length > 20) repaint($("doc-scroll"));
+}
+
+// sameDeps says the block cells in gone and those in middle, which took
+// their place, are the same blocks, with the same ids and depends=.
+function sameDeps(gone: Cell[], middle: Cell[]): boolean {
+  const a = gone.filter((c) => c.block >= 0);
+  const b = middle.filter((c) => c.block >= 0);
+  return (
+    a.length === b.length &&
+    a.every((c, k) => {
+      const d = b[k];
+      return c.block === d.block && c.id === d.id && renumbered(c) === renumbered(d) && sameJSON(c.depends, d.depends);
+    })
+  );
 }
 
 // takeFresh lines fresh, every cell Go laid out, up with the cells the
@@ -1060,28 +1076,34 @@ function indexCells() {
   cells.forEach((c, i) => {
     cellIndex.set(c, i);
     if (renumbered(c)) blockCells.set(c.block, c);
-    if (!c.heading) return;
-    // A heading is known by its level and text, and which one it is of
-    // those alike, so its fold outlives edits elsewhere.
-    const name = c.heading + ":" + (c.title ?? "");
-    const nth = seen.get(name) ?? 0;
-    seen.set(name, nth + 1);
-    const key = "section:" + name + ":" + nth;
-    foldKeys.set(c, key);
-    headingByKey.set(key, c);
+    if (c.heading) keyHeading(c, seen);
   });
   foldCells();
 }
 
+// keyHeading gives heading c its fold's key. A heading is known by its
+// level and text, and which one it is of those alike, as seen counts,
+// so its fold outlives edits elsewhere.
+function keyHeading(c: Cell, seen: Map<string, number>) {
+  const name = c.heading + ":" + (c.title ?? "");
+  const nth = seen.get(name) ?? 0;
+  seen.set(name, nth + 1);
+  const key = "section:" + name + ":" + nth;
+  foldKeys.set(c, key);
+  headingByKey.set(key, c);
+}
+
 // reindex is indexCells for splice sp, made to was, the cells before
-// it, when it replaced cells with as many others, none a heading, and
-// added or took away no block, as typing in a paragraph does: only the
-// cells replaced are indexed again. Going through every cell took most
-// of the time a keystroke in a long document spent drawing. It reports
-// whether it could.
+// it, when it replaced cells with as many others and added or took away
+// no block, as typing in a paragraph or a block, or changing a heading,
+// does: only the cells replaced are indexed again, and the headings
+// keyed again if one changed. Going through every cell took most of the
+// time a keystroke in a long document spent drawing. It reports whether
+// it could.
 function reindex(sp: SpliceIn, was: Cell[]): boolean {
   if (sp.remove !== sp.heads.length || sp.move.block !== 0) return false;
-  for (let k = 0; k < sp.remove; k++) if (was[sp.at + k].heading || sp.heads[k].heading) return false;
+  let headings = false;
+  for (let k = 0; k < sp.remove; k++) if (was[sp.at + k].heading || sp.heads[k].heading) headings = true;
   for (let k = 0; k < sp.remove; k++) {
     const c = was[sp.at + k];
     cellIndex.delete(c);
@@ -1093,6 +1115,23 @@ function reindex(sp: SpliceIn, was: Cell[]): boolean {
     if (renumbered(c)) blockCells.set(c.block, c);
     heights.set(i, hidden[i] ? 0 : (measured.get(c.hash ?? "") ?? guessPitch(c)));
   });
+  if (headings) {
+    headingByKey = new Map();
+    const seen = new Map<string, number>();
+    let folded = false;
+    for (const c of cells) {
+      if (!c.heading) continue;
+      keyHeading(c, seen);
+      folded ||= shownFolded(c);
+    }
+    // What a fold hides can change with a heading's level; with none
+    // folded, nothing is hidden, before or after.
+    if (folded) {
+      foldCells();
+      return true;
+    }
+    for (const c of sp.heads) if (c.heading) hides.set(c, 0);
+  }
   shownBlocks = null;
   for (const [c, card] of cardOf) decorate(card, c);
   return true;

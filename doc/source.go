@@ -18,6 +18,11 @@ func (d *Document) SetSource(src []byte) error {
 	if d.splice(src) {
 		return nil
 	}
+	return d.reparse(src)
+}
+
+// reparse is SetSource by a parse of the whole of src.
+func (d *Document) reparse(src []byte) error {
 	nd, err := Parse(src)
 	if err != nil {
 		return err
@@ -55,13 +60,16 @@ func (d *Document) SetSource(src []byte) error {
 func sameKey(b *Block) string { return b.Info + "\x00" + b.Body }
 
 // splice is SetSource for an edit to the prose between two blocks, as
-// typing in prose makes, without parsing the whole of src: it parses
-// from the fence of the block above the edit to that of the block below,
-// and if that finds what it did before, moved, d takes src with
-// everything after the edit moved. It reports whether it could; when it
-// can't, as when the edit changed a block or one of the lines mdsh
-// reads in prose, d is left as it was. A parse of the whole file was
-// most of the time an edit to a long one took.
+// typing in prose makes, or to the body of a plain block, as typing in a
+// block makes, without parsing the whole of src: it parses from the
+// fence of the block above the edit, or of the block edited, to that of
+// the block below, and if that finds what it did before, moved, but for
+// the edited block's body, d takes src with everything after the edit
+// moved. The edited block is a new *Block with the old one's id. It
+// reports whether it could; when it can't, as when the edit changed a
+// fence or one of the lines mdsh reads in prose, d is left as it was. A
+// parse of the whole file was most of the time an edit to a long one
+// took.
 func (d *Document) splice(src []byte) bool {
 	was := d.Src
 	// The edit took was[p:wasEnd] and put src[p:end] there.
@@ -87,9 +95,21 @@ func (d *Document) splice(src []byte) bool {
 	}
 	from = max(from, d.FrontMatter.End)
 	var prev *Block
+	edited := false // the edit is in prev's body
 	if k > 0 {
 		prev = d.Blocks[k-1]
-		if prev.Output.End > p || prev.quote != 0 || prev.col != 0 || prev.Lead != "" || prev.Prefix != "" || prev.IsInput() {
+		if prev.quote != 0 || prev.col != 0 || prev.Lead != "" || prev.Prefix != "" || prev.IsInput() {
+			return false
+		}
+		if p < prev.Span.End {
+			// The body of a block that nothing else reads, between its
+			// fences.
+			if p < prev.BodySpan.Start || wasEnd > prev.BodySpan.End || prev.BodySpan.End == prev.Span.End ||
+				prev.IsInclude() || prev.IsTape() || prev.IsHTTP() {
+				return false
+			}
+			edited = true
+		} else if prev.Output.End > p {
 			return false
 		}
 		from = prev.Span.Start
@@ -119,7 +139,8 @@ func (d *Document) splice(src []byte) bool {
 		}
 	}
 	nd := &Document{Src: src, Options: d.Options}
-	if _, err := parseLines(nd, from, stop); err != nil {
+	c := countsOf(d.Blocks[:max(k-1, 0)])
+	if _, err := parseLines(nd, from, stop, c); err != nil {
 		return false
 	}
 	// Where something of was's is in src, if the edit left it whole.
@@ -140,7 +161,14 @@ func (d *Document) splice(src []byte) bool {
 	if next != nil {
 		want = append(want, next)
 	}
-	if len(nd.Blocks) != len(want) || (prev != nil && !sameBlock(nd.Blocks[0], prev, 0)) || (next != nil && !sameFence(nd.Blocks[len(want)-1], next, delta)) {
+	if len(nd.Blocks) != len(want) || (next != nil && !sameFence(nd.Blocks[len(want)-1], next, delta)) {
+		return false
+	}
+	if edited {
+		if !sameEdited(nd.Blocks[0], prev, delta) || d.twin(prev, nd.Blocks[0]) {
+			return false
+		}
+	} else if prev != nil && !sameBlock(nd.Blocks[0], prev, 0) {
 		return false
 	}
 	var copies []*Copy
@@ -211,6 +239,9 @@ func (d *Document) splice(src []byte) bool {
 
 	// It is the same document, moved.
 	d.Src = src
+	if edited {
+		d.Blocks[k-1] = nd.Blocks[0]
+	}
 	if delta == 0 {
 		return true
 	}
@@ -268,6 +299,27 @@ func sameBlock(a, b *Block, delta int) bool {
 	x.move(delta)
 	x.ID, x.VarTaken, x.MirrorOf, x.session = a.ID, a.VarTaken, a.MirrorOf, a.session
 	return reflect.DeepEqual(*a, x)
+}
+
+// sameEdited says a, from a parse of part of the file, is b with its
+// body edited, the edit moving what is after the body by delta.
+func sameEdited(a, b *Block, delta int) bool {
+	x := *b
+	x.move(delta)
+	x.Span.Start, x.BodySpan.Start = b.Span.Start, b.BodySpan.Start
+	x.Body = a.Body
+	return reflect.DeepEqual(*a, x)
+}
+
+// twin reports whether a block of d's other than b is the same as b or
+// as nb, b edited, by sameKey: SetSource would match them up otherwise.
+func (d *Document) twin(b, nb *Block) bool {
+	for _, o := range d.Blocks {
+		if o != b && o.Info == b.Info && (o.Body == b.Body || o.Body == nb.Body) {
+			return true
+		}
+	}
+	return false
 }
 
 // sameFence says a is b's fence, moved by delta: a parse that stopped at
