@@ -26,6 +26,10 @@
   <link rel="stylesheet" href="{{ "css/chroma.css" | relURL }}">
   <link rel="stylesheet" href="{{ "css/tty.css" | relURL }}">
   <link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
+  {{- /* On the home page: /llms.txt and /llms-full.txt, see hugo.toml. */}}
+  {{- range .AlternativeOutputFormats }}
+  <link rel="{{ .Rel }}" type="{{ .MediaType.Type }}" href="{{ .Permalink }}" title="{{ path.Base .Permalink }}">
+  {{- end }}
 </head>
 <body>
   <div class="sheet">

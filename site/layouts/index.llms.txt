@@ -1,0 +1,50 @@
+{{- /* /llms.txt (https://llmstxt.org): what mdsh is and where its docs
+   are, for an LLM or an agent that reads the site. The docs list comes
+   from the docs section's front matter, so a new page shows up here on
+   its own. /llms-full.txt has the pages' text. */ -}}
+# mdsh
+
+> {{ site.Params.description }}
+
+mdsh runs the code blocks in a markdown file, in order, like a notebook
+whose file format is plain markdown. Each block's output is written back
+into the file under the block, so a document is both the runbook and the
+record of its last run. The same document runs from the command line
+(`mdsh file.md`), in a terminal UI (`mdsh -i file.md`), in a desktop app
+(`mdsh-gui file.md`) and in a browser (`mdsh --serve file.md`), and a run
+can be written out as markdown, HTML or PDF.
+
+A document is ordinary markdown: every `sh` and `zsh` fence runs, in
+the same long-lived shell, and other languages are left alone; attributes
+in braces after the language (`{#id env=name depends=other}`) name a
+block, pick its env and order it; `textbox`, `choice`, `http`, `include`
+and `output` fences are the other block kinds; and document-wide options
+go under an `mdsh:` key in YAML front matter.
+
+The full text of every docs page is at {{ "llms-full.txt" | absURL }}.
+
+## Docs
+{{ $docs := site.GetPage "/docs" }}
+- [{{ $docs.Title }}]({{ $docs.Permalink }}): {{ $docs.Description }}
+{{- range $docs.Pages.ByWeight }}
+- [{{ .Title }}]({{ .Permalink }}): {{ .Description }}
+{{- end }}
+
+## Guides
+{{ range slice "/install" "/app" "/examples" "/use-cases" "/security" "/roadmap" "/changelog" }}
+{{- with site.GetPage . }}
+- [{{ .Title }}]({{ .Permalink }}): {{ .Description }}
+{{- end }}{{ end }}
+
+## Source
+
+- [Repository]({{ site.Params.repo }}): the Go source, the examples and the docs, MIT licensed.
+- [README]({{ site.Params.repo }}/blob/main/README.md): the long-form introduction, with every feature.
+- [Specification]({{ site.Params.repo }}/blob/main/docs/spec.md): the normative reference for the document format, every fence attribute and front matter key.
+- [Examples]({{ site.Params.repo }}/tree/main/examples): runnable documents, from a first script to runbooks and reports.
+- [Releases]({{ site.Params.repo }}/releases): downloads for macOS, Linux and Windows.
+
+## Optional
+
+- [Full docs text]({{ "llms-full.txt" | absURL }}): every docs page and the cheat sheet in one markdown file.
+- [Changelog]({{ site.Params.repo }}/blob/main/CHANGELOG.md): what changed in each release.

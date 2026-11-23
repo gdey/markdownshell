@@ -51,6 +51,21 @@ site's assets in `hugo.toml` and rendered by
 docs page's (`title`, `description`, `weight`). The Website workflow
 runs when either file changes, too.
 
+## llms.txt
+
+`/llms.txt` and `/llms-full.txt` are for pointing an LLM at the docs
+([llmstxt.org](https://llmstxt.org)). Both are output formats of the
+home page in `hugo.toml`, rendered by `layouts/index.llms.txt` and
+`layouts/index.llmsfull.txt`: the first lists every docs page with the
+`description` from its front matter, the landing pages and the
+repository's README, spec and examples; the second is the docs pages
+and the cheat sheet as one markdown file, with `relref` links made
+absolute and screenshots turned into markdown images by the
+`.llmsfull.txt` shortcodes in `layouts/shortcodes/`. A new docs page
+shows up in both on its own; only the paragraph that introduces mdsh at
+the top of `index.llms.txt` is written by hand. The home page links
+them with `<link rel="alternate">`.
+
 ## Screenshots
 
 The app and terminal pictures in `static/images/app/` were taken from a

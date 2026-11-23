@@ -1,0 +1,3 @@
+{{- /* Hugo's relref, for /llms-full.txt: the absolute URL, so the link
+   works from wherever the file is read. */ -}}
+{{- .Page.Ref (dict "path" (.Get 0)) -}}
