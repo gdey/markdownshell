@@ -57,6 +57,9 @@ type Cell struct {
 	Depends []string `json:"depends,omitempty"`
 	// Output is the block's output, saved or from this session, rendered.
 	Output string `json:"output,omitempty"`
+	// Spill is set for a block with out=file: the file its output went
+	// to, which Output shows a window of.
+	Spill *SpillCell `json:"spill,omitempty"`
 	// At is when the run that made Output started (RFC 3339, in UTC):
 	// this session's run, or the at= saved with the output. Empty when
 	// there is no output or it was saved without a time.

@@ -341,6 +341,8 @@ func (m *Model) writeReport(r pendingReport) {
 		Env:          run.WithMode(m.environ(), run.ModeReport),
 		Title:        report.Title(r.File),
 		Dir:          filepath.Dir(r.File),
+		File:         r.File,
+		Out:          r.Dest,
 		AllowOutside: m.opts.Run.AllowOutside,
 	}
 	out, err := func() ([]byte, error) {

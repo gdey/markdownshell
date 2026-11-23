@@ -179,17 +179,56 @@ async function showIncludeFile(inc: IncludeCell, firstLine: number, hooks: Inclu
     return null;
   });
   if (!file) return;
-  const dialog = $<HTMLDialogElement>("include-dialog");
-  $("include-title").textContent = inc.file;
   const first = inc.window ? (inc.last ? firstLine : 0) : inc.from || 1;
   const last = inc.window ? inc.last || 0 : inc.to || file.lines;
   const shown = inc.window ? (last ? `lines ${first}–${last} (${inc.window})` : `no lines (${inc.window})`) : rangeText(inc.from, inc.to, file.lines);
-  $("include-note").textContent = `${file.lines} lines; ${shown} included`;
+  showFile(inc.file, file, inc.lang, first, last, `${file.lines} lines; ${shown} included`);
+}
+
+// showFile shows the whole of file, named name, in the include dialog,
+// with lines first through last marked and scrolled to, and note under
+// its name.
+function showFile(name: string, file: IncludeFile, lang: string, first: number, last: number, note: string) {
+  const dialog = $<HTMLDialogElement>("include-dialog");
+  $("include-title").textContent = name;
+  $("include-note").textContent = note;
   const code = $("include-text");
-  const lines = codeLines(file.text, inc.lang);
+  const lines = codeLines(file.text, lang);
   lines.forEach((l, i) => l.classList.toggle("included", i + 1 >= first && i + 1 <= last));
   code.replaceChildren(...lines);
   dialog.showModal();
   const target = lines[Math.max(first - 2, 0)];
   if (target) target.scrollIntoView({ block: "start" });
+}
+
+// spillName is the name of an out=file file= as the output bar shows
+// it: its last part, as build.log.
+function spillName(file: string): string {
+  return file.replace(/^res:\/\//, "").split("/").pop() || file;
+}
+
+// spillLine is the line on the output bar of block c, which has
+// out=file: how long the file is, which opens it over the card, and a
+// badge when the window found nothing.
+export function spillLine(c: Cell, say: (text: string) => void): HTMLElement {
+  const sp = c.spill!;
+  const name = spillName(sp.file);
+  const text = sp.lines ? `${sp.lines.toLocaleString()} ${sp.lines === 1 ? "line" : "lines"} in ${name}` : name;
+  const open = el("button", { className: "spill-open link", type: "button", title: `Show the whole of ${sp.file}` }, text);
+  open.onclick = async (e) => {
+    e.stopPropagation();
+    const file = await App.SpillFile(c.block).catch((err) => {
+      say(message(err));
+      return null;
+    });
+    if (!file) return;
+    const first = sp.first ?? 0;
+    const last = sp.last ?? 0;
+    const shown = last ? `lines ${first}–${last}${sp.window ? ` (${sp.window})` : ""} shown` : sp.warning ? "no lines shown" : "";
+    showFile(sp.file, file, "", first, last, [`${file.lines} lines`, shown, sp.truncated ? "cut at 16 MB" : ""].filter(Boolean).join("; "));
+  };
+  const line = el("span", { className: "spill-line muted" }, open);
+  if (sp.truncated) line.append(el("span", { className: "stale-badge", title: "The output was longer than 16 MB, so its end was dropped" }, "truncated"));
+  if (sp.warning) line.append(el("span", { className: "stale-badge include-nomatch", title: sp.warning }, "no match"));
+  return line;
 }

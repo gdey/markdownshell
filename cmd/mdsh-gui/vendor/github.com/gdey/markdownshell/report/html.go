@@ -9,8 +9,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/docroot"
 	"github.com/gdey/markdownshell/rawhtml"
+	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termrec"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -32,7 +34,7 @@ func page(md []byte, opts Options) ([]byte, error) {
 	gm := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(parser.WithASTTransformers(util.Prioritized(imgs, 100))),
-		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(fences{}, 100)), rawhtml.Option(rawhtml.Options{Image: imgs.raw})),
+		goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(fences{assets: opts.assets()}, 100)), rawhtml.Option(rawhtml.Options{Image: imgs.raw})),
 	)
 	var body bytes.Buffer
 	if err := gm.Convert(stripFrontMatter(md), &body); err != nil {
@@ -77,9 +79,27 @@ img { max-width: 100%; }
 `
 
 // fences draws fenced code blocks as figures, captioned like the PDF.
-type fences struct{}
+// fences draws fenced code blocks. assets is the document's assets
+// folder, as a link from the page, for an out=file output's res:// file.
+type fences struct{ assets string }
 
-func (fences) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+// spillLink is a link to the file an out=file output fence, with attrs,
+// shows a window of: its name, and how it picks the lines shown.
+func (f fences) spillLink(attrs doc.Attrs) string {
+	file := attrs["file"]
+	name, res := strings.CutPrefix(file, run.ResScheme)
+	href := file
+	if res {
+		href = f.assets + "/" + name
+	}
+	s := `<a href="` + html.EscapeString((&url.URL{Path: href}).EscapedPath()) + `">` + html.EscapeString(name) + "</a>"
+	if attrs.Has("truncated") {
+		s += " (cut at 16 MB)"
+	}
+	return s
+}
+
+func (fc fences) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindFencedCodeBlock, func(w util.BufWriter, src []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -90,7 +110,7 @@ func (fences) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 		if f.Info != nil {
 			info = strings.TrimSpace(string(f.Info.Segment.Value(src)))
 		}
-		class, caption := "block", info
+		class, caption, link := "block", info, ""
 		var body bytes.Buffer
 		for i := 0; i < f.Lines().Len(); i++ {
 			s := f.Lines().At(i)
@@ -115,13 +135,20 @@ func (fences) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 			if m := exitRE.FindStringSubmatch(info); m != nil && m[1] != "0" {
 				caption = "exit " + m[1]
 			}
+			if _, attrs := doc.ParseInfo(info); attrs.Has(doc.IncludeAttr) && attrs["file"] != "" {
+				link = fc.spillLink(attrs)
+			}
 			if strings.TrimSpace(body.String()) == "" {
 				body.Reset()
 			}
 		}
 		w.WriteString(`<figure class="` + class + `">`)
-		if caption != "" {
-			w.WriteString("<figcaption>" + html.EscapeString(caption) + "</figcaption>")
+		if caption != "" || link != "" {
+			w.WriteString("<figcaption>" + html.EscapeString(caption))
+			if caption != "" && link != "" {
+				w.WriteString(" · ")
+			}
+			w.WriteString(link + "</figcaption>")
 		}
 		w.WriteString("<pre><code")
 		if lang != "" && lang != "output" {

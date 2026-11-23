@@ -27,7 +27,7 @@ import { initReport, openReport } from "./report.js";
 import { runGutter, setRunLines } from "./rungutter.js";
 import { secretMask, setSecretLines } from "./secretmask.js";
 import { textboxGrip } from "./textbox.js";
-import { includeControls } from "./include.js";
+import { includeControls, spillLine } from "./include.js";
 import { drawHTTP, statusBadge } from "./http.js";
 import { drawEarlier, fullTime, timeAgo } from "./earlier.js";
 import { initSplitGrip, showSplitGrip } from "./split.js";
@@ -2064,6 +2064,7 @@ function drawBlock(c: Cell): HTMLElement {
   // A background tty block that is running shows its terminal.
   if (c.terminal) adoptBackground(c.block, block.querySelector<HTMLElement>(".output")!);
   const tools = el("div", { className: "output-tools" }, el("span", { className: "output-at" }), copyOutputButton(block, c));
+  if (c.spill) tools.prepend(spillLine(c, status));
   if (c.movable && c.earlier?.length) tools.append(clearEarlierButton(c));
   if (c.movable) tools.append(clearOutputButton(c));
   block.querySelector(".output-part")!.append(tools);

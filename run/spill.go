@@ -50,11 +50,7 @@ func spillLines(d *doc.Document) int {
 // that printed the same leaves it alone. A nosave block's output is
 // never written to the folder: the window shows from memory.
 func spill(d *doc.Document, b *doc.Block, r *Result, opts Options) error {
-	_, arg := outKind(b)
-	s := &Spill{File: arg, Lines: spillLines(d)}
-	if s.File == "" {
-		s.File = ResScheme + b.ID + ".log"
-	}
+	s := &Spill{File: SpillFile(b), Lines: spillLines(d)}
 	r.Spill = s
 	if len(r.Stdout) > docroot.MaxRead {
 		r.Stdout = r.Stdout[:docroot.MaxRead]
@@ -121,4 +117,19 @@ func (s *Session) refillIncludes(b *doc.Block) {
 		s.results[i] = r
 		s.emit(Event{Kind: Done, Block: ib, Result: r})
 	}
+}
+
+// SpillFile is the file= block b's output fence names, for a block with
+// out=file: its out=file path, else res://<id>.log.
+func SpillFile(b *doc.Block) string {
+	if _, arg := outKind(b); arg != "" {
+		return arg
+	}
+	return ResScheme + b.ID + ".log"
+}
+
+// SpillFile reads the file block b, which has out=file, wrote its output
+// to, under the rules an include's file is read by.
+func (s *Session) SpillFile(b *doc.Block) ([]byte, error) {
+	return IncludeFile(&doc.Block{Attrs: doc.Attrs{doc.IncludeAttr: "", "file": SpillFile(b)}}, s.opts)
 }

@@ -558,6 +558,11 @@ own fence. A `nosave` block writes no file; `secret` and `tty` can't have
 `out=file`. With `history=N`, earlier runs' logs are kept like images, as
 `build.2026-11-13T190800Z.log`.
 
+In mdsh-gui the output bar says how long the log is, "4,210 lines in
+build.log", and clicking it shows the whole file with the window's lines
+marked; a window that matched nothing is badged "no match". `--html` links
+the log from the output's caption, and `--pdf` names it there.
+
 ## Including files
 
 A block marked `<include` holds lines from another file, so a doc can quote

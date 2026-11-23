@@ -1092,6 +1092,14 @@ export function SourceBlocksAt(): $CancellablePromise<$models.SourceBlocks> {
 }
 
 /**
+ * SpillFile reads the whole of the file block i, which has out=file,
+ * wrote its output to, for showing it.
+ */
+export function SpillFile(i: number): $CancellablePromise<notebook$0.IncludeFile> {
+    return $Call.ByName("github.com/gdey/markdownshell/ui.App.SpillFile", i);
+}
+
+/**
  * StartScreen lists the markdown files under the start folder, and the
  * recent files that still exist.
  */

@@ -117,3 +117,49 @@ func TestIncludeWindowCell(t *testing.T) {
 		t.Errorf("SetIncludeRange on a window: %v", err)
 	}
 }
+
+// A block with out=file has a Spill cell: its file, how long it is and
+// the lines its output shows; SpillFile reads the whole of it.
+func TestSpillCell(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "doc.md")
+	src := "```sh {#b out=file}\nprintf 'a\\nFAIL\\nc\\n'\n```\n\n```output {for=b match=^FAIL}\n```\n\n```sh {#n out=file}\necho hi\n```\n\n```output {for=n match=nope}\n```\n"
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	spill := func(i int) *SpillCell {
+		for _, c := range n.Cells() {
+			if c.Block == i {
+				return c.Spill
+			}
+		}
+		return nil
+	}
+	if c := spill(0); c == nil || c.File != "res://b.log" || c.Lines != 0 || c.Window != `match "^FAIL"` {
+		t.Fatalf("before running: %+v", c)
+	}
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.RunBlock(1); err != nil {
+		t.Fatal(err)
+	}
+	if c := spill(0); c == nil || c.Lines != 3 || c.First != 2 || c.Last != 3 || c.Warning != "" {
+		t.Errorf("after running: %+v", c)
+	}
+	if c := spill(1); c == nil || c.First != 0 || !strings.Contains(c.Warning, "no line of res://n.log") {
+		t.Errorf("no match: %+v", c)
+	}
+	f, err := n.SpillFile(0)
+	if err != nil || f.Text != "a\nFAIL\nc\n" || f.Lines != 3 {
+		t.Errorf("SpillFile = %+v, %v", f, err)
+	}
+	if _, err := n.SpillFile(5); err == nil {
+		t.Error("SpillFile of no block gave no error")
+	}
+}

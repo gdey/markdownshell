@@ -148,3 +148,67 @@ func (n *Notebook) includeBlock(i int) (*doc.Block, error) {
 	}
 	return b, nil
 }
+
+// SpillCell is the file a block with out=file wrote its output to, for
+// the line on its output bar that says how long it is and opens it.
+type SpillCell struct {
+	// File is its output fence's file=, as res://build.log.
+	File string `json:"file"`
+	// Lines is how many lines the file has, from this session's run; 0
+	// when the block hasn't run.
+	Lines int `json:"lines,omitempty"`
+	// First and Last are the lines of the file the output shows, from
+	// this session's run; 0 when it hasn't run or nothing matched.
+	First int `json:"first,omitempty"`
+	Last  int `json:"last,omitempty"`
+	// Window is how the output fence picks its lines, as `match "^FAIL"`,
+	// or "" for the first fold_output lines.
+	Window string `json:"window,omitempty"`
+	// Warning is why the window is empty, as no line matching match=.
+	Warning string `json:"warning,omitempty"`
+	// Truncated is set when the output was too long for the file, so
+	// its end was dropped.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+// spillCell is b's SpillCell, or nil when b hasn't out=file. r is its
+// result this session.
+func spillCell(b *doc.Block, r *run.Result) *SpillCell {
+	if !b.SpillsOutput() {
+		return nil
+	}
+	inc, _ := doc.SpillInclude("x", b.OutWindow, 0)
+	c := &SpillCell{File: run.SpillFile(b), Window: windowText(inc)}
+	if r == nil || r.Spill == nil {
+		return c
+	}
+	c.File, c.Truncated, c.Lines = r.Spill.File, r.Spill.Truncated, run.LineCount(r.Stdout)
+	w, _, err := r.Spill.Window(r, b.OutWindow)
+	if err == nil {
+		c.Warning = w.Warning
+		if w.First > 0 {
+			c.First, c.Last = w.First, w.First+run.LineCount(w.Text)-1
+		}
+	}
+	return c
+}
+
+// SpillFile reads the whole of the file block i, which has out=file,
+// wrote its output to: from this session's run, else from the file.
+func (n *Notebook) SpillFile(i int) (IncludeFile, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if i < 0 || i >= len(n.d.Blocks) || !n.d.Blocks[i].SpillsOutput() {
+		return IncludeFile{}, fmt.Errorf("block %d has no out=file", i)
+	}
+	var data []byte
+	if r := n.results[i]; r != nil && r.Spill != nil {
+		data = r.Stdout
+	} else {
+		var err error
+		if data, err = n.sess.SpillFile(n.d.Blocks[i]); err != nil {
+			return IncludeFile{}, err
+		}
+	}
+	return IncludeFile{Text: string(data), Lines: run.LineCount(data)}, nil
+}

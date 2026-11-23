@@ -352,7 +352,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 				linkDir = filepath.Dir(abs)
 			}
 		}
-		opts.Format, opts.Dir, opts.Title = format, linkDir, report.Title(file)
+		opts.Format, opts.Dir, opts.Title, opts.File, opts.Out = format, linkDir, report.Title(file), file, reportFile
 		out, err := report.Render(d, results, opts)
 		if err != nil {
 			return err

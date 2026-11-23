@@ -418,7 +418,16 @@ func (r *renderer) code(lang string, info *ast.Text, body []string) {
 	gutter := 0
 	if _, attrs := doc.ParseInfo(infoText); attrs.Has(doc.IncludeAttr) {
 		if inc, err := (&doc.Block{Attrs: attrs}).Include(); err == nil {
-			label = includeLabel(inc)
+			// An out=file output names its file after its exit status.
+			inc.File = strings.TrimPrefix(inc.File, "res://")
+			if lang == "output" {
+				label = strings.TrimPrefix(strings.Join([]string{label, includeLabel(inc)}, " · "), " · ")
+				if attrs.Has("truncated") {
+					label += " (cut at 16 MB)"
+				}
+			} else {
+				label = includeLabel(inc)
+			}
 			if inc.Numbered {
 				gutter = numberedGutter(body, firstNumber(body, max(inc.From, 1)))
 			}

@@ -156,3 +156,22 @@ func TestInlineOutside(t *testing.T) {
 		t.Errorf("inline with AllowOutside = %.40q, want a data: URI", got)
 	}
 }
+
+// An out=file output links its file from the caption, by the document's
+// assets folder as seen from where the page is written.
+func TestSpillLink(t *testing.T) {
+	md := []byte("```output {for=b exit=2 truncated <include file=res://my build.log match=^FAIL}\nFAIL x\n```\n")
+	md = []byte(strings.Replace(string(md), "res://my build.log", `"res://my build.log"`, 1))
+	out, err := page(md, Options{File: "/w/docs/d.md", Out: "/w/out/r.html"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `<figcaption>exit 2 · <a href="../docs/d.md.assets/my%20build.log">my build.log</a> (cut at 16 MB)</figcaption>`
+	if !bytes.Contains(out, []byte(want)) {
+		t.Errorf("no link to the log:\n%s", out)
+	}
+	out, _ = page([]byte("```output {for=b exit=0 <include file=logs/b.txt}\nok\n```\n"), Options{File: "d.md"})
+	if !bytes.Contains(out, []byte(`<figcaption><a href="logs/b.txt">logs/b.txt</a></figcaption>`)) {
+		t.Errorf("no link to logs/b.txt:\n%s", out)
+	}
+}
