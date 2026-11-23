@@ -29,9 +29,18 @@ type liveTerm struct {
 	sh *env.Shell // nil until attached, and once the shell ends
 	// p draws what the shell shows, and takes the keys typed for it.
 	p *pane
+	// env is the env whose shell the pane is on, "" for the top level
+	// (see moveHistory).
+	env string
+	// parked holds the shells of the other envs the pane has been on,
+	// by env, each with its screen, for when it comes back.
+	parked map[string]parkedShell
+	// drawn is every live pane's drawn, so one wait covers them all.
+	drawn chan struct{}
 
-	mu  sync.Mutex
-	rec *termrec.Recorder // what a typed command shows, while it runs
+	mu    sync.Mutex
+	rec   *termrec.Recorder // what a typed command shows, while it runs
+	recSh *env.Shell        // the shell rec is for
 	// queue holds what the shell did, in order, for Update; the shell's
 	// callbacks can't wait on it.
 	queue []liveMsg
@@ -56,8 +65,23 @@ type liveMsg struct {
 // liveDrawnMsg says the live pane's screen changed.
 type liveDrawnMsg struct{ m *Model }
 
+// parkedShell is a shell the pane has left, with its screen.
+type parkedShell struct {
+	sh *env.Shell
+	p  *pane
+}
+
 func newLiveTerm() *liveTerm {
-	return &liveTerm{p: newPane(), wake: make(chan struct{}, 1), cur: -1}
+	lt := &liveTerm{wake: make(chan struct{}, 1), cur: -1, parked: map[string]parkedShell{}, drawn: make(chan struct{}, 1)}
+	lt.p = lt.newPane()
+	return lt
+}
+
+// newPane is a pane for a live shell.
+func (lt *liveTerm) newPane() *pane {
+	p := newPane()
+	p.drawn = lt.drawn
+	return p
 }
 
 // isLive reports whether the History pane is live: open, with the
@@ -66,12 +90,22 @@ func (m *Model) isLive() bool {
 	return m.hist.open && m.opts.Run.InteractiveShell && m.sess.InteractiveShell()
 }
 
-// attachLive attaches the live pane to the session's top-level shell,
-// starting it if need be, so what it shows, such as its prompt, draws
-// in the pane.
+// attachLive attaches the live pane to the shell of the env it is on,
+// the top level unless moveHistory moved it, starting it if need be,
+// so what it shows, such as its prompt, draws in the pane.
 func (m *Model) attachLive() error {
 	lt := m.lterm
-	sh, err := m.sess.TopShell(context.Background())
+	if lt.env != env.TopLevel && !m.sess.Interactive(lt.env) {
+		// The shells were started again, which forgets the env the pane
+		// was moved to. Name it again, unless a block has started it
+		// scripted meanwhile, which only moveHistory may end.
+		if m.sess.Scripted(lt.env) {
+			lt.env = env.TopLevel
+		} else {
+			m.sess.SetInteractive(lt.env)
+		}
+	}
+	sh, err := m.sess.Shell(context.Background(), lt.env)
 	if err != nil || sh == nil {
 		return err
 	}
@@ -79,7 +113,8 @@ func (m *Model) attachLive() error {
 		return nil
 	}
 	lt.sh = sh
-	lt.p.take(-3)
+	p := lt.p
+	p.take(-3)
 	// The emulator's answers, such as where its cursor is, and the keys
 	// typed in the pane go to the shell.
 	go func(keys chan []byte) {
@@ -93,10 +128,10 @@ func (m *Model) attachLive() error {
 				return
 			}
 		}
-	}(lt.p.keys)
+	}(p.keys)
 	m.fit()
-	sh.View(liveView{m, sh})
-	sh.Watch(func(e env.Event) { m.liveEvent(sh, e) })
+	sh.View(liveView{m, sh, p})
+	sh.Watch(func(e env.Event) { m.liveEvent(sh, p, e) })
 	go func() {
 		<-sh.Done()
 		lt.push(liveMsg{sh: sh, ev: env.Event{Kind: "exit"}})
@@ -108,23 +143,24 @@ func (m *Model) attachLive() error {
 type liveView struct {
 	m  *Model
 	sh *env.Shell
+	p  *pane // its own, kept while the pane is on another env
 }
 
 func (v liveView) Write(b []byte) (int, error) {
 	lt := v.m.lterm
 	lt.mu.Lock()
-	if lt.rec != nil {
+	if lt.rec != nil && lt.recSh == v.sh {
 		lt.rec.Write(b)
 	}
 	lt.mu.Unlock()
-	return paneOut{lt.p}.Write(b)
+	return paneOut{v.p}.Write(b)
 }
 
 var _ io.Writer = liveView{}
 
 // liveEvent takes what the shell did, with its lock held: it keeps a
 // typed command's screen and queues the rest for Update.
-func (m *Model) liveEvent(sh *env.Shell, e env.Event) {
+func (m *Model) liveEvent(sh *env.Shell, p *pane, e env.Event) {
 	if e.Typed {
 		// Blocks played from the file run as they always do.
 		return
@@ -134,9 +170,9 @@ func (m *Model) liveEvent(sh *env.Shell, e env.Event) {
 	lt.mu.Lock()
 	switch e.Kind {
 	case "start":
-		lt.rec = termrec.NewRecorder(lt.p.size())
+		lt.rec, lt.recSh = termrec.NewRecorder(p.size()), sh
 	case "end":
-		if lt.rec != nil {
+		if lt.rec != nil && lt.recSh == sh {
 			it.shown = lt.rec.Recording()
 			lt.rec = nil
 		}
@@ -170,7 +206,7 @@ func (m *Model) watchLive() tea.Msg {
 		lt.mu.Unlock()
 		select {
 		case <-lt.wake:
-		case <-lt.p.drawn:
+		case <-lt.drawn:
 			return liveDrawnMsg{m}
 		case <-m.done:
 			return nil
@@ -181,7 +217,16 @@ func (m *Model) watchLive() tea.Msg {
 // onLive handles what the live pane's shell did.
 func (m *Model) onLive(msg liveMsg) tea.Cmd {
 	lt := m.lterm
-	if msg.sh != lt.sh && msg.ev.Kind != "exit" {
+	if msg.sh != lt.sh {
+		if msg.ev.Kind == "exit" {
+			// A shell the pane left has ended: its env starts a new
+			// one when the pane comes back.
+			for name, pk := range lt.parked {
+				if pk.sh == msg.sh {
+					delete(lt.parked, name)
+				}
+			}
+		}
 		return nil
 	}
 	switch msg.ev.Kind {
@@ -237,7 +282,7 @@ func (m *Model) liveStart(msg liveMsg) {
 	var b *doc.Block
 	var err error
 	if m.opts.HistoryReuse {
-		if b = history.Reuse(m.d, lang, cmd, false); b != nil {
+		if b = history.ReuseIn(m.d, lang, cmd, false, lt.env); b != nil {
 			id := b.ID
 			if err = history.KeepRuns(m.d, b); err == nil {
 				err = m.syncSession()
@@ -249,7 +294,7 @@ func (m *Model) liveStart(msg liveMsg) {
 		}
 	}
 	if b == nil {
-		b, err = m.d.AppendBlock(history.Info(lang, history.NextID(m.d), false), cmd)
+		b, err = m.d.AppendBlock(history.InfoIn(lang, history.NextID(m.d), false, lt.env), cmd)
 	}
 	if err == nil {
 		err = m.sess.Sync()

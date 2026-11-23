@@ -708,6 +708,9 @@ func (m *Model) histView() string {
 		hint = " keys go to the shell · ctrl+g back to the file "
 		if !m.hist.focus {
 			hint = " h type here "
+			if len(m.sess.Envs()) > 1 {
+				hint = " h type here · @ another env "
+			}
 		}
 	}
 	if m.hist.sel != nil {
@@ -720,8 +723,12 @@ func (m *Model) histView() string {
 	if live {
 		// The shell's jobs, where the line editor shows its directory.
 		where = ""
+		if m.lterm.env != "" {
+			// On a sub-env's shell, which typed commands run in.
+			where = envName(m.lterm.env)
+		}
 		if j := m.lterm.jobsText(); j != "" {
-			where = "jobs: " + j
+			where = strings.TrimPrefix(where+" · jobs: "+j, " · ")
 		}
 	}
 	if d := termsafe.Visible(where); d != "" {
