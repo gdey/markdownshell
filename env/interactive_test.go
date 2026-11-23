@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -147,13 +148,28 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Fatalf("timed out waiting for %s", what)
 }
 
+// fgRuns reports whether cmd, as ps shows it, holds s's terminal: not
+// only the shell's child that will become it, which ignores ctrl+z till
+// it does.
+func fgRuns(s *Shell, cmd string) bool {
+	if !fg(s) {
+		return false
+	}
+	for _, j := range ttyJobs(strings.TrimPrefix(s.ia.ttyName, "/dev/"), s.PID()) {
+		if j.Command == cmd {
+			return true
+		}
+	}
+	return false
+}
+
 func TestInteractiveJobControl(t *testing.T) {
 	for _, sh := range shells(t) {
 		t.Run(filepath.Base(sh), func(t *testing.T) {
 			s := startI(t, sh, nil)
 			// ctrl+z stops the command; the shell carries on.
 			go func() {
-				waitFor(t, "sleep to run", func() bool { return s.Busy() && fg(s) })
+				waitFor(t, "sleep to run", func() bool { return s.Busy() && fgRuns(s, "sleep 30") })
 				s.Type([]byte{0x1a})
 			}()
 			var out syncBuf
@@ -189,7 +205,7 @@ func TestInteractiveJobControl(t *testing.T) {
 			}
 			// A stopped job ends with the shell.
 			go func() {
-				waitFor(t, "sleep to run", func() bool { return s.Busy() && fg(s) })
+				waitFor(t, "sleep to run", func() bool { return s.Busy() && fgRuns(s, "sleep 31") })
 				s.Type([]byte{0x1a})
 			}()
 			s.RunLine(context.Background(), "sleep 31", &out)
@@ -564,19 +580,133 @@ func TestInteractiveSuspend(t *testing.T) {
 			s.Type([]byte("sh -c \"trap '' TSTP; exec sleep 30\"\r"))
 			// Once sh has set the trap and become sleep: sooner, ctrl+z
 			// stops sh.
-			waitFor(t, "sleep to run", func() bool {
-				if !fg(s) {
-					return false
-				}
-				for _, j := range ttyJobs(strings.TrimPrefix(s.ia.ttyName, "/dev/"), s.PID()) {
-					if j.Command == "sleep 30" {
-						return true
-					}
-				}
-				return false
-			})
+			waitFor(t, "sleep to run", func() bool { return fgRuns(s, "sleep 30") })
 			if _, _, err := s.RunLine(context.Background(), "echo no", io.Discard); !errors.Is(err, ErrNotStopped) {
 				t.Errorf("RunLine: %v", err)
+			}
+		})
+	}
+}
+
+// TestInteractiveSubEnv: a sub-env SetInteractive names starts
+// interactively on a terminal of its own, with what its share passes
+// from the parent, and a scripted one running for it is ended first.
+func TestInteractiveSubEnv(t *testing.T) {
+	sh := shells(t)[0]
+	home := t.TempDir()
+	st := NewStack(Config{
+		Path:        sh,
+		Interactive: true,
+		Env:         []string{"HOME=" + home, "PATH=" + os.Getenv("PATH"), "TERM=xterm", noCompinit},
+		Dir:         home,
+		KillAfter:   10 * time.Second,
+	})
+	defer st.Close()
+	ctx := context.Background()
+	top, err := st.Get(ctx, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := top.Shell.Run(ctx, "export KEPT=yes DROPPED=no", io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if st.Interactive("build") {
+		t.Error("build interactive before SetInteractive")
+	}
+	b, err := st.Get(ctx, "build", []string{"KEPT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Shell.Interactive() || !st.Scripted("build") {
+		t.Fatalf("build: interactive %v, scripted %v", b.Shell.Interactive(), st.Scripted("build"))
+	}
+	if !st.SetInteractive("build") {
+		t.Error("SetInteractive didn't end the scripted shell")
+	}
+	if !b.Shell.Exited() {
+		t.Error("the scripted shell is still running")
+	}
+	if st.SetInteractive("build") {
+		t.Error("SetInteractive again ended a shell")
+	}
+	b, err = st.Get(ctx, "build", []string{"KEPT"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !b.Shell.Interactive() || !st.Interactive("build") || st.Scripted("build") {
+		t.Fatalf("build after SetInteractive: interactive %v", b.Shell.Interactive())
+	}
+	if b.Shell == top.Shell {
+		t.Fatal("build is the top level's shell")
+	}
+	var out syncBuf
+	if rc, _, err := b.Shell.Run(ctx, `echo "kept=${KEPT-} dropped=${DROPPED-}"`, &out, &out); err != nil || rc != 0 {
+		t.Fatalf("run: %d %v", rc, err)
+	}
+	if got := clean(out.String()); !strings.Contains(got, "kept=yes dropped=") || strings.Contains(got, "dropped=no") {
+		t.Errorf("build sees %q", got)
+	}
+	// Its children stay scripted unless named too.
+	c, err := st.Get(ctx, "build/test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Shell.Interactive() {
+		t.Error("build/test runs interactively")
+	}
+}
+
+// TestInteractiveTypedWrap: a typed line longer than the terminal is
+// wide, or edited as it was typed, is reported as the line that ran,
+// not as what the line editor drew to show it.
+func TestInteractiveTypedWrap(t *testing.T) {
+	list := shells(t)
+	if bash, err := exec.LookPath("bash"); err == nil {
+		// bash run as sh, as macOS's /bin/sh is: its prompt's marks
+		// must not count toward the prompt's width, or a narrow
+		// terminal wraps inside them.
+		sh := filepath.Join(t.TempDir(), "bash-as", "sh")
+		if err := os.MkdirAll(filepath.Dir(sh), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(bash, sh); err != nil {
+			t.Fatal(err)
+		}
+		list = append(list, sh)
+	}
+	for _, sh := range list {
+		name := filepath.Base(sh)
+		if filepath.Base(filepath.Dir(sh)) == "bash-as" {
+			name = "bash as sh"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, c := range []struct{ typed, want string }{
+				{"echo wraps-past-the-edge-of-a-narrow-terminal-and-on-past-it-again\r", "echo wraps-past-the-edge-of-a-narrow-terminal-and-on-past-it-again"},
+				{"echo abX\x7fc\r", "echo abc"},
+			} {
+				s := startI(t, sh, nil)
+				s.SetSize(20, 30)
+				runI(t, s, "true")
+				var mu sync.Mutex
+				var cmd []string
+				s.Watch(func(e Event) {
+					if e.Kind == "start" {
+						mu.Lock()
+						cmd = append(cmd, e.Command)
+						mu.Unlock()
+					}
+				})
+				s.Type([]byte(c.typed))
+				waitFor(t, "the command", func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(cmd) > 0
+				})
+				mu.Lock()
+				if cmd[0] != c.want {
+					t.Errorf("got %q, want %q", cmd[0], c.want)
+				}
+				mu.Unlock()
 			}
 		})
 	}

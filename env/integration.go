@@ -222,8 +222,15 @@ __mdsh_prompt() {
 	__mdsh_dump "$__mdsh_s"
 	printf '\033]133;D;%s;mdsh\007\033]133;A;mdsh\007' "$__mdsh_s"
 }
-__mdsh_b=$(printf '\033]133;B;mdsh\007')
-PS1='$(__mdsh_prompt)'"${PS1-\$ }$__mdsh_b"
+if [ -n "${BASH_VERSION-}" ]; then
+	# bash run as sh, as macOS's /bin/sh is, counts the marks toward
+	# the prompt's width unless they are between \[ and \], which other
+	# shells would print.
+	PS1='\[$(__mdsh_prompt)\]'"${PS1-\$ }"'\[\033]133;B;mdsh\007\]'
+else
+	__mdsh_b=$(printf '\033]133;B;mdsh\007')
+	PS1='$(__mdsh_prompt)'"${PS1-\$ }$__mdsh_b"
+fi
 unset __mdsh_b
 `
 

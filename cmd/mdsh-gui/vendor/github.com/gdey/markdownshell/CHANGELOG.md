@@ -152,6 +152,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- With the experimental interactive shell, a command typed in History
+  in bash that wrapped past the pane's edge was added with a carriage
+  return and a doubled character where it wrapped, and one edited with
+  backspace, in bash or sh, kept the backspaces. The typed line is now
+  read as the terminal shows it. In zsh, a command typed soon after
+  another, on a busy machine, could be added as the one before it.
+  With bash as sh, as macOS's `/bin/sh` is, mdsh's marks in the prompt
+  counted toward its width, so a narrow pane wrapped inside them and the
+  shell looked busy for good.
 - On macOS, mdsh-gui opened with a folder on the command line showed
   a "read …: is a directory" error sheet, which held back the window by
   a quarter of a second or kept it from showing at all. macOS asks to

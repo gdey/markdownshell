@@ -48,11 +48,15 @@ type Stack struct {
 	// again.
 	Prepare  func(cfg *Config) error
 	prepared bool
+	// interactive holds the sub-envs that run interactively, as the
+	// top level does with Config.Interactive: those the History pane
+	// has been moved to (see SetInteractive).
+	interactive map[string]bool
 }
 
 // NewStack returns a stack whose top-level env starts with cfg.
 func NewStack(cfg Config) *Stack {
-	return &Stack{cfg: cfg, envs: map[string]*Env{}, starting: map[string]*Shell{}}
+	return &Stack{cfg: cfg, envs: map[string]*Env{}, starting: map[string]*Shell{}, interactive: map[string]bool{}}
 }
 
 // Get returns the env called name, creating it and any missing parents.
@@ -109,9 +113,13 @@ func (s *Stack) Get(ctx context.Context, name string, share []string) (*Env, err
 		return nil, fmt.Errorf("env %q: %w", name, err)
 	}
 	cfg := s.cfg
-	// Only the top-level env, the one a terminal shows, runs
-	// interactively; the rest are scripted.
-	cfg.Interactive, cfg.Login = false, false
+	// Only the envs a terminal shows run interactively: the top level,
+	// and those SetInteractive names. The rest are scripted.
+	s.mu.Lock()
+	if !s.interactive[name] {
+		cfg.Interactive, cfg.Login = false, false
+	}
+	s.mu.Unlock()
 	filter := Filter
 	if s.Strict {
 		filter = FilterStrict
@@ -167,6 +175,58 @@ func (s *Stack) started(e *Env, share, environ []string) {
 	}
 	sort.Strings(names)
 	s.OnStart(e, share, names)
+}
+
+// SetInteractive has the sub-env name run interactively, on a terminal
+// of its own, from its next start, when the top level does
+// (Config.Interactive). A shell can't become interactive as it runs,
+// so a scripted shell already running for name is ended, and what
+// blocks set there is lost: the caller asks first (see Scripted). It
+// reports whether it ended one. The top level, "", is left as it is.
+func (s *Stack) SetInteractive(name string) bool {
+	name = strings.Trim(name, "/")
+	if name == TopLevel || !s.cfg.Interactive {
+		return false
+	}
+	s.mu.Lock()
+	s.interactive[name] = true
+	e := s.envs[name]
+	if e != nil && !e.Shell.Interactive() {
+		delete(s.envs, name)
+	} else {
+		e = nil
+	}
+	s.mu.Unlock()
+	if e == nil {
+		return false
+	}
+	e.Shell.Close()
+	return true
+}
+
+// Interactive reports whether env name runs, or will run,
+// interactively.
+func (s *Stack) Interactive(name string) bool {
+	name = strings.Trim(name, "/")
+	if !s.cfg.Interactive {
+		return false
+	}
+	if name == TopLevel {
+		return true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.interactive[name]
+}
+
+// Scripted reports whether a scripted shell runs for env name now, one
+// SetInteractive would end.
+func (s *Stack) Scripted(name string) bool {
+	name = strings.Trim(name, "/")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e := s.envs[name]
+	return e != nil && !e.Shell.Exited() && !e.Shell.Interactive()
 }
 
 // TopInteractive reports whether the top-level env's shell runs, or

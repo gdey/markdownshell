@@ -59,15 +59,18 @@ type interactive struct {
 	view io.Writer
 	// out gets a command's output, C to D, for the RunLine waiting on
 	// it; typed says RunLine typed a line and waits for its end.
-	out     io.Writer
-	typed   bool
-	ended   bool
-	status  int
-	echo    bytes.Buffer // what was echoed after B, the command line
-	marksD  int          // mdsh D marks seen
-	states  int          // state records read
-	last    State
-	lastCmd string // the command line zsh's preexec sent
+	out    io.Writer
+	typed  bool
+	ended  bool
+	status int
+	echo   bytes.Buffer // what was echoed after B, the command line
+	// prompt is the prompt's last line, A to B, as drawn; drawing
+	// is what is being drawn now, which becomes prompt at B.
+	prompt, drawing bytes.Buffer
+	marksD          int // mdsh D marks seen
+	states          int // state records read
+	last            State
+	lastCmd         string // the command line zsh's preexec sent
 	// resuming is set while the line that brings back a job RunLine
 	// stopped is typed, until its command starts.
 	resuming bool
@@ -271,7 +274,13 @@ func (ia *interactive) text(p []byte) {
 		ia.view.Write(p)
 	}
 	switch ia.phase {
+	case phasePrompt:
+		ia.drawPrompt(p)
 	case phaseInput:
+		if ia.redraw {
+			ia.drawPrompt(p)
+			return
+		}
 		ia.echo.Write(p)
 	case phaseRunning:
 		ia.running(p)
@@ -319,6 +328,7 @@ func (ia *interactive) onMark(mk mark) {
 			// a line: the prompt alone ends the command.
 			ia.end(-1)
 		}
+		ia.drawing.Reset()
 		if ia.phase == phaseInput && !ia.entered && !ia.typed {
 			// The prompt drawn again: what is typed stays.
 			ia.redraw = true
@@ -330,6 +340,9 @@ func (ia *interactive) onMark(mk mark) {
 		if ia.phase == phaseRunning && ia.typed {
 			return
 		}
+		ia.prompt.Reset()
+		ia.prompt.Write(ia.drawing.Bytes())
+		ia.drawing.Reset()
 		if ia.redraw {
 			// The line typed so far is drawn again after it.
 			ia.redraw = false
@@ -339,6 +352,10 @@ func (ia *interactive) onMark(mk mark) {
 		ia.phase = phaseInput
 		ia.dirty, ia.entered = false, false
 		ia.echo.Reset()
+		// zsh sends a line twice, from its history hook and from
+		// preexec; the second can come after the command started, and
+		// is not the next line's.
+		ia.lastCmd = ""
 	case markCommand:
 		if ia.phase == phaseInput {
 			ia.start()
@@ -351,6 +368,26 @@ func (ia *interactive) onMark(mk mark) {
 		ia.lineRan()
 		ia.phase = phaseDone
 	}
+}
+
+// drawPrompt keeps the prompt's last line as it is drawn; ia.mu is
+// held.
+func (ia *interactive) drawPrompt(p []byte) {
+	if i := bytes.LastIndexByte(p, '\n'); i >= 0 {
+		ia.drawing.Reset()
+		p = p[i+1:]
+	}
+	ia.drawing.Write(p)
+}
+
+// typedLine is the line typed at the prompt, read from what the line
+// editor drew; ia.mu is held.
+func (ia *interactive) typedLine() string {
+	_, cols, err := pty.Getsize(ia.ptm)
+	if err != nil {
+		cols = 0
+	}
+	return typedLine(ia.prompt.String(), ia.echo.String(), cols)
 }
 
 // lineRan reports a line typed at the terminal that ran no command, as
@@ -366,7 +403,7 @@ func (ia *interactive) lineRan() {
 	line := ia.lastCmd
 	ia.lastCmd = ""
 	if line == "" {
-		line = strings.ReplaceAll(stripEsc(ia.echo.String()), "\r", "")
+		line = ia.typedLine()
 	}
 	line = strings.TrimSpace(line)
 	ia.echo.Reset()
@@ -400,7 +437,7 @@ func (ia *interactive) start() {
 	cmd := ia.lastCmd
 	ia.lastCmd = ""
 	if cmd == "" {
-		cmd = strings.TrimSpace(stripEsc(ia.echo.String()))
+		cmd = ia.typedLine()
 	}
 	ia.typedOut.Reset()
 	resumed := ia.resuming && !ia.typed
