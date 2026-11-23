@@ -191,7 +191,12 @@ This page is the reference.
   brings the command back; alt-click (option-click on a Mac) the play
   button, or press cmd/ctrl+alt+enter, to run the block in a side shell
   and leave the command running. Blocks such as `fg` are a record of
-  the session, not steps to repeat.
+  the session, not steps to repeat. The env menu on the bar moves the
+  pane to another env the file names, such as `env=build`: its shell
+  starts interactively, with what its `share=` passes and your rc file,
+  and commands typed there become `env=build` blocks. An env whose
+  blocks already ran in a scripted shell asks first, since it starts
+  again. Each shell keeps its jobs and screen when the pane moves away.
 - **Console** (View › Console, cmd/ctrl+shift+Y). Errors and notes from
   the app, with a count on the toolbar; a line about a place in a file
   jumps to it. A warning an edit fixed is struck out, and one with a

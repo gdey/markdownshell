@@ -298,6 +298,7 @@ env starts in the document's folder.
 | `H` | Show an `http` block's response headers, or its body |
 | `b` | Show or hide the block's earlier runs, kept by `history=N` |
 | `Z` | History fills the screen; esc gives the document its place back |
+| `@` | Move History to another env the file names (interactive shell): its shell starts interactively, keeping its share; one already run scripted asks first, as it starts again |
 | `C` / `O` | Show or hide code / output |
 | `]` / `[` | Next / previous tab |
 | ctrl+t | New tab, on the list of files |
@@ -352,7 +353,8 @@ In the outline ↑/↓ move between entries and ←/→ fold and unfold a
 section; the window's tabs take the arrows, enter and delete. The
 History pane takes the same line keys as `mdsh -i`'s, shift+enter for
 another line, ctrl+c to stop a command (or copy selected lines),
-ctrl+z to stop and keep the job, ctrl+d to close; ``# ```sh`` starts a
+ctrl+z to stop and keep the job, ctrl+d to close; with the interactive
+shell, the env menu on its bar moves it to another env the file names; ``# ```sh`` starts a
 block as in `mdsh -i`. Its record button (the dot) turns recording
 off, so commands run without being added to the file; closing the pane
 turns it back on. A `background` block that outlives its run shows
