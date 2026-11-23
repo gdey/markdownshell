@@ -299,6 +299,13 @@ type Result struct {
 	// is nil when the request got no response.
 	Request *httpblock.Request
 	HTTP    *httpblock.Response
+	// FirstLine is, for an include block, the line in its file that
+	// Stdout starts on, counting from 1. It is 0 when its window matched
+	// nothing.
+	FirstLine int
+	// Warning is, for an include block, why its window is empty, or that
+	// symbol= named more than one definition. It doesn't fail the block.
+	Warning string
 }
 
 // Failed reports whether the block ran and did not succeed.

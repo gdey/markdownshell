@@ -420,7 +420,7 @@ func (r *renderer) code(lang string, info *ast.Text, body []string) {
 		if inc, err := (&doc.Block{Attrs: attrs}).Include(); err == nil {
 			label = includeLabel(inc)
 			if inc.Numbered {
-				gutter = numberedGutter(body, max(inc.From, 1))
+				gutter = numberedGutter(body, firstNumber(body, max(inc.From, 1)))
 			}
 		}
 	}
@@ -467,9 +467,30 @@ func (r *renderer) code(lang string, info *ast.Text, body []string) {
 	r.mono = false
 }
 
+// firstNumber is the line number printing put in front of the first of
+// a number_on include's lines, which is where a match= or symbol=
+// window starts, or def when they have none.
+func firstNumber(lines []string, def int) int {
+	if len(lines) == 0 {
+		return def
+	}
+	f := strings.Fields(lines[0])
+	if len(f) == 0 {
+		return def
+	}
+	if n, err := strconv.Atoi(f[0]); err == nil && n > 0 {
+		return n
+	}
+	return def
+}
+
 // includeLabel captions an include block with the lines it shows.
 func includeLabel(inc doc.Include) string {
 	switch {
+	case inc.Match != "":
+		return fmt.Sprintf("%s, from the line matching %s", inc.File, inc.Match)
+	case inc.Symbol != "":
+		return fmt.Sprintf("%s, %s", inc.File, inc.Symbol)
 	case inc.From > 1 && inc.To > 0:
 		return fmt.Sprintf("%s, lines %d–%d", inc.File, inc.From, inc.To)
 	case inc.From > 1:

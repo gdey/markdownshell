@@ -238,8 +238,9 @@ export interface Cell {
     "include"?: IncludeCell | null;
 
     /**
-     * FirstLine is set on the cell of an include with from= past 1: the
-     * line in its file the included lines start on, where the code's line
+     * FirstLine is set on the cell of an include whose lines start past
+     * the first, by from=, match= or symbol=: the line in its file the
+     * included lines start on, where the code's line
      * numbers count from, so they are the file's.
      */
     "firstLine"?: number;
@@ -643,6 +644,25 @@ export interface IncludeCell {
      */
     "from": number;
     "to": number;
+
+    /**
+     * Window is how a match= or symbol= include picks its lines, as
+     * `match "^FAIL"`, or "" for one that picks them by from= and to=,
+     * whose grips then drag them.
+     */
+    "window"?: string;
+
+    /**
+     * Last is the line in the file its lines end on, from its last
+     * read, 0 when that isn't known or nothing matched.
+     */
+    "last"?: number;
+
+    /**
+     * Warning is why its lines are empty, as no line matching match=,
+     * from its last read.
+     */
+    "warning"?: string;
 }
 
 /**

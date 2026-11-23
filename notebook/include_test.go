@@ -80,3 +80,40 @@ func TestSetIncludeRange(t *testing.T) {
 		t.Errorf("after undo: %s", got)
 	}
 }
+
+// An include that picks its lines by match= or symbol= says how, starts
+// its numbers where its lines start, and has no range to drag.
+func TestIncludeWindowCell(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "b.log"), []byte("l1\nl2\nFAIL\nl4\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "doc.md")
+	src := "```text {<include file=b.log match=^FAIL before=1 lines=2}\n```\n\n```text {<include file=b.log match=nope}\n```\n"
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := Open(file, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	var cells []Cell
+	for _, c := range n.Cells() {
+		if c.Include != nil {
+			cells = append(cells, c)
+		}
+	}
+	if len(cells) != 2 {
+		t.Fatalf("include cells = %+v", cells)
+	}
+	if c := cells[0]; c.FirstLine != 2 || c.Include.Last != 4 || c.Include.Window != `match "^FAIL", 1 before, 2 lines` || c.Include.Warning != "" {
+		t.Errorf("window cell = %d %+v", c.FirstLine, c.Include)
+	}
+	if c := cells[1]; c.FirstLine != 0 || c.Include.Last != 0 || !strings.Contains(c.Include.Warning, "no line of b.log") {
+		t.Errorf("no-match cell = %d %+v", c.FirstLine, c.Include)
+	}
+	if err := n.SetIncludeRange(0, 1, 2); err == nil || !strings.Contains(err.Error(), "picked by match") {
+		t.Errorf("SetIncludeRange on a window: %v", err)
+	}
+}

@@ -45,7 +45,7 @@ func CheckInfo(info string) []Problem {
 		if strings.HasPrefix(tok, "#") {
 			key, value, set = "#", tok[1:], true
 		}
-		spec, ok := doc.LookupAttr(key)
+		spec, ok := doc.LookupAttrFor(key, include)
 		switch {
 		case !ok:
 			add("warning", "mdsh doesn't know %s and leaves it as it is", key)

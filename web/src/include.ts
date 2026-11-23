@@ -46,11 +46,21 @@ export function includeControls(s: HTMLElement, c: Cell, hooks: IncludeHooks) {
   const code = pre?.querySelector<HTMLElement>("code");
   if (!pre || !code) return;
   s.classList.add("include-cell");
-  const label = el("span", { className: "include-range muted" }, rangeText(inc.from, inc.to, 0));
-  const whole = iconButton("eye", `Show the whole of ${inc.file}`, () => void showIncludeFile(inc, hooks));
+  const label = el("span", { className: "include-range muted" }, inc.window || rangeText(inc.from, inc.to, 0));
+  const whole = iconButton("eye", `Show the whole of ${inc.file}`, () => void showIncludeFile(inc, c.firstLine || 1, hooks));
   whole.classList.add("include-whole");
-  const bar = el("div", { className: "include-bar" }, el("span", { className: "include-file" }, inc.file), label, whole);
+  const bar = el("div", { className: "include-bar" }, el("span", { className: "include-file" }, inc.file), label);
+  // An include whose lines are found by match= or symbol= names them
+  // by what they hold, so there are no grips to drag, and a window that
+  // found nothing says so.
+  if (inc.window && inc.last) label.title = `lines ${c.firstLine || 1}–${inc.last}`;
+  if (inc.warning) bar.append(el("span", { className: "stale-badge include-nomatch", title: inc.warning }, "no match"));
+  bar.append(whole);
   bar.onclick = (e) => e.stopPropagation();
+  if (inc.window) {
+    pre.before(bar);
+    return;
+  }
   // load reads the whole file once per card.
   let loaded: Promise<IncludeFile | null> | null = null;
   const load = () => (loaded ??= App.IncludeFile(inc.block).then(
@@ -163,7 +173,7 @@ function lineHeight(code: HTMLElement): number {
 
 // showIncludeFile shows the whole of inc's file over the window, with
 // the included lines marked, scrolled to the first of them.
-async function showIncludeFile(inc: IncludeCell, hooks: IncludeHooks) {
+async function showIncludeFile(inc: IncludeCell, firstLine: number, hooks: IncludeHooks) {
   const file = await App.IncludeFile(inc.block).catch((err) => {
     hooks.say(message(err));
     return null;
@@ -171,11 +181,12 @@ async function showIncludeFile(inc: IncludeCell, hooks: IncludeHooks) {
   if (!file) return;
   const dialog = $<HTMLDialogElement>("include-dialog");
   $("include-title").textContent = inc.file;
-  $("include-note").textContent = `${file.lines} lines; ${rangeText(inc.from, inc.to, file.lines)} included`;
+  const first = inc.window ? (inc.last ? firstLine : 0) : inc.from || 1;
+  const last = inc.window ? inc.last || 0 : inc.to || file.lines;
+  const shown = inc.window ? (last ? `lines ${first}–${last} (${inc.window})` : `no lines (${inc.window})`) : rangeText(inc.from, inc.to, file.lines);
+  $("include-note").textContent = `${file.lines} lines; ${shown} included`;
   const code = $("include-text");
   const lines = codeLines(file.text, inc.lang);
-  const first = inc.from || 1;
-  const last = inc.to || file.lines;
   lines.forEach((l, i) => l.classList.toggle("included", i + 1 >= first && i + 1 <= last));
   code.replaceChildren(...lines);
   dialog.showModal();

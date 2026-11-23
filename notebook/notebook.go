@@ -129,8 +129,9 @@ type Cell struct {
 	// Include is set for an include block, whose lines come from a
 	// file: the view can drag its range, and show the whole file.
 	Include *IncludeCell `json:"include,omitempty"`
-	// FirstLine is set on the cell of an include with from= past 1: the
-	// line in its file the included lines start on, where the code's line
+	// FirstLine is set on the cell of an include whose lines start past
+	// the first, by from=, match= or symbol=: the line in its file the
+	// included lines start on, where the code's line
 	// numbers count from, so they are the file's.
 	FirstLine int `json:"firstLine,omitempty"`
 	// From and To are the cell's bytes in the file, output included.

@@ -503,6 +503,12 @@ func main() {
 | `from=N` | First line to include, counting from 1; `0` (the default) is the start of the file |
 | `to=N` | Last line to include, inclusive; the default is the end of the file |
 | `number_on` | Show each line with its line number in the file |
+| `match="re"` | Start at the first line matching a Go regexp, instead of `from=` |
+| `symbol=Name` | Show a Go definition: a function, a method as `T.Method` or `(*T).Method`, a type, a const or a var, with its doc comment |
+| `comment=false` | With `symbol=`, leave out the doc comment |
+| `before=N` | Also show the N lines above the start |
+| `lines=N` | Show N lines from the start, the start included |
+| `until="re"` | End at the first line matching a Go regexp at or after the start, that line included |
 
 - The fence's language is the language the lines are shown in.
 - The file must be in the document's folder, or a folder under it, and
@@ -520,6 +526,16 @@ func main() {
 - `number_on` is for display. Printed markdown starts each line with its
   number; write-back stores the plain lines, and other renderers can
   number them their own way.
+- `match=` and `symbol=` find the lines by what they hold, so the block
+  stays on them when the file changes above. They can't be combined with
+  `from=` or `to=`, and `lines=` can't be combined with `until=`. Without
+  `lines=` or `until=`, a `match=` window runs to the end of the file and
+  a `symbol=` window to the end of the definition. Line numbers start
+  where the window does. `symbol=` reads only Go so far; in a grouped
+  `const (…)` or `var (…)` the window is the name's own lines.
+- When `match=` or `symbol=` finds nothing, the block is left empty and
+  mdsh warns, without failing the run: a window on errors in a log that
+  has none this time is the normal case.
 - Includes are read on every run, even with `--only`, `--hide-code` or
   `--hide-output`. `skip` leaves the stored lines alone and `show=` hides
   the block. A missing file or a `from=` past the end of the file is an

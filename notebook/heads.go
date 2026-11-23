@@ -477,10 +477,18 @@ func (l *cellLayout) blockCell(i int, b *doc.Block) {
 	if !run.Runnable(b) {
 		c := Cell{Block: -1, From: span.Start, To: span.End}
 		if inc, err := b.Include(); err == nil && b.IsInclude() {
-			if inc.From > 1 {
-				c.FirstLine = inc.From
+			first := inc.From
+			ic := &IncludeCell{Block: i, File: inc.File, From: inc.From, To: inc.To, Lang: b.Lang, Window: windowText(inc)}
+			if r := n.results[i]; r != nil && r.Ran && r.Err == nil {
+				first, ic.Warning = r.FirstLine, r.Warning
+				if r.FirstLine > 0 {
+					ic.Last = r.FirstLine + run.LineCount(r.Stdout) - 1
+				}
 			}
-			c.Include = &IncludeCell{Block: i, File: inc.File, From: inc.From, To: inc.To, Lang: b.Lang}
+			if first > 1 {
+				c.FirstLine = first
+			}
+			c.Include = ic
 		}
 		add(c, bodySrc{md: append(append([]byte(nil), code...), out...), block: -1})
 		return

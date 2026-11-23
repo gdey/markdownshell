@@ -549,6 +549,29 @@ file and `to` to the end. The fence's language is the language, and
 `number_on` shows line numbers when the document is printed, in the
 TUI, and in `--html` and `--pdf`. mdsh-gui numbers every code block, so
 it numbers an include's lines from `from=` with or without `number_on`.
+
+An include can find its lines by what they hold rather than by number, so
+it stays on the right lines when the file changes above them:
+
+````markdown
+```text {<include file=res://build.log match="^FAIL" before=3 lines=20}
+```
+
+```go {<include file=run/history.go symbol=ownAsset number_on}
+```
+````
+
+`match=` starts at the first line matching a Go regexp; `before=N` adds N
+lines above it, `lines=N` shows N lines from it, and `until=` ends at the
+first line at or after it matching another regexp (else the window runs
+to the end of the file). `symbol=` shows a Go definition with its doc
+comment: a function, a method as `T.Method` or `(*T).Method`, a type, a
+const or a var; `comment=false` leaves the comment out. Only Go is read
+for `symbol=` so far. Line numbers start where the window does. When
+nothing matches, the block is left empty and mdsh warns, without failing
+the run. `match=` and `symbol=` can't be combined with `from=` or `to=`,
+nor `lines=` with `until=`.
+
 An include block never runs and has no name. [examples/include.md](examples/include.md)
 shows each option.
 

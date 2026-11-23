@@ -125,6 +125,14 @@ and takes none of the attributes above.
 | `from=N` | First line, counting from 1 (default the first) |
 | `to=N` | Last line, inclusive (default the last) |
 | `number_on` | Show each line's number in the file |
+| `match="RE"` | Start at the first line matching a Go regexp (not with `from=`/`to=`) |
+| `symbol=NAME` | Show a Go func, method (`T.M`), type, const or var with its doc comment |
+| `comment=false` | With `symbol=`, leave out the doc comment |
+| `before=N` | Also show N lines above the start |
+| `lines=N` | Show N lines from the start |
+| `until="RE"` | End at the first line from the start matching a regexp (not with `lines=`) |
+
+No match leaves the block empty with a warning; the run doesn't fail.
 
 ### Input blocks
 

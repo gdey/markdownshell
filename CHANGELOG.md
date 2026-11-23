@@ -8,6 +8,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An include block can find its lines by what they hold, so it stays on
+  them when the file changes above: `match="^FAIL"` starts at the first
+  line matching a regexp, `before=N` adds lines above it, and `lines=N`
+  or `until="re"` ends it. `symbol=Name` shows a Go function, method
+  (`T.Method`), type, const or var with its doc comment (`comment=false`
+  drops it). Line numbers start where the window does. A window that
+  finds nothing is left empty with a warning, a "no match" badge in
+  mdsh-gui, and doesn't fail the run.
+
+  ![Three includes in mdsh-gui: a build log from its first FAIL line, numbered from line 42; a Go method found by symbol=, numbered from line 10; and a match on "^panic" that found nothing, badged "no match"](docs/changelog/include-windows.png)
+
 - A block's output longer than 25 lines opens folded to its first line,
   in mdsh-gui and `mdsh --serve`, so a long log doesn't push the rest of
   the file out of view; it shows as it streams and folds once the block

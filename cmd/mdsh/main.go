@@ -374,6 +374,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 			fmt.Fprintf(stderr, "mdsh: %s: warning: %s\n", displayName(file), d.FrontMatterErr)
 		}
 		results := run.Includes(d, run.Options{File: file, AllowOutside: *allowOutside})
+		warnIncludes(stderr, file, d, results)
 		if *outFile != "" {
 			out, _ := report.Render(d, results, reportOpts)
 			err = writeFile(*outFile, out, 0o644)
@@ -557,6 +558,7 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 	}
 
 	results, runErr := run.Run(ctx, d, opts)
+	warnIncludes(stderr, file, d, results)
 	if results == nil {
 		return runErr
 	}
@@ -1244,4 +1246,14 @@ func displayName(file string) string {
 		return "stdin"
 	}
 	return file
+}
+
+// warnIncludes prints the warnings of d's include blocks, such as a
+// match= that matched no line, which don't fail the run.
+func warnIncludes(stderr io.Writer, file string, d *doc.Document, results []*run.Result) {
+	for _, r := range results {
+		if r != nil && r.Warning != "" {
+			fmt.Fprintf(stderr, "mdsh: %s: warning: line %d: %s\n", displayName(file), bytes.Count(d.Src[:r.Block.Span.Start], []byte("\n"))+1, r.Warning)
+		}
+	}
 }

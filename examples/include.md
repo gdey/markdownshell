@@ -39,6 +39,38 @@ for name in "$@"; do
 done
 ```
 
+An include can find its lines by what they hold, so it keeps showing
+the right ones when the file changes above them. `match=` starts at the
+first line matching a regexp, and `until=` ends at the first line after
+it matching another:
+
+```sh {<include file=include/greet.sh match="^greet\(\)" until="^}" number_on}
+greet() {
+	printf 'hello, %s\n' "$1"
+}
+```
+
+`symbol=` shows a Go definition, with its doc comment, by name: a
+function, a method as `T.Method`, a type, a const or a var.
+`comment=false` leaves the comment out, and `before=N` and `lines=N` add
+lines above the start or stop after N lines:
+
+```go {<include file=include/greet.go symbol=Greeter.Greet}
+// Greet returns the greeting for name.
+func (g Greeter) Greet(name string) string {
+	return fmt.Sprintf("%s, %s", g.Greeting, name)
+}
+```
+
+```go {<include file=include/greet.go symbol=Greeter comment=false}
+type Greeter struct {
+	Greeting string
+}
+```
+
+When nothing matches, the block is left empty and mdsh warns, without
+failing the run.
+
 Includes sit alongside ordinary blocks. This one runs the script shown
 above:
 
