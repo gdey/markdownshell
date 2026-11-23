@@ -103,6 +103,13 @@ func TestRenderInclude(t *testing.T) {
 	}
 }
 
+func TestRenderSpill(t *testing.T) {
+	md := "```output {for=b exit=2 truncated <include file=res://b.log match=^FAIL before=1 number_on}\n 9  ok\n10  FAIL\n```\n"
+	if _, err := Render([]byte(md), Options{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLoadGIFFrame(t *testing.T) {
 	dir := t.TempDir()
 	data, err := termrec.GIF(termrec.Recording{Cols: 10, Rows: 2, Events: []termrec.Event{

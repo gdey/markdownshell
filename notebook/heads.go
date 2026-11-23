@@ -528,6 +528,7 @@ func (l *cellLayout) blockCell(i int, b *doc.Block) {
 		Timeout:         timeoutMs(b),
 		CodeLines:       textLines(b.Body),
 		OutputLines:     textLines(string(out)),
+		Spill:           spillCell(b, r),
 		From:            span.Start,
 		To:              span.End,
 	}, bodySrc{block: i, out: out})

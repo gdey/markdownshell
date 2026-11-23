@@ -86,6 +86,34 @@ type Options struct {
 	// source, as for an mdsh-gui document a run was written into; see
 	// render.Options.InSource. Nil means none is.
 	InSource func(r *run.Result) bool
+	// File is the document's file name, for links to files in its
+	// assets folder, <file>.assets, as out=file writes. Empty means
+	// mdsh.md.
+	File string
+	// Out is where the report is written, for those links: they are
+	// relative to its folder. Empty means beside the document.
+	Out string
+}
+
+// assets is the document's assets folder, as a link from the report.
+func (o Options) assets() string {
+	name := "mdsh.md"
+	if o.File != "" {
+		name = filepath.Base(o.File)
+	}
+	dir := name + ".assets"
+	if o.File == "" || o.Out == "" || o.Out == "-" {
+		return dir
+	}
+	from, err1 := filepath.Abs(filepath.Dir(o.Out))
+	to, err2 := filepath.Abs(filepath.Join(filepath.Dir(o.File), dir))
+	if err1 != nil || err2 != nil {
+		return dir
+	}
+	if rel, err := filepath.Rel(from, to); err == nil {
+		return filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(to)
 }
 
 // Render makes a report of d with results, matched to its blocks as

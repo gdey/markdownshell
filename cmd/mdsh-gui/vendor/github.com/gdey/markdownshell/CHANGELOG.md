@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An `out=file` block's output bar in mdsh-gui says how long its log is,
+  "63 lines in test.log", and clicking that shows the whole log with the
+  lines the output shows marked. A window that matched nothing is badged
+  "no match", and a log cut at 16 MB "truncated". `--html` reports link
+  the log from the output's caption, and `--pdf` names it there.
+
+  ![Two out=file blocks: test's output bar reads "63 lines in test.log" over the lines around the first FAIL, and lint's reads "1 line in lint.log" with a "no match" badge](docs/changelog/spill-bar.png)
+
 - `out=file` sends a block's stdout to `<doc>.assets/<id>.log` (or the
   path given), and its output fence becomes an include of the file: the
   first `fold_output` lines, or the window you pick by adding `match=`,

@@ -110,6 +110,12 @@ export interface Cell {
     "output"?: string;
 
     /**
+     * Spill is set for a block with out=file: the file its output went
+     * to, which Output shows a window of.
+     */
+    "spill"?: SpillCell | null;
+
+    /**
      * At is when the run that made Output started (RFC 3339, in UTC):
      * this session's run, or the at= saved with the output. Empty when
      * there is no output or it was saved without a time.
@@ -874,6 +880,47 @@ export interface SourceBlock {
      * Runs says whether depends= can name it: an input never runs.
      */
     "runs": boolean;
+}
+
+/**
+ * SpillCell is the file a block with out=file wrote its output to, for
+ * the line on its output bar that says how long it is and opens it.
+ */
+export interface SpillCell {
+    /**
+     * File is its output fence's file=, as res://build.log.
+     */
+    "file": string;
+
+    /**
+     * Lines is how many lines the file has, from this session's run; 0
+     * when the block hasn't run.
+     */
+    "lines"?: number;
+
+    /**
+     * First and Last are the lines of the file the output shows, from
+     * this session's run; 0 when it hasn't run or nothing matched.
+     */
+    "first"?: number;
+    "last"?: number;
+
+    /**
+     * Window is how the output fence picks its lines, as `match "^FAIL"`,
+     * or "" for the first fold_output lines.
+     */
+    "window"?: string;
+
+    /**
+     * Warning is why the window is empty, as no line matching match=.
+     */
+    "warning"?: string;
+
+    /**
+     * Truncated is set when the output was too long for the file, so
+     * its end was dropped.
+     */
+    "truncated"?: boolean;
 }
 
 /**

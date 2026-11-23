@@ -1234,6 +1234,16 @@ func (a *App) IncludeFile(ctx context.Context, i int) (notebook.IncludeFile, err
 	return n.IncludeFile(i)
 }
 
+// SpillFile reads the whole of the file block i, which has out=file,
+// wrote its output to, for showing it.
+func (a *App) SpillFile(ctx context.Context, i int) (notebook.IncludeFile, error) {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return notebook.IncludeFile{}, err
+	}
+	return n.SpillFile(i)
+}
+
 // SetCastFrame writes frame=n, where a recording's player was left, on
 // tty block i, or with i < 0 on the cast fence holding body. Undo takes
 // it back.

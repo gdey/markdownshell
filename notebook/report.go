@@ -62,6 +62,7 @@ func (n *Notebook) MakeReport(r Report) ([]byte, error) {
 		Env:   run.WithMode(os.Environ(), run.ModeReport),
 		Title: report.Title(n.File()),
 		Dir:   filepath.Dir(n.File()),
+		File:  n.File(),
 	}
 	if r.Saved {
 		src, err := os.ReadFile(n.File())
