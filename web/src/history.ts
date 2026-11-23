@@ -10,7 +10,8 @@
 // prompt still becomes notes and History blocks as it runs (see
 // notebook.Live), and the foot shows the shell's jobs.
 
-import { Terminal } from "@xterm/xterm";
+import { type IMarker, Terminal } from "@xterm/xterm";
+import { aboveSequence } from "./above.js";
 import { Clipboard } from "/wails/runtime.js";
 import { App, message, type HistoryEnv } from "./api.js";
 import { confirmShells, lostWarning } from "./confirm.js";
@@ -139,6 +140,7 @@ function ensureTerm(): Terminal {
   term.open($("history-term"));
   // What commands typed here print comes with links, as their blocks do.
   terminalLinks(term, (msg) => say(`\x1b[31m${msg}\x1b[0m`));
+  markPrompts(term);
   term.onData((keys) => {
     if (live) sendKeys(keys);
     else if (block !== -1) typeKeys(keys);
@@ -282,7 +284,7 @@ function slide(open: boolean) {
   if (open === !pane.classList.contains("closed")) return;
   if (!open) setFull(false);
   // Closing it records again.
-  if (!open && !record) setRecord(true, true);
+  if (!open && !record) setRecord(true);
   $("history-toggle").setAttribute("aria-expanded", String(open));
   const from = open ? 0 : body.offsetHeight;
   pane.classList.toggle("closed", !open);
@@ -304,7 +306,7 @@ function slide(open: boolean) {
 // showHistory is about to start the shells again and ask itself.
 export function showBar(on: boolean, prompt = true) {
   if (!on) setFull(false);
-  if (!on && !record) setRecord(true, true);
+  if (!on && !record) setRecord(true);
   $("history").hidden = !on;
   if (on && prompt) void updatePrompt();
 }
@@ -340,7 +342,10 @@ async function goLive(): Promise<boolean> {
   live = await App.HistoryLive().catch(() => false);
   setLive(live);
   if (!live) return false;
-  if (!was) term?.reset();
+  if (!was) {
+    term?.reset();
+    forgetPrompt();
+  }
   fitHistory();
   try {
     await App.AttachShell();
@@ -407,7 +412,10 @@ export function historyLive(kind: string, data: string | undefined, bytes: strin
       historyBusy(false);
       jobs = [];
       drawJobs();
-      if (live && term) say("\x1b[2m(the shell ended: type to start a new one)\x1b[0m");
+      // With the shell gone nothing else draws on the screen, so this
+      // goes at the cursor, where the next shell's prompt follows it.
+      atPrompt = false;
+      if (live && term) term.write(`${term.buffer.active.cursorX > 0 ? "\r\n" : ""}\x1b[2m(the shell ended: type to start a new one)\x1b[0m\r\n`);
       return true;
     case "live":
       liveRunning = data === "running";
@@ -424,6 +432,7 @@ export function historyLive(kind: string, data: string | undefined, bytes: strin
       // shows from now on.
       if (live && term) {
         term.reset();
+        forgetPrompt();
         if (bytes) term.write(decode(bytes));
         term.focus();
       }
@@ -614,11 +623,81 @@ function showDir(dir: string) {
 }
 
 // say writes a line to the transcript, on a line of its own even after
-// output that didn't end one, as ^C or printf leave.
+// output that didn't end one, as ^C or printf leave. Live, the screen
+// is the shell's, so sayLive writes it.
 function say(text: string) {
+  if (live) {
+    sayLive(text);
+    return;
+  }
   const t = ensureTerm();
   t.write((t.buffer.active.cursorX > 0 ? "\n" : "") + text + "\n");
 }
+
+// sayLive writes text on the live pane's screen, which is the shell's:
+// written at the cursor, behind the line editor's back, it would leave
+// the editor's idea of where its cursor is out of step with the screen,
+// and the cursor in the wrong place. At the prompt, the text goes above
+// it, the prompt and the cursor moving down together (see above.ts).
+// While a command runs, or the shell is gone, or the prompt can't be
+// found, it goes to the status line.
+function sayLive(text: string) {
+  const seq = term && atPrompt && !liveRunning ? aboveSequence(text.split("\n"), screen(term)) : null;
+  if (term && seq !== null) term.write(seq);
+  else hooks.say(plain(text));
+}
+
+// The shell marks its prompt's start with OSC 133;A, where the input
+// starts with B, where a command starts with C and where it ended with
+// D. promptMark is the line of the last A, and atPrompt says whether
+// the shell sits at it.
+let promptMark: IMarker | null = null;
+let atPrompt = false;
+
+// markPrompts follows the shell's marks.
+function markPrompts(t: Terminal) {
+  t.parser.registerOscHandler(133, (data) => {
+    switch (data[0]) {
+      case "A":
+        promptMark?.dispose();
+        promptMark = t.buffer.active.type === "normal" ? t.registerMarker(0) : null;
+        atPrompt = promptMark !== null;
+        break;
+      case "C":
+      case "D":
+        atPrompt = false;
+        break;
+    }
+    return true;
+  });
+}
+
+// forgetPrompt drops the prompt's mark, as when the screen is reset.
+function forgetPrompt() {
+  promptMark?.dispose();
+  promptMark = null;
+  atPrompt = false;
+}
+
+// screen says where the prompt and the cursor are on t's screen, for
+// aboveSequence. Without the prompt's mark, it is taken to start on
+// the cursor's line, as wrapped.
+function screen(t: Terminal) {
+  const b = t.buffer.active;
+  const y = b.cursorY;
+  const line = (row: number) => b.getLine(b.baseY + row);
+  let top = y;
+  if (promptMark && !promptMark.isDisposed && promptMark.line >= b.baseY) top = promptMark.line - b.baseY;
+  else while (top > 0 && line(top)?.isWrapped) top--;
+  let last = y;
+  while (last + 1 < t.rows && line(last + 1)?.isWrapped) last++;
+  let free = 0;
+  while (t.rows - 1 - free > last && (line(t.rows - 1 - free)?.translateToString(true) ?? "") === "") free++;
+  return { rows: t.rows, cols: t.cols, x: b.cursorX, y, top, last, free };
+}
+
+// plain is text without its colors, for the status line.
+const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, "").replace(/\s*\n\s*/g, " ").trim();
 
 // isNote reports whether text is a note, every line starting with #,
 // which is added as prose rather than run.
@@ -718,8 +797,9 @@ async function submit(entered: string) {
 // setRecord turns recording on or off: off, a command typed here runs,
 // in the shell blocks run in, but isn't added to the file. A note or a
 // block still is. It starts on, and closing the pane turns it on
-// again; quiet leaves the transcript be.
-function setRecord(on: boolean, quiet = false) {
+// again. The button, the pane's tint and the input's placeholder show
+// which it is, so the transcript isn't told.
+function setRecord(on: boolean) {
   record = on;
   App.SetRecording(on).catch(() => {});
   const button = $("history-record");
@@ -729,7 +809,6 @@ function setRecord(on: boolean, quiet = false) {
   const box = input();
   box.placeholder = on ? "A command to run and add to the file, or # a note" : "A command to run, not added to the file, or # a note";
   if (inBlock(box.value) === null) box.setAttribute("aria-label", commandLabel());
-  if (term && !quiet) say(on ? "\x1b[2m(recording on: commands typed here are added to the file)\x1b[0m" : "\x1b[2m(recording off: commands typed here run but aren't added to the file)\x1b[0m");
 }
 
 const recordOnTitle = "Recording: commands typed here are added to the file. Click to stop recording";

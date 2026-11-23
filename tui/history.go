@@ -308,13 +308,8 @@ func (m *Model) histKey(k tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 	case "ctrl+o":
-		// Recording on or off.
+		// Recording on or off, as the pane's rule shows.
 		h.unrecorded = !h.unrecorded
-		if h.unrecorded {
-			m.histLog(helpStyle.Render("(recording off: commands typed here run but aren't added to the file; ctrl+o records again)"))
-		} else {
-			m.histLog(helpStyle.Render("(recording on: commands typed here are added to the file)"))
-		}
 		return nil
 	case "ctrl+l":
 		// It clears the pane, as it clears a terminal.
