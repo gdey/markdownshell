@@ -13,12 +13,14 @@ import (
 // blank line, and returns it. info is the fence's info string: a
 // language, such as sh, and any attributes. Earlier blocks keep their
 // spans, so results for them stay valid. It fails if the end of d would
-// swallow the block, such as an unclosed fence.
+// swallow the block, such as an unclosed fence. body may be empty only
+// for an include, whose body is filled from its files.
 func (d *Document) AppendBlock(info, body string) (*Block, error) {
 	if body == "" {
-		return nil, errors.New("empty block")
-	}
-	if body[len(body)-1] != '\n' {
+		if _, attrs := ParseInfo(info); !attrs.Has(IncludeAttr) {
+			return nil, errors.New("empty block")
+		}
+	} else if body[len(body)-1] != '\n' {
 		body += "\n"
 	}
 	fence := "```"

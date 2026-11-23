@@ -215,6 +215,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- An include typed in the History pane, as
+  `` # ```markdown {<include file=README.md} `` then a closing fence, is
+  added to the file. Its body comes from its files, so it has none of
+  its own, and it was turned away as empty.
+
+  ![The History pane after typing an include of hello.md and its closing fence: "added to the end of the file", and the file shows the include with hello.md's text](docs/changelog/history-include-block.png)
+
 - With the experimental interactive shell, a message mdsh showed in the
   History pane, such as why a link wasn't opened, was written at the
   shell's cursor, behind its back, so the cursor and what you typed
