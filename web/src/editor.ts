@@ -1,7 +1,7 @@
 // Help for the mdsh attributes in opening fences, and Vim's :w, :q and
 // :RunBlock, for the markdown editors.
 
-import { type EditorState, type Extension, Facet } from "@codemirror/state";
+import { type EditorState, type Extension, Facet, type Text } from "@codemirror/state";
 import { EditorView, hoverTooltip, type Tooltip } from "@codemirror/view";
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { type Diagnostic, linter } from "@codemirror/lint";
@@ -192,15 +192,7 @@ let answered = new Map<string, Problem[]>();
 async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
   const out: Diagnostic[] = [];
   const doc = state.doc;
-  const infos: { n: number; from: number; text: string }[] = [];
-  let n = 0;
-  let from = 0;
-  for (const it = doc.iterLines(); !it.next().done; from += it.value.length + 1) {
-    n++;
-    if (!it.value.includes("{")) continue;
-    const r = infoRange(state, from);
-    if (r && r.text.trim()) infos.push({ n, ...r });
-  }
+  const infos = infosIn(doc);
   // Blocks are only asked about if a depends= is there.
   const problems0 = infos.some((r) => dependsRe.test(r.text)) ? await dependsProblems(state, infos) : null;
   const bad = new Map<number, Map<string, boolean>>(); // by line, the names that aren't a block that runs
@@ -253,6 +245,44 @@ async function checkInfo(state: EditorState): Promise<Diagnostic[]> {
     else out.push({ from: r.from + v.index + 1, to: r.from + v.index + v[0].length, severity: "error", message: `var=${v[1]} is already bound on line ${first}, so this one is ignored` });
   }
   return out;
+}
+
+// Info is a fence's info string with attributes, on line n, from from.
+type Info = { n: number; from: number; text: string };
+
+// infos are the info strings in each piece of a text, with their lines
+// and places counted in the piece. The pieces an edit leaves alone are
+// the same objects in the text after it, so only those it changed are
+// looked through again: looking through every line of a long file at
+// each keystroke took 100 ms.
+const infos = new WeakMap<Text, Info[]>();
+
+// infosIn are the info strings in doc with attributes in them, in order.
+function infosIn(doc: Text): Info[] {
+  let got = infos.get(doc);
+  if (got) return got;
+  got = [];
+  if (doc.children) {
+    let n = 0;
+    let from = 0;
+    for (const c of doc.children) {
+      for (const r of infosIn(c)) got.push({ n: r.n + n, from: r.from + from, text: r.text });
+      n += c.lines;
+      from += c.length + 1;
+    }
+  } else {
+    let n = 0;
+    let from = 0;
+    for (const it = doc.iterLines(); !it.next().done; from += it.value.length + 1) {
+      n++;
+      if (!it.value.includes("{")) continue;
+      const m = fence.exec(it.value);
+      if (!m || /^\s*(output|tape)\b/.test(m[2]) || !m[2].trim()) continue;
+      got.push({ n, from: from + m[1].length, text: m[2] });
+    }
+  }
+  infos.set(doc, got);
+  return got;
 }
 
 // token finds the attribute token around pos in the info string: its

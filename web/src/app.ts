@@ -633,10 +633,13 @@ function updateDoc(r: Relayout) {
     card.remove();
     cardOf.delete(c);
   }
+  const was = cells;
   cells = next;
   virtual = cells.length > lazyCells;
   $("doc").classList.toggle("virtual", virtual);
-  indexCells();
+  // Typing in prose changes no block, so the lines between them stay.
+  const same = !!r.splice && reindex(r.splice, was) && !gone.some((c) => c.block >= 0) && !middle.some((c) => c.block >= 0);
+  if (!same) indexCells();
   bareBodies();
   // A few new cards, as typing makes, are drawn as typing's; many, as
   // a fence opened above them makes, are drawn as the view's, like
@@ -646,7 +649,8 @@ function updateDoc(r: Relayout) {
   select(Math.min(selected, blocks().length - 1), false);
   markSection();
   drawOutline();
-  setDeps(cells);
+  if (same) drawDeps();
+  else setDeps(cells);
   // Many new cards can leave the view blank, as drawing every one can.
   if (middle.length > 20) repaint($("doc-scroll"));
 }
@@ -670,27 +674,48 @@ function takeFresh(fresh: Cell[]): { next: Cell[]; middle: Cell[]; gone: Cell[] 
 // out of sight take their bodies again when drawn, as what a block's
 // body says of where it can be dragged can change with any edit.
 function takeSplice(sp: SpliceIn): { next: Cell[]; middle: Cell[]; gone: Cell[] } {
-  const next = new Array<Cell>(cells.length - sp.remove + sp.heads.length);
-  for (let i = 0; i < cells.length; i++) {
-    const j = newIndex(sp, i);
-    if (j < 0) continue;
+  const shift = sp.heads.length - sp.remove;
+  const end = sp.at + sp.remove;
+  const next = new Array<Cell>(cells.length + shift);
+  // The cards drawn are few, and are kept apart from the rest, which
+  // are gone through with as little as can be for each: in a long
+  // document, a lookup for each cell took most of the time.
+  const drawn = new Set<number>();
+  for (const c of cardOf.keys()) {
+    const i = cellIndex.get(c);
+    if (i !== undefined && (i < sp.at || i >= end)) drawn.add(i);
+  }
+  for (let i = 0; i < sp.at; i++) {
     const c = cells[i];
+    next[i] = c;
+    if (!drawn.has(i)) partial.add(c);
+  }
+  const moving = sp.move.line !== 0 || sp.move.pos !== 0 || sp.move.block !== 0;
+  for (let i = end; i < cells.length; i++) {
+    const c = cells[i];
+    const j = i + shift;
     next[j] = c;
-    if (cardOf.has(c)) {
-      keepCell(c, sp.drawn.get(c) ?? headAfter(sp, c, i, j), j);
-      continue;
-    }
-    if (i >= sp.at) {
+    if (drawn.has(i)) continue;
+    if (moving) {
       moveHead(c, sp.move);
       if (c.outputLine) c.outputLine += sp.move.line;
-      headIndex.set(c, j);
     }
-    const fix = sp.fixes.get(j);
-    if (fix) takeHead(c, fix);
-    else partial.add(c);
+    if (shift) headIndex.set(c, j);
+    partial.add(c);
+  }
+  for (const i of drawn) {
+    const c = cells[i];
+    const j = newIndex(sp, i);
+    keepCell(c, sp.drawn.get(c) ?? headAfter(sp, c, i, j), j);
+  }
+  for (const [j, fix] of sp.fixes) {
+    const c = next[j];
+    if (j < sp.at || j >= sp.at + sp.heads.length) {
+      if (!cardOf.has(c)) takeHead(c, fix);
+    }
   }
   sp.heads.forEach((c, k) => (next[sp.at + k] = c));
-  return { next, middle: sp.heads, gone: cells.slice(sp.at, sp.at + sp.remove) };
+  return { next, middle: sp.heads, gone: cells.slice(sp.at, end) };
 }
 
 // keepCell has cell c, drawn now, take f, the cell Go laid out in its
@@ -1046,6 +1071,31 @@ function indexCells() {
     headingByKey.set(key, c);
   });
   foldCells();
+}
+
+// reindex is indexCells for splice sp, made to was, the cells before
+// it, when it replaced cells with as many others, none a heading, and
+// added or took away no block, as typing in a paragraph does: only the
+// cells replaced are indexed again. Going through every cell took most
+// of the time a keystroke in a long document spent drawing. It reports
+// whether it could.
+function reindex(sp: SpliceIn, was: Cell[]): boolean {
+  if (sp.remove !== sp.heads.length || sp.move.block !== 0) return false;
+  for (let k = 0; k < sp.remove; k++) if (was[sp.at + k].heading || sp.heads[k].heading) return false;
+  for (let k = 0; k < sp.remove; k++) {
+    const c = was[sp.at + k];
+    cellIndex.delete(c);
+    if (renumbered(c) && blockCells.get(c.block) === c) blockCells.delete(c.block);
+  }
+  sp.heads.forEach((c, k) => {
+    const i = sp.at + k;
+    cellIndex.set(c, i);
+    if (renumbered(c)) blockCells.set(c.block, c);
+    heights.set(i, hidden[i] ? 0 : (measured.get(c.hash ?? "") ?? guessPitch(c)));
+  });
+  shownBlocks = null;
+  for (const [c, card] of cardOf) decorate(card, c);
+  return true;
 }
 
 // foldCells works out which cells the folded sections hide, and the
