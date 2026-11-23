@@ -28,7 +28,15 @@ func NameBlocks(d *doc.Document, results []*Result, opts Options) ([]doc.Rename,
 		old[r.New] = r.Old
 	}
 	for _, r := range results {
-		if r == nil || r.Image == "" {
+		if r == nil {
+			continue
+		}
+		if o, ok := old[r.Block.ID]; ok && r.Spill != nil {
+			if rest, ok := strings.CutPrefix(r.Spill.File, ResScheme+o+"."); ok {
+				r.Spill.File = ResScheme + r.Block.ID + "." + rest
+			}
+		}
+		if r.Image == "" {
 			continue
 		}
 		if o, ok := old[r.Block.ID]; ok {

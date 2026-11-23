@@ -2,6 +2,7 @@ package doc
 
 import (
 	"bytes"
+	"maps"
 	"reflect"
 	"sort"
 )
@@ -184,7 +185,7 @@ func (d *Document) splice(src []byte) bool {
 		m, ok := move(c.Span)
 		n := *nd.Copies[i]
 		n.Span = c.Span
-		if !ok || m != nd.Copies[i].Span || n != *c {
+		if !ok || m != nd.Copies[i].Span || !sameCopy(&n, c) {
 			return false
 		}
 	}
@@ -358,4 +359,10 @@ func commonSuffix(a, b []byte) int {
 		i++
 	}
 	return i
+}
+
+// sameCopy reports whether a and b are the same output copy.
+func sameCopy(a, b *Copy) bool {
+	return a.For == b.For && a.Stream == b.Stream && a.Region == b.Region && a.Span == b.Span &&
+		a.Prefix == b.Prefix && a.Lead == b.Lead && a.NoSave == b.NoSave && maps.Equal(a.Window, b.Window)
 }

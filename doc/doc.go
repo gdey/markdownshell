@@ -70,6 +70,10 @@ type Block struct {
 	// outMain and outErr are set once Output holds a stdout part (a
 	// fence or region) and a stderr fence. Another one is a copy.
 	outMain, outErr bool
+	// OutWindow is the window attributes (see WindowAttrs) of the
+	// fence of b's current stdout output: for out=file, what part of the
+	// file it shows, which write-back keeps.
+	OutWindow Attrs
 	// outNoSave is set when a fence in Output is marked nosave: the
 	// output is kept as the file has it, as if the block were.
 	outNoSave bool
@@ -127,6 +131,9 @@ type Copy struct {
 	// NoSave is set for a copy fence marked nosave: write-back keeps
 	// what it holds, whatever its block does.
 	NoSave bool
+	// Window is the copy fence's window attributes (see WindowAttrs):
+	// for a copy of out=file output, what part of the file it shows.
+	Window Attrs
 }
 
 // HasOutput reports whether output is already saved after b in the file.
@@ -287,6 +294,12 @@ func parseLines(d *Document, pos, stop int, c counts) (map[string]bool, error) {
 				last.Output.End = next
 				last.addPart(b.Attrs["stream"] == "stderr")
 				last.addCurrentPart(Span{pos, next}, b.Attrs["at"], b.Attrs["stream"] == "stderr")
+				if b.Attrs["stream"] != "stderr" {
+					last.OutWindow = windowOf(b.Attrs)
+				}
+				if err := checkWindow(b); err != nil {
+					return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
+				}
 				if b.Attrs.Has("nosave") {
 					last.outNoSave = true
 				}
@@ -296,8 +309,11 @@ func parseLines(d *Document, pos, stop int, c counts) (map[string]bool, error) {
 			if b.Lang == "output" {
 				// Output away from its block is a copy, part of the
 				// prose. An unclosed one is just prose.
+				if err := checkWindow(b); err != nil {
+					return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
+				}
 				if b.BodySpan.End < b.Span.End && b.Attrs["for"] != "" {
-					d.Copies = append(d.Copies, &Copy{For: b.Attrs["for"], Stream: b.Attrs["stream"], Span: b.Span, Prefix: b.Prefix, Lead: b.Lead, NoSave: b.Attrs.Has("nosave")})
+					d.Copies = append(d.Copies, &Copy{For: b.Attrs["for"], Stream: b.Attrs["stream"], Span: b.Span, Prefix: b.Prefix, Lead: b.Lead, NoSave: b.Attrs.Has("nosave"), Window: windowOf(b.Attrs)})
 				}
 				last = nil
 				pos = next
@@ -340,6 +356,9 @@ func parseLines(d *Document, pos, stop int, c counts) (map[string]bool, error) {
 			}
 			ids[b.ID] = true
 			if err := checkHistoryAttr(b); err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
+			}
+			if err := checkSpill(b); err != nil {
 				return nil, fmt.Errorf("line %d: %w", lineNo(src, pos), err)
 			}
 			if v := b.Attrs["var"]; v != "" && b.IsInput() {

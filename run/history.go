@@ -61,6 +61,30 @@ var rotated = regexp.MustCompile(`^(.+)\.(\d{4}-\d\d-\d\dT\d{6}Z|earlier)(\.[^./
 // imageLink finds the target of the first image link in s.
 var imageLink = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)\)`)
 
+// spillLink finds the file= of an output fence that includes an
+// out=file file, quoted or not.
+var spillLink = regexp.MustCompile(`<include\s+file=("(?:[^"\\]|\\.)*"|[^\s}]+)`)
+
+// fileLinks are the files output part s links to, as the document
+// writes them: its image links, and the file= of an out=file fence,
+// with res:// resolved as opts says.
+func fileLinks(s []byte, opts Options) []string {
+	var links []string
+	for _, m := range imageLink.FindAllSubmatch(s, -1) {
+		links = append(links, string(m[1]))
+	}
+	for _, m := range spillLink.FindAllSubmatch(s, -1) {
+		v := string(m[1])
+		if len(v) >= 2 && v[0] == '"' {
+			v = strings.ReplaceAll(v[1:len(v)-1], `\"`, `"`)
+		}
+		if rel, err := resolveRes(v, opts); err == nil {
+			links = append(links, rel)
+		}
+	}
+	return links
+}
+
 // ownAsset reports whether rel, a path relative to opts.Dir, is a file
 // mdsh writes for block b: its default <doc>.assets/<id>.<ext>, or the
 // path its out= names, or the cast saved beside a .gif. Only these are
@@ -135,8 +159,8 @@ func (s *Session) rotateAssets(b *doc.Block) {
 	}
 	if !ok {
 		for _, p := range b.CurrentParts {
-			if m := imageLink.FindSubmatch(s.d.Src[p.Start:p.End]); m != nil {
-				link = string(m[1])
+			if l := fileLinks(s.d.Src[p.Start:p.End], s.opts); len(l) > 0 {
+				link = l[0]
 				break
 			}
 		}
@@ -202,16 +226,15 @@ func TidyHistoryAssets(before, after []byte, opts Options) error {
 	kept := map[string]bool{}
 	for _, b := range cur.Blocks {
 		for _, e := range b.History {
-			for _, m := range imageLink.FindAllSubmatch(cur.Src[e.Span.Start:e.Span.End], -1) {
-				kept[b.ID+"\x00"+string(m[1])] = true
+			for _, l := range fileLinks(cur.Src[e.Span.Start:e.Span.End], opts) {
+				kept[b.ID+"\x00"+l] = true
 			}
 		}
 	}
 	var errs []error
 	for _, b := range old.Blocks {
 		for _, e := range b.History {
-			for _, m := range imageLink.FindAllSubmatch(old.Src[e.Span.Start:e.Span.End], -1) {
-				link := string(m[1])
+			for _, link := range fileLinks(old.Src[e.Span.Start:e.Span.End], opts) {
 				rel := linkPath(link)
 				if rel == "" || kept[b.ID+"\x00"+link] {
 					continue

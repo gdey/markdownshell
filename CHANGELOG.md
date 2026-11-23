@@ -8,6 +8,17 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `out=file` sends a block's stdout to `<doc>.assets/<id>.log` (or the
+  path given), and its output fence becomes an include of the file: the
+  first `fold_output` lines, or the window you pick by adding `match=`,
+  `before=`, `lines=`, `until=`, `from=` or `to=` to the fence, which
+  every run keeps. So a long build log stays out of the document, and
+  the document points at the part that matters. Copies keep their own
+  windows, includes of the log show the latest run, the file is
+  rewritten only when it changed, and `history=N` keeps earlier logs.
+
+  ![A test block with out=file: its output fence shows the first 25 lines of the log, and a copy under "The first failure" shows the lines around the first --- FAIL](docs/changelog/spill-output.png)
+
 - An include block can find its lines by what they hold, so it stays on
   them when the file changes above: `match="^FAIL"` starts at the first
   line matching a regexp, `before=N` adds lines above it, and `lines=N`
