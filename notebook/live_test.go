@@ -281,3 +281,97 @@ func TestLiveSide(t *testing.T) {
 		t.Errorf("after ctrl+c:\n%s", got)
 	}
 }
+
+// TestLiveSubEnv: the pane moves to a sub-env, whose scripted shell it
+// asks to end first; commands typed there become History blocks of that
+// env, and moving back shows the top level's screen again.
+func TestLiveSubEnv(t *testing.T) {
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("no bash")
+	}
+	t.Setenv("HOME", t.TempDir())
+	file := write(t, "---\nmdsh:\n  shell: "+path+"\n  env:\n    share: [\"...\"]\n---\n"+
+		"```sh {#a env=build share=Y}\necho \"in build: ${Y-}\"\n```\n")
+	var mu sync.Mutex
+	var shown strings.Builder
+	var moved []string
+	n, err := Open(file, Options{OnEvent: func(e Event) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch e.Kind {
+		case "shell":
+			shown.Write(e.Bytes)
+		case "shell-env":
+			moved = append(moved, e.Data+": "+string(e.Bytes))
+			shown.Reset()
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	n.SetInteractiveShell(true, false)
+	if _, err := n.SetHistory(true, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.AttachShell(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	until := func(what string, ok func() bool) {
+		t.Helper()
+		for !ok() {
+			if time.Now().After(deadline) {
+				mu.Lock()
+				t.Fatalf("no %s; text:\n%s\nshown: %q", what, n.Text(), shown.String())
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	n.TypeShell("export Y=from-top; echo top-marker\r")
+	until("top command", func() bool { return strings.Contains(n.Text(), "{#history-1 skip links}") && !n.Running() })
+	// A block starts build scripted.
+	if err := n.RunBlock(0); err != nil {
+		t.Fatal(err)
+	}
+	if got := noAt(n.Text()); !strings.Contains(got, "in build: from-top") {
+		t.Fatalf("build's block:\n%s", got)
+	}
+	envs := n.HistoryEnvs()
+	if len(envs) != 2 || !envs[0].Current || envs[1].Name != "build" || !envs[1].Scripted || envs[1].Live {
+		t.Fatalf("envs: %+v", envs)
+	}
+	if err := n.SetHistoryEnv("build", false); err != ErrEnvScripted {
+		t.Fatalf("SetHistoryEnv: %v", err)
+	}
+	if err := n.SetHistoryEnv("build", true); err != nil {
+		t.Fatal(err)
+	}
+	if n.HistoryEnvName() != "build" {
+		t.Fatalf("on %q", n.HistoryEnvName())
+	}
+	n.TypeShell("echo \"typed in build: $Y\"\r")
+	until("build command", func() bool {
+		return strings.Contains(noAt(n.Text()), "{#history-2 env=build skip links}\necho \"typed in build: $Y\"\n```") && !n.Running()
+	})
+	if got := noAt(n.Text()); !strings.Contains(got, "typed in build: from-top") {
+		t.Errorf("build's typed command:\n%s", got)
+	}
+	envs = n.HistoryEnvs()
+	if envs[0].Current || !envs[1].Current || !envs[1].Live || envs[1].Scripted {
+		t.Errorf("envs: %+v", envs)
+	}
+	if err := n.SetHistoryEnv("", false); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	last := moved[len(moved)-1]
+	mu.Unlock()
+	if !strings.HasPrefix(last, ": ") || !strings.Contains(last, "top-marker") || strings.Contains(last, "typed in build") {
+		t.Errorf("moving back showed %q", last)
+	}
+	if err := n.SetHistoryEnv("nowhere", false); err == nil {
+		t.Error("moved to an env no block names")
+	}
+}

@@ -18,6 +18,19 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![A block that printed 40 lines, its output folded to "1 … 39 more lines", over a block whose three lines show](docs/changelog/fold-long-output.png)
 
+- With the experimental interactive shell on, the History pane can move
+  to a sub-env: the picker on its bar, shown when blocks name an
+  `env=`, lists the top level and each env. Picking one starts that
+  env's shell interactively, on a terminal of its own, so vim, ctrl+z
+  and `fg` work there too, and what you type there is added with the
+  env's `env=`, so it runs there again. When blocks have already started
+  the env's shell, it asks first, as it starts again and what they set
+  is lost. The shell the pane leaves keeps running, with its jobs and
+  what it showed, for when you come back; the picker counts each env's
+  stopped jobs.
+
+  ![The History pane on env=build: the picker reads env=build (1 stopped), echo shows the TARGET the env shares from the top level, and vim is stopped with ctrl+z](docs/changelog/history-sub-env.png)
+
 - With the experimental interactive shell on (Settings › Shell), the
   History pane is a terminal on the document's shell, in mdsh-gui and
   `mdsh --serve`: the shell draws its own prompt, reads your rc file's

@@ -718,6 +718,34 @@ func (a *App) ShellSize(ctx context.Context, cols, rows int) {
 	}
 }
 
+// HistoryEnvs lists the envs the live History pane can be moved to,
+// for its env picker: the top level, then each env the file's blocks
+// name.
+func (a *App) HistoryEnvs(ctx context.Context) []notebook.HistoryEnv {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return nil
+	}
+	return n.HistoryEnvs()
+}
+
+// SetHistoryEnv moves the live History pane to env name's shell, which
+// runs interactively from then on; see notebook.SetHistoryEnv. Its
+// error for an env whose shell runs scripted starts with "scripted:",
+// so the page can ask, then call it again with restart.
+func (a *App) SetHistoryEnv(ctx context.Context, name string, restart bool) error {
+	_, n, err := a.notebook(ctx)
+	if err != nil {
+		return err
+	}
+	if err := n.SetHistoryEnv(name, restart); errors.Is(err, notebook.ErrEnvScripted) {
+		return fmt.Errorf("scripted: %w", err)
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
 // SetRecording turns the live History pane's Record switch on or off:
 // off, commands typed at its prompt run but aren't added to the file.
 func (a *App) SetRecording(ctx context.Context, on bool) {

@@ -854,6 +854,8 @@ body.history-full #history-grip { display: none; }
    the clock and the shell's jobs. */
 #history.live :is(#history-input, #history-prompt, #history-block-prompt, #history-prompt-head, #history-dir, #history-cursor) { display: none !important; }
 #history.live:not(.closed) .history-line { min-height: 18px; padding-right: 150px; }
+#history-env { flex: none; max-width: 28ch; margin-top: 2px; padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; color: var(--fg); background: var(--bg); font: calc(11px * var(--text-scale))/16px var(--font-code); text-overflow: ellipsis; }
+#history-env[hidden], #history.closed #history-env { display: none; }
 #history-jobs { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; padding-top: 2px; }
 #history-jobs[hidden] { display: none; }
 #history.closed #history-jobs { order: 1; padding-top: 0; }
