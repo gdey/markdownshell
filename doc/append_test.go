@@ -1,6 +1,9 @@
 package doc
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestAppendBlock(t *testing.T) {
 	d, err := Parse([]byte("# T\n\n```sh\necho one\n```\n\nprose\n"))
@@ -28,6 +31,14 @@ func TestAppendBlock(t *testing.T) {
 	// Attributes go in the info string.
 	if b, err = d.AppendBlock("zsh {#typed}", "pwd"); err != nil || b.ID != "typed" || b.Lang != "zsh" {
 		t.Errorf("block %+v, err %v", b, err)
+	}
+
+	// Only an include, filled from its files, may have no body.
+	if _, err = d.AppendBlock("sh", ""); err == nil {
+		t.Error("appended an empty sh block")
+	}
+	if b, err = d.AppendBlock("md {<include file=README.md}", ""); err != nil || !b.IsInclude() || !strings.HasSuffix(string(d.Src), "\n```md {<include file=README.md}\n```\n") {
+		t.Errorf("empty include: src %q, err %v", d.Src, err)
 	}
 
 	open, _ := Parse([]byte("```sh\necho open\n"))

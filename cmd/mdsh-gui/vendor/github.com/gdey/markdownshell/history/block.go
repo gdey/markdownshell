@@ -93,10 +93,14 @@ func BlockPrompt(info string) string {
 
 // AddBlock adds a block typed in the terminal, with info and body, to
 // the end of d, as it was typed. It fails, leaving d as it was, for a
-// block with no body or one d can't take.
+// block with no body, other than an include, whose body is filled from
+// its files, or one d can't take.
 func AddBlock(d *doc.Document, info, body string) (*doc.Block, error) {
 	if strings.TrimSpace(body) == "" {
-		return nil, errors.New("the block is empty, so it wasn't added")
+		if _, attrs := doc.ParseInfo(info); !attrs.Has(doc.IncludeAttr) {
+			return nil, errors.New("the block is empty, so it wasn't added")
+		}
+		body = ""
 	}
 	b, err := d.AppendBlock(info, body)
 	if err != nil {

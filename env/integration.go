@@ -155,6 +155,10 @@ __mdsh_precmd() {
 	return $s
 }
 __mdsh_wrap() {
+	# A prompt that sets PS1 from a precmd hook it adds later, as
+	# powerlevel10k does on its first prompt, would undo the marks:
+	# this hook stays last.
+	[[ ${precmd_functions[-1]} == __mdsh_wrap ]] || precmd_functions=(${precmd_functions:#__mdsh_wrap} __mdsh_wrap)
 	[[ $PS1 == *'133;A;mdsh'* ]] || PS1=$'%{\e]133;A;mdsh\a%}'$PS1$'%{\e]133;B;mdsh\a%}'
 }
 __mdsh_preexec() {

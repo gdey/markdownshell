@@ -215,6 +215,21 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- With the interactive shell on zsh and powerlevel10k, only the first
+  line typed in the History pane went into the file: notes typed after
+  it weren't added as prose, nor commands as blocks. powerlevel10k adds
+  the hook that sets its prompt after mdsh's, which took mdsh's prompt
+  marks off it. mdsh's hook now moves itself back to the end.
+
+  ![The live History pane on powerlevel10k: a note, echo two and a second note typed, and the file shows the first note, the echo two block with its output, then the second note](docs/changelog/history-p10k-notes.png)
+
+- An include typed in the History pane, as
+  `` # ```markdown {<include file=README.md} `` then a closing fence, is
+  added to the file. Its body comes from its files, so it has none of
+  its own, and it was turned away as empty.
+
+  ![The History pane after typing an include of hello.md and its closing fence: "added to the end of the file", and the file shows the include with hello.md's text](docs/changelog/history-include-block.png)
+
 - With the experimental interactive shell, a message mdsh showed in the
   History pane, such as why a link wasn't opened, was written at the
   shell's cursor, behind its back, so the cursor and what you typed

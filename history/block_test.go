@@ -1,6 +1,7 @@
 package history_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gdey/markdownshell/doc"
@@ -119,5 +120,13 @@ func TestAddBlock(t *testing.T) {
 	}
 	if string(d.Src) != before {
 		t.Errorf("src changed: %q", d.Src)
+	}
+	// An include's body is filled from its files, so it may be empty.
+	b, err = history.AddBlock(d, "markdown {<include file=README.md}", "\n")
+	if err != nil {
+		t.Fatalf("include: %v", err)
+	}
+	if !b.IsInclude() || !strings.HasSuffix(string(d.Src), "```markdown {<include file=README.md}\n```\n") {
+		t.Errorf("include: src = %q", d.Src)
 	}
 }

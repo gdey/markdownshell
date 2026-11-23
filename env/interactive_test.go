@@ -711,3 +711,45 @@ func TestInteractiveTypedWrap(t *testing.T) {
 		})
 	}
 }
+
+// TestInteractiveLatePromptHook: a prompt that adds the precmd hook
+// setting PS1 on its first prompt, after mdsh's, as powerlevel10k does,
+// doesn't lose mdsh's prompt marks, so notes and commands typed after
+// the first are still reported.
+func TestInteractiveLatePromptHook(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("no zsh")
+	}
+	s := startI(t, zsh, map[string]string{".zshrc": `__late_ps1() { PS1='late> ' }
+__late_init() {
+	precmd_functions=(${precmd_functions:#__late_init})
+	precmd_functions+=(__late_ps1)
+	__late_ps1
+}
+precmd_functions+=(__late_init)
+`})
+	var mu sync.Mutex
+	var got []string
+	s.Watch(func(e Event) {
+		if e.Kind == "line" || e.Kind == "start" {
+			mu.Lock()
+			got = append(got, e.Kind+" "+e.Command)
+			mu.Unlock()
+		}
+	})
+	want := []string{"line # one", "start echo two", "line # three", "start echo four", "line # five"}
+	for i, line := range []string{"# one", "echo two", "# three", "echo four", "# five"} {
+		s.Type([]byte(line + "\r"))
+		waitFor(t, line, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return len(got) > i
+		})
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
