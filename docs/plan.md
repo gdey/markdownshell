@@ -84,3 +84,7 @@ events as the CLI and TUI. Not designed yet.
   (design, Nov 2, 2026; after v1.3; not built).
 - HTTP request blocks with checks on the response: see
   [docs/http/design.md](http/design.md) (design, Nov 13, 2026; not built).
+- Saving while typing, and a `.mdsh` bundle with its own history, with
+  a local model (Kronk, yzma) describing versions: see
+  [docs/smart-save/design.md](smart-save/design.md) (design, Nov 23,
+  2026; not built).
