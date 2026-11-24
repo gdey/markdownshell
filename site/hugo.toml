@@ -10,6 +10,22 @@ disableKinds = ["taxonomy", "term"]
   description = "mdsh turns the markdown you already have into something that runs, and turns each run into a record you can send. A desktop app, a terminal UI and a CLI."
   repo = "https://github.com/gdey/markdownshell"
 
+# /llms.txt and /llms-full.txt, for pointing an LLM at the docs
+# (https://llmstxt.org): the index of the docs pages, and their full text,
+# built from the same content as the HTML pages so they can't drift.
+[outputFormats.llms]
+  mediaType = "text/plain"
+  baseName = "llms"
+  isPlainText = true
+  rel = "alternate"
+[outputFormats.llmsfull]
+  mediaType = "text/plain"
+  baseName = "llms-full"
+  isPlainText = true
+  rel = "alternate"
+[outputs]
+  home = ["html", "llms", "llmsfull"]
+
 [markup.highlight]
   noClasses = false
 

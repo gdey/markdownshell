@@ -1,0 +1,27 @@
+{{- /* /llms-full.txt (https://llmstxt.org): the docs section as one
+   markdown file, for an LLM that wants everything in a single fetch. The
+   pages are rendered from the same markdown as the site, with the
+   shortcodes resolved by their .llmsfull.txt variants, so relref links
+   become absolute URLs and screenshots become their captions. */ -}}
+# mdsh documentation
+
+> {{ site.Params.description }}
+
+This file is every page of the mdsh documentation at {{ site.Home.Permalink }}
+in one place, in reading order. Each page starts with a `#` heading and
+the address of the HTML page. The short index is at {{ "llms.txt" | absURL }}.
+The normative specification of the document format is
+{{ site.Params.repo }}/blob/main/docs/spec.md.
+{{ $docs := site.GetPage "/docs" }}
+{{- range (slice $docs | append $docs.Pages.ByWeight) }}
+
+---
+
+# {{ .Title }}
+
+{{ .Permalink }}
+
+{{ with .Description }}{{ . }}
+{{ end }}
+{{ .RenderShortcodes | strings.TrimSpace }}
+{{- end }}

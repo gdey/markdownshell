@@ -1,0 +1,1 @@
+{{- partial "looks.html" (dict "or" (.Get 0)) -}}

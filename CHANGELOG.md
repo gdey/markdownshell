@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The website has an [llms.txt](https://gdey.github.io/markdownshell/llms.txt),
+  for pointing an LLM or a coding agent at the docs: what mdsh is and a
+  link with a line on each docs page, and
+  [llms-full.txt](https://gdey.github.io/markdownshell/llms-full.txt),
+  every docs page and the cheat sheet as one markdown file. Both are built
+  from the docs pages themselves, so they stay current.
+
 - An `out=file` block's output bar in mdsh-gui says how long its log is,
   "63 lines in test.log", and clicking that shows the whole log with the
   lines the output shows marked. A window that matched nothing is badged

@@ -1,0 +1,4 @@
+{{- /* A screenshot, for /llms-full.txt: a markdown image of the plain
+   light picture with the caption as its alt text. */ -}}
+{{- $src := .Get "src" | default (printf "%s-light.png" (.Get "name")) -}}
+![{{ with .Inner }}{{ . | plainify | strings.TrimSpace }}{{ else }}{{ .Get "alt" }}{{ end }}]({{ printf "images/app/%s" $src | absURL }})
