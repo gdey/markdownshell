@@ -303,6 +303,19 @@ function appendCells(more: Cell[]) {
   placeSoon();
 }
 
+// sectionMarks marks heading c's card with the blocks of its section,
+// as drawProse does: none when no block in it runs, as when an edit
+// took the last one away. A card drawn again keeps its marks.
+function sectionMarks(card: HTMLElement, c: Cell) {
+  if (c.sectionTo) {
+    card.dataset.sectionFrom = String(c.sectionFrom ?? 0);
+    card.dataset.sectionTo = String(c.sectionTo);
+  } else {
+    delete card.dataset.sectionFrom;
+    delete card.dataset.sectionTo;
+  }
+}
+
 // fixHeads takes in the heads of cells Go laid out before and since
 // changed, as a heading's section does once the next heading comes.
 // A card drawn from a fixed cell is drawn again, from its new body.
@@ -315,10 +328,7 @@ function fixHeads(at: number[], heads: Cell[]) {
     headIndex.set(c, i);
     const card = cardOf.get(c);
     if (!card) return;
-    if (c.heading) {
-      card.dataset.sectionFrom = String(c.sectionFrom ?? 0);
-      card.dataset.sectionTo = String(c.sectionTo ?? 0);
-    }
+    if (c.heading) sectionMarks(card, c);
     bare.add(card);
     redraw.push(card);
   });
@@ -770,13 +780,10 @@ function keepCell(c: Cell, f: Cell, j: number): Cell {
     if (card) renumberInput(card, input.block, to);
     input.block = to;
   }
-  if (c.heading && f.sectionTo && (c.sectionFrom !== f.sectionFrom || c.sectionTo !== f.sectionTo)) {
-    if (card) {
-      card.dataset.sectionFrom = String(f.sectionFrom ?? 0);
-      card.dataset.sectionTo = String(f.sectionTo);
-    }
+  if (c.heading && (c.sectionFrom !== f.sectionFrom || c.sectionTo !== f.sectionTo)) {
     c.sectionFrom = f.sectionFrom;
     c.sectionTo = f.sectionTo;
+    if (card) sectionMarks(card, c);
   }
   if (placeFields.every((k) => c[k] === f[k])) return keepHead(c, f, card);
   // Only what changed is written: writing every card's place, though

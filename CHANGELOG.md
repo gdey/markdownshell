@@ -237,6 +237,10 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![The History pane after typing an include of hello.md and its closing fence: "added to the end of the file", and the file shows the include with hello.md's text](docs/changelog/history-include-block.png)
 
+- After an edit that left a heading's section with no block that runs,
+  the rendered view could keep the section's old blocks for that
+  heading, as the page took in a section's change only when it had
+  blocks, and a card drawn again kept its old card's marks.
 - With the experimental interactive shell, a message mdsh showed in the
   History pane, such as why a link wasn't opened, was written at the
   shell's cursor, behind its back, so the cursor and what you typed
