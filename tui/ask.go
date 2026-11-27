@@ -66,6 +66,7 @@ func (m *Model) asking() *askMsg {
 func (m *Model) askAdd(msg askMsg) tea.Cmd {
 	m.asks = append(m.asks, &msg)
 	if len(m.asks) == 1 {
+		m.statusAsking()
 		return m.askShow()
 	}
 	return nil
@@ -105,6 +106,7 @@ func (m *Model) askDone(answer string, by run.Answered) tea.Cmd {
 	a := m.asking()
 	a.reply <- askReply{answer, by}
 	m.asks = m.asks[1:]
+	m.statusAsking()
 	return m.askShow()
 }
 
@@ -116,6 +118,7 @@ func (m *Model) askGone(id string) tea.Cmd {
 		}
 		m.asks = append(m.asks[:n], m.asks[n+1:]...)
 		if n == 0 {
+			m.statusAsking()
 			return m.askShow()
 		}
 		break

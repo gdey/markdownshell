@@ -39,6 +39,7 @@ import (
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
+	"github.com/gdey/markdownshell/termstatus"
 	"github.com/gdey/markdownshell/trust"
 	"github.com/gdey/markdownshell/tui"
 	"github.com/gdey/markdownshell/writable"
@@ -557,7 +558,15 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 	}
 
+	// The terminal is told what the run is doing (OSC 7501).
+	var st *termstatus.Tracker
+	if tty != nil {
+		st = termstatus.NewTracker(tty, "mdsh")
+	}
+	finish := trackStatus(d, &opts, st)
+
 	results, runErr := run.Run(ctx, d, opts)
+	finish(results, runErr)
 	warnIncludes(stderr, file, d, results)
 	if results == nil {
 		return runErr
@@ -797,6 +806,11 @@ func interactiveCmd(o interactiveOpts, stdin io.Reader, stdout io.Writer) error 
 	}
 	protocol := termimg.Detect(os.Getenv)
 	approvals := trust.OpenDefault()
+	// The terminal is told what mdsh -i is doing (OSC 7501): one
+	// record for the program, whichever tab is running. Quitting
+	// clears it.
+	status := termstatus.NewTracker(stdout, "mdsh")
+	defer status.Clear()
 	c.Open = func(file string) (*doc.Document, tui.Options, error) {
 		abs, err := filepath.Abs(file)
 		if err != nil {
@@ -833,6 +847,7 @@ func interactiveCmd(o interactiveOpts, stdin io.Reader, stdout io.Writer) error 
 			Images:       style != "notty",
 			Protocol:     protocol,
 			Trust:        approvals,
+			Status:       status,
 		}, nil
 	}
 	return tui.Run(c)

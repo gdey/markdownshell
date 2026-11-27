@@ -30,6 +30,7 @@ import (
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
 	"github.com/gdey/markdownshell/termsafe"
+	"github.com/gdey/markdownshell/termstatus"
 	"github.com/gdey/markdownshell/trust"
 	"github.com/gdey/markdownshell/writable"
 )
@@ -71,6 +72,10 @@ type Options struct {
 	// be read into its shells, so each file asks once. Nil remembers
 	// nothing.
 	Trust *trust.Store
+	// Status, if set, is told what mdsh -i is doing, for the terminal
+	// it runs in (OSC 7501): working, blocked on a question, done or
+	// error. Tabs share one.
+	Status *termstatus.Tracker
 }
 
 // Model is the TUI's state. It is a tea.Model.
@@ -131,9 +136,13 @@ type Model struct {
 	// asks are the questions blocks put with mdsh ctl ask and confirm,
 	// asked one at a time, the first in its block's card with askIn or
 	// askPick.
-	asks    []*askMsg
-	askIn   textinput.Model
-	askPick int
+	asks []*askMsg
+	// runFailed says a block of the run going on failed, and runFailure
+	// which, for the terminal's status.
+	runFailed  bool
+	runFailure string
+	askIn      textinput.Model
+	askPick    int
 	// srcAsk is the env.source question while it is up, and src the
 	// answer given, which the run's goroutine reads.
 	srcAsk *srcPrompt
@@ -507,8 +516,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 		return m, nil
 	case tea.KeyMsg:
+		m.statusSeen()
 		return m.key(msg)
 	case eventMsg:
+		m.statusEvent(run.Event(msg))
 		m.event(run.Event(msg))
 		return m, tea.Batch(m.wait, m.tick(), m.clock())
 	case checkMsg:
@@ -566,6 +577,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.prompt = &msg
 			m.helping, m.procsOpen = false, false
 			m.moveTo(i)
+			m.statusAsking()
 		}
 		m.refresh()
 		return m, m.wait
@@ -632,6 +644,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case runDoneMsg:
 		m.running, m.active, m.stopping = false, -1, false
 		m.cancel()
+		m.statusEnded(msg.err)
 		if msg.hist != nil {
 			m.typedDone(msg.hist)
 		}
@@ -1337,6 +1350,7 @@ func (m *Model) answer(key string) {
 	}
 	m.prompt.reply <- a
 	m.prompt = nil
+	m.statusAsking()
 }
 
 // start runs the block under the cursor, or with all, it and every
@@ -1353,6 +1367,7 @@ func (m *Model) start(all bool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.running, m.cancel, m.status = true, cancel, ""
 	m.skipSaved = false
+	m.statusStarted()
 	go func() {
 		var err error
 		if all {
@@ -1386,6 +1401,7 @@ func (m *Model) startSection() {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.running, m.cancel, m.status = true, cancel, ""
 	m.skipSaved = false
+	m.statusStarted()
 	go func() {
 		m.events <- runDoneMsg{err: m.sess.RunRange(ctx, from, to)}
 	}()

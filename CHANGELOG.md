@@ -8,6 +8,15 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh doc.md` and `mdsh -i` tell the terminal they run in what they
+  are doing, with the Program Status Protocol (OSC 7501): working as
+  each block starts, with how far through the blocks the run is, blocked
+  while a `confirm=`, `depends=` or `mdsh ctl ask` question waits, and
+  done or error as the run ends, naming the block that failed. A
+  terminal that shows program status, such as Ghostty, lists the run and
+  what it waits on; one that doesn't ignores the reports. See
+  [docs/program-status/design.md](docs/program-status/design.md).
+
 - `symbol=` on an include finds definitions in languages other than Go,
   best effort, with the highlighter's tokens: Python, JavaScript,
   TypeScript, Rust, C, Java, Ruby, shell, YAML and most others it
