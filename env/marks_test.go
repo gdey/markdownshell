@@ -127,7 +127,7 @@ end
 // TestLostMark: a prompt that comes with no D, as when ctrl+c threw
 // the rest of a line away, ends the command with status unknown.
 func TestLostMark(t *testing.T) {
-	ia := &interactive{kind: kindBash, status: -1}
+	ia := &interactive{kind: kindBash, exitStatus: -1}
 	ia.cond = newCond(ia)
 	var events []string
 	ia.watch = func(e Event) { events = append(events, fmt.Sprintf("%s %q %d", e.Kind, e.Command, e.Status)) }
@@ -143,14 +143,14 @@ func TestLostMark(t *testing.T) {
 	if !reflect.DeepEqual(events, want) {
 		t.Errorf("events: %q", events)
 	}
-	if ia.phase != phaseInput || !ia.ended || ia.status != -1 {
-		t.Errorf("phase %v ended %v status %d", ia.phase, ia.ended, ia.status)
+	if ia.phase != phaseInput || !ia.ended || ia.exitStatus != -1 {
+		t.Errorf("phase %v ended %v status %d", ia.phase, ia.ended, ia.exitStatus)
 	}
 }
 
 // TestShNoC: sh has no C mark; the command starts after its echoed line.
 func TestShNoC(t *testing.T) {
-	ia := &interactive{kind: kindSh, status: -1}
+	ia := &interactive{kind: kindSh, exitStatus: -1}
 	ia.cond = newCond(ia)
 	var out strings.Builder
 	ia.out, ia.typed = &out, true
@@ -159,8 +159,8 @@ func TestShNoC(t *testing.T) {
 	ia.scan.Write([]byte("\x1b]133;A;mdsh\x07$ \x1b]133;B;mdsh\x07ech"))
 	ia.scan.Write([]byte("o hi\r\nhi\r\n\x1b]133;D;0;mdsh\x07"))
 	ia.mu.Unlock()
-	if out.String() != "hi\r\n" || !ia.ended || ia.status != 0 {
-		t.Errorf("out %q ended %v status %d", out.String(), ia.ended, ia.status)
+	if out.String() != "hi\r\n" || !ia.ended || ia.exitStatus != 0 {
+		t.Errorf("out %q ended %v status %d", out.String(), ia.ended, ia.exitStatus)
 	}
 }
 

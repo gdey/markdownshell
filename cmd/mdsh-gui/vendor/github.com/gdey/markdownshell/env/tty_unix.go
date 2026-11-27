@@ -98,7 +98,8 @@ func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec 
 	if st, err := term.GetState(int(ptm.Fd())); err == nil {
 		defer term.Restore(int(ptm.Fd()), st)
 	}
-	s.pty.attach(io.MultiWriter(t.Out, rec))
+	out, tee := newStatusTee(io.MultiWriter(t.Out, rec), ptm, t.Status)
+	s.pty.attach(out)
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -124,6 +125,7 @@ func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec 
 	status, exited, err = s.run(ctx, script, io.Discard, io.Discard, true, t.JobControl)
 
 	s.pty.attach(nil)
+	tee.end()
 	close(stop)
 	wg.Wait()
 	return status, exited, err

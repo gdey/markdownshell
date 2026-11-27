@@ -1,7 +1,8 @@
 # Program status in the terminal (OSC 7501)
 
-Design. Step 1 (mdsh and `mdsh -i` reporting their own state) is built;
-steps 2 to 5 are not yet.
+Design. Steps 1 (mdsh and `mdsh -i` reporting their own state) and 2
+(mdsh keeping the records of the programs blocks run) are built; steps 3
+to 5 are not yet.
 
 ## The ask
 
@@ -86,19 +87,35 @@ gives them the records.
 Code: `termstatus/`, `cmd/mdsh/status.go` (`trackStatus` wraps the
 `run.Options` hooks), `tui/status.go`.
 
-## Step 2: a scanner and record store in `env`
+## Step 2: a scanner and record store in `env` (built)
 
-Widen `markScanner` (OSC 133 only today) into an OSC scanner that also
-takes 7501: parse per the spec (grammar, limits, base64, control
-character refusal, id hierarchy), keep records per pty with the lifetime
-rules (drop working/blocked at a block's end and at the History shell's
-next mdsh-tagged OSC 133 A), answer the `?` query on the pty master
-before vt10x or xterm.js see it, and hand `env` an event for each change.
-Every pty mdsh owns goes through one place in `env`, so History,
-foreground tty and background tty blocks get it together, in the GUI,
-the TUI and `--serve`. Records are scoped to the pty they arrived on, so
-one block can't set another's state. Scripted blocks: strip a stray 7501
-from output, where `termsafe.Styled` would show it as visible text.
+`termstatus.Parse` reads a report's body as the spec says a terminal
+should (pairs on `:`, malformed pairs skipped, unknown keys ignored, a
+bad state or id, bad base64, an overlong or control-character message
+throwing the report away whole); `termstatus.Store` keeps one terminal's
+records, with `Apply` (replace, or `clear` a subtree), `ProcessEnded`
+(drop working, blocked and idle; keep done and error), app inheritance
+and the 256-record cap; `termstatus.Scanner` finds the reports in a byte
+stream on its way to a writer, however they are split across writes,
+passing every byte through unchanged, and sees the `?` query.
+
+In `env`, `Terminal` gains `Status func([]termstatus.Report)`: the pty
+paths of a tty block (`RunTerminal`) and a background tty block
+(`BackgroundTerminal`) put a scanner in front of the terminal's writer
+(`env/status.go`, `statusTee`), call `Status` with the records at each
+change, answer the query on the pty master, and call `Status(nil)` once
+the block has ended and its terminal goes. The History shell's stream
+goes through a scanner before the mark scanner; its records come as a
+`Watch` event, `Kind: "status"`, with `Records`, and a command's end
+drops its working and blocked ones, as a terminal does at the next
+prompt. Records are per terminal, so one block can't set another's.
+
+Not here: `RunTTY`, a tty block on the CLI's own terminal, passes the
+program's reports to that terminal unchanged, where a root report
+replaces mdsh's own until mdsh reports again; step 3 may rewrite them
+under the block's id. A scripted block's stray report on a pipe is shown
+as text by `termsafe.Styled`; step 5 strips it, since `mdsh ctl status`
+is how such a block reports.
 
 ## Step 3: `mdsh -i` shows block status and forwards it
 

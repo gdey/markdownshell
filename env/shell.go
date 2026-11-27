@@ -20,6 +20,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gdey/markdownshell/termstatus"
 )
 
 // ErrExited is returned by Run when the block ended the shell, for
@@ -80,6 +82,12 @@ type Terminal struct {
 	Size func() (cols, rows int)
 	// Resized, if not nil, says when Size changes.
 	Resized <-chan struct{}
+	// Status, if set, is told what the programs on the terminal report
+	// about themselves with OSC 7501 (package termstatus): called with
+	// the terminal's records each time they change, and with nil once
+	// the script has ended and the terminal is let go. It may be
+	// called from another goroutine.
+	Status func([]termstatus.Report)
 	// JobControl runs the script with the shell's job control on, as
 	// in an interactive shell: ctrl+z stops a command and the shell
 	// carries on, and jobs, fg and bg work. Off, or in a shell that

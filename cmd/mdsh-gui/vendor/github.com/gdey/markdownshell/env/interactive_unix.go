@@ -19,6 +19,8 @@ import (
 
 	"github.com/creack/pty"
 	"golang.org/x/sys/unix"
+
+	"github.com/gdey/markdownshell/termstatus"
 )
 
 // phase is where an interactive shell is between its marks.
@@ -59,11 +61,11 @@ type interactive struct {
 	view io.Writer
 	// out gets a command's output, C to D, for the RunLine waiting on
 	// it; typed says RunLine typed a line and waits for its end.
-	out    io.Writer
-	typed  bool
-	ended  bool
-	status int
-	echo   bytes.Buffer // what was echoed after B, the command line
+	out        io.Writer
+	typed      bool
+	ended      bool
+	exitStatus int
+	echo       bytes.Buffer // what was echoed after B, the command line
 	// prompt is the prompt's last line, A to B, as drawn; drawing
 	// is what is being drawn now, which becomes prompt at B.
 	prompt, drawing bytes.Buffer
@@ -80,6 +82,10 @@ type interactive struct {
 	readEOF  bool
 	watch    func(Event) // calls each of Watch's functions
 	scan     markScanner
+	// status finds the OSC 7501 reports of the programs on the
+	// terminal, on the stream's way to scan, and keeps their records.
+	status *termstatus.Scanner
+	recs   termstatus.Store
 }
 
 // Event is something an interactive shell did, for Shell.Watch.
@@ -102,6 +108,11 @@ type Event struct {
 	// wrote to the terminal, from its start to its end, escapes and
 	// all.
 	Output []byte
+	// Records, on "status", are the shell's terminal's records: what
+	// the programs on it reported about themselves with OSC 7501, each
+	// time they change. A command's end drops its working and blocked
+	// records, as a terminal does at the next prompt.
+	Records []termstatus.Report
 }
 
 // startTimeout bounds how long Start waits for an interactive shell's
@@ -164,9 +175,10 @@ func startInteractive(ctx context.Context, s *Shell, cfg Config, init string, la
 		state.Close()
 		return err
 	}
-	ia := &interactive{kind: kind, ptm: ptm, ttyName: pts.Name(), state: state, status: -1}
+	ia := &interactive{kind: kind, ptm: ptm, ttyName: pts.Name(), state: state, exitStatus: -1}
 	ia.cond = sync.NewCond(&ia.mu)
 	ia.scan = markScanner{text: ia.text, mark: ia.onMark}
+	ia.status = termstatus.NewScanner(scanWriter{&ia.scan}, ia.onStatus, func() { ptm.WriteString(termstatus.QueryReply) })
 	s.ia = ia
 	// The shell has its own copies; mdsh keeps none, so reading ends
 	// once the shell and its jobs have all let go of the terminal.
@@ -239,7 +251,7 @@ func (ia *interactive) read() {
 		n, err := ia.ptm.Read(buf)
 		if n > 0 {
 			ia.mu.Lock()
-			ia.scan.Write(buf[:n])
+			ia.status.Write(buf[:n])
 			ia.mu.Unlock()
 		}
 		if err != nil {
@@ -448,7 +460,7 @@ func (ia *interactive) start() {
 }
 
 func (ia *interactive) end(status int) {
-	ia.status = status
+	ia.exitStatus = status
 	ia.ended = true
 	ia.phase = phaseDone
 	if ia.watch != nil {
@@ -459,6 +471,26 @@ func (ia *interactive) end(status int) {
 		ia.watch(ev)
 	}
 	ia.typedOut.Reset()
+	// The command's working and blocked records go with it, as a
+	// terminal drops them at the next prompt.
+	if ia.recs.ProcessEnded() && ia.watch != nil {
+		ia.watch(Event{Kind: "status", Records: ia.recs.Records()})
+	}
+}
+
+// onStatus takes a program's OSC 7501 report; ia.mu is held.
+func (ia *interactive) onStatus(r termstatus.Report) {
+	if ia.recs.Apply(r) && ia.watch != nil {
+		ia.watch(Event{Kind: "status", Records: ia.recs.Records()})
+	}
+}
+
+// scanWriter is the mark scanner as an io.Writer.
+type scanWriter struct{ s *markScanner }
+
+func (w scanWriter) Write(p []byte) (int, error) {
+	w.s.Write(p)
+	return len(p), nil
 }
 
 func (ia *interactive) onRecord(r record) {
@@ -617,7 +649,7 @@ func (s *Shell) runLine(ctx context.Context, line string, out io.Writer) (status
 		ia.mu.Unlock()
 		return 0, false, ErrLineTyped
 	}
-	ia.out, ia.typed, ia.ended, ia.status = out, true, false, -1
+	ia.out, ia.typed, ia.ended, ia.exitStatus = out, true, false, -1
 	ia.mu.Unlock()
 	defer func() {
 		ia.mu.Lock()
@@ -682,7 +714,7 @@ func (s *Shell) runLine(ctx context.Context, line string, out io.Writer) (status
 		}
 		return s.exit, true, ErrExited
 	}
-	status = ia.status
+	status = ia.exitStatus
 	// The state record the hook wrote before the D mark.
 	want := ia.marksD
 	t := time.AfterFunc(stateWait, func() { ia.mu.Lock(); ia.cond.Broadcast(); ia.mu.Unlock() })
