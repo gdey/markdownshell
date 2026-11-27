@@ -12,7 +12,27 @@ import (
 
 	"github.com/gdey/markdownshell/doc"
 	"github.com/gdey/markdownshell/env"
+	"github.com/gdey/markdownshell/termstatus"
 )
+
+// status takes what the program in the pane reports about itself; nil
+// says the pane's program ended.
+func (p *pane) status(recs []termstatus.Report) {
+	p.mu.Lock()
+	p.recs = recs
+	notify := p.notify
+	p.mu.Unlock()
+	if notify != nil {
+		notify()
+	}
+}
+
+// records is what the program in the pane last reported.
+func (p *pane) records() []termstatus.Report {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.recs
+}
 
 // pane is the terminal a tty block runs in, drawn in the block's card
 // as in mdsh-gui: what the block shows goes to a terminal emulator, and
@@ -27,6 +47,10 @@ type pane struct {
 	cols, rows int
 	block      int // the block running in it, or -1
 	vt         vt10x.Terminal
+	// recs is what the program in the pane reports about itself (OSC
+	// 7501), and notify, if set, is called when that changes.
+	recs   []termstatus.Report
+	notify func()
 }
 
 func newPane() *pane {
@@ -43,7 +67,7 @@ func newPane() *pane {
 
 // env is the pane as run sees it.
 func (p *pane) env() *env.Terminal {
-	return &env.Terminal{Keys: p.keys, Out: paneOut{p}, Size: p.size, Resized: p.resized}
+	return &env.Terminal{Keys: p.keys, Out: paneOut{p}, Size: p.size, Resized: p.resized, Status: p.status}
 }
 
 func (p *pane) size() (cols, rows int) {

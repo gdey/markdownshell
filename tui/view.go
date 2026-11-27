@@ -298,9 +298,9 @@ func tagsOf(b *doc.Block) string {
 func (m *Model) state(i int, r *run.Result) string {
 	switch {
 	case m.active == i:
-		return lipgloss.NewStyle().Foreground(runningCol).Render("running… " + m.elapsed(i))
+		return lipgloss.NewStyle().Foreground(runningCol).Render("running… "+m.elapsed(i)) + m.statusChip(i)
 	case m.bg[i]:
-		return lipgloss.NewStyle().Foreground(runningCol).Render("running in the background… " + m.elapsed(i))
+		return lipgloss.NewStyle().Foreground(runningCol).Render("running in the background… "+m.elapsed(i)) + m.statusChip(i)
 	case m.prompt != nil && m.index[m.prompt.block] == i:
 		return lipgloss.NewStyle().Foreground(runningCol).Render("waiting for an answer")
 	case r.Ran && errors.Is(r.Err, context.Canceled):

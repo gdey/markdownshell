@@ -732,6 +732,9 @@ func (m *Model) histView() string {
 		if j := m.lterm.jobsText(); j != "" {
 			where = strings.TrimPrefix(where+" · jobs: "+j, " · ")
 		}
+		if s := statusWords(m.lterm.recs); s != "" {
+			where = strings.TrimPrefix(where+" · "+s, " · ")
+		}
 	}
 	if d := termsafe.Visible(where); d != "" {
 		room := m.width - lipgloss.Width(title) - lipgloss.Width(off) - lipgloss.Width(hint) - 6

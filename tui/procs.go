@@ -75,6 +75,9 @@ func (m *Model) addProcs(ps []*env.Proc, depth int) {
 		text := termsafe.Visible(p.Command)
 		if p.Block != "" {
 			text = "◐ " + termsafe.Visible(p.Block) + "  " + text
+			if s := statusWords(m.blockRecordsByLabel(p.Block)); s != "" {
+				text += "  " + s
+			}
 		}
 		m.procs = append(m.procs, procRow{depth: depth, pid: p.PID, text: text, secs: p.Secs})
 		m.addProcs(p.Children, depth+1)
