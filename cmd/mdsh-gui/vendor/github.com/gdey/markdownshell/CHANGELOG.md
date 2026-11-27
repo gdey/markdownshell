@@ -8,6 +8,21 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `symbol=` on an include finds definitions in languages other than Go,
+  best effort, with the highlighter's tokens: Python, JavaScript,
+  TypeScript, Rust, C, Java, Ruby, shell, YAML and most others it
+  knows. `A.b` finds `b` inside `A`, as a class's method or a Rust
+  `impl` block's. A Go file that doesn't parse is read the same way,
+  with a warning. `lines=` or `until=` fixes the end when the guess is
+  wrong.
+
+- The website has an [llms.txt](https://gdey.github.io/markdownshell/llms.txt),
+  for pointing an LLM or a coding agent at the docs: what mdsh is and a
+  link with a line on each docs page, and
+  [llms-full.txt](https://gdey.github.io/markdownshell/llms-full.txt),
+  every docs page and the cheat sheet as one markdown file. Both are built
+  from the docs pages themselves, so they stay current.
+
 - An `out=file` block's output bar in mdsh-gui says how long its log is,
   "63 lines in test.log", and clicking that shows the whole log with the
   lines the output shows marked. A window that matched nothing is badged

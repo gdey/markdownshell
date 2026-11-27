@@ -119,14 +119,35 @@ func lineStarts(data []byte) []int {
 // start through end, counting from 1. start is 0 when there is none,
 // and warn says why. warn can also be set with a definition, when more
 // than one has the name: the first is used.
+//
+// Go is read with go/parser, exactly. Other languages, and Go that
+// doesn't parse, are read with a Chroma lexer, as symbolTokens says.
 func symbolLines(data []byte, inc doc.Include, lang string) (start, end int, warn string) {
-	if lang != "go" && filepath.Ext(inc.File) != ".go" {
-		return 0, 0, fmt.Sprintf("include: symbol= finds only Go definitions so far, and %s isn't Go", inc.File)
+	if lang != "go" && (!plainLang(lang) || filepath.Ext(inc.File) != ".go") {
+		return symbolTokens(data, inc, lang)
 	}
+	start, end, warn, err := goSymbolLines(data, inc)
+	if err == nil {
+		return start, end, warn
+	}
+	start, end, warn = symbolTokens(data, inc, "go")
+	parse := fmt.Sprintf("include: %s doesn't read as Go (%v), so symbol=%s is a best guess", inc.File, err, inc.Symbol)
+	if start == 0 {
+		return start, end, warn
+	}
+	if warn != "" {
+		parse += "; " + strings.TrimPrefix(warn, "include: ")
+	}
+	return start, end, parse
+}
+
+// goSymbolLines is symbolLines for Go, with go/parser. err is set when
+// data isn't Go.
+func goSymbolLines(data []byte, inc doc.Include) (start, end int, warn string, err error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, inc.File, data, parser.ParseComments|parser.SkipObjectResolution)
 	if err != nil {
-		return 0, 0, fmt.Sprintf("include: symbol=%s: %s doesn't read as Go: %v", inc.Symbol, inc.File, err)
+		return 0, 0, "", err
 	}
 	recv, name := splitSymbol(inc.Symbol)
 	type span struct{ from, to token.Pos }
@@ -173,12 +194,20 @@ func symbolLines(data []byte, inc doc.Include, lang string) (start, end int, war
 		}
 	}
 	if len(found) == 0 {
-		return 0, 0, fmt.Sprintf("include: %s defines no %s", inc.File, inc.Symbol)
+		return 0, 0, noSymbol(inc), nil
 	}
 	if len(found) > 1 {
-		warn = fmt.Sprintf("include: %s defines %s %d times; showing the first", inc.File, inc.Symbol, len(found))
+		warn = manySymbols(inc, len(found))
 	}
-	return fset.Position(found[0].from).Line, fset.Position(found[0].to).Line, warn
+	return fset.Position(found[0].from).Line, fset.Position(found[0].to).Line, warn, nil
+}
+
+func noSymbol(inc doc.Include) string {
+	return fmt.Sprintf("include: %s defines no %s", inc.File, inc.Symbol)
+}
+
+func manySymbols(inc doc.Include, n int) string {
+	return fmt.Sprintf("include: %s defines %s %d times; showing the first", inc.File, inc.Symbol, n)
 }
 
 // splitSymbol splits a symbol= name into its receiver type, "" for none,

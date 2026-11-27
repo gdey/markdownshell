@@ -68,6 +68,17 @@ type Greeter struct {
 }
 ```
 
+Other languages are a best guess from the highlighter: the definition
+runs to its closing brace, or for Python and YAML to the end of what is
+indented under it. `lines=` or `until=` sets the end when the guess is
+wrong:
+
+```sh {<include file=include/greet.sh symbol=greet}
+greet() {
+	printf 'hello, %s\n' "$1"
+}
+```
+
 When nothing matches, the block is left empty and mdsh warns, without
 failing the run.
 

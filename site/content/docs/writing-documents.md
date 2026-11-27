@@ -505,7 +505,7 @@ func main() {
 | `to=N` | Last line to include, inclusive; the default is the end of the file |
 | `number_on` | Show each line with its line number in the file |
 | `match="re"` | Start at the first line matching a Go regexp, instead of `from=` |
-| `symbol=Name` | Show a Go definition: a function, a method as `T.Method` or `(*T).Method`, a type, a const or a var, with its doc comment |
+| `symbol=Name` | Show a definition with its doc comment. In Go: a function, a method as `T.Method` or `(*T).Method`, a type, a const or a var. In other languages, best effort; `A.b` is `b` inside `A` |
 | `comment=false` | With `symbol=`, leave out the doc comment |
 | `before=N` | Also show the N lines above the start |
 | `lines=N` | Show N lines from the start, the start included |
@@ -532,8 +532,14 @@ func main() {
   `from=` or `to=`, and `lines=` can't be combined with `until=`. Without
   `lines=` or `until=`, a `match=` window runs to the end of the file and
   a `symbol=` window to the end of the definition. Line numbers start
-  where the window does. `symbol=` reads only Go so far; in a grouped
-  `const (…)` or `var (…)` the window is the name's own lines.
+  where the window does. In Go, `symbol=` reads the file exactly, and in
+  a grouped `const (…)` or `var (…)` the window is the name's own lines.
+- Other languages are read with the highlighter's tokens, so `symbol=`
+  is a best guess there: the definition starts at the name after
+  `def`, `function`, `class`, `fn`, `struct` and the like, and ends at
+  its closing brace, or for Python and YAML at the last line indented
+  under it. A file that isn't valid Go is read the same way, with a
+  warning. When the end is wrong, `lines=` or `until=` sets it.
 - When `match=` or `symbol=` finds nothing, the block is left empty and
   mdsh warns, without failing the run: a window on errors in a log that
   has none this time is the normal case.

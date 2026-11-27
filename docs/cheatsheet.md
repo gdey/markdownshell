@@ -127,7 +127,7 @@ and takes none of the attributes above.
 | `to=N` | Last line, inclusive (default the last) |
 | `number_on` | Show each line's number in the file |
 | `match="RE"` | Start at the first line matching a Go regexp (not with `from=`/`to=`) |
-| `symbol=NAME` | Show a Go func, method (`T.M`), type, const or var with its doc comment |
+| `symbol=NAME` | Show a Go func, method (`T.M`), type, const or var with its doc comment; other languages best effort, `A.b` for `b` inside `A` |
 | `comment=false` | With `symbol=`, leave out the doc comment |
 | `before=N` | Also show N lines above the start |
 | `lines=N` | Show N lines from the start |
