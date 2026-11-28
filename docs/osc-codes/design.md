@@ -294,9 +294,11 @@ parses it (PR 10467) but did not yet show notifications when checked.
 ### Notifications in general (OSC 9, 99, 777, 1337 RequestAttention)
 
 No notification sequence is standard; three incompatible ones coexist.
-mdsh today: emits none. The GUI has native notifications where it needs
-them. The TUI has no way to reach a user whose terminal is unfocused: a
-`confirm` waiting, a long block ending, a background job finishing.
+mdsh today: `mdsh -i` sends one (package `termnotify`) when a `confirm`
+or question waits, or a run of 10 seconds or more ends, once no key has
+been pressed for 10 seconds; see the 7501 design's Notifications
+section. Before that, the TUI had no way to reach a user whose terminal
+is unfocused. A background job finishing still notifies nobody.
 
 Should mdsh: **yes, in the TUI, by detection.** One helper
 `notify(title, body)` that picks the sequence from the environment:

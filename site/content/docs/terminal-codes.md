@@ -40,7 +40,7 @@ kitty's docs and memory.
 | 6 | xterm: special-colour switch; iTerm2: tab colour | strips | ½ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 7 | current directory, as a `file://` URL | strips | ○ | ● | ● | ● | ● | ● | ○ | ½ | ○ | ○ | ● | ● | ● |
 | 8 | hyperlinks | sends, strips | ½ | ● | ● | ● | ● | ● | ● | ● | ● | ● (3.4+) | ● | ● | ○ |
-| 9 | iTerm2: desktop notification | strips | ○ | ● | ○ | ● | ● | ½ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| 9 | iTerm2: desktop notification | sends, strips | ○ | ● | ○ | ● | ● | ½ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 9;4 | ConEmu: progress state | strips | ○ | ½ ? | ○ | ○ | ● | ○ | ○ | ● | ● | ○ | ○ | ½ (draft) | ○ |
 | 9;9 | ConEmu: current directory | strips | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ |
 | 10, 11, 12 | text, background and cursor colour, with `?` to query | reads the 11 reply, strips | ● | ● | ● | ● | ● | ● | ● | ● | ● | ½ | ● | ● | ○ |
@@ -50,10 +50,10 @@ kitty's docs and memory.
 | 50 | xterm: font; old iTerm2 and Konsole settings | strips | ● | ½ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ½ | ○ |
 | 52 | clipboard: write, and read where allowed | sends, strips | ½ | ½ | ½ | ½ (write) | ½ (write) | ● | ● | ● | ½ | ½ | ½ | ● | ○ |
 | 66 | kitty text sizing | strips | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
-| 99 | kitty desktop notification | strips | ○ | ○ | ● | ○ | ½ (parsed) | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| 99 | kitty desktop notification | sends, strips | ○ | ○ | ● | ○ | ½ (parsed) | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 133 | shell integration marks: prompt, input, output, exit status | sends, reads | ○ | ● | ● | ● | ● | ● | ○ | ● | ● | ○ | ○ | ½ | ○ |
 | 633 | VS Code shell integration | strips | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ |
-| 777 | rxvt extensions, `notify` | strips | ○ | ○ | ○ | ● | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| 777 | rxvt extensions, `notify` | sends, strips | ○ | ○ | ○ | ● | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 1337 | iTerm2: images, user variables, marks and more | sends `File`, strips | ○ | ● | ○ | ½ | ○ | ○ | ○ | ○ | ½ (images) | ○ | ○ | ½ (images) | ○ |
 | 5522 | kitty clipboard protocol | strips | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 7501 | Program Status Protocol | sends, reads, strips | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
@@ -116,7 +116,8 @@ Terminal, Ghostty, VS Code and ConEmu show in the tab or the taskbar;
 `9;9` sends the directory on Windows; `9;1` to `9;12` otherwise stay
 in ConEmu, `9;7` runs programs and no other terminal should ever honour
 it. Ghostty takes an unknown sub-command as a notification, which is
-the collision made visible. mdsh sends neither and strips both.
+the collision made visible. mdsh **sends** the iTerm2 form from `mdsh -i`
+(see below), never starting it with a digit, and strips both from output.
 
 ### 21, 22, 66, 5522: kitty's
 
@@ -147,7 +148,13 @@ heard by the block's emulator and goes no further, in the app and in
 kitty's `OSC 99`, with ids, urgency and buttons, is in kitty and foot,
 and parsed but not yet shown by Ghostty. rxvt's `OSC 777 ; notify ;
 title ; body` is in WezTerm and foot. No notification sequence is
-standard; mdsh sends none.
+standard, so `mdsh -i` **sends** the one the terminal speaks when you
+have looked away (no key for 10 seconds) and a confirm or question
+waits, or a long run ends: 99 on kitty, 9 on iTerm2, WezTerm and
+Ghostty, 777 on foot, the bell elsewhere. Under tmux it is wrapped in
+passthrough, which needs `allow-passthrough on`; without it, mdsh rings
+the bell. `MDSH_NOTIFY` picks the sequence or turns it off. Output
+strips all three.
 
 ### 133: shell integration marks
 
@@ -199,9 +206,9 @@ in the repository):
 
 1. Send `9;4` progress and a title from `mdsh -i`, next to the 7501
    reports it already sends.
-2. Desktop notifications from `mdsh -i` when a block waits on you or a
-   long one ends, by the terminal's own sequence (9, 99 or 777), with
-   tmux passthrough.
+2. Done: desktop notifications from `mdsh -i` when a block waits on
+   you or a long one ends, by the terminal's own sequence (9, 99 or
+   777), with tmux passthrough.
 3. Forward OSC 52 writes out of tty blocks and the History pane to the
    clipboard, in the app and in `mdsh -i`, and wrap mdsh's own copy for
    tmux.
