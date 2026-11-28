@@ -61,7 +61,11 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 	}
 	defer term.Restore(fd, st)
 
-	s.pty.attach(io.MultiWriter(tty, rec))
+	// What the block does to the terminal's title and colours is put
+	// back once it ends.
+	io.WriteString(tty, titlePush)
+	colours := &colourWatch{}
+	s.pty.attach(io.MultiWriter(tty, rec, colours))
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -75,6 +79,7 @@ func (s *Shell) RunTTY(ctx context.Context, script string, tty *os.File, rec io.
 	s.pty.attach(nil)
 	close(stop)
 	wg.Wait()
+	io.WriteString(tty, titlePop+colours.reset())
 	return status, exited, err
 }
 
