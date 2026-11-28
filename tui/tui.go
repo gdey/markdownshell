@@ -104,9 +104,12 @@ type Model struct {
 	// run events, so drawing and saving never read the session while a
 	// run is going.
 	results []*run.Result
-	index   map[*doc.Block]int
-	nav     []int // blocks the cursor stops on: runnable and include blocks
-	parts   []part
+	// copyAt is the block c last copied from, and which of the texts
+	// its output offers c copies next.
+	copyAt struct{ block, next int }
+	index  map[*doc.Block]int
+	nav    []int // blocks the cursor stops on: runnable and include blocks
+	parts  []part
 
 	events chan tea.Msg
 	// lterm is the History pane as a terminal on the interactive shell.
@@ -897,6 +900,10 @@ func (m *Model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.fixFrontMatter()
 	case "y":
 		if cmd := m.copyBlock(); cmd != nil {
+			return m, cmd
+		}
+	case "c":
+		if cmd := m.copyOffered(); cmd != nil {
 			return m, cmd
 		}
 	case "Y":

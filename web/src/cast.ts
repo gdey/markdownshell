@@ -14,12 +14,13 @@
 // as in a PDF: writes less than 100ms apart share a frame, and a write
 // that changes nothing on screen makes none.
 
-import { Terminal } from "@xterm/xterm";
+import { type IMarker, Terminal } from "@xterm/xterm";
 import { Clipboard, Events } from "/wails/runtime.js";
 import { App } from "./api.js";
 import { announce, el, iconButton, svg, icons } from "./dom.js";
 import { codeFont, textSize } from "./theme.js";
 import { type Cast, parseCast } from "./castparse.js";
+import { copyLabel, copyMark } from "./copyable.js";
 
 // step is the shortest time between frames, and maxDelay caps how long
 // playback waits on one, as the GIF does.
@@ -27,7 +28,13 @@ const step = 0.1;
 const maxDelay = 2;
 
 // A frame is the screen once events[0..upto) are written, at time at.
-type Frame = { at: number; upto: number };
+// copies are the texts it offers to copy (see copyable.ts).
+type Frame = { at: number; upto: number; copies: Copy[] };
+// A Copy is text a frame offers to copy: a region the program bracketed
+// with OSC 1337 CopyToClipboard and EndCopy, while it is on the screen,
+// with the row and column it ends at; or, with row -1, the last text
+// the program sent with OSC 52, which isn't shown.
+type Copy = { text: string; row: number; col: number };
 // used is how many rows, from the top, any frame shows something on.
 type Loaded = { text: string; cast: Cast; frames: Frame[]; used: number };
 
@@ -101,10 +108,76 @@ function usedRows(t: Terminal, cursor: boolean): number {
   return used;
 }
 
+// rangeText is the text t shows from row y0, column x0, to row y1,
+// column x1, buffer lines both: a wrapped line goes on without a line
+// break, and spaces end no line but the last.
+function rangeText(t: Terminal, y0: number, x0: number, y1: number, x1: number): string {
+  const b = t.buffer.active;
+  let s = "";
+  for (let y = y0; y <= y1; y++) {
+    const line = b.getLine(y);
+    if (!line) return "";
+    if (y > y0 && !line.isWrapped) s += "\n";
+    s += y < y1 ? line.translateToString(!b.getLine(y + 1)?.isWrapped, y === y0 ? x0 : 0) : line.translateToString(false, y === y0 ? x0 : 0, x1);
+  }
+  return s;
+}
+
+// A region is a copyable region the program wrote: where it starts, by
+// a marker that follows its line as the screen scrolls, how many lines
+// on it ends, and its text.
+type Region = { marker: IMarker; x0: number; lines: number; x1: number; text: string };
+
+// watchCopies follows the texts a recording offers to copy as t plays
+// it, and returns what the screen offers now.
+function watchCopies(t: Terminal): () => Copy[] {
+  const regions: Region[] = [];
+  let open: { marker: IMarker; x: number } | null = null;
+  let offered = "";
+  t.parser.registerOscHandler(1337, (data) => {
+    const mark = copyMark("1337;" + data);
+    if (!mark) return false;
+    const b = t.buffer.active;
+    if (mark.kind === "open") {
+      open?.marker.dispose();
+      const marker = t.registerMarker(0);
+      open = marker ? { marker, x: b.cursorX } : null;
+    } else if (mark.kind === "close" && open) {
+      const y0 = open.marker.line;
+      const y1 = b.baseY + b.cursorY;
+      const text = y0 < 0 ? "" : rangeText(t, y0, open.x, y1, b.cursorX);
+      if (text.trim()) regions.push({ marker: open.marker, x0: open.x, lines: y1 - y0, x1: b.cursorX, text });
+      else open.marker.dispose();
+      open = null;
+    }
+    return true;
+  });
+  t.parser.registerOscHandler(52, (data) => {
+    const mark = copyMark("52;" + data);
+    if (mark?.kind === "text") offered = mark.text;
+    return true;
+  });
+  return () => {
+    const b = t.buffer.active;
+    const out: Copy[] = [];
+    for (const r of regions) {
+      if (r.marker.isDisposed) continue;
+      const y0 = r.marker.line;
+      // Shown while the screen still has its text where it was written.
+      if (rangeText(t, y0, r.x0, y0 + r.lines, r.x1) === r.text) out.push({ text: r.text, row: y0 + r.lines - b.baseY, col: r.x1 });
+    }
+    if (offered) out.push({ text: offered, row: -1, col: 0 });
+    return out;
+  };
+}
+
+const sameCopies = (a: Copy[], b: Copy[]) => a.length === b.length && a.every((c, i) => c.text === b[i].text && c.row === b[i].row && c.col === b[i].col);
+
 // frames plays cast through a terminal that isn't shown, and returns its
 // frames and how many rows they use.
 async function frames(cast: Cast): Promise<{ frames: Frame[]; used: number }> {
   const t = new Terminal({ cols: cast.cols, rows: cast.rows, scrollback: 0, allowProposedApi: true });
+  const copies = watchCopies(t);
   const out: Frame[] = [];
   const ev = cast.events;
   let last = "";
@@ -116,8 +189,16 @@ async function frames(cast: Cast): Promise<{ frames: Frame[]; used: number }> {
       cursor = cursorShown(ev[i][1], cursor);
       if (i + 1 < ev.length && out.length && ev[i + 1][0] - out[out.length - 1].at < step) continue;
       const s = screen(t, cursor);
-      if (out.length && s === last) continue;
-      out.push({ at: ev[i][0], upto: i + 1 });
+      if (out.length && s === last) {
+        // Text offered to copy with nothing new shown, as OSC 52 is,
+        // makes no frame of its own, so the frame numbers stay
+        // termrec's; the frame shown offers it.
+        const now = copies();
+        const prev = out[out.length - 1];
+        if (!sameCopies(now, prev.copies)) prev.copies = now;
+        continue;
+      }
+      out.push({ at: ev[i][0], upto: i + 1, copies: copies() });
       used = Math.max(used, usedRows(t, cursor));
       last = s;
     }
@@ -332,7 +413,11 @@ function player(src: string, alt: string, opts: CastOptions, body: string): HTML
   }
   const buttons = [playBtn, back, fwd, shotBtn, copyBtn, ...swaps];
   for (const b of buttons) b.disabled = true;
-  const controls = el("div", { className: "cast-controls" }, back, playBtn, fwd, scrub, note, status, shotBtn, copyBtn);
+  // copyLayer holds a copy button by each region the frame shown offers
+  // to copy, and offered a button for the text it sent with OSC 52.
+  const copyLayer = el("div", { className: "cast-copies" });
+  const offered = el("span", { className: "cast-offered" });
+  const controls = el("div", { className: "cast-controls" }, back, playBtn, fwd, scrub, note, offered, status, shotBtn, copyBtn);
   if (swaps.length) controls.append(el("span", { className: "cast-sep" }), ...swaps);
   box.append(controls);
 
@@ -363,6 +448,48 @@ function player(src: string, alt: string, opts: CastOptions, body: string): HTML
       return failed(err);
     }
     say(lines(text) + why);
+  }
+
+  // copyOffered puts text the recording offers to copy on the
+  // clipboard.
+  async function copyOffered(text: string, hidden: boolean) {
+    try {
+      await Clipboard.SetText(text);
+    } catch (err) {
+      return failed(err);
+    }
+    say(copyLabel(text, hidden).replace(/^Copy /, ""));
+  }
+
+  // drawCopies puts a copy button just after the end of each region
+  // frame f offers to copy, over the screen, and one in the controls
+  // for its OSC 52 text.
+  function drawCopies(f: Frame, cols: number, rows: number) {
+    const scr = screenHost.querySelector<HTMLElement>(".xterm-screen");
+    const host = screenHost.getBoundingClientRect();
+    const at = scr?.getBoundingClientRect();
+    const cw = at ? at.width / cols : 0;
+    const rh = at ? at.height / rows : 0;
+    const shown: HTMLElement[] = [];
+    const hidden: HTMLElement[] = [];
+    for (const c of f.copies) {
+      const b = iconButton("copy", copyLabel(c.text, c.row < 0), () => void copyOffered(c.text, c.row < 0));
+      b.classList.add("cast-copy");
+      if (c.row < 0) {
+        hidden.push(b);
+        continue;
+      }
+      if (!at) continue;
+      // Past the right edge it sits over the region's last cell.
+      const col = Math.min(c.col, cols - 2);
+      b.style.left = `${at.left - host.left + screenHost.scrollLeft + col * cw}px`;
+      b.style.top = `${at.top - host.top + c.row * rh}px`;
+      b.style.height = `${rh}px`;
+      shown.push(b);
+    }
+    copyLayer.replaceChildren(...shown);
+    offered.replaceChildren(...hidden);
+    offered.hidden = !hidden.length;
   }
 
   // copyFrame puts the frame shown on the clipboard as plain text: what
@@ -435,6 +562,7 @@ function player(src: string, alt: string, opts: CastOptions, body: string): HTML
       written = upto;
       return chunk ? write(t, chunk) : undefined;
     });
+    drawCopies(fs[frame], cast.cols, cast.rows);
     const end = fs[fs.length - 1].at;
     status.textContent = `${frame + 1} / ${fs.length} · ${clock(fs[frame].at)} / ${clock(end)}`;
     scrub.value = String(frame + 1);
@@ -532,6 +660,7 @@ function player(src: string, alt: string, opts: CastOptions, body: string): HTML
       data = d;
       term = new Terminal({ cols: d.cast.cols, rows: d.cast.rows, fontSize: textSize(13), fontFamily: codeFont(), theme: colors(), scrollback: 0, disableStdin: true, cursorBlink: false, screenReaderMode: true, rightClickSelectsWord: false });
       term.open(screenHost);
+      screenHost.append(copyLayer);
       ignoreMouseModes(term);
       // With text selected, the copy key copies it.
       term.attachCustomKeyEventHandler((e) => {

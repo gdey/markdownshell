@@ -8,6 +8,22 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Output can offer text to copy. A program that brackets text with
+  iTerm2's `OSC 1337 ; CopyToClipboard` and `EndCopy`, or sends it with
+  `OSC 52`, gets a copy button for it in mdsh-gui instead of writing the
+  clipboard: the bracketed text is underlined with the button after it,
+  and OSC 52's text, which isn't shown, is a button that says how long
+  it is. A recording shows the button while the text is on its screen,
+  and an OSC 52 text from then on. `mdsh -i` marks the texts ⧉1, ⧉2…
+  and `c` copies them in turn. Saved output keeps the sequences, so the
+  buttons come back when the file is opened again.
+
+  ![A block's output in mdsh-gui: the token underlined with a copy button after it, and an OSC 52 text as a button that reads "text to copy, 49 chars"](docs/changelog/copyable-output.png)
+
+  ![A recording in the cast player: a copy button at the end of the token while it is on the screen, and, after the screen clears, a "text to copy" button in the controls for the OSC 52 text](docs/changelog/copyable-cast.png)
+
+  ![mdsh -i: the token marked ⧉1, the OSC 52 text as "⧉1 text to copy, 49 chars (c)", and the status line after c: "copied text ⧉1 from ssh's output"](docs/changelog/copyable-tui.png)
+
 - The website has a [Terminal escape codes](https://gdey.github.io/markdownshell/docs/terminal-codes/)
   page: every OSC sequence terminals speak, from titles and the clipboard
   to shell marks, notifications and program status, how widely each is

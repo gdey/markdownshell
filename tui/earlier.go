@@ -107,7 +107,7 @@ func (m *Model) entryText(b *doc.Block, e doc.Entry) string {
 			parts = append(parts, m.markdown(text))
 		default:
 			// Dim, as saved output is, so the current output stands out.
-			parts = append(parts, savedStyle.Render(links(b, clean(termsafe.Styled(text)))))
+			parts = append(parts, savedStyle.Render(links(b, clean(termsafe.Styled(markCopyable(text))))))
 		}
 	}
 	if len(parts) == 0 {

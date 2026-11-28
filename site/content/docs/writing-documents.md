@@ -209,6 +209,24 @@ when its block doesn't run, `--hide-output` and `show-output=` hide copies
 too, and a copy for a block that doesn't exist is left alone with a
 warning.
 
+### Text to copy
+
+A program can offer text for the clipboard. iTerm2's
+`OSC 1337 ; CopyToClipboard` and `OSC 1337 ; EndCopy` bracket text it
+prints, and `OSC 52 ; c ; base64` carries the text in the sequence
+without showing it. A terminal writes the clipboard on either. mdsh
+never writes your clipboard from output, which is saved in the file and
+replayed by whoever opens it: it shows a copy button instead. A
+bracketed region is underlined with the button after it; an OSC 52 text
+is a button that says how long it is. In `mdsh -i` the texts are marked
+⧉1, ⧉2… and `c` copies them in turn. A recording shows the button while
+the region is on its screen.
+
+```sh
+printf 'Token: \033]1337;CopyToClipboard=\a%s\033]1337;EndCopy\a\n' "$TOKEN"
+printf '\033]52;c;%s\a' "$(printf %s "$KEY" | base64 | tr -d '\n')"
+```
+
 ### Keeping values out of the file
 
 Mark a block `nosave` when its output shouldn't be committed, such as a

@@ -48,13 +48,13 @@ kitty's docs and memory.
 | 21 | kitty colour protocol | strips | ○ | ○ | ● | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 22 | pointer shape | strips | ½ | ○ | ● | ○ | ● | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 50 | xterm: font; old iTerm2 and Konsole settings | strips | ● | ½ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ½ | ○ |
-| 52 | clipboard: write, and read where allowed | sends, strips | ½ | ½ | ½ | ½ (write) | ½ (write) | ● | ● | ● | ½ | ½ | ½ | ● | ○ |
+| 52 | clipboard: write, and read where allowed | sends, reads | ½ | ½ | ½ | ½ (write) | ½ (write) | ● | ● | ● | ½ | ½ | ½ | ● | ○ |
 | 66 | kitty text sizing | strips | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 99 | kitty desktop notification | strips | ○ | ○ | ● | ○ | ½ (parsed) | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 133 | shell integration marks: prompt, input, output, exit status | sends, reads | ○ | ● | ● | ● | ● | ● | ○ | ● | ● | ○ | ○ | ½ | ○ |
 | 633 | VS Code shell integration | strips | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ |
 | 777 | rxvt extensions, `notify` | strips | ○ | ○ | ○ | ● | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
-| 1337 | iTerm2: images, user variables, marks and more | sends `File`, strips | ○ | ● | ○ | ½ | ○ | ○ | ○ | ○ | ½ (images) | ○ | ○ | ½ (images) | ○ |
+| 1337 | iTerm2: images, user variables, marks and more | sends `File`, reads `CopyToClipboard` | ○ | ● | ○ | ½ | ○ | ○ | ○ | ○ | ½ (images) | ○ | ○ | ½ (images) | ○ |
 | 5522 | kitty clipboard protocol | strips | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 7501 | Program Status Protocol | sends, reads, strips | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 
@@ -136,8 +136,10 @@ which most terminals refuse or ask about. Writes work almost everywhere,
 often behind a setting: xterm's `allowWindowOps`, an iTerm2 preference,
 tmux's `set-clipboard`. Terminal.app ignores it. mdsh **sends** it when
 you copy a block in `mdsh -i`, and runs `pbcopy`, `wl-copy`, `xclip` or
-`xsel` as well when it is local, for terminals that drop it. Output
-can't carry it. A program that writes OSC 52 inside a tty block is
+`xsel` as well when it is local, for terminals that drop it. In a
+block's output mdsh **reads** it but never writes your clipboard: the
+text gets a copy button, or `c` in `mdsh -i` (see
+[Text to copy]({{< relref "writing-documents#text-to-copy" >}})). A program that writes OSC 52 inside a tty block is
 heard by the block's emulator and goes no further, in the app and in
 `mdsh -i`; under plain `mdsh doc.md` it reaches your terminal. Overlaps kitty's 5522 and iTerm2's
 `1337;CopyToClipboard`.
@@ -175,7 +177,9 @@ file, `SetUserVar=`, `CurrentDir=`, `SetMark`, `SetBadgeFormat=`,
 all of it; WezTerm takes `File` and `SetUserVar`; Konsole, mintty and
 VS Code draw `File` images. mdsh **sends** `File` for images under
 iTerm2 and WezTerm (kitty's graphics protocol on kitty and Ghostty,
-sixel elsewhere; neither is an OSC) and strips the rest.
+sixel elsewhere; neither is an OSC). In output it **reads**
+`CopyToClipboard` and `EndCopy` and puts a copy button by the text
+between them, and strips the rest.
 
 ### 7501: program status
 
@@ -207,8 +211,5 @@ in the repository):
    tmux.
 4. Show a program's OSC 8 link in saved output as "text (address)"
    instead of the raw sequence.
-5. Copyable regions: text a program brackets with
-   `1337;CopyToClipboard` and `EndCopy`, or sends as an OSC 52 payload,
-   gets a copy button instead of a silent clipboard write.
-6. Read `9;4` and 7501 from the programs in tty blocks, for the block's
+5. Read `9;4` and 7501 from the programs in tty blocks, for the block's
    card.

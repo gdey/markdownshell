@@ -88,6 +88,7 @@ with the reason.
 | `e` / `E` | edit the block, or the whole file, in `$EDITOR` |
 | `y` | copy the block's code to the clipboard |
 | `Y` | copy an `http` block's request as a `curl` command |
+| `c` | copy text the block's output offers to copy, marked ⧉1, ⧉2…; again for the next |
 | `H` | show an `http` block's response headers, or its body again |
 | `b` | show or hide the block's earlier runs, kept by `history=N` |
 | `x` | show or hide a `secret` block's code and output |

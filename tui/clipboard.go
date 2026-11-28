@@ -17,7 +17,10 @@ type copiedMsg struct {
 	// label names the block; it is "" for History's lines.
 	label string
 	lines int
-	err   error
+	// offered, when set, names the text of a block's output copied
+	// with c (see copyOffered).
+	offered string
+	err     error
 }
 
 // copyBlock puts the code of the block under the cursor on the
@@ -43,6 +46,10 @@ func (m *Model) copyBlock() tea.Cmd {
 func (m *Model) copied(msg copiedMsg) {
 	if msg.err != nil {
 		m.status = "copy: " + msg.err.Error()
+		return
+	}
+	if msg.offered != "" {
+		m.status = offeredStatus(msg)
 		return
 	}
 	unit := "lines"
