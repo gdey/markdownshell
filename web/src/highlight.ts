@@ -22,7 +22,8 @@ import { properties } from "@codemirror/legacy-modes/mode/properties";
 import { css } from "@codemirror/legacy-modes/mode/css";
 import { c, cpp, java, kotlin } from "@codemirror/legacy-modes/mode/clike";
 
-import { el } from "./dom.js";
+import { el, iconButton } from "./dom.js";
+import { copyLabel, copyMark } from "./copyable.js";
 
 // httpWords are the words an http block's checks and captures use, in
 // Hurl's names.
@@ -180,8 +181,13 @@ const unfinished = /\x1b(?:\[[0-9;:?<=>]*[ -/]*|\][^\x07\x1b]*\x1b?|[()*+])?$/;
 
 // Ansi turns text with ANSI escapes into nodes, colored as SGR
 // sequences say, leaving out the other sequences. It keeps its state
-// between writes, so output can come in pieces.
+// between writes, so output can come in pieces. Text a program offers
+// to copy (see copyable.ts) gets a copy button: a region bracketed with
+// OSC 1337 CopyToClipboard and EndCopy is wrapped with one after it,
+// and an OSC 52 text, which isn't shown, becomes a button alone.
 export class Ansi {
+  // region is the copyable region open, which text goes into.
+  private region: HTMLElement | null = null;
   private fg = "";
   private bg = "";
   private bold = false;
@@ -204,6 +210,7 @@ export class Ansi {
     for (const m of text.matchAll(escape)) {
       this.put(out, text.slice(last, m.index));
       if (m[3] === "m" && !m[2] && !/[?<=>]/.test(m[1] ?? "")) this.sgr(m[1] ?? "");
+      else if (m[0][1] === "]") this.osc(out, m[0].slice(2, m[0].endsWith("\x07") ? -1 : -2));
       last = m.index! + m[0].length;
     }
     this.put(out, text.slice(last));
@@ -216,11 +223,43 @@ export class Ansi {
     let bg = this.bg;
     if (this.inverse) [fg, bg] = [bg || "var(--code-bg)", fg || "var(--fg)"];
     const cls = [this.bold && "ansi-bold", this.dim && "ansi-dim", this.italic && "ansi-italic", this.underline && "ansi-underline"].filter(Boolean).join(" ");
-    if (!fg && !bg && !cls) return void out.push(document.createTextNode(text));
+    const into = (n: Node) => (this.region ? this.region.append(n) : out.push(n));
+    if (!fg && !bg && !cls) return void into(document.createTextNode(text));
     const span = el("span", { className: cls }, text);
     if (fg) span.style.color = fg;
     if (bg) span.style.backgroundColor = bg;
-    out.push(span);
+    into(span);
+  }
+
+  // osc acts on an OSC sequence that offers text to copy.
+  private osc(out: Node[], body: string) {
+    const mark = copyMark(body);
+    if (!mark) return;
+    if (mark.kind === "close") {
+      this.region = null;
+      return;
+    }
+    if (mark.kind === "text") {
+      const b = copyButton(() => mark.text, true);
+      const label = copyLabel(mark.text, true);
+      b.title = label;
+      b.setAttribute("aria-label", label);
+      // The words are drawn by CSS, from data-label, so the output's
+      // text, as Copy output copies it, stays what the program printed.
+      const n = [...mark.text].length;
+      const chip = el("span", { className: "copyable-text offered" }, b);
+      chip.dataset.label = `text to copy, ${n} ${n === 1 ? "char" : "chars"}`;
+      return void (this.region ? this.region.append(chip) : out.push(chip));
+    }
+    const text = el("span", { className: "copy-text" });
+    const b = copyButton(() => text.textContent ?? "", false);
+    // The tooltip names the text once it's all there.
+    b.addEventListener("pointerenter", () => (b.title = copyLabel(text.textContent ?? "", false)));
+    b.addEventListener("focus", () => b.setAttribute("aria-label", copyLabel(text.textContent ?? "", false)));
+    const wrap = el("span", { className: "copyable-text" }, text, b);
+    if (this.region) this.region.parentElement!.after(wrap);
+    else out.push(wrap);
+    this.region = text;
   }
 
   private sgr(params: string) {
@@ -259,6 +298,18 @@ export class Ansi {
       }
     }
   }
+}
+
+// copyButton is a button that offers text() to copy: it sends an
+// mdsh-copy event, which the page answers by copying (see app.ts), so
+// this file needn't know the clipboard.
+export function copyButton(text: () => string, hidden: boolean): HTMLButtonElement {
+  const b = iconButton("copy", hidden ? "Copy the text the program offered" : "Copy this text", () => {
+    b.dispatchEvent(new CustomEvent("mdsh-copy", { bubbles: true, detail: { text: text(), hidden } }));
+  });
+  b.classList.add("copy-region");
+  b.setAttribute("contenteditable", "false");
+  return b;
 }
 
 // color is the CSS color of xterm's color n: the 16 named ones follow

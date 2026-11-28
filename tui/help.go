@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/gdey/markdownshell/copyable"
 	"github.com/gdey/markdownshell/doc"
 )
 
@@ -82,6 +83,7 @@ var helpItems = []helpItem{
 
 	{group: "Edit", keys: "e", key: runeKey("e"), what: says("edit the block in $EDITOR"), off: noEdit},
 	{group: "Edit", keys: "y", key: runeKey("y"), what: says("copy the block's code to the clipboard"), off: noBlocks},
+	{group: "Edit", keys: "c", key: runeKey("c"), what: says("copy text the block's output offers (⧉1, ⧉2…; again for the next)"), off: noOffered},
 	{group: "Edit", keys: "Y", key: runeKey("Y"), what: says("copy an http block as a curl command"), off: noHTTP},
 	{group: "Edit", keys: "V", key: runeKey("V"), what: says("select lines of History to copy (shift+↑ in the pane)"), off: func(m *Model) string {
 		switch {
@@ -170,6 +172,13 @@ func noBlocks(m *Model) string {
 func noEarlier(m *Model) string {
 	if i := m.cur(); i < 0 || len(m.d.Blocks[i].History) == 0 {
 		return "the block has no earlier runs"
+	}
+	return ""
+}
+
+func noOffered(m *Model) string {
+	if i := m.cur(); i < 0 || !copyable.Has(m.rawOutput(i)) {
+		return "the block's output offers nothing to copy"
 	}
 	return ""
 }

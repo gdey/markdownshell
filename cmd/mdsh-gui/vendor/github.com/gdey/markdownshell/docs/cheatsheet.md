@@ -285,6 +285,7 @@ env starts in the document's folder.
 | `F` | Fix front matter that doesn't parse, when mdsh can: quote a value with a `: ` in it |
 | `y` | Copy the block's code to the clipboard (OSC 52, and the system clipboard locally) |
 | `Y` | Copy an `http` block as a `curl` command |
+| `c` | Copy text the block's output offers (marked ⧉1, ⧉2…); again for the next |
 | `V` | Select lines of History's output (shift+↑ in the pane too): ↑/↓ `j`/`k` extend, `g`/`G` ends, `o` other end, `y` or enter copies, esc cancels |
 | `J`/`K`, alt+↓/↑ | Move the block, with its output and tape, down or up |
 | `u` | Undo the last move |

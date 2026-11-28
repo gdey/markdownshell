@@ -1661,6 +1661,31 @@ async function copyOutput(block: HTMLElement, c: Cell) {
 
 const copiedTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 
+// A copy button on text a block's output offers to copy (see
+// copyButton in highlight.ts) copies it, as a secret if the block is
+// one, and says Copied for a moment.
+document.addEventListener("mdsh-copy", (e) => {
+  const { text, hidden } = (e as CustomEvent<{ text: string; hidden: boolean }>).detail;
+  const b = e.target as HTMLElement;
+  const block = b.closest<HTMLElement>(".block");
+  const c = block ? cellOf.get(block) : undefined;
+  const secret = !!c?.secret;
+  void (async () => {
+    if (!text) return status("no text to copy");
+    try {
+      await setClipboard(text, secret);
+    } catch (err) {
+      return status("couldn't copy: " + message(err));
+    }
+    const n = text.split("\n").length;
+    const what = hidden ? "the text the program offered" : "the text";
+    status("Copied " + what + (c?.name ?? c?.id ? " from " + (c?.name ?? c?.id) : "") + ", " + n + (n === 1 ? " line" : " lines") + (secret ? secretNote() : ""));
+    b.classList.add("copied");
+    clearTimeout(copiedTimers.get(b));
+    copiedTimers.set(b, setTimeout(() => b.classList.remove("copied"), 1500));
+  })();
+});
+
 // outputText is the text of a block's output, out. Output a block
 // printed is in pre elements, one for each stream, whose text is what it
 // printed; other output, such as out=markdown's, is taken as shown.

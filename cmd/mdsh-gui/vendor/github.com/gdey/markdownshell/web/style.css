@@ -507,6 +507,17 @@ figure.diagram { position: relative; margin: 12px 0; }
 .copyable > pre { margin: 0; }
 .copyable > .copy-code { position: absolute; top: 4px; right: 4px; z-index: 1; background: var(--code-bg); opacity: 0; }
 .copyable:hover > .copy-code, .copyable > .copy-code:focus-visible { opacity: 1; }
+/* Text a block's output offers to copy, with OSC 1337 CopyToClipboard
+   or OSC 52: a dashed underline and a copy button after it, or, for
+   OSC 52's text, which isn't shown, the button alone with a word. */
+.copyable-text { border-bottom: 1px dashed var(--accent); }
+.copyable-text > button.copy-region { padding: 0 3px; margin: 0 0 0 2px; line-height: 1; vertical-align: -2px; color: var(--accent); border-radius: 4px; }
+.copyable-text > button.copy-region svg { width: 13px; height: 13px; }
+.copyable-text.offered { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px 0 0; border: 1px dashed var(--accent); border-radius: 4px; }
+.copyable-text.offered > button.copy-region { margin: 0; }
+.copyable-text.offered::after { content: attr(data-label); color: var(--muted); font: calc(12px * var(--text-scale)) var(--font-ui); }
+button.copy-region.copied { color: var(--ok); }
+button.copy-region.copied::after { content: " Copied"; font: calc(11px * var(--text-scale)) var(--font-ui); }
 figure.diagram .diagram-image { padding: 8px 0; }
 figure.diagram .diagram-image img { display: block; margin: 0; }
 figure.diagram[data-show="image"] > pre, figure.diagram[data-show="code"] > .diagram-image { display: none; }
@@ -754,6 +765,16 @@ figure.diagram[data-lang="cast"] .diagram-image { padding-top: 32px; }
 .cast-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
 .cast-scrub { flex: 1; min-width: 80px; margin: 0 6px; accent-color: var(--accent, #4a90e2); }
 .cast-status { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: calc(12px * var(--text-scale, 1)); }
+/* A copy button by a region the frame shown offers to copy, and one in
+   the controls for text sent with OSC 52 (see drawCopies). */
+.cast-screen { position: relative; }
+.cast-copies > button.cast-copy { position: absolute; z-index: 2; padding: 0 3px; display: inline-flex; align-items: center; color: var(--accent-fg); background: var(--accent); border-radius: 4px; opacity: .9; }
+.cast-copies > button.cast-copy:hover, .cast-copies > button.cast-copy:focus-visible { opacity: 1; color: var(--accent-fg); background: var(--accent); }
+.cast-copies > button.cast-copy svg { width: 12px; height: 12px; fill: currentColor; }
+.cast-offered { display: inline-flex; align-items: center; margin-right: 6px; }
+.cast-offered[hidden] { display: none; }
+.cast-offered > button.cast-copy { color: var(--accent); }
+.cast-offered > button.cast-copy::after { content: "text to copy"; margin-left: 4px; font-size: calc(12px * var(--text-scale, 1)); }
 .cast-note { margin-right: 8px; white-space: nowrap; font-size: calc(12px * var(--text-scale, 1)); color: var(--accent); }
 
 /* The History pane: a terminal along the bottom whose commands are

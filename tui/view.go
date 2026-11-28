@@ -355,7 +355,7 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 			if s := m.markdown(string(r.Stdout)); s != "" {
 				parts = append(parts, s)
 			}
-		} else if s := strings.TrimRight(clean(string(r.Stdout)), "\n"); s != "" {
+		} else if s := strings.TrimRight(clean(markCopyable(string(r.Stdout))), "\n"); s != "" {
 			parts = append(parts, links(r.Block, s))
 		}
 		if s := strings.TrimRight(clean(string(r.Stderr)), "\n"); s != "" {
@@ -386,7 +386,7 @@ func (m *Model) output(i int, r *run.Result, w int) string {
 		if run.OutKind(b) == "markdown" {
 			return savedStyle.Render(m.savedLabel(b, "saved output")) + "\n" + m.markdown(out)
 		}
-		return wrap.Render(savedStyle.Render(m.savedLabel(b, "saved output") + "\n" + links(b, clean(termsafe.Styled(out)))))
+		return wrap.Render(savedStyle.Render(m.savedLabel(b, "saved output") + "\n" + links(b, clean(termsafe.Styled(markCopyable(out))))))
 	}
 	return ""
 }
