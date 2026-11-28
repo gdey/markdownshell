@@ -558,15 +558,17 @@ func runCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) (retErr er
 		}
 	}
 
-	// The terminal is told what the run is doing (OSC 7501).
+	// The terminal is told what the run is doing (OSC 7501), and shows
+	// a progress bar (OSC 9;4) where it can, gone once mdsh exits.
 	var st *termstatus.Tracker
 	if tty != nil {
-		st = termstatus.NewTracker(tty, "mdsh")
+		st = termstatus.NewTracker(tty, "mdsh").WithProgress(termstatus.ProgressTerminal(os.Getenv))
 	}
 	finish := trackStatus(d, &opts, st)
 
 	results, runErr := run.Run(ctx, d, opts)
 	finish(results, runErr)
+	st.Exit()
 	warnIncludes(stderr, file, d, results)
 	if results == nil {
 		return runErr
@@ -807,10 +809,12 @@ func interactiveCmd(o interactiveOpts, stdin io.Reader, stdout io.Writer) error 
 	protocol := termimg.Detect(os.Getenv)
 	approvals := trust.OpenDefault()
 	// The terminal is told what mdsh -i is doing (OSC 7501): one
-	// record for the program, whichever tab is running. Quitting
-	// clears it.
-	status := termstatus.NewTracker(stdout, "mdsh")
+	// record for the program, whichever tab is running. The progress
+	// bar (OSC 9;4, where the terminal shows one) and the window title
+	// follow it. Quitting clears it and puts the terminal's title back.
+	status := termstatus.NewTracker(stdout, "mdsh").WithProgress(termstatus.ProgressTerminal(os.Getenv))
 	defer status.Clear()
+	c.Status = status
 	c.Open = func(file string) (*doc.Document, tui.Options, error) {
 		abs, err := filepath.Abs(file)
 		if err != nil {

@@ -127,6 +127,14 @@ next key. A terminal that shows program status, such as Ghostty, lists
 mdsh and what it waits on in its tab or inbox; one that doesn't ignores
 the reports. `mdsh doc.md` reports the same way.
 
+The window title names the file, marked while a run is going:
+`[50%] deploy.md - mdsh` with a block's `mdsh ctl status --step` as the
+percent, `[running]` without steps, `[waiting]` while a card asks,
+`[failed]`, and `[done]` until your next key. Quitting puts your
+terminal's title back, where it keeps a title stack. Ghostty, Windows
+Terminal, VS Code and ConEmu also show a progress bar on the tab or
+taskbar (OSC 9;4), and `mdsh doc.md` shows it too, gone when it exits.
+
 ## Images and recordings
 
 Images and recordings show under their block as a preview in colored

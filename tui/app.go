@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/gdey/markdownshell/doc"
+	"github.com/gdey/markdownshell/termstatus"
 )
 
 // Opener reads file and returns its document and the options to show it
@@ -30,6 +31,9 @@ type Config struct {
 	// the start screen lists first, and the view the last file was left
 	// in. Empty keeps neither.
 	State string
+	// Status, if set, is the tracker every tab's Options.Status shares;
+	// the window title follows the tab in front.
+	Status *termstatus.Tracker
 }
 
 // Run shows the file, or the start screen, full screen until the user
@@ -217,6 +221,25 @@ func (a *app) resize() tea.Cmd {
 }
 
 func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	model, cmd := a.update(msg)
+	a.title()
+	return model, cmd
+}
+
+// title names the file in front in the window title, or mdsh alone on
+// the start screen.
+func (a *app) title() {
+	if a.c.Status == nil {
+		return
+	}
+	name := ""
+	if m := a.tab().doc; m != nil && m.opts.Run.File != "" {
+		name = filepath.Base(m.opts.Run.File)
+	}
+	a.c.Status.Title(name)
+}
+
+func (a *app) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	t := a.tab()
 	if m, ok := msg.(tabMsg); ok {
 		t, msg = m.t, m.msg
