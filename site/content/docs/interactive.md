@@ -117,6 +117,16 @@ once it ends (`✓ 1.4s`). The time is for this session; it isn't saved.
 A block picked by hand runs even if it is marked `skip` or its `run=`
 condition is false; `a` and `s` honor both.
 
+## Status in your terminal
+
+`mdsh -i` tells the terminal it runs in what it is doing, with the
+[Program Status Protocol](https://mitchellh.com/writing/program-status-osc7501)
+(OSC 7501): working while a block runs, blocked while a card waits for
+your answer, done or error once the run ends, and idle again at your
+next key. A terminal that shows program status, such as Ghostty, lists
+mdsh and what it waits on in its tab or inbox; one that doesn't ignores
+the reports. `mdsh doc.md` reports the same way.
+
 ## Images and recordings
 
 Images and recordings show under their block as a preview in colored

@@ -454,6 +454,7 @@ func (m *Model) runUnrecorded(text string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.running, m.cancel, m.status = true, cancel, ""
 	m.hist.running = true
+	m.statusStarted()
 	m.fit()
 	go func() {
 		r, full, err := m.sess.RunUnrecorded(ctx, lang, text)
@@ -551,6 +552,7 @@ func (m *Model) runTyped(text string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.running, m.cancel, m.status = true, cancel, ""
 	m.skipSaved = false
+	m.statusStarted()
 	if bg {
 		go func() {
 			_, err := m.sess.RunBlock(ctx, i)
