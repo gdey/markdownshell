@@ -5,6 +5,7 @@
 import { Terminal } from "@xterm/xterm";
 import { App } from "./api.js";
 import { setOutput } from "./dom.js";
+import { copyOsc52 } from "./osc52.js";
 import { codeFont, textSize } from "./theme.js";
 
 const defaultRows = 24;
@@ -87,6 +88,7 @@ export function openTerminal(i: number) {
   // screenReaderMode has xterm read out what the block writes.
   term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: !matchMedia("(prefers-reduced-motion: reduce)").matches, theme: colors(), scrollback: 1000, screenReaderMode: true });
   term.open(host);
+  copyOsc52(term, () => i);
   term.onData(typeKeys);
   term.focus();
 }
@@ -144,6 +146,7 @@ function newBackground(i: number): Background {
   host.setAttribute("aria-label", "The block's terminal: what you type goes to it while other blocks run");
   const term = new Terminal({ cols: cols(), rows: rows(), fontSize: textSize(13), fontFamily: codeFont(), cursorBlink: !matchMedia("(prefers-reduced-motion: reduce)").matches, theme: colors(), scrollback: 1000, screenReaderMode: true });
   const b: Background = { term, host, typing: Promise.resolve(), opened: false };
+  copyOsc52(term, () => i);
   // Keys go to Go one call at a time, in order, as typeKeys does.
   term.onData((keys) => {
     b.typing = b.typing.then(() => App.TypeBackground(i, keys)).catch(() => {});

@@ -20,6 +20,7 @@ import { Ansi } from "./highlight.js";
 import { keyHint } from "./keys.js";
 import { terminalLinks } from "./links.js";
 import { readlineKey } from "./readline.js";
+import { copyOsc52 } from "./osc52.js";
 import { typeKeys, wanted } from "./terminal.js";
 import { codeFont, textSize } from "./theme.js";
 import { blockPrompt, inBlock, isBlock, openBlock } from "./typedblock.js";
@@ -141,6 +142,9 @@ function ensureTerm(): Terminal {
   // What commands typed here print comes with links, as their blocks do.
   terminalLinks(term, (msg) => say(`\x1b[31m${msg}\x1b[0m`));
   markPrompts(term);
+  // A program run here copies as one in a block's terminal does; at the
+  // live shell, the copy is no block's.
+  copyOsc52(term, () => (live || block < 0 ? -1 : block));
   term.onData((keys) => {
     if (live) sendKeys(keys);
     else if (block !== -1) typeKeys(keys);

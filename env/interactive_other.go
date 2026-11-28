@@ -20,6 +20,7 @@ type Event struct {
 	Typed   bool
 	Resumed bool
 	Output  []byte
+	Copied  string
 }
 
 var (

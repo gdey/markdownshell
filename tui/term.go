@@ -27,6 +27,10 @@ type pane struct {
 	cols, rows int
 	block      int // the block running in it, or -1
 	vt         vt10x.Terminal
+
+	// copy, if set, takes what a program in the pane copies with OSC
+	// 52, which vt10x drops.
+	copy func(text string)
 }
 
 func newPane() *pane {
@@ -43,7 +47,7 @@ func newPane() *pane {
 
 // env is the pane as run sees it.
 func (p *pane) env() *env.Terminal {
-	return &env.Terminal{Keys: p.keys, Out: paneOut{p}, Size: p.size, Resized: p.resized}
+	return &env.Terminal{Keys: p.keys, Out: paneOut{p}, Size: p.size, Resized: p.resized, Clipboard: p.copy}
 }
 
 func (p *pane) size() (cols, rows int) {

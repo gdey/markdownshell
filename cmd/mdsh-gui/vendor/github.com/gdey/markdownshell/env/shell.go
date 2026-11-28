@@ -88,6 +88,10 @@ type Terminal struct {
 	// the script has ended and the terminal is let go. It may be
 	// called from another goroutine.
 	Status func([]termstatus.Report)
+	// Clipboard, if set, is called with the text a program on the
+	// terminal puts on the clipboard with OSC 52, for a terminal that
+	// would otherwise drop it. It may be called from another goroutine.
+	Clipboard func(text string)
 	// JobControl runs the script with the shell's job control on, as
 	// in an interactive shell: ctrl+z stops a command and the shell
 	// carries on, and jobs, fg and bg work. Off, or in a shell that

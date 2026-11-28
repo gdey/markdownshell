@@ -109,7 +109,7 @@ func (s *Shell) BackgroundTerminal(ctx context.Context, script, pidVar string, t
 	j.PID = cmd.Process.Pid
 	j.term = &termJob{cmd: cmd, ended: make(chan struct{})}
 
-	out, tee := newStatusTee(io.MultiWriter(t.Out, rec), ptm, t.Status)
+	out, tee := newStatusTee(io.MultiWriter(t.Out, rec), ptm, t.Status, t.Clipboard)
 	read := make(chan struct{})
 	go func() {
 		defer close(read)

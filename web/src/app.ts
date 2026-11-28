@@ -34,6 +34,7 @@ import { initSplitGrip, showSplitGrip } from "./split.js";
 import { type LineEdit, Synced, type Version, diff, eventChanges, lineEditsOf, textOf } from "./sync.js";
 import { adoptBackground, closeBackgrounds, closeTerminal, endBackground, endTerminal, openBackground, openTerminal, sizeTerminal, wantTerminalSize, writeBackground, writeTerminal } from "./terminal.js";
 import { applyTheme } from "./theme.js";
+import { onTerminalCopy } from "./osc52.js";
 import { applyKeyHints, hinted, isMac } from "./keys.js";
 import { drawn as startupDrawn, mark as startupMark } from "./startup.js";
 import { type HeadRow, decodeHeads, headOf, moveHead, partial, sameHead } from "./heads.js";
@@ -1689,6 +1690,23 @@ async function setClipboard(text: string, secret: boolean) {
   if (secret) await App.CopySecret(text);
   else await Clipboard.SetText(text);
 }
+
+// A program in a terminal, a tty block's or History's, copied text with
+// OSC 52: it goes on the clipboard as a copy button's would, marked
+// secret if the block is, and the status line says so, since nothing
+// else shows it happened.
+onTerminalCopy(async (text, i) => {
+  const c = i >= 0 ? cells.find((c) => c.block === i) : undefined;
+  const secret = !!c?.secret;
+  const name = c ? (c.name ?? c.id ?? "") : "";
+  try {
+    await setClipboard(text, secret);
+  } catch (err) {
+    return status("couldn't copy: " + message(err));
+  }
+  const n = text.split("\n").length;
+  status((name ? name : c ? "The block" : "A program in History") + " copied " + n + (n === 1 ? " line" : " lines") + (secret ? secretNote() : ""));
+});
 
 // revealed holds the blocks whose secret code and output are shown. A
 // block marked secret, or whose code names a secret variable, is masked
