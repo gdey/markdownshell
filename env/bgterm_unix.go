@@ -109,7 +109,7 @@ func (s *Shell) BackgroundTerminal(ctx context.Context, script, pidVar string, t
 	j.PID = cmd.Process.Pid
 	j.term = &termJob{cmd: cmd, ended: make(chan struct{})}
 
-	out := io.MultiWriter(t.Out, rec)
+	out, tee := newStatusTee(io.MultiWriter(t.Out, rec), ptm, t.Status)
 	read := make(chan struct{})
 	go func() {
 		defer close(read)
@@ -160,6 +160,7 @@ func (s *Shell) BackgroundTerminal(ctx context.Context, script, pidVar string, t
 		}
 		close(stop)
 		ptm.Close()
+		tee.end()
 		j.mu.Lock()
 		if status >= 0 {
 			j.done, j.status = true, status

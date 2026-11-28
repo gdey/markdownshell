@@ -117,6 +117,7 @@ github.com/gdey/markdownshell/shellrc
 github.com/gdey/markdownshell/tape
 github.com/gdey/markdownshell/termrec
 github.com/gdey/markdownshell/termsafe
+github.com/gdey/markdownshell/termstatus
 github.com/gdey/markdownshell/textimg
 github.com/gdey/markdownshell/trust
 github.com/gdey/markdownshell/ui

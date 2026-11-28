@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- mdsh keeps the Program Status Protocol (OSC 7501) records of the
+  programs blocks run: a program on a `tty` block's terminal, a
+  background `tty` block's or the History pane's shell can report
+  working, blocked, done or error, with a message, and mdsh keeps the
+  records as a terminal would and answers the feature query. Nothing
+  shows them yet; the cards and the History bar will. See
+  [docs/program-status/design.md](docs/program-status/design.md).
+
 - `mdsh doc.md` and `mdsh -i` tell the terminal they run in what they
   are doing, with the Program Status Protocol (OSC 7501): working as
   each block starts, with how far through the blocks the run is, blocked
