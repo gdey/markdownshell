@@ -8,6 +8,20 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh -i` names the file in the terminal's window title and marks it
+  while it works, waits on you, has failed or has a result you haven't
+  seen: `[50%] deploy.md - mdsh`, `[waiting]`, `[failed]`, `[done]`.
+  The terminal's own title comes back when mdsh quits, where the
+  terminal keeps a title stack (xterm, VTE, kitty, WezTerm, Ghostty,
+  iTerm2). `mdsh doc.md` and `mdsh -i` also show a progress bar on the
+  tab or taskbar (OSC 9;4) in Ghostty, Windows Terminal, VS Code and
+  ConEmu: the share of a block's `mdsh ctl status --step N --of M`, a
+  busy bar while a block runs without steps, paused while a question
+  waits, red on a failure. Other terminals read OSC 9 as a
+  notification, so they don't get it.
+
+  ![mdsh -i running deploy.md, step 2 of 4: the tab reads "[50%] deploy.md - mdsh" with a progress bar half way along its bottom edge](docs/changelog/terminal-progress.png)
+
 - The website has a [Terminal escape codes](https://gdey.github.io/markdownshell/docs/terminal-codes/)
   page: every OSC sequence terminals speak, from titles and the clipboard
   to shell marks, notifications and program status, how widely each is

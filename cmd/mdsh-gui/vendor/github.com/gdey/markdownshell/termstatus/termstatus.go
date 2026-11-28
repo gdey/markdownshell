@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -258,7 +259,18 @@ type Tracker struct {
 	mu      sync.Mutex
 	last    string // the sequence last written, so the same state isn't sent twice
 	state   State
+	cur     Report // the report last written
 	working Report // the last Working report, for Unblocked
+
+	// The progress bar (OSC 9;4) and window title (OSC 0) that follow
+	// the same state, when asked for: see progress.go.
+	progress     bool
+	lastProgress string
+	refresh      *time.Timer
+	refreshEvery time.Duration
+	titled       bool
+	titleName    string
+	lastTitle    string
 }
 
 // NewTracker reports to w, the program's terminal, as app. A nil w
@@ -280,7 +292,9 @@ func (t *Tracker) report(r Report) {
 	}
 	t.last = seq
 	t.state = r.State
+	t.cur = r
 	io.WriteString(t.w, seq)
+	t.follow()
 }
 
 // Working says the program is busy with msg, progress percent of the
@@ -370,7 +384,7 @@ func (t *Tracker) Settled() bool {
 }
 
 // Clear removes the program's records from the terminal, as when it
-// quits with nothing to show.
+// quits with nothing to show, and does what Exit does.
 func (t *Tracker) Clear() {
 	if t == nil {
 		return
@@ -379,4 +393,5 @@ func (t *Tracker) Clear() {
 	defer t.mu.Unlock()
 	t.working = Report{}
 	t.report(Report{State: Clear})
+	t.exit()
 }

@@ -34,14 +34,14 @@ kitty's docs and memory.
 
 | OSC | What it does | mdsh | xterm | iTerm2 | kitty | WezTerm | Ghostty | foot | Alacritty | Windows Terminal | VS Code | tmux | GNOME (VTE) | Konsole | Terminal.app |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0, 1, 2 | window title, icon name | strips | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
+| 0, 1, 2 | window title, icon name | sends, strips | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | 4, 104 | palette colours: set, query, reset | strips | ● | ● | ● | ● | ● | ● | ● | ● | ● | ½ | ● | ● | ○ |
 | 5, 105 | bold, underline and blink colours | strips | ● | ○ | ○ | ○ | ● | ½ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 6 | xterm: special-colour switch; iTerm2: tab colour | strips | ½ | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | 7 | current directory, as a `file://` URL | strips | ○ | ● | ● | ● | ● | ● | ○ | ½ | ○ | ○ | ● | ● | ● |
 | 8 | hyperlinks | sends, strips | ½ | ● | ● | ● | ● | ● | ● | ● | ● | ● (3.4+) | ● | ● | ○ |
 | 9 | iTerm2: desktop notification | strips | ○ | ● | ○ | ● | ● | ½ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
-| 9;4 | ConEmu: progress state | strips | ○ | ½ ? | ○ | ○ | ● | ○ | ○ | ● | ● | ○ | ○ | ½ (draft) | ○ |
+| 9;4 | ConEmu: progress state | sends, strips | ○ | ½ ? | ○ | ○ | ● | ○ | ○ | ● | ● | ○ | ○ | ½ (draft) | ○ |
 | 9;9 | ConEmu: current directory | strips | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ | ○ |
 | 10, 11, 12 | text, background and cursor colour, with `?` to query | reads the 11 reply, strips | ● | ● | ● | ● | ● | ● | ● | ● | ● | ½ | ● | ● | ○ |
 | 13–19, 113–119 | pointer, Tektronix and highlight colours | strips | ● | ½ | ½ | ○ | ● | ½ | ○ | ○ | ○ | ○ | ½ | ○ | ○ |
@@ -69,7 +69,9 @@ nothing where it isn't understood.
 
 ### 0, 1, 2: title
 
-Universal. mdsh doesn't set your terminal's title yet. A title a program
+Universal. `mdsh -i` sets the title to the file in front, marked
+while a run is going (`[50%] deploy.md - mdsh`, `[waiting]`,
+`[failed]`, `[done]`), and puts your title back when it quits. A title a program
 sets in a tty block stays inside the block's emulator in the app and in
 `mdsh -i`; under plain `mdsh doc.md` it reaches your terminal, and mdsh
 puts the title back when the block ends. Overlaps ConEmu `9;3`
@@ -116,7 +118,11 @@ Terminal, Ghostty, VS Code and ConEmu show in the tab or the taskbar;
 `9;9` sends the directory on Windows; `9;1` to `9;12` otherwise stay
 in ConEmu, `9;7` runs programs and no other terminal should ever honour
 it. Ghostty takes an unknown sub-command as a notification, which is
-the collision made visible. mdsh sends neither and strips both.
+the collision made visible. `mdsh -i` and `mdsh doc.md` send `9;4`
+progress, from the same state as their 7501 reports, only to Windows
+Terminal, Ghostty, VS Code and ConEmu, since the others would show it
+as a notification. mdsh sends no notification and strips both from
+output.
 
 ### 21, 22, 66, 5522: kitty's
 
@@ -198,7 +204,7 @@ The ranked list, from the survey behind this page
 in the repository):
 
 1. Send `9;4` progress and a title from `mdsh -i`, next to the 7501
-   reports it already sends.
+   reports it already sends. (Done.)
 2. Desktop notifications from `mdsh -i` when a block waits on you or a
    long one ends, by the terminal's own sequence (9, 99 or 777), with
    tmux passthrough.

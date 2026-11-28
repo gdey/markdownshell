@@ -84,6 +84,19 @@ the clipboard's OSC 52 already does; one tracker is shared by every tab.
 report; the window title and dock will show the same states once step 4
 gives them the records.
 
+The same tracker drives two older signals for terminals without 7501
+(`termstatus/progress.go`): the ConEmu progress bar, OSC 9;4, where
+`ProgressTerminal` says the terminal shows it (Ghostty, Windows
+Terminal, VS Code, ConEmu; never under tmux, and never elsewhere, as
+iTerm2, WezTerm and kitty take OSC 9 as a notification), and in
+`mdsh -i` the window title, OSC 0, naming the tab in front with the
+state as a prefix. Working maps to the bar's normal or indeterminate
+state, blocked to paused, error to error, the rest hides it; it is
+re-sent every 10 seconds while live, since Ghostty drops a silent bar
+after 15. The title is pushed on the terminal's stack before the first
+change and popped at exit; the CLI hides its bar at exit (`Exit`), as
+9;4 has no notion of a finished program.
+
 Code: `termstatus/`, `cmd/mdsh/status.go` (`trackStatus` wraps the
 `run.Options` hooks), `tui/status.go`.
 
@@ -150,8 +163,9 @@ forwards it upward as that block's child record.
 
 - Markers for blocked moments in the cast player: casts keep the raw
   bytes, so the reports are there. Skip until asked.
-- OSC 9;4 (ConEmu progress): the spec allows mapping it to the root
-  record. Easy to add to the step 2 scanner later.
+- Taking OSC 9;4 (ConEmu progress) from programs in blocks: the spec
+  allows mapping it to the root record. Easy to add to the step 2
+  scanner later. (mdsh's own 9;4 is sent, in step 1.)
 - OS notifications on blocked, as a setting, after the chips exist.
 
 ## Caveats
