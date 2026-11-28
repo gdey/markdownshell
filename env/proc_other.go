@@ -13,7 +13,7 @@ func kill(cmd *exec.Cmd) { cmd.Process.Kill() }
 
 // interrupt can't reach a script's commands here without ending the
 // shell, so it does nothing; Kill ends it.
-func interrupt(*exec.Cmd) {}
+var interrupt = func(*exec.Cmd) {}
 
 // killChildren can't find what pid started here.
 func killChildren(int, map[int]bool, map[int]bool) map[int]bool { return nil }
