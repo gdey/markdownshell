@@ -29,6 +29,7 @@ import (
 	"github.com/gdey/markdownshell/render"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
+	"github.com/gdey/markdownshell/termnotify"
 	"github.com/gdey/markdownshell/termsafe"
 	"github.com/gdey/markdownshell/termstatus"
 	"github.com/gdey/markdownshell/trust"
@@ -76,6 +77,11 @@ type Options struct {
 	// it runs in (OSC 7501): working, blocked on a question, done or
 	// error. Tabs share one.
 	Status *termstatus.Tracker
+	// Notify, if set, asks the terminal for a desktop notification
+	// when a card waits for an answer, or a long run ends, while the
+	// user hasn't pressed a key for a while (package termnotify). Tabs
+	// share one.
+	Notify *termnotify.Notifier
 }
 
 // Model is the TUI's state. It is a tea.Model.
@@ -141,8 +147,14 @@ type Model struct {
 	// which, for the terminal's status.
 	runFailed  bool
 	runFailure string
-	askIn      textinput.Model
-	askPick    int
+	// runStart is when the run going on started, and notifiedWait the
+	// confirm prompt or question a notification was last sent for, so
+	// each is sent once.
+	runStart     time.Time
+	notifiedWait any
+
+	askIn   textinput.Model
+	askPick int
 	// srcAsk is the env.source question while it is up, and src the
 	// answer given, which the run's goroutine reads.
 	srcAsk *srcPrompt
@@ -517,6 +529,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		m.statusSeen()
+		m.opts.Notify.Seen()
 		return m.key(msg)
 	case eventMsg:
 		m.statusEvent(run.Event(msg))
@@ -631,6 +644,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.bgDrawn(msg)
 	case editedMsg:
+		// Back from the editor, where keys went to it.
+		m.opts.Notify.Seen()
 		m.edited(msg)
 		m.refresh()
 		return m, nil
@@ -639,11 +654,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, nil
 	case ttyBackMsg:
+		// Back from a full-screen viewer, where keys went to it.
+		m.opts.Notify.Seen()
 		m.refresh()
 		return m, nil
 	case runDoneMsg:
 		m.running, m.active, m.stopping = false, -1, false
 		m.cancel()
+		m.notifyEnded(msg.err)
 		m.statusEnded(msg.err)
 		if msg.hist != nil {
 			m.typedDone(msg.hist)

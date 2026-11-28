@@ -152,7 +152,23 @@ forwards it upward as that block's child record.
   bytes, so the reports are there. Skip until asked.
 - OSC 9;4 (ConEmu progress): the spec allows mapping it to the root
   record. Easy to add to the step 2 scanner later.
-- OS notifications on blocked, as a setting, after the chips exist.
+- OS notifications on blocked in mdsh-gui, as a setting, after the
+  chips exist. (`mdsh -i` already asks its terminal for one: see
+  Notifications below.)
+
+## Notifications from `mdsh -i` (built)
+
+The same moments step 1 reports also ask the terminal for a desktop
+notification, through package `termnotify`, since a terminal that shows
+7501 is rare and a notification is not: OSC 99 on kitty, OSC 9 on iTerm2,
+WezTerm and Ghostty, OSC 777 on foot, a bell elsewhere, wrapped in tmux
+passthrough under tmux (where tmux is asked what the outer terminal is
+and whether `allow-passthrough` is on; without it, a bell). It sends when
+`statusAsking` reports a new blocked state, and when a run of 10 seconds
+or more ends, either only once no key was pressed for 10 seconds.
+`MDSH_NOTIFY` picks the sequence or turns it off. Step 3 should call the
+same `notifyWaiting` when a block's own record turns blocked, so a
+`terraform apply` waiting in a tty card notifies like a confirm does.
 
 ## Caveats
 

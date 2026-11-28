@@ -127,6 +127,22 @@ next key. A terminal that shows program status, such as Ghostty, lists
 mdsh and what it waits on in its tab or inbox; one that doesn't ignores
 the reports. `mdsh doc.md` reports the same way.
 
+## Notifications
+
+When you have looked away, `mdsh -i` asks the terminal for a desktop
+notification: when a `confirm=`, `depends=` or `mdsh ctl ask` question
+starts waiting, and when a run that took 10 seconds or more ends, saying
+how long it took or which block failed. "Looked away" means no key for 10
+seconds, so a prompt that comes up right after you pressed enter, or a
+run you watched, notifies nobody. The sequence depends on the terminal:
+OSC 99 on kitty, OSC 9 on iTerm2, WezTerm and Ghostty, OSC 777 on foot,
+and the bell elsewhere, which most terminals show as a badge or a
+bounce. Under tmux, mdsh asks tmux which terminal it runs in and wraps
+the notification for tmux to pass on; that needs
+`set -g allow-passthrough on`, and without it mdsh rings the bell, which
+tmux marks on the window. Set `MDSH_NOTIFY` to `off`, `bell`, `osc9`,
+`osc99` or `osc777` to choose yourself.
+
 ## Images and recordings
 
 Images and recordings show under their block as a preview in colored

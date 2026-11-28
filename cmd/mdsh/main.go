@@ -38,6 +38,7 @@ import (
 	"github.com/gdey/markdownshell/report"
 	"github.com/gdey/markdownshell/run"
 	"github.com/gdey/markdownshell/termimg"
+	"github.com/gdey/markdownshell/termnotify"
 	"github.com/gdey/markdownshell/termsafe"
 	"github.com/gdey/markdownshell/termstatus"
 	"github.com/gdey/markdownshell/trust"
@@ -811,6 +812,10 @@ func interactiveCmd(o interactiveOpts, stdin io.Reader, stdout io.Writer) error 
 	// clears it.
 	status := termstatus.NewTracker(stdout, "mdsh")
 	defer status.Clear()
+	// And, when the user looked away, asks it for a desktop
+	// notification: OSC 99, 9 or 777 by what the terminal is, or a
+	// bell.
+	notify := termnotify.ForTerminal(stdout)
 	c.Open = func(file string) (*doc.Document, tui.Options, error) {
 		abs, err := filepath.Abs(file)
 		if err != nil {
@@ -848,6 +853,7 @@ func interactiveCmd(o interactiveOpts, stdin io.Reader, stdout io.Writer) error 
 			Protocol:     protocol,
 			Trust:        approvals,
 			Status:       status,
+			Notify:       notify,
 		}, nil
 	}
 	return tui.Run(c)

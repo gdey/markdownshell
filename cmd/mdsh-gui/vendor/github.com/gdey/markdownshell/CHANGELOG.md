@@ -8,6 +8,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `mdsh -i` asks the terminal for a desktop notification when you have
+  looked away (no key for 10 seconds) and a `confirm=`, `depends=` or
+  `mdsh ctl ask` question starts waiting, or a run of 10 seconds or more
+  ends. kitty gets OSC 99, iTerm2, WezTerm and Ghostty OSC 9, foot
+  OSC 777, and other terminals the bell. Under tmux the notification is
+  passed through when `allow-passthrough` is on, and is a bell
+  otherwise. `MDSH_NOTIFY` picks the sequence or turns it off.
+
 - The website has a [Terminal escape codes](https://gdey.github.io/markdownshell/docs/terminal-codes/)
   page: every OSC sequence terminals speak, from titles and the clipboard
   to shell marks, notifications and program status, how widely each is
