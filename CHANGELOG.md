@@ -254,6 +254,12 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Playing two blocks in a row while a command typed in the History pane
+  holds the shell no longer, now and then, leaves the second waiting
+  until that command ends. mdsh stops the command to run each block and
+  brings it back after, but could type the second block before the
+  shell had read the line that brings the command back.
+
 - Stopping a block no longer, now and then, stops the next one too,
   or lets it run on past the command it was stopped at. Run kept
   interrupting for a moment after the stopped block ended, which could
