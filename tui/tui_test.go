@@ -1375,6 +1375,13 @@ func TestOSC52(t *testing.T) {
 	if got, want := osc52("hi\n"), "\x1b]52;c;aGkK\a"; got != want {
 		t.Errorf("osc52 = %q, want %q", got, want)
 	}
+	if got, want := clipboardSeq("hi\n", false), "\x1b]52;c;aGkK\a"; got != want {
+		t.Errorf("outside tmux, clipboardSeq = %q, want %q", got, want)
+	}
+	// Inside tmux, the OSC 52 goes in tmux's passthrough, its ESC doubled.
+	if got, want := clipboardSeq("hi\n", true), "\x1bPtmux;\x1b\x1b]52;c;aGkK\a\x1b\\"; got != want {
+		t.Errorf("inside tmux, clipboardSeq = %q, want %q", got, want)
+	}
 }
 
 // TestFullEnvBanner checks that a file whose env.share brings in the

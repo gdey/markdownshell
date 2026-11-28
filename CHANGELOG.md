@@ -269,6 +269,20 @@ follow [Semantic Versioning](https://semver.org/).
   pick light or dark styles, changes nothing, so a palette you set
   yourself is left alone.
 
+- A program in a `tty` block or the History pane of mdsh-gui that copies
+  with OSC 52, as vim, tmux and lazygit do, now sets the clipboard. It
+  was dropped before. The status line says which block copied how many
+  lines, and a `secret` block's copy goes on marked secret, as its copy
+  buttons do. Reads of the clipboard are never answered.
+
+  ![A tty block whose program copied a line with OSC 52, and the status line saying yank copied 1 line](docs/changelog/gui-osc52-copy-light.png)
+
+- `mdsh -i` inside tmux, over ssh, now reaches the clipboard: it hands
+  tmux the text with `tmux load-buffer -w`, which tmux 3.2 and later send
+  on to the terminal under the default `set-clipboard external`, and
+  wraps its OSC 52 in tmux's passthrough for older tmux and
+  `allow-passthrough on`.
+
 - With the interactive shell on zsh and powerlevel10k, only the first
   line typed in the History pane went into the file: notes typed after
   it weren't added as prose, nor commands as blocks. powerlevel10k adds
