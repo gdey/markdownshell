@@ -16,7 +16,7 @@ Not goals for v1: a plugin system, remote kernels, or languages beyond what `run
 
 Every feature of `mdsh` and `mdsh -i` gets a place in the GUI. New in the GUI: save as, create report, a start screen, and editing the whole document. M1 to M7 are the milestones below.
 
-Later additions have notes of their own beside this one: [dependency lines](depends.md) draws `depends=` in the rendered view's margin and lets you edit it there. The [interface guidelines](../hig.md) set the rules for errors, confirmations, keys, accessibility and terminology across the GUI, TUI and CLI.
+Later additions have notes of their own beside this one: [dependency lines](depends.md) draws `depends=` in the rendered view's margin and lets you edit it there, and [editing in the rendered view](in-place-editing.md) proposes a block options panel and in-place editors for block bodies and prose (Nov 24, not yet decided). The [interface guidelines](../hig.md) set the rules for errors, confirmations, keys, accessibility and terminology across the GUI, TUI and CLI.
 
 | Feature | Today (CLI / TUI) | In the GUI | When |
 | --- | --- | --- | --- |
@@ -117,7 +117,7 @@ j answered the open questions on Oct 28.
 | Windows or tabs | Tabs, which drag between windows and out into their own (j, Oct 29). They are drawn in the window rather than using macOS's own window tabs, so they work the same on Linux. |
 | Packaging | An unsigned (ad hoc signed) universal `.app` in a `.dmg` and a `.zip` for macOS, and an AppImage for Linux, added to the same release as mdsh as separate files (j, Oct 29). A Flatpak needs blocks to run on the host, outside its sandbox, so it comes later. A Windows installer much later. |
 | Platforms | macOS and Linux. Windows is not supported for now. |
-| Where to edit | In the source view only. Clicks in the rendered view take you there. Inline editors in the rendered view were tried and dropped (Oct 29). |
+| Where to edit | In the source view only. Clicks in the rendered view take you there. Inline editors in the rendered view were tried and dropped (Oct 29). Revisited in [in-place-editing.md](in-place-editing.md) now that Go owns the text (Nov 24). |
 | Block attribute helper | Completion and hover help inside `{…}`, from an attribute table exported by `doc`. |
 | Markdown bar | Insert-at-cursor buttons for headings, lists, tables, blocks and so on. The text stays plain markdown; it is not WYSIWYG. |
 | Vim key bindings | A setting, off by default. It covers all editors, since they are all CodeMirror. |
