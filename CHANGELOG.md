@@ -8,6 +8,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The website has a [Terminal escape codes](https://gdey.github.io/markdownshell/docs/terminal-codes/)
+  page: every OSC sequence terminals speak, from titles and the clipboard
+  to shell marks, notifications and program status, how widely each is
+  supported across thirteen terminals, and what mdsh sends, reads or
+  strips. The survey behind it, with what mdsh should do next, is
+  [docs/osc-codes/design.md](docs/osc-codes/design.md).
+
 - mdsh keeps the Program Status Protocol (OSC 7501) records of the
   programs blocks run: a program on a `tty` block's terminal, a
   background `tty` block's or the History pane's shell can report
