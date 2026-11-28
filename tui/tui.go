@@ -141,8 +141,12 @@ type Model struct {
 	// which, for the terminal's status.
 	runFailed  bool
 	runFailure string
-	askIn      textinput.Model
-	askPick    int
+	// forwarded holds, for each pane, the ids of the records of its
+	// program sent up to the terminal mdsh -i runs in as children of
+	// its own, so those gone can be cleared; see status.go.
+	forwarded map[*pane]map[string]bool
+	askIn     textinput.Model
+	askPick   int
 	// srcAsk is the env.source question while it is up, and src the
 	// answer given, which the run's goroutine reads.
 	srcAsk *srcPrompt
@@ -335,6 +339,7 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 		active:    -1,
 		pane:      newPane(),
 		lterm:     newLiveTerm(),
+		forwarded: map[*pane]map[string]bool{},
 		termBlock: -1,
 		bgPanes:   map[int]*pane{},
 		bgFocus:   -1,
@@ -353,6 +358,8 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	}
 	m.sess = sess
 	m.results = append([]*run.Result(nil), sess.Results()...)
+	m.pane.notify = func() { m.send(statusMsg{m.pane}) }
+	m.lterm.p.notify = func() { m.send(statusMsg{m.lterm.p}) }
 
 	m.layout()
 	m.input = textinput.New()
@@ -623,6 +630,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refresh()
 		}
 		return m, m.watchLive
+	case statusMsg:
+		m.onStatus(msg.p)
+		m.refresh()
+		return m, m.wait
 	case bgPaneMsg:
 		return m, tea.Batch(m.wait, m.bgPane(msg))
 	case bgDrawnMsg:

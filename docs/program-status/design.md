@@ -1,8 +1,8 @@
 # Program status in the terminal (OSC 7501)
 
-Design. Steps 1 (mdsh and `mdsh -i` reporting their own state) and 2
-(mdsh keeping the records of the programs blocks run) are built; steps 3
-to 5 are not yet.
+Design. Steps 1 (mdsh and `mdsh -i` reporting their own state), 2 (mdsh
+keeping the records of the programs blocks run) and 3 (`mdsh -i` showing
+them and forwarding them) are built; steps 4 and 5 are not yet.
 
 ## The ask
 
@@ -117,17 +117,32 @@ under the block's id. A scripted block's stray report on a pipe is shown
 as text by `termsafe.Styled`; step 5 strips it, since `mdsh ctl status`
 is how such a block reports.
 
-## Step 3: `mdsh -i` shows block status and forwards it
+## Step 3: `mdsh -i` shows block status and forwards it (built)
 
-Card header: the running badge gains the record's state, "working 42%",
-"waiting: permission", with `msg`. The History bar's jobs badge and the
-Processes panel (`P`) get a state column. `mdsh -i` re-emits each
-block's records upward as children of its own, `id=<block-id>` (made a
-valid segment with `termstatus.Name`), keeping the block's `app`, so the
-outer terminal reads "mdsh › terraform: blocked, permission"; a block's
-end clears its children. The spec doesn't cover nested consumers; its
-hierarchical ids fit, and a terminal that shows only root records still
-sees mdsh's own state.
+![A background tty block's card in mdsh -i, its header reading "running in the background… 2s · terraform waiting: permission Apply 14 resources?"](../changelog/program-status-tui.png)
+
+The card header's running badge gains what the block's program reports,
+after a dot: "terraform working 20% Planning 14 resources", "terraform
+waiting: permission Apply 14 resources?", "✗ failed …", "✓ done …", the
+app first when the program names one, in the running colour, red for
+error, green for done (`tui/status.go`, `statusWords`). The root record
+stands for the program; with none, the first. The Processes panel (`P`)
+says the same after the block's command, and the History bar after the
+shell's jobs, for a command typed at the prompt.
+
+`mdsh -i` sends each pane's records up to the terminal it runs in as
+children of its own record: `id=<block label>` (made a valid segment
+with `termstatus.Name`), or `<label>/<the program's id>`, keeping the
+program's `app`, so an inbox there reads "mdsh › terraform: blocked";
+records that go, and the block's end, clear them (`Tracker.Child`,
+`ClearChild`). A command typed in the History pane goes under its
+History block, or `history` before it has one. The spec doesn't cover
+nested consumers; its hierarchical ids fit, and a terminal that shows
+only root records still sees mdsh's own state.
+
+The pane keeps the records (`pane.status`, from `env.Terminal.Status`)
+and wakes the model with a `statusMsg`; the live shell's "status" events
+come through `onLive`.
 
 ## Step 4: mdsh-gui shows block status
 

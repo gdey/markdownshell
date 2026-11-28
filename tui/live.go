@@ -14,6 +14,7 @@ import (
 	"github.com/gdey/markdownshell/env"
 	"github.com/gdey/markdownshell/history"
 	"github.com/gdey/markdownshell/termrec"
+	"github.com/gdey/markdownshell/termstatus"
 )
 
 // With the interactive shell (--interactive-shell), the History pane is
@@ -50,6 +51,9 @@ type liveTerm struct {
 	busy bool // a command typed at the prompt runs
 	cur  int  // its block, or -1
 	jobs []env.ShellJob
+	// recs is what the program the shell runs reports about itself
+	// (OSC 7501), for the pane's bar.
+	recs []termstatus.Report
 	// ends are typed commands' ends that wait for a run of blocks,
 	// which has the session.
 	ends []liveMsg
@@ -258,6 +262,10 @@ func (m *Model) onLive(msg liveMsg) tea.Cmd {
 		}
 	case "state":
 		m.liveJobs(msg.sh)
+	case "status":
+		// What the command typed at the prompt reports about itself.
+		lt.recs = msg.ev.Records
+		m.forwardStatus(lt.p, m.liveStatusKey(), lt.recs)
 	}
 	m.refresh()
 	return nil

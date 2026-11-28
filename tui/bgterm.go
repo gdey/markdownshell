@@ -32,6 +32,7 @@ type bgDrawnMsg struct {
 // b, as big as the one tty blocks run in.
 func (m *Model) backgroundTerminal(b *doc.Block) (*env.Terminal, func()) {
 	p := newPane()
+	p.notify = func() { m.send(statusMsg{p}) }
 	p.setSize(m.pane.size())
 	// The model keeps which block it is; take readies its screen.
 	p.take(0)

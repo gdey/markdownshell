@@ -127,6 +127,12 @@ next key. A terminal that shows program status, such as Ghostty, lists
 mdsh and what it waits on in its tab or inbox; one that doesn't ignores
 the reports. `mdsh doc.md` reports the same way.
 
+It works the other way too: a program in a `tty` block's terminal, or
+typed in the History pane, that reports its own status shows it after
+the card's running badge, "terraform waiting: permission Apply?", and in
+the Processes panel, and `mdsh -i` passes it up to your terminal under
+the block's name.
+
 ## Images and recordings
 
 Images and recordings show under their block as a preview in colored

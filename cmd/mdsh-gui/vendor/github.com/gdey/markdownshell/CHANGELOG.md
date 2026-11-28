@@ -15,13 +15,19 @@ follow [Semantic Versioning](https://semver.org/).
   strips. The survey behind it, with what mdsh should do next, is
   [docs/osc-codes/design.md](docs/osc-codes/design.md).
 
-- mdsh keeps the Program Status Protocol (OSC 7501) records of the
-  programs blocks run: a program on a `tty` block's terminal, a
-  background `tty` block's or the History pane's shell can report
-  working, blocked, done or error, with a message, and mdsh keeps the
-  records as a terminal would and answers the feature query. Nothing
-  shows them yet; the cards and the History bar will. See
+- A program on a `tty` block's terminal, a background `tty` block's or
+  the History pane's shell can say what it is doing with the Program
+  Status Protocol (OSC 7501): working, with a percentage, blocked on a
+  permission, a question or a credential, done or error, each with a
+  message. mdsh keeps the records as a terminal would and answers the
+  feature query. `mdsh -i` shows them after the card's running badge
+  ("terraform waiting: permission Apply 14 resources?"), in the
+  Processes panel and on the History bar, and passes them up to the
+  terminal it runs in under the block's name, so an inbox there says
+  which block needs you. mdsh-gui's cards are to follow. See
   [docs/program-status/design.md](docs/program-status/design.md).
+
+  ![A background tty block's card in mdsh -i, with the program's status after the running badge](docs/changelog/program-status-tui.png)
 
 - `mdsh doc.md` and `mdsh -i` tell the terminal they run in what they
   are doing, with the Program Status Protocol (OSC 7501): working as

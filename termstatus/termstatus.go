@@ -259,6 +259,9 @@ type Tracker struct {
 	last    string // the sequence last written, so the same state isn't sent twice
 	state   State
 	working Report // the last Working report, for Unblocked
+	// children are the child records reported, by id, each the
+	// sequence last written for it.
+	children map[string]string
 }
 
 // NewTracker reports to w, the program's terminal, as app. A nil w
@@ -378,5 +381,55 @@ func (t *Tracker) Clear() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.working = Report{}
+	t.children = nil
 	t.report(Report{State: Clear})
+}
+
+// Child reports r as a record under the program's own, id naming it:
+// what a program the tracker's program runs is doing, as a block's
+// program under mdsh. r's ID, if any, goes under id; its App is kept, so
+// the terminal can tell whose record it is, and with none the terminal
+// takes the tracker's. ClearChild takes the record back.
+func (t *Tracker) Child(id string, r Report) {
+	if t == nil || id == "" {
+		return
+	}
+	if r.ID != "" {
+		id += "/" + r.ID
+	}
+	r.ID = id
+	seq := r.Sequence()
+	if seq == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.children == nil {
+		t.children = map[string]string{}
+	}
+	if t.children[id] == seq {
+		return
+	}
+	t.children[id] = seq
+	io.WriteString(t.w, seq)
+}
+
+// ClearChild removes the record id names, and those under it, as Child
+// made them.
+func (t *Tracker) ClearChild(id string) {
+	if t == nil || id == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	had := false
+	for k := range t.children {
+		if k == id || strings.HasPrefix(k, id+"/") {
+			delete(t.children, k)
+			had = true
+		}
+	}
+	if had {
+		io.WriteString(t.w, Report{ID: id, State: Clear}.Sequence())
+	}
 }

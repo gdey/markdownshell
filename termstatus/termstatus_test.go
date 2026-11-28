@@ -162,3 +162,26 @@ func TestNilTracker(t *testing.T) {
 		t.Error("a tracker with no writer should be nil")
 	}
 }
+
+func TestTrackerChildren(t *testing.T) {
+	var out bytes.Buffer
+	tr := NewTracker(&out, "mdsh")
+	tr.Child("deploy", Report{State: Working, Progress: 10, App: "terraform"})
+	tr.Child("deploy", Report{State: Working, Progress: 10, App: "terraform"}) // the same: not sent
+	tr.Child("deploy", Report{ID: "plan", State: Done, Progress: NoProgress})
+	tr.Child("", Report{State: Done}) // no id: nothing
+	want := "\x1b]7501;state=working:id=deploy:progress=10:app=terraform\x1b\\" +
+		"\x1b]7501;state=done:id=deploy/plan\x1b\\"
+	if out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+	out.Reset()
+	tr.ClearChild("deploy")
+	tr.ClearChild("deploy") // gone already: nothing
+	if out.String() != "\x1b]7501;state=clear:id=deploy\x1b\\" {
+		t.Errorf("clear: %q", out.String())
+	}
+	var nilTr *Tracker
+	nilTr.Child("x", Report{State: Idle})
+	nilTr.ClearChild("x")
+}
