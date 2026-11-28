@@ -9,6 +9,9 @@ import (
 
 func ownGroup(*exec.Cmd) {}
 
+// unignoreInterrupt has nothing to do here, without SIGINT.
+func unignoreInterrupt() {}
+
 func kill(cmd *exec.Cmd) { cmd.Process.Kill() }
 
 // interrupt can't reach a script's commands here without ending the

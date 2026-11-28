@@ -93,6 +93,7 @@ func (s *Shell) BackgroundTerminal(ctx context.Context, script, pidVar string, t
 		pty.Setsize(ptm, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 	}
 	resize()
+	unignoreInterrupt()
 	cmd := exec.Command(s.path, runner)
 	cmd.Env = environ(vars)
 	cmd.Dir = s.dir

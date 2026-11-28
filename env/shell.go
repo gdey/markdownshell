@@ -187,6 +187,7 @@ func start(ctx context.Context, cfg Config, launched func(*Shell)) (*Shell, erro
 		}
 		return s, nil
 	}
+	unignoreInterrupt()
 	s.cmd = exec.Command(cfg.Path)
 	s.cmd.Env = cfg.Env
 	s.cmd.Dir = cfg.Dir
