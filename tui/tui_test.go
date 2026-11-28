@@ -1336,6 +1336,24 @@ func TestOutputLinks(t *testing.T) {
 	}
 }
 
+// TestSavedOutputProgramLinks checks that a link a program wrote into
+// saved output shows its target after its text, and that every link
+// the view makes goes where its text says.
+func TestSavedOutputProgramLinks(t *testing.T) {
+	src := "```sh {#a links}\ntrue\n```\n\n" +
+		"```output {for=a}\n\x1b]8;;https://evil.example/x\x1b\\https://bank.example\x1b]8;;\x1b\\\n```\n"
+	m, _ := newModel(t, src, Options{})
+	v := m.View()
+	for _, want := range []string{
+		"\x1b]8;;https://bank.example\x1b\\https://bank.example\x1b]8;;\x1b\\ (",
+		"(\x1b]8;;https://evil.example/x\x1b\\https://evil.example/x\x1b]8;;\x1b\\)",
+	} {
+		if !strings.Contains(v, want) {
+			t.Errorf("view has no %q:\n%q", want, v)
+		}
+	}
+}
+
 func TestCopyBlock(t *testing.T) {
 	var got []string
 	old := setClipboard
