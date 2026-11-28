@@ -31,8 +31,9 @@ func completionCmd(args []string, stdout io.Writer) error {
 	}
 }
 
-// serveWord is --serve, or one of its options, in a list of words.
-var serveWord = regexp.MustCompile(` --serve[a-z-]*`)
+// serveWord is --serve, or one of its options, in a list of words or
+// a case's patterns.
+var serveWord = regexp.MustCompile(`( |\|)--serve[a-z-]*`)
 
 // completionScript is script as this mdsh completes: without --serve
 // and its options when it was built without them.
@@ -46,9 +47,7 @@ func completionScript(script string) string {
 		if strings.HasPrefix(t, "'--serve") || strings.HasPrefix(t, "\"--serve") {
 			continue
 		}
-		if strings.Contains(line, "compgen -W") {
-			line = serveWord.ReplaceAllString(line, "")
-		}
+		line = serveWord.ReplaceAllString(line, "")
 		b.WriteString(line)
 	}
 	return b.String()
@@ -115,14 +114,14 @@ _mdsh() {
 		done
 		[[ -n $f ]] && COMPREPLY=($(compgen -W "$(mdsh __blocks "$f" 2>/dev/null)" -- "$cur"))
 		return ;;
-	-o|--pdf|-pdf|--html|-html|--source|-source)
+	-o|--pdf|-pdf|--html|-html|--source|-source|--serve-cert|--serve-key|--serve-client-ca)
 		compopt -o filenames 2>/dev/null
 		COMPREPLY=($(compgen -f -- "$cur"))
 		return ;;
 	esac
 
 	if [[ $cur == -* ]]; then
-		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --show-secrets --only --source --stop-on-error --yes --step --color --no-color -i --autosave --allow-outside --serve --version -h" -- "$cur"))
+		COMPREPLY=($(compgen -W "--hide-code --hide-output --no-run -n -w -o --pdf --html --show-secrets --only --source --stop-on-error --yes --step --color --no-color -i --autosave --allow-outside --serve --serve-cert --serve-key --serve-client-ca --version -h" -- "$cur"))
 		return
 	fi
 
@@ -181,6 +180,9 @@ _mdsh() {
 		'--autosave[with -i, save after every block that runs]' \
 		"--allow-outside[let includes and out= files reach outside the document's folder]" \
 		'--serve=-[serve the notebook to a web browser]::address (host\:port):' \
+		'--serve-cert[PEM certificate to serve HTTPS with]:certificate:_files' \
+		'--serve-key[private key for --serve-cert]:key:_files' \
+		'--serve-client-ca[require client certificates signed by these CAs]:CA file:_files' \
 		'--version[print the version]' \
 		'-h[show help]' \
 		'1:markdown file:_files -g "*.md"' \

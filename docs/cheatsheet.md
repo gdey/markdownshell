@@ -36,6 +36,8 @@ behaves.
 | `mdsh -i --interactive-shell doc.md` | History's shell runs interactively, reading your rc files, and its pane is a terminal: vim, ctrl+z, `fg` and `jobs` work, ctrl+g gives the keys back; `--login-shell` starts it as a login shell (experimental) |
 | `mdsh -i [folder]` | A start screen listing the markdown files under this folder, or that one |
 | `mdsh --serve [doc.md \| folder]` | The desktop app's notebook in a web browser, at 127.0.0.1:8080; `--serve=host:port` listens elsewhere. Anyone with the printed address can run commands as you. Only in an mdsh built with `-tags serve` |
+| `mdsh --serve=0.0.0.0:8443 --serve-cert c.pem --serve-key k.pem` | HTTPS for other machines; without a certificate, a self-signed one whose fingerprint is printed. Off loopback it is always HTTPS |
+| `mdsh --serve=… --serve-client-ca ca.pem` | Also require a client certificate that CA signed (mutual TLS) |
 | `mdsh --serve=stdio doc.md` | The same notebook to the program that started mdsh, such as an editor plugin, as JSON lines on stdin and stdout |
 | `mdsh - < doc.md` | Read the document from stdin |
 | `mdsh completion bash\|zsh` | A completion script: flags, `.md` files and, after `--only`, block ids |
