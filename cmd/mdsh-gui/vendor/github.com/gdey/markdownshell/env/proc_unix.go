@@ -23,8 +23,9 @@ func kill(cmd *exec.Cmd) {
 	cmd.Process.Kill()
 }
 
-// interrupt sends SIGINT to cmd's process group, as ctrl+c would.
-func interrupt(cmd *exec.Cmd) { syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) }
+// interrupt sends SIGINT to cmd's process group, as ctrl+c would. It
+// is a variable so tests can see each one.
+var interrupt = func(cmd *exec.Cmd) { syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) }
 
 // killChildren ends every process pid started, and what they started,
 // that is in old, but not pid itself, nor the processes in spare and
@@ -52,8 +53,12 @@ func killChildren(pid int, spare, old map[int]bool) map[int]bool {
 }
 
 // processTree maps each process ID to the processes it started, as ps
-// lists them.
-func processTree() map[int][]int {
+// lists them. It is a variable so tests can make ps as slow as a busy
+// machine does.
+var processTree = psTree
+
+// psTree is processTree, from ps.
+func psTree() map[int][]int {
 	out, _ := exec.Command("ps", "-A", "-o", "pid=", "-o", "ppid=").Output()
 	children := map[int][]int{}
 	for _, line := range strings.Split(string(out), "\n") {
