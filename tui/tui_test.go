@@ -1585,3 +1585,40 @@ func TestProcessesPanel(t *testing.T) {
 		t.Error("esc didn't close the panel")
 	}
 }
+
+// TestTTYCopy checks that what a program in a tty block copies with
+// OSC 52, which the pane's emulator drops, goes on the clipboard, and
+// the status line says so.
+func TestTTYCopy(t *testing.T) {
+	var got []string
+	old := setClipboard
+	setClipboard = func(s string) error { got = append(got, s); return nil }
+	t.Cleanup(func() { setClipboard = old })
+	src := "```sh {#yank tty}\nprintf 'a\\033]52;c;%s\\007b\\n' \"$(printf 'kubectl logs web' | base64)\"; read n\n```\n"
+	m, _ := newModel(t, src, Options{})
+	press(m, "enter")
+	deadline := time.After(10 * time.Second)
+	for len(got) == 0 {
+		select {
+		case msg := <-m.events:
+			m.Update(msg)
+			if c, ok := msg.(programCopyMsg); ok {
+				m.Update(m.programCopy(c)())
+			}
+		case <-m.pane.drawn:
+			m.Update(paneMsg{m})
+		case <-deadline:
+			t.Fatalf("nothing copied:\n%s", m.View())
+		}
+	}
+	if got[0] != "kubectl logs web" || m.status != "yank copied 1 line" {
+		t.Errorf("copied %q, status %q", got, m.status)
+	}
+	// While the run goes on, the footer says so beside "running…".
+	if v := m.View(); !strings.Contains(v, "running… · yank copied 1 line") {
+		t.Errorf("the footer doesn't say what was copied:\n%s", v)
+	}
+	until(t, m, "the screen", func() bool { return strings.Contains(m.pane.screen(), "ab") })
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pump(t, m)
+}

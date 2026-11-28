@@ -27,18 +27,25 @@ type statusTee struct {
 
 // newStatusTee scans what is written to the writer it returns, passing
 // it on to w. Reports go to the store, and the feature query is answered
-// on ptm, the program's input. changed may be nil, in which case nothing
-// is scanned and w is returned as it is.
-func newStatusTee(w io.Writer, ptm io.Writer, changed func([]termstatus.Report)) (io.Writer, *statusTee) {
-	if changed == nil {
+// on ptm, the program's input; OSC 52 copies go to copied. With changed
+// and copied both nil, nothing is scanned and w is returned as it is;
+// with changed nil, only copies are looked for.
+func newStatusTee(w io.Writer, ptm io.Writer, changed func([]termstatus.Report), copied func(string)) (io.Writer, *statusTee) {
+	if changed == nil && copied == nil {
 		return w, nil
 	}
+	sc := termstatus.NewScanner(w, nil, nil)
+	sc.Clipboard = copied
+	if changed == nil {
+		return sc, nil
+	}
 	t := &statusTee{changed: changed}
-	sc := termstatus.NewScanner(w, t.report, func() {
+	sc.Report = t.report
+	sc.Query = func() {
 		if ptm != nil {
 			io.WriteString(ptm, termstatus.QueryReply)
 		}
-	})
+	}
 	return sc, t
 }
 

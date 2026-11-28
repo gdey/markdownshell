@@ -230,6 +230,8 @@ func (m *Model) onLive(msg liveMsg) tea.Cmd {
 		return nil
 	}
 	switch msg.ev.Kind {
+	case "copy":
+		return m.programCopy(programCopyMsg{text: msg.ev.Copied, label: "a program in History"})
 	case "start":
 		m.liveStart(msg)
 		if lt.busy {

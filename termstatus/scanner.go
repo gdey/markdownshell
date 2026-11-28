@@ -16,6 +16,9 @@ type Scanner struct {
 	// caller can write QueryReply to the program.
 	Report func(Report)
 	Query  func()
+	// Clipboard, if set, is called with the text of each OSC 52 a
+	// program writes to put it on the clipboard (see ParseCopy).
+	Clipboard func(text string)
 
 	// osc is the sequence being collected, from its ESC, or nil
 	// between sequences; esc says the last byte was a lone ESC.
@@ -86,7 +89,7 @@ func (s *Scanner) scan(p []byte) {
 				}
 			default:
 				s.osc = append(s.osc, c)
-				if len(s.osc) > MaxSequence {
+				if len(s.osc) > MaxSequence && (s.Clipboard == nil || !isCopy(s.osc) || len(s.osc) > maxCopySequence) {
 					s.osc = nil
 				}
 			}
@@ -97,6 +100,14 @@ func (s *Scanner) scan(p []byte) {
 // end takes a whole sequence, osc without its terminator.
 func (s *Scanner) end(osc []byte) {
 	s.osc = nil
+	if isCopy(osc) {
+		if s.Clipboard != nil {
+			if text, ok := ParseCopy(string(osc[len(copyPrefix):])); ok {
+				s.Clipboard(text)
+			}
+		}
+		return
+	}
 	if !bytes.HasPrefix(osc, oscPrefix) {
 		return
 	}

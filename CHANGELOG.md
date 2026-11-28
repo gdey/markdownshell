@@ -277,6 +277,14 @@ follow [Semantic Versioning](https://semver.org/).
 
   ![A tty block whose program copied a line with OSC 52, and the status line saying yank copied 1 line](docs/changelog/gui-osc52-copy-light.png)
 
+- A program in a `tty` block, a background `tty` block or the live
+  History pane of `mdsh -i` that copies with OSC 52 now sets the
+  clipboard, as it would in the terminal outside: the pane's terminal
+  emulator dropped it. The footer says which block copied how many
+  lines, beside "running…" while the run goes on.
+
+  ![mdsh -i running a tty block whose program copied a line, the footer saying running… · yank copied 1 line](docs/changelog/tui-osc52-copy.png)
+
 - `mdsh -i` inside tmux, over ssh, now reaches the clipboard: it hands
   tmux the text with `tmux load-buffer -w`, which tmux 3.2 and later send
   on to the terminal under the default `set-clipboard external`, and

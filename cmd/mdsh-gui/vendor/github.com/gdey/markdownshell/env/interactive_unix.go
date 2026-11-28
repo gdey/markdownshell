@@ -93,7 +93,8 @@ type Event struct {
 	// Kind is "start" when a command starts, with Command; "end" when
 	// it ends, with Status; "state" when the shell sent its state, at
 	// each prompt; "line" when a line typed at the terminal ran no
-	// command, as a comment doesn't in bash and zsh, with Command.
+	// command, as a comment doesn't in bash and zsh, with Command;
+	// "status" with Records; "copy" with Copied.
 	Kind    string
 	Command string
 	Status  int
@@ -113,6 +114,9 @@ type Event struct {
 	// time they change. A command's end drops its working and blocked
 	// records, as a terminal does at the next prompt.
 	Records []termstatus.Report
+	// Copied, on "copy", is the text a program on the shell's terminal
+	// put on the clipboard with OSC 52.
+	Copied string
 }
 
 // startTimeout bounds how long Start waits for an interactive shell's
@@ -179,6 +183,7 @@ func startInteractive(ctx context.Context, s *Shell, cfg Config, init string, la
 	ia.cond = sync.NewCond(&ia.mu)
 	ia.scan = markScanner{text: ia.text, mark: ia.onMark}
 	ia.status = termstatus.NewScanner(scanWriter{&ia.scan}, ia.onStatus, func() { ptm.WriteString(termstatus.QueryReply) })
+	ia.status.Clipboard = ia.onCopy
 	s.ia = ia
 	// The shell has its own copies; mdsh keeps none, so reading ends
 	// once the shell and its jobs have all let go of the terminal.
@@ -482,6 +487,13 @@ func (ia *interactive) end(status int) {
 func (ia *interactive) onStatus(r termstatus.Report) {
 	if ia.recs.Apply(r) && ia.watch != nil {
 		ia.watch(Event{Kind: "status", Records: ia.recs.Records()})
+	}
+}
+
+// onCopy takes what a program copied with OSC 52; ia.mu is held.
+func (ia *interactive) onCopy(text string) {
+	if ia.watch != nil {
+		ia.watch(Event{Kind: "copy", Copied: text})
 	}
 }
 

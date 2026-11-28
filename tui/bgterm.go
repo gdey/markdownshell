@@ -33,6 +33,8 @@ type bgDrawnMsg struct {
 func (m *Model) backgroundTerminal(b *doc.Block) (*env.Terminal, func()) {
 	p := newPane()
 	p.setSize(m.pane.size())
+	label := m.d.Label(b)
+	p.copy = func(text string) { m.send(programCopyMsg{text: text, label: label}) }
 	// The model keeps which block it is; take readies its screen.
 	p.take(0)
 	m.send(bgPaneMsg{block: b, p: p})

@@ -103,7 +103,7 @@ func (s *Shell) RunTerminal(ctx context.Context, script string, t Terminal, rec 
 	if st, err := term.GetState(int(ptm.Fd())); err == nil {
 		defer term.Restore(int(ptm.Fd()), st)
 	}
-	out, tee := newStatusTee(io.MultiWriter(t.Out, rec), ptm, t.Status)
+	out, tee := newStatusTee(io.MultiWriter(t.Out, rec), ptm, t.Status, t.Clipboard)
 	s.pty.attach(out)
 	stop := make(chan struct{})
 	var wg sync.WaitGroup

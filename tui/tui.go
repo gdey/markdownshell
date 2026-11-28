@@ -194,6 +194,9 @@ type Model struct {
 	// it is drawn in while one runs, or -1.
 	pane      *pane
 	termBlock int
+	// runNote is said beside "running…" while a run goes on, such as
+	// that a program in a block copied to the clipboard.
+	runNote string
 	// bgPanes are the terminals of background tty blocks still running,
 	// by block, and bgFocus the block whose terminal has the keys, or
 	// -1 (see bgterm.go).
@@ -346,6 +349,13 @@ func New(d *doc.Document, opts Options) (*Model, error) {
 	}
 	if info, err := os.Stat(opts.Run.File); err == nil {
 		m.mtime = info.ModTime()
+	}
+	// A program in a tty block copies through the pane's terminal.
+	m.pane.copy = func(text string) {
+		m.pane.mu.Lock()
+		i := m.pane.block
+		m.pane.mu.Unlock()
+		m.send(programCopyMsg{text: text, block: i})
 	}
 	sess, err := m.newSession(opts.Run)
 	if err != nil {
@@ -634,6 +644,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.edited(msg)
 		m.refresh()
 		return m, nil
+	case programCopyMsg:
+		return m, tea.Batch(m.wait, m.programCopy(msg))
 	case copiedMsg:
 		m.copied(msg)
 		m.refresh()
@@ -643,6 +655,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case runDoneMsg:
 		m.running, m.active, m.stopping = false, -1, false
+		m.runNote = ""
 		m.cancel()
 		m.statusEnded(msg.err)
 		if msg.hist != nil {
@@ -1711,6 +1724,9 @@ func (m *Model) footer() string {
 	status := m.status
 	if m.running {
 		status = "running…"
+		if m.runNote != "" {
+			status += " · " + m.runNote
+		}
 	}
 	if n := len(m.bg); n > 0 {
 		if status != "" {

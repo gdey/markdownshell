@@ -21,6 +21,36 @@ type copiedMsg struct {
 	label string
 	lines int
 	err   error
+	// program says a program in the block copied, with OSC 52.
+	program bool
+}
+
+// programCopyMsg is what a program on a terminal mdsh draws, a tty
+// block's pane, a background one's or History's, copied with OSC 52.
+// label names where it runs; block, if label is "", is the block that
+// was on the tty pane.
+type programCopyMsg struct {
+	text  string
+	label string
+	block int
+}
+
+// programCopy puts what a program copied on the clipboard, as the
+// terminal it would run in otherwise would, and says so in the status
+// line, so no program changes the clipboard unseen.
+func (m *Model) programCopy(msg programCopyMsg) tea.Cmd {
+	label := msg.label
+	if label == "" {
+		if i := msg.block; i >= 0 && i < len(m.d.Blocks) {
+			label = m.d.Label(m.d.Blocks[msg.block])
+		} else {
+			label = "a program"
+		}
+	}
+	text := msg.text
+	return func() tea.Msg {
+		return copiedMsg{label: label, lines: strings.Count(text, "\n") + 1, err: setClipboard(text), program: true}
+	}
 }
 
 // copyBlock puts the code of the block under the cursor on the
@@ -51,6 +81,13 @@ func (m *Model) copied(msg copiedMsg) {
 	unit := "lines"
 	if msg.lines == 1 {
 		unit = "line"
+	}
+	if msg.program {
+		m.status = msg.label + " copied " + strconv.Itoa(msg.lines) + " " + unit
+		if m.running {
+			m.runNote = m.status
+		}
+		return
 	}
 	if msg.label == "" {
 		m.status = "copied " + strconv.Itoa(msg.lines) + " " + unit + " from History"

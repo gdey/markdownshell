@@ -149,3 +149,50 @@ func TestInteractiveStatus(t *testing.T) {
 		})
 	}
 }
+
+// TestCopy checks that a program's OSC 52 copy reaches a Terminal's
+// Clipboard, with no Status set, and the interactive shell's "copy"
+// event.
+func TestCopy(t *testing.T) {
+	sh, err := Start(Config{Env: []string{"PATH=" + os.Getenv("PATH")}, TTY: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sh.Close()
+	var mu sync.Mutex
+	var got []string
+	copied := func(s string) { mu.Lock(); got = append(got, s); mu.Unlock() }
+	var shown syncBuf
+	script := "printf '\\033]52;c;aGkK\\007'; printf '\\033]52;c;?\\007'; echo end\n"
+	if status, _, err := sh.RunTerminal(context.Background(), script, Terminal{Out: &shown, Clipboard: copied}, io.Discard); err != nil || status != 0 {
+		t.Fatalf("status %d, err %v", status, err)
+	}
+	mu.Lock()
+	if len(got) != 1 || got[0] != "hi\n" {
+		t.Errorf("copied %q, want hi", got)
+	}
+	got = nil
+	mu.Unlock()
+	if !strings.Contains(shown.String(), "\x1b]52;c;aGkK\a") {
+		t.Errorf("the stream lost the OSC 52: %q", shown.String())
+	}
+	for _, shell := range shells(t) {
+		t.Run(filepath.Base(shell), func(t *testing.T) {
+			s := startI(t, shell, nil)
+			var cp []string
+			s.Watch(func(e Event) {
+				if e.Kind == "copy" {
+					mu.Lock()
+					cp = append(cp, e.Copied)
+					mu.Unlock()
+				}
+			})
+			runI(t, s, "printf '\\033]52;c;aGkK\\007'")
+			mu.Lock()
+			defer mu.Unlock()
+			if len(cp) != 1 || cp[0] != "hi\n" {
+				t.Errorf("copy events %q", cp)
+			}
+		})
+	}
+}
