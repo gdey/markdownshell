@@ -679,11 +679,15 @@ func (s *Shell) runLine(ctx context.Context, line string, out io.Writer) (status
 		ia.cond.Broadcast()
 		ia.mu.Unlock()
 	}()
+	// interruptTTY ends with interrupting, and is waited for, so no
+	// ctrl+c meant for this command reaches the next.
 	var interrupting chan struct{}
+	var interrupted sync.WaitGroup
 	defer func() {
 		if interrupting != nil {
 			close(interrupting)
 		}
+		interrupted.Wait()
 	}()
 
 	ia.mu.Lock()
@@ -691,7 +695,8 @@ func (s *Shell) runLine(ctx context.Context, line string, out io.Writer) (status
 		if ctx.Err() != nil && interrupting == nil {
 			stopped = ctx.Err()
 			interrupting = make(chan struct{})
-			go s.interruptTTY(interrupting)
+			stop := interrupting
+			interrupted.Go(func() { s.interruptTTY(stop) })
 		}
 		select {
 		case <-s.forced:
@@ -760,7 +765,7 @@ func (s *Shell) interruptTTY(stop <-chan struct{}) {
 	killed := false
 	var sent time.Time
 	for {
-		if s.Exited() {
+		if closed(stop) || s.Exited() {
 			return
 		}
 		if time.Since(sent) >= time.Second {

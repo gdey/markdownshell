@@ -16,7 +16,7 @@ func kill(cmd *exec.Cmd) { cmd.Process.Kill() }
 func interrupt(*exec.Cmd) {}
 
 // killChildren can't find what pid started here.
-func killChildren(int, map[int]bool) {}
+func killChildren(int, map[int]bool, map[int]bool) map[int]bool { return nil }
 
 // killTree ends process pid. Here it can't find what pid started.
 func killTree(pid int) {

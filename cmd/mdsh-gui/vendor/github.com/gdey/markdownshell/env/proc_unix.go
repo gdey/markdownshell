@@ -27,9 +27,15 @@ func kill(cmd *exec.Cmd) {
 func interrupt(cmd *exec.Cmd) { syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) }
 
 // killChildren ends every process pid started, and what they started,
-// but not pid itself, nor the processes in spare and what they started.
-func killChildren(pid int, spare map[int]bool) {
+// that is in old, but not pid itself, nor the processes in spare and
+// what they started. It returns the processes it found, killed or not,
+// for the next call's old: passing what one call found before an
+// interrupt to the next after it ends only what outlived that
+// interrupt, never a command the script started since, which the
+// interrupt that follows ends as it should.
+func killChildren(pid int, spare, old map[int]bool) map[int]bool {
 	children := processTree()
+	found := map[int]bool{}
 	for todo := children[pid]; len(todo) > 0; {
 		p := todo[0]
 		todo = todo[1:]
@@ -37,8 +43,12 @@ func killChildren(pid int, spare map[int]bool) {
 			continue
 		}
 		todo = append(todo, children[p]...)
-		syscall.Kill(p, syscall.SIGKILL)
+		found[p] = true
+		if old[p] {
+			syscall.Kill(p, syscall.SIGKILL)
+		}
 	}
+	return found
 }
 
 // processTree maps each process ID to the processes it started, as ps
