@@ -578,8 +578,30 @@ func (s *Shell) resume(job string) {
 		return
 	}
 	ia.resuming = true
-	io.WriteString(ia.ptm, sourceLine(f)+"\r")
+	if _, err := io.WriteString(ia.ptm, sourceLine(f)+"\r"); err != nil {
+		ia.resuming = false
+		return
+	}
+	// Until the job is back, the shell is still at the prompt, or
+	// reading the line, where the next RunLine would type its line
+	// behind this one, to run only after the job ends. The job is back
+	// once it holds the terminal, or it ended and the shell is past it.
+	// sh's start is seen as soon as the terminal echoes the line, which
+	// is before the shell reads it, so the start alone isn't enough.
+	deadline = time.Now().Add(promptWait)
+	for !s.Exited() && time.Now().Before(deadline) {
+		if !ia.resuming && (ia.phase != phaseRunning || s.foreground() != 0) {
+			return
+		}
+		ia.mu.Unlock()
+		time.Sleep(resumePoll)
+		ia.mu.Lock()
+	}
 }
+
+// resumePoll is how often resume looks for the job it brought back to
+// hold the terminal, which nothing announces.
+const resumePoll = 10 * time.Millisecond
 
 // ErrNotStopped is returned by RunLine when the command typed at the
 // terminal that holds the shell didn't stop for ctrl+z. It is an
