@@ -254,6 +254,13 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Stopping a block no longer, now and then, stops the next one too,
+  or lets it run on past the command it was stopped at. Run kept
+  interrupting for a moment after the stopped block ended, which could
+  reach the next block, and the kill that follows for a command that
+  ignores ctrl+c could take a command the block had only just started,
+  so the block went on past it.
+
 - A `tty` block that `mdsh` runs on the terminal it is in no longer
   leaves that terminal retitled or recoloured. mdsh saves the title on
   xterm's title stack before the block and restores it after, and resets

@@ -392,8 +392,11 @@ func (s *Shell) runKill(ctx context.Context, script string, stdout, stderr io.Wr
 	var outRC string
 	gotOut, gotErr := false, false
 	// stopped is ctx's error once ctx ended and the script was
-	// interrupted; stop ends interrupt.
+	// interrupted; stop ends interrupt, which Run waits for, so no
+	// interrupt meant for this script reaches the next.
 	var stopped error
+	var interrupting sync.WaitGroup
+	defer interrupting.Wait()
 	stop := make(chan struct{})
 	defer close(stop)
 	watchStops(s.cmd.Process.Pid, stop)
@@ -420,7 +423,7 @@ func (s *Shell) runKill(ctx context.Context, script string, stdout, stderr io.Wr
 			gotErr = true
 		case <-done:
 			done, stopped = nil, ctx.Err()
-			go s.interrupt(stop, killAfter)
+			interrupting.Go(func() { s.interrupt(stop, killAfter) })
 		case <-s.forced:
 			<-s.waited
 			s.drainTTY(onTTY)
@@ -459,34 +462,52 @@ const (
 // next one, a few milliseconds later, ends them. The same goes for
 // what follows a command that ignored SIGINT and was killed: bash only
 // acts on an interrupt that killed the command it waited for. After
-// interruptFor it also kills every process the shell started, except
-// its background jobs, in case one ignores SIGINT. A script still
-// running after that, such as a loop in the shell that ignores the
-// trap, needs Kill, which killAfter, if set, does itself.
+// interruptFor it also kills every process the shell started that
+// outlived an interrupt, except its background jobs, in case one
+// ignores SIGINT; one started since is left to the next interrupt, as
+// a kill would let the script go on past it. A script still running
+// after that, such as a loop in the shell that ignores the trap, needs
+// Kill, which killAfter, if set, does itself.
 func (s *Shell) interrupt(stop <-chan struct{}, killAfter time.Duration) {
 	start := time.Now()
 	t := time.NewTicker(interruptEvery)
 	defer t.Stop()
+	var seen map[int]bool
 	for {
-		if s.Exited() {
-			return
-		}
-		interrupt(s.cmd)
-		if killAfter > 0 && time.Since(start) >= killAfter {
-			s.Kill()
+		if closed(stop) || s.Exited() {
 			return
 		}
 		if time.Since(start) >= interruptFor {
 			s.jobMu.Lock()
 			spare := maps.Clone(s.jobs)
 			s.jobMu.Unlock()
-			killChildren(s.cmd.Process.Pid, spare)
+			seen = killChildren(s.cmd.Process.Pid, spare, seen)
+			// Finding them takes a while, in which the script may
+			// have ended.
+			if closed(stop) {
+				return
+			}
+		}
+		interrupt(s.cmd)
+		if killAfter > 0 && time.Since(start) >= killAfter {
+			s.Kill()
+			return
 		}
 		select {
 		case <-stop:
 			return
 		case <-t.C:
 		}
+	}
+}
+
+// closed reports whether c is closed.
+func closed(c <-chan struct{}) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
 	}
 }
 
