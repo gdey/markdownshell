@@ -168,7 +168,9 @@ export function colorOutput(root: HTMLElement) {
   const codes = root.matches("code") ? [root] : root.querySelectorAll<HTMLElement>("pre > code");
   for (const code of codes) {
     const text = code.textContent ?? "";
-    if (text.includes("\x1b")) code.replaceChildren(...new Ansi().write(text));
+    if (!text.includes("\x1b")) continue;
+    const ansi = new Ansi();
+    code.replaceChildren(...ansi.write(text), ...ansi.end());
   }
 }
 
@@ -178,9 +180,16 @@ const escape = /\x1b(?:\[([0-9;:?<=>]*)([ -/]*)([@-~])|\][^\x07\x1b]*(?:\x07|\x1
 // unfinished matches an escape sequence cut off at the end of the text.
 const unfinished = /\x1b(?:\[[0-9;:?<=>]*[ -/]*|\][^\x07\x1b]*\x1b?|[()*+])?$/;
 
+// osc8 matches an OSC 8 hyperlink sequence, with its target: printable
+// ASCII, as the spec says. An empty target ends a link.
+const osc8 = /^\x1b\]8;[\x20-\x3a\x3c-\x7e]*;([\x20-\x7e]*)(?:\x07|\x1b\\)$/;
+
 // Ansi turns text with ANSI escapes into nodes, colored as SGR
 // sequences say, leaving out the other sequences. It keeps its state
-// between writes, so output can come in pieces.
+// between writes, so output can come in pieces. A hyperlink a program
+// wrote (OSC 8) shows as its text with its target after it, "text
+// (uri)", or as the text alone when the two are the same, as
+// termsafe.Styled shows it in the TUI: a link can't hide where it goes.
 export class Ansi {
   private fg = "";
   private bg = "";
@@ -190,6 +199,7 @@ export class Ansi {
   private underline = false;
   private inverse = false;
   private rest = "";
+  private link: { uri: string; text: string } | null = null;
 
   write(text: string): Node[] {
     text = this.rest + text;
@@ -204,14 +214,37 @@ export class Ansi {
     for (const m of text.matchAll(escape)) {
       this.put(out, text.slice(last, m.index));
       if (m[3] === "m" && !m[2] && !/[?<=>]/.test(m[1] ?? "")) this.sgr(m[1] ?? "");
+      const link = osc8.exec(m[0]);
+      if (link) {
+        this.endLink(out);
+        if (link[1]) this.link = { uri: link[1], text: "" };
+      }
       last = m.index! + m[0].length;
     }
     this.put(out, text.slice(last));
     return out;
   }
 
+  // end is what is left to draw when the text ends: the target of a
+  // link it never closed.
+  end(): Node[] {
+    const out: Node[] = [];
+    this.endLink(out);
+    return out;
+  }
+
+  // endLink draws where the link went after its text, unless the text
+  // says it already.
+  private endLink(out: Node[]) {
+    const l = this.link;
+    if (!l) return;
+    this.link = null;
+    if (l.text !== l.uri) this.put(out, l.text ? ` (${l.uri})` : l.uri);
+  }
+
   private put(out: Node[], text: string) {
     if (!text) return;
+    if (this.link) this.link.text += text;
     let fg = this.fg;
     let bg = this.bg;
     if (this.inverse) [fg, bg] = [bg || "var(--code-bg)", fg || "var(--fg)"];

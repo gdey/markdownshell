@@ -87,36 +87,116 @@ func isControl(r rune) bool {
 // SGR sequences (ESC [ params m, which only set colours and the like)
 // are kept, so coloured output stays coloured, and every other control
 // character is shown as Visible shows it, so a saved output or a line
-// of prose can't write the clipboard (OSC 52), set the window title,
-// make a link whose target isn't its text (OSC 8), or move the cursor
-// to hide text. A newline, a tab and a carriage return just before a
-// newline (CRLF line ends) pass as they are. Unlike Visible it leaves
-// zero-width and bidi characters alone: they don't drive the terminal,
-// and prose and output use them (emoji joiners, right-to-left text).
+// of prose can't write the clipboard (OSC 52), set the window title, or
+// move the cursor to hide text. A newline, a tab and a carriage return
+// just before a newline (CRLF line ends) pass as they are. Unlike
+// Visible it leaves zero-width and bidi characters alone: they don't
+// drive the terminal, and prose and output use them (emoji joiners,
+// right-to-left text).
+//
+// A hyperlink a program wrote (OSC 8, as ls --hyperlink and compilers
+// do) shows as its text with its target after it, "text (uri)", or as
+// the text alone when the two are the same, so a link can't hide where
+// it goes and output that links file names still reads well.
 func Styled(s string) string {
 	if !hasC0C1(s) {
 		return s
 	}
 	var b strings.Builder
 	b.Grow(len(s) + 8)
+	var l link
 	for len(s) > 0 {
 		if n := sgrLen(s); n > 0 {
 			b.WriteString(s[:n])
 			s = s[n:]
 			continue
 		}
+		if uri, n := osc8Len(s); n > 0 {
+			l.end(&b)
+			l = link{uri: uri, open: uri != ""}
+			s = s[n:]
+			continue
+		}
 		r, n := utf8.DecodeRuneInString(s)
+		var out string
 		switch {
 		case r == utf8.RuneError && n == 1:
-			fmt.Fprintf(&b, "<0x%02X>", s[0])
+			out = fmt.Sprintf("<0x%02X>", s[0])
 		case r == '\r' && strings.HasPrefix(s[1:], "\n"), !isC0C1(r):
-			b.WriteString(s[:n])
+			out = s[:n]
 		default:
-			b.WriteString(Visible(s[:n]))
+			out = Visible(s[:n])
+		}
+		b.WriteString(out)
+		if l.open {
+			l.text.WriteString(out)
 		}
 		s = s[n:]
 	}
+	l.end(&b)
 	return b.String()
+}
+
+// link is the OSC 8 hyperlink Styled is in, and the text shown in it so
+// far, without its SGR sequences.
+type link struct {
+	uri  string
+	open bool
+	text strings.Builder
+}
+
+// end writes where the link went after its text, unless the text says
+// it already.
+func (l *link) end(b *strings.Builder) {
+	if !l.open {
+		return
+	}
+	l.open = false
+	switch text := l.text.String(); {
+	case text == l.uri:
+	case text == "":
+		b.WriteString(l.uri)
+	default:
+		b.WriteString(" (" + l.uri + ")")
+	}
+}
+
+// osc8Len is the target and length of the OSC 8 hyperlink sequence s
+// starts with (ESC ] 8 ; params ; uri, ended by BEL or ST), or 0 if it
+// doesn't start with one. An empty target ends a link. The params and
+// target must be printable ASCII, as the spec says, so nothing that
+// drives a terminal can hide in them; a sequence with anything else in
+// it is left for Visible to show.
+func osc8Len(s string) (uri string, n int) {
+	if !strings.HasPrefix(s, "\x1b]8;") {
+		return "", 0
+	}
+	semi := -1
+	for i := 4; i < len(s); i++ {
+		switch c := s[i]; {
+		case c == 0x07:
+			return osc8URI(s, semi, i, i+1)
+		case c == 0x1b:
+			if i+1 < len(s) && s[i+1] == '\\' {
+				return osc8URI(s, semi, i, i+2)
+			}
+			return "", 0
+		case c == ';' && semi < 0:
+			semi = i
+		case c < 0x20 || c > 0x7e:
+			return "", 0
+		}
+	}
+	return "", 0
+}
+
+// osc8URI is osc8Len's result for a sequence whose params end at semi
+// and whose target ends at end, n bytes in all.
+func osc8URI(s string, semi, end, n int) (string, int) {
+	if semi < 0 {
+		return "", 0
+	}
+	return s[semi+1 : end], n
 }
 
 // sgrLen is the length of the SGR sequence s starts with, or 0.

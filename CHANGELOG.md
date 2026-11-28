@@ -198,6 +198,16 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- A link a program wrote into its output (OSC 8, as `ls --hyperlink`
+  and gcc write) shows as its text with where it goes after it,
+  `notes.md (file://host/home/j/notes.md)`, in saved output in `mdsh -i`
+  and the terminal, and in output in mdsh-gui, or as the text alone
+  when the text is the address. The TUI used to show the raw escape
+  sequence and mdsh-gui dropped the address. A link still can't hide
+  its target behind other text.
+
+  ![mdsh-gui output of ls --hyperlink and gcc: each file name followed by its file:// address, the -Wunused-variable link followed by its gcc.gnu.org address, and a link whose text is https://bank.example followed by its real target, https://evil.example/login](docs/changelog/osc8-links.png)
+
 - mdsh-gui starts faster. The window's tab bar no longer loads the
   editor's code, the first calls each page makes to Go go together, and
   the start folder's files are listed while the window loads, on every
