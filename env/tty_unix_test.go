@@ -92,6 +92,18 @@ func TestRunTTY(t *testing.T) {
 			t.Errorf("terminal shows %q, want %q in it", out, want)
 		}
 	}
+	// The title is saved before the block and restored after it, and
+	// the background it set is reset; the foreground it only asked for
+	// is left alone.
+	if !strings.HasPrefix(out, titlePush) {
+		t.Errorf("terminal shows %q, want it to start by saving the title", out)
+	}
+	if want := "\x1b]11;#000000\x1b\\" + titlePop + "\x1b]111\x1b\\"; !strings.Contains(out, want) {
+		t.Errorf("terminal shows %q, want %q in it", out, want)
+	}
+	if strings.Contains(out, "\x1b]110") {
+		t.Errorf("terminal shows %q, want the foreground left alone", out)
+	}
 	got := report.String()
 	for _, want := range []string{"status=0 X=set\n", "recorded: terminal ok", "recorded: got typed"} {
 		if !strings.Contains(got, want) {
@@ -121,7 +133,10 @@ func ttyChild() {
 	// The sleep says so from its own process, which already ends on
 	// ctrl+c, so the test's ctrl+c can't come between commands, where
 	// the shell ignores it.
-	script := "test -t 0 && test -t 1 && test -t 2 && echo terminal ok\nread -r l; echo \"got $l\"\nsh -c 'echo sleeping; exec sleep 5'; echo \"sleep ended $?\"\nX=set\n"
+	script := "test -t 0 && test -t 1 && test -t 2 && echo terminal ok\nread -r l; echo \"got $l\"\nsh -c 'echo sleeping; exec sleep 5'; echo \"sleep ended $?\"\nX=set\n" +
+		// It retitles the terminal, asks for its foreground and sets its
+		// background, which RunTTY puts back after.
+		"printf '\\033]2;block\\007\\033]10;?\\007\\033]11;#000000\\033\\\\'\n"
 	var rec bytes.Buffer
 	if _, _, err := sh.RunTTY(ctx, script, tty, &rec); err != nil {
 		fail(err)

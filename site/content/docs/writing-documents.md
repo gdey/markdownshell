@@ -407,6 +407,14 @@ The block still runs in its env's shell, so variables and the working
 directory carry over as usual. Ctrl+c goes to the command, not to mdsh,
 and window resizes are passed on.
 
+When `mdsh` runs the block on the terminal it is in, the block can
+retitle that terminal or change its colours. mdsh puts them back when
+the block ends: the title as it was before (on terminals with xterm's
+title stack, which most have), and each colour the block set to the
+terminal's default, as tmux does for a pane. In mdsh-gui and `mdsh -i`
+the block runs on a terminal drawn in its card, so it can't change
+yours.
+
 mdsh records the session as an [asciinema](https://asciinema.org) cast,
 `<doc>.assets/<block-id>.cast` (or the path `out=recording:path` names),
 and links it below the block. mdsh-gui plays it in the block's card,

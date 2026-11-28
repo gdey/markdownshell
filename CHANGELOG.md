@@ -247,6 +247,14 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A `tty` block that `mdsh` runs on the terminal it is in no longer
+  leaves that terminal retitled or recoloured. mdsh saves the title on
+  xterm's title stack before the block and restores it after, and resets
+  each colour the block set (OSC 104, 105 and 110 to 119), as tmux does
+  for a pane. A block that only asks for a colour, as programs do to
+  pick light or dark styles, changes nothing, so a palette you set
+  yourself is left alone.
+
 - With the interactive shell on zsh and powerlevel10k, only the first
   line typed in the History pane went into the file: notes typed after
   it weren't added as prose, nor commands as blocks. powerlevel10k adds
