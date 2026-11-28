@@ -164,6 +164,7 @@ func startInteractive(ctx context.Context, s *Shell, cfg Config, init string, la
 			environ = unsetEnv(environ, "MDSH_USER_ZDOTDIR")
 		}
 	}
+	unignoreInterrupt()
 	s.cmd = exec.Command(cfg.Path, args...)
 	s.cmd.Env = environ
 	s.cmd.Dir = cfg.Dir

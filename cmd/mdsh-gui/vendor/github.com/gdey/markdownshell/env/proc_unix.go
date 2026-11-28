@@ -8,9 +8,24 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
+
+// unignoreInterrupt makes SIGINT reach the shells mdsh starts, and what
+// they run, when mdsh itself was started with it ignored, as a command
+// run with & from a script is, or under nohup. An ignored signal stays
+// ignored across exec, and a shell can't trap or reset one it started
+// with ignored, so stopping a block, which sends SIGINT, did nothing:
+// the killed command let the script go on. A signal mdsh handles is
+// reset to the default for what it starts, so mdsh handles SIGINT, and
+// drops it, which leaves mdsh ignoring it as before.
+var unignoreInterrupt = sync.OnceFunc(func() {
+	if signal.Ignored(os.Interrupt) {
+		signal.Notify(make(chan os.Signal, 1), os.Interrupt)
+	}
+})
 
 // ownGroup starts cmd in a process group of its own, so kill reaches
 // whatever a block started too.

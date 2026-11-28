@@ -254,6 +254,11 @@ follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Stopping a block works when mdsh was started with ctrl+c ignored, as
+  a command run with `&` from a script, or under `nohup`, is. The shells
+  mdsh started inherited that, so a stop couldn't interrupt a block's
+  commands, and the block ran on past them, or never stopped.
+
 - Stopping a block no longer, now and then, stops the next one too,
   or lets it run on past the command it was stopped at. Run kept
   interrupting for a moment after the stopped block ended, which could
